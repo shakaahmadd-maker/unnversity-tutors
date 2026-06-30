@@ -1,0 +1,11 @@
+{
+  "name": "University Tutors",
+  "description": "Premium marketing website and complete online tutoring ecosystem for universitytutors.com, providing live tutoring, assignment help, and workspace tracking.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone"
+  ],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

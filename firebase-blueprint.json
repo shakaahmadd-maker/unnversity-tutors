@@ -1,0 +1,213 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "User profile with role details",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "role": { "type": "string", "enum": ["student", "tutor", "admin"] },
+        "name": { "type": "string" },
+        "email": { "type": "string", "format": "email" },
+        "avatarUrl": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "suspended": { "type": "boolean" },
+        "bio": { "type": "string" },
+        "hourlyRate": { "type": "number" },
+        "rating": { "type": "number" },
+        "reviewCount": { "type": "number" },
+        "subjects": { "type": "array" },
+        "country": { "type": "string" },
+        "availableSlots": { "type": "array" }
+      },
+      "required": ["id", "role", "name", "email", "avatarUrl", "createdAt"]
+    },
+    "Chat": {
+      "title": "Chat",
+      "description": "Chat channel between student and tutor",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "studentId": { "type": "string" },
+        "tutorId": { "type": "string" },
+        "subject": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "studentId", "tutorId", "subject", "createdAt", "updatedAt"]
+    },
+    "Message": {
+      "title": "Message",
+      "description": "A chat message",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "chatId": { "type": "string" },
+        "senderId": { "type": "string" },
+        "content": { "type": "string" },
+        "fileUrl": { "type": "string" },
+        "fileName": { "type": "string" },
+        "timestamp": { "type": "string", "format": "date-time" },
+        "isSystem": { "type": "boolean" }
+      },
+      "required": ["id", "chatId", "senderId", "content", "timestamp"]
+    },
+    "Quote": {
+      "title": "Quote",
+      "description": "Tutor quote proposal sent via chat channel",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "chatId": { "type": "string" },
+        "amount": { "type": "number" },
+        "estimatedHours": { "type": "number" },
+        "status": { "type": "string", "enum": ["pending", "accepted", "declined"] },
+        "serviceType": { "type": "string" },
+        "deliveryTime": { "type": "string" },
+        "scopeOfWork": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "chatId", "amount", "estimatedHours", "status", "createdAt"]
+    },
+    "Assignment": {
+      "title": "Assignment",
+      "description": "Core assignment job specifications and status tracker",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "studentId": { "type": "string" },
+        "tutorId": { "type": "string" },
+        "title": { "type": "string" },
+        "subject": { "type": "string" },
+        "deadline": { "type": "string" },
+        "wordCount": { "type": "number" },
+        "referenceStyle": { "type": "string" },
+        "sourcesCount": { "type": "number" },
+        "instructions": { "type": "string" },
+        "fileUrls": { "type": "array" },
+        "progressPercent": { "type": "number" },
+        "status": { "type": "string" },
+        "quoteAmount": { "type": "number" },
+        "tutorWorkFileUrl": { "type": "string" },
+        "tutorWorkFileName": { "type": "string" },
+        "reviewed": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "studentId", "title", "subject", "deadline", "status", "progressPercent", "createdAt"]
+    },
+    "Payment": {
+      "title": "Payment",
+      "description": "Secure payment holds status sheet",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "assignmentId": { "type": "string" },
+        "amount": { "type": "number" },
+        "status": { "type": "string", "enum": ["escrow", "released", "refunded"] },
+        "stripePaymentIntent": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "assignmentId", "amount", "status", "stripePaymentIntent", "createdAt"]
+    },
+    "SupportTicket": {
+      "title": "SupportTicket",
+      "description": "User submit-able support request ticket",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "studentId": { "type": "string" },
+        "subject": { "type": "string" },
+        "message": { "type": "string" },
+        "status": { "type": "string", "enum": ["open", "resolved"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "studentId", "subject", "message", "status", "createdAt"]
+    },
+    "Review": {
+      "title": "Review",
+      "description": "Rating and comments for a tutor's completed solution",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "tutorId": { "type": "string" },
+        "studentName": { "type": "string" },
+        "studentAvatar": { "type": "string" },
+        "rating": { "type": "number" },
+        "comment": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "tutorId", "studentName", "rating", "comment", "createdAt"]
+    },
+    "Blog": {
+      "title": "Blog",
+      "description": "Academic platform blog posts",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "adminId": { "type": "string" },
+        "title": { "type": "string" },
+        "content": { "type": "string" },
+        "image": { "type": "string" },
+        "category": { "type": "string" },
+        "tags": { "type": "array" },
+        "publishedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "adminId", "title", "content", "category", "publishedAt"]
+    },
+    "FAQ": {
+      "title": "FAQ",
+      "description": "Frequently Asked Questions",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "question": { "type": "string" },
+        "answer": { "type": "string" },
+        "category": { "type": "string" },
+        "order": { "type": "number" }
+      },
+      "required": ["id", "question", "answer", "category", "order"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "Collection of user profiles"
+    },
+    "/chats/{chatId}": {
+      "schema": "Chat",
+      "description": "Conversations list"
+    },
+    "/chats/{chatId}/messages/{messageId}": {
+      "schema": "Message",
+      "description": "Messages inside a chat room"
+    },
+    "/chats/{chatId}/quotes/{quoteId}": {
+      "schema": "Quote",
+      "description": "Escrow payment quotes issued by tutor"
+    },
+    "/assignments/{assignmentId}": {
+      "schema": "Assignment",
+      "description": "List of assignment details"
+    },
+    "/payments/{paymentId}": {
+      "schema": "Payment",
+      "description": "Hold escrow statement log"
+    },
+    "/tickets/{ticketId}": {
+      "schema": "SupportTicket",
+      "description": "Support query ticket logged list"
+    },
+    "/reviews/{reviewId}": {
+      "schema": "Review",
+      "description": "Public review and comments collection"
+    },
+    "/blogs/{blogId}": {
+      "schema": "Blog",
+      "description": "Academic blogs"
+    },
+    "/faqs/{faqId}": {
+      "schema": "FAQ",
+      "description": "FAQs category questions"
+    }
+  }
+}

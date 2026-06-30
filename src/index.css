@@ -1,0 +1,93 @@
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&family=Inter:wght@400;500;600;700;800;950&family=Space+Grotesk:wght@500;600;700;800&family=JetBrains+Mono:wght@400;550&family=Archivo:ital,wght@0,100..900;1,100..900&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", system-ui, -apple-system, sans-serif;
+  --font-display: "Outfit", system-ui, sans-serif;
+  --font-serif: "Space Grotesk", Georgia, serif;
+  --font-mono: "JetBrains Mono", monospace;
+  --font-heading: "Archivo", sans-serif;
+  
+  --color-orange-50: #FFF7ED;
+  --color-orange-100: #FFEDD5;
+  --color-orange-200: #FED7AA;
+  --color-orange-350: #FB923C;
+  --color-orange-500: #EA580C; /* Brand Vibrant Orange from Design HTML */
+  --color-orange-600: #EA580C;
+  --color-orange-650: #C2410C;
+  --color-orange-660: #9A3412;
+  --color-orange-700: #9A3412;
+  --color-orange-850: #7C2D12;
+  
+  /* Mapping slate colors as gray overrides for that modern premium backdrop */
+  --color-gray-50: #F8FAFC;
+  --color-gray-55: #F1F5F9;
+  --color-gray-100: #F1F5F9;
+  --color-gray-150: #E2E8F0;
+  --color-gray-200: #E2E8F0;
+  --color-gray-250: #CBD5E1;
+  --color-gray-300: #CBD5E1;
+  --color-gray-400: #94A3B8;
+  --color-gray-450: #94A3B8;
+  --color-gray-500: #64748B;
+  --color-gray-505: #64748B;
+  --color-gray-600: #475569;
+  --color-gray-650: #475569;
+  --color-gray-655: #475569;
+  --color-gray-700: #334155;
+  --color-gray-750: #1E293B;
+  --color-gray-800: #1E293B;
+  --color-gray-850: #0F172A;
+  --color-gray-900: #0F172A;
+  --color-gray-905: #020617;
+  --color-gray-950: #020617;
+}
+
+/* Micro-animations and utility fade-in classes */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes bounceSlow {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-8px);
+  }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.animate-fade-in-up {
+  animation: fadeIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.animate-bounce-slow {
+  animation: bounceSlow 2.5s ease-in-out infinite;
+}
+
+/* Custom Scrollbar behavior */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #CBD5E1;
+  border-radius: 99px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #94A3B8;
+}
