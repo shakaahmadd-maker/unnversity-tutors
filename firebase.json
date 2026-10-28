@@ -1,8 +1,0 @@
-{
-  "firestore": [
-    {
-      "database": "ai-studio-universitytutors-dd0ea42b-4947-4773-834b-d55d8b35478a",
-      "rules": "firestore.rules"
-    }
-  ]
-}

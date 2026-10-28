@@ -21,7 +21,6 @@ import SpecializedServicePage from './components/SpecializedServicePage';
 import WhatsAppPage from './components/WhatsAppPage';
 import { COUNTRY_ONLINE_TUTORING_PAGES } from './data/countryOnlineTutoringData';
 import { SPECIALIZED_SERVICE_PAGES_MAP } from './data/specializedTutoringServicesData';
-import { auth } from './firebase';
 
 import { store } from './lib/store';
 import { UserRole, Chat, User, Assignment, Payment, Invoice, ActivityLog, AppNotification, SOP, AssignmentReport, Agreement } from './types';
@@ -665,13 +664,12 @@ export default function App() {
     }
 
     try {
-      // Fetch the real Google Authentication ID Token for authorization
-      const idToken = auth.currentUser ? await auth.currentUser.getIdToken() : '';
+      const sessionToken = localStorage.getItem('auth_token') || '';
       const response = await fetch('/api/create-privileged-user', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${idToken}`
+          'Authorization': `Bearer ${sessionToken}`
         },
         body: JSON.stringify({
           name,
@@ -1054,14 +1052,14 @@ export default function App() {
           <button
             id="trigger-whatsapp-chat-modal"
             onClick={() => setIsWhatsAppModalOpen(true)}
-            className="group bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white w-11 h-11 sm:w-auto sm:h-auto p-2.5 sm:px-4 sm:py-2.5 rounded-full shadow-lg sm:shadow-2xl transition-all hover:scale-105 active:scale-95 cursor-pointer flex items-center justify-center font-bold gap-2 border border-emerald-400/40"
+            className="group bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white w-9.5 h-9.5 sm:w-auto sm:h-auto p-2 sm:px-4 sm:py-2.5 rounded-full shadow-md sm:shadow-2xl transition-all hover:scale-105 active:scale-95 cursor-pointer flex items-center justify-center font-bold gap-2 border border-emerald-400/40"
             title="Open WhatsApp Instant Chat"
           >
             <div className="relative flex items-center justify-center shrink-0">
-              <svg className="w-5 h-5 sm:w-5 sm:h-5 fill-white" viewBox="0 0 24 24">
+              <svg className="w-4.5 h-4.5 sm:w-5 sm:h-5 fill-white" viewBox="0 0 24 24">
                 <path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946.003-6.556 5.338-11.891 11.893-11.891 3.181.001 6.167 1.24 8.413 3.488 2.245 2.248 3.481 5.236 3.48 8.414-.003 6.557-5.338 11.892-11.893 11.892-1.99-.001-3.951-.5-5.688-1.448l-6.205 1.654zm6.597-3.807c1.676.995 3.276 1.591 5.392 1.592 5.448 0 9.886-4.434 9.889-9.885.002-5.462-4.415-9.89-9.881-9.892-5.452 0-9.887 4.434-9.887 9.884-.001 2.225.651 3.891 1.746 5.634l-.999 3.648 3.742-.981zm11.387-5.464c-.074-.124-.272-.198-.57-.347-.297-.149-1.758-.868-2.031-.967-.272-.099-.47-.149-.669.149-.198.297-.768.967-.941 1.165-.173.198-.347.223-.644.074-.297-.149-1.255-.462-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.297-.347.446-.521.151-.172.2-.296.3-.495.099-.198.05-.372-.025-.521-.075-.148-.669-1.611-.916-2.206-.242-.579-.487-.501-.669-.51l-.57-.01c-.198 0-.52.074-.792.372s-1.04 1.016-1.04 2.479 1.065 2.876 1.213 3.074c.149.198 2.095 3.2 5.076 4.487.709.306 1.263.489 1.694.626.712.226 1.36.194 1.872.118.571-.085 1.758-.719 2.006-1.413.248-.695.248-1.29.173-1.414z"/>
               </svg>
-              <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-emerald-300 rounded-full animate-ping"></span>
+              <span className="absolute -top-1 -right-1 w-2 h-2 bg-emerald-300 rounded-full animate-ping"></span>
             </div>
             <span className="text-xs font-sans tracking-wide text-white uppercase font-bold hidden sm:inline">Instant Chat</span>
           </button>

@@ -35,9 +35,6 @@ import {
 import TutorsListAdmin from './TutorsListAdmin';
 import { store } from '../lib/store';
 
-import { db } from '../firebase';
-import { collection, getDocs, doc, getDoc, query, orderBy, limit } from 'firebase/firestore';
-
 interface AdminDashboardProps {
   currentUser: User;
   users: User[];
@@ -167,10 +164,10 @@ export default function AdminDashboard({
     setIsAuditingUsers(true);
     setAuditError(null);
     try {
-      console.log("[DIAGNOSTICS] Beginning Firestore users cross-reference audit...");
-      const userCol = collection(db, 'users');
-      const snap = await getDocs(userCol);
-      const fetchedUsers = snap.docs.map(doc => doc.data() as User);
+      console.log("[DIAGNOSTICS] Beginning PostgreSQL users cross-reference audit...");
+      const res = await fetch('/api/users');
+      const data = await res.json();
+      const fetchedUsers = (data.users || []) as User[];
       setDbUsers(fetchedUsers);
       
       // Cross-reference against our users prop (which represents storeState.users)
@@ -180,17 +177,13 @@ export default function AdminDashboard({
       const unsynced = fetchedUsers.filter(dbUser => {
         const idMatched = propUserIds.has(dbUser.id);
         const emailMatched = propEmails.has(dbUser.email.toLowerCase().trim());
-        // A user is unsynced if neither id nor email match are found in our local users prop
         return !idMatched && !emailMatched;
       });
       
       setUnsyncedUsers(unsynced);
       setLastAuditTime(new Date().toLocaleTimeString());
       
-      console.log(`[DIAGNOSTICS] Audit complete. Found ${fetchedUsers.length} total users in Firestore. ${unsynced.length} are unsynced in the local store.`);
-      if (unsynced.length > 0) {
-        console.warn("[DIAGNOSTICS] Unsynced Users detected:", unsynced);
-      }
+      console.log(`[DIAGNOSTICS] Audit complete. Found ${fetchedUsers.length} total users in PostgreSQL. ${unsynced.length} are unsynced in the local store.`);
     } catch (err: any) {
       console.error("[DIAGNOSTICS] Audit failed:", err);
       setAuditError(err.message || String(err));
@@ -207,27 +200,18 @@ export default function AdminDashboard({
     setTestingChatConnectionId(chatId);
     setChatConnectionResult(null);
     try {
-      console.log(`[DIAGNOSTICS] Running live Firestore subcollection test query for chat: ${chatId}`);
+      console.log(`[DIAGNOSTICS] Running live PostgreSQL messages test query for chat: ${chatId}`);
       
-      // Check if we have local messages for this chatId (which means the active snapshot listener has pulled messages)
       const hasLocalMessages = messages.some(m => m.chatId === chatId);
-      
-      // Query Firestore directly for the last 5 messages under this chat subcollection
-      const msgQuery = query(
-        collection(db, 'chats', chatId, 'messages'),
-        orderBy('timestamp', 'desc'),
-        limit(5)
-      );
-      
-      const snap = await getDocs(msgQuery);
-      const messagesCount = snap.size;
-      const lastMessages = snap.docs.map(doc => doc.data() as Message).reverse();
+      const res = await fetch(`/api/messages?chatId=${encodeURIComponent(chatId)}`);
+      const data = await res.json();
+      const chatMessages = (data.messages || []) as Message[];
       
       setChatConnectionResult({
         chatId,
         active: hasLocalMessages,
-        messagesCount,
-        lastMessages
+        messagesCount: chatMessages.length,
+        lastMessages: chatMessages.slice(-5)
       });
     } catch (err: any) {
       console.error(`[DIAGNOSTICS] Connection test failed for chat ${chatId}:`, err);

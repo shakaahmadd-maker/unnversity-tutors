@@ -311,43 +311,43 @@ export default function Footer({ onNavigate, onOpenBecomeTutor }: FooterProps) {
           <p className="font-medium max-w-xl">
             © 2026 universitytutors.com. All Rights Reserved. Created under educational technology guidelines for UK, US, CA, AU, NZ &amp; IE local curriculum support.
           </p>
-          <div className="flex flex-wrap items-center justify-center md:justify-end gap-x-2 sm:gap-x-3 gap-y-1.5 text-xs font-bold">
+          <div className="flex flex-wrap items-center justify-center md:justify-end gap-1.5 sm:gap-x-2 md:gap-x-3 text-xs font-bold w-full md:w-auto">
             <button 
               id="footer-cc-priv" 
-              onClick={() => onNavigate('privacy')} 
-              className="hover:underline hover:text-orange-700 text-[#542104] transition-colors cursor-pointer py-1 px-1"
+              onClick={() => { onNavigate('privacy'); window.scrollTo({ top: 0, behavior: 'smooth' }); }} 
+              className="hover:underline hover:text-orange-800 hover:bg-[#ffd9be]/50 text-[#542104] transition-all cursor-pointer py-1.5 px-2.5 rounded-md active:scale-95 text-xs font-semibold"
             >
               Privacy Policy
             </button>
-            <span className="text-[#ffab85] select-none text-[10px]" aria-hidden="true">•</span>
+            <span className="text-[#ffab85] select-none text-[10px] hidden sm:inline" aria-hidden="true">•</span>
             <button 
               id="footer-cc-terms" 
-              onClick={() => onNavigate('terms')} 
-              className="hover:underline hover:text-orange-700 text-[#542104] transition-colors cursor-pointer py-1 px-1"
+              onClick={() => { onNavigate('terms'); window.scrollTo({ top: 0, behavior: 'smooth' }); }} 
+              className="hover:underline hover:text-orange-800 hover:bg-[#ffd9be]/50 text-[#542104] transition-all cursor-pointer py-1.5 px-2.5 rounded-md active:scale-95 text-xs font-semibold"
             >
               Terms of Service
             </button>
-            <span className="text-[#ffab85] select-none text-[10px]" aria-hidden="true">•</span>
+            <span className="text-[#ffab85] select-none text-[10px] hidden sm:inline" aria-hidden="true">•</span>
             <button 
               id="footer-cc-disclosure" 
-              onClick={() => onNavigate('google-disclosure')} 
-              className="hover:underline hover:text-orange-700 text-[#542104] transition-colors cursor-pointer py-1 px-1"
+              onClick={() => { onNavigate('google-disclosure'); window.scrollTo({ top: 0, behavior: 'smooth' }); }} 
+              className="hover:underline hover:text-orange-800 hover:bg-[#ffd9be]/50 text-[#542104] transition-all cursor-pointer py-1.5 px-2.5 rounded-md active:scale-95 text-xs font-semibold"
             >
               Google Disclosure
             </button>
-            <span className="text-[#ffab85] select-none text-[10px]" aria-hidden="true">•</span>
+            <span className="text-[#ffab85] select-none text-[10px] hidden sm:inline" aria-hidden="true">•</span>
             <button 
               id="footer-cc-contact" 
-              onClick={() => onNavigate('contact')} 
-              className="hover:underline hover:text-orange-700 text-[#542104] transition-colors cursor-pointer py-1 px-1"
+              onClick={() => { onNavigate('contact'); window.scrollTo({ top: 0, behavior: 'smooth' }); }} 
+              className="hover:underline hover:text-orange-800 hover:bg-[#ffd9be]/50 text-[#542104] transition-all cursor-pointer py-1.5 px-2.5 rounded-md active:scale-95 text-xs font-semibold"
             >
               Contact Us
             </button>
-            <span className="text-[#ffab85] select-none text-[10px]" aria-hidden="true">•</span>
+            <span className="text-[#ffab85] select-none text-[10px] hidden sm:inline" aria-hidden="true">•</span>
             <button 
               id="footer-cc-sop" 
-              onClick={() => onNavigate('sop')} 
-              className="hover:underline hover:text-orange-700 text-[#542104] transition-colors cursor-pointer py-1 px-1"
+              onClick={() => { onNavigate('sop'); }} 
+              className="hover:underline hover:text-orange-800 hover:bg-[#ffd9be]/50 text-[#542104] transition-all cursor-pointer py-1.5 px-2.5 rounded-md active:scale-95 text-xs font-semibold"
             >
               System SOP
             </button>

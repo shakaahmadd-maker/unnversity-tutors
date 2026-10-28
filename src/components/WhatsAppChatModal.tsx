@@ -75,7 +75,7 @@ export default function WhatsAppChatModal({
     >
       {/* Rectangular style block form popup positioned directly above bottom-left WhatsApp button */}
       <div 
-        className="bg-white rounded-2xl max-w-sm sm:max-w-md w-full border border-emerald-600 shadow-2xl overflow-hidden font-sans sm:mb-16 md:mb-20 animate-slide-up max-h-[92vh] flex flex-col"
+        className="bg-white rounded-2xl max-w-[340px] sm:max-w-md w-full border border-emerald-600 shadow-2xl overflow-hidden font-sans sm:mb-16 md:mb-20 animate-slide-up max-h-[92vh] flex flex-col"
         id="whatsapp-chat-modal-dialog"
       >
         {/* Top Header Banner */}
@@ -215,19 +215,19 @@ export default function WhatsAppChatModal({
               </div>
 
               {/* Action buttons */}
-              <div className="pt-0.5 flex items-center gap-2">
+              <div className="pt-1 flex items-center gap-2">
                 <button
                   type="button"
                   onClick={onClose}
-                  className="w-1/3 py-2 px-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-bold rounded-lg transition-colors cursor-pointer border border-gray-300 text-center"
+                  className="w-1/3 py-2 sm:py-2.5 px-2 bg-gray-100 hover:bg-gray-200 text-gray-700 text-[11px] sm:text-xs font-bold rounded-xl transition-all cursor-pointer border border-gray-300 text-center active:scale-95"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="w-2/3 py-2 px-3 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white text-xs font-bold rounded-lg shadow-md transition-all flex items-center justify-center gap-1.5 cursor-pointer border border-emerald-700 uppercase tracking-wider"
+                  className="w-2/3 py-2 sm:py-2.5 px-3 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white text-[11px] sm:text-xs font-bold rounded-xl shadow-md transition-all flex items-center justify-center gap-1.5 cursor-pointer border border-emerald-700 active:scale-95"
                 >
-                  <Send className="w-3 h-3" />
+                  <Send className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
                   <span>Start WhatsApp Chat</span>
                 </button>
               </div>

@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { Mail, Lock, User as UserIcon, LogIn, ChevronRight, CheckCircle2, ShieldCheck, Apple, CheckSquare, Inbox, AlertCircle, ArrowLeft, Send, KeyRound } from 'lucide-react';
 import { UserRole } from '../types';
 import { store } from '../lib/store';
-import { googleSignIn } from '../firebase';
 
 interface AuthPageProps {
   onLogin: (email: string, password?: string) => Promise<boolean>;
@@ -24,74 +23,6 @@ export default function AuthPage({ onLogin, onRegister, onNavigate }: AuthPagePr
   const [isLoginView, setIsLoginView] = useState(true);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [isLoggingInRealGoogle, setIsLoggingInRealGoogle] = useState(false);
-  
-  const handleRealGoogleSignIn = async () => {
-    if (isLoggingInRealGoogle) return;
-    setIsLoggingInRealGoogle(true);
-    setErrorMsg('');
-    setSuccessMsg('');
-    try {
-      const result = await googleSignIn();
-      if (result) {
-        const { user } = result;
-        const targetEmail = user.email || '';
-        if (!targetEmail) {
-          setErrorMsg('No email associated with this Google account.');
-          return;
-        }
-
-        if (targetEmail.toLowerCase().trim() === 'shaka.ahmadd@gmail.com') {
-          setErrorMsg('Administrative login for Shaka Ahmad is restricted to the dedicated Admin Portal at /admin only.');
-          return;
-        }
-
-        // Check if user is registered in our system store
-        const matchedUser = store.users.find(u => u.email.toLowerCase().trim() === targetEmail.toLowerCase().trim());
-        if (matchedUser) {
-          const loggedIn = onLogin(targetEmail);
-          if (loggedIn) {
-            setSuccessMsg(`Welcome back, ${matchedUser.name}! Authentication verified.`);
-            setTimeout(() => {
-              onNavigate('dashboard');
-            }, 1000);
-          } else {
-            setErrorMsg('Failed to initialize workspace session.');
-          }
-        } else {
-          // Setup real verified student or admin account if it's new
-          const isShaka = targetEmail.toLowerCase().trim() === 'shaka.ahmadd@gmail.com';
-          const assignedRole = isShaka ? UserRole.ADMIN : UserRole.STUDENT;
-          const realName = isShaka ? 'Shaka Ahmad' : (user.displayName || 'Google Student');
-          const success = onRegister(realName, targetEmail, assignedRole, {
-            verified: true,
-            signupMethod: 'google',
-            verifiedAt: new Date().toISOString()
-          });
-          if (success) {
-            setSuccessMsg(`Welcome, ${realName}! Real ${assignedRole} account created and authenticated successfully.`);
-            setTimeout(() => {
-              onLogin(targetEmail);
-              onNavigate('dashboard');
-            }, 1100);
-          } else {
-            setErrorMsg('Failed to complete account registration on the platform.');
-          }
-        }
-      }
-    } catch (err: any) {
-      console.error('Real Google Sign in error:', err);
-      let customErr = err?.message || String(err);
-      if (customErr.includes('cancelled-popup-request') || err?.code === 'auth/cancelled-popup-request') {
-        customErr = 'Sign-In Request Cancelled: A previous popup operation was already running or got cancelled by another trigger. [CANCELLED_POPUP_REQUEST]';
-      } else if (customErr.includes('popup-closed-by-user') || err?.code === 'auth/popup-closed-by-user') {
-        customErr = 'Sign-In Popup Closed: The Google Authentication window was closed before completion or blocked by your browser. [POPUP_CLOSED_BY_USER]';
-      }
-      setErrorMsg(customErr);
-    } finally {
-      setIsLoggingInRealGoogle(false);
-    }
-  };
   const [name, setName] = useState('');
   const [role, setRole] = useState<UserRole>(UserRole.STUDENT);
   const [errorMsg, setErrorMsg] = useState('');
@@ -135,14 +66,9 @@ export default function AuthPage({ onLogin, onRegister, onNavigate }: AuthPagePr
   }, [simEmails]);
 
   // Student providers and email validation
-  const [signupMethod, setSignupMethod] = useState<'email' | 'google' | 'apple'>('email');
+  const [signupMethod, setSignupMethod] = useState<'email' | 'apple'>('email');
   const [verificationSentTo, setVerificationSentTo] = useState('');
-  const [verificationProvider, setVerificationProvider] = useState<'email' | 'google' | 'apple' | null>(null);
-
-  // Google verification simulation
-  const [isGoogleModalOpen, setIsGoogleModalOpen] = useState(false);
-  const [googleSimEmail, setGoogleSimEmail] = useState('');
-  const [googleSimName, setGoogleSimName] = useState('');
+  const [verificationProvider, setVerificationProvider] = useState<'email' | 'apple' | null>(null);
 
   // Apple verification simulation
   const [isAppleModalOpen, setIsAppleModalOpen] = useState(false);
@@ -358,10 +284,7 @@ export default function AuthPage({ onLogin, onRegister, onNavigate }: AuthPagePr
             } else {
               setErrorMsg('Something went wrong during student registration.');
             }
-            return;
-          } else if (signupMethod === 'google') {
-            await handleRealGoogleSignIn();
-            return;
+
           } else if (signupMethod === 'apple') {
             setAppleSimEmail(email || 'student.apple@icloud.com');
             setAppleSimName(name || 'Apple Student');
@@ -419,7 +342,7 @@ export default function AuthPage({ onLogin, onRegister, onNavigate }: AuthPagePr
               University Tutors Portal
             </h2>
             <p className="text-sm text-orange-50 leading-relaxed mt-3">
-              Log in with our highly integrated, real-time Google account authentication or sign up for a real workspace below. Connect directly with verified global academic coaches.
+              Log in with your verified email and password credentials or establish a new student profile. Connect directly with verified global academic coaches.
             </p>
 
             <div className="space-y-4 mt-8">
@@ -719,34 +642,7 @@ export default function AuthPage({ onLogin, onRegister, onNavigate }: AuthPagePr
                           </span>
                         </button>
 
-                        {/* Option 2: Google */}
-                        <button
-                          type="button"
-                          id="signup-choice-google"
-                          onClick={() => setSignupMethod('google')}
-                          className={`w-full p-2.5 rounded-xl border flex items-center justify-between text-left transition-all cursor-pointer ${
-                            signupMethod === 'google'
-                              ? 'bg-orange-100/70 border-orange-400 text-amber-955 font-bold animate-pulse'
-                              : 'bg-white border-gray-150 hover:bg-gray-50 text-gray-700'
-                          }`}
-                        >
-                          <div className="flex items-center gap-2.5">
-                            <svg className="w-4 h-4 shrink-0 block" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                              <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
-                              <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
-                              <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l3.66-2.85z" fill="#FBBC05"/>
-                              <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.85c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
-                            </svg>
-                            <div className="leading-tight">
-                              <span className="text-xs block font-sans">Google Account</span>
-                              <span className="text-[9px] text-amber-800/60 font-mono">Status: Enabled</span>
-                            </div>
-                          </div>
-                          <span className="text-[10px] bg-emerald-50 text-emerald-700 border border-emerald-200 px-2 py-0.5 rounded-full font-bold flex items-center gap-1">
-                            <CheckCircle2 className="w-3 h-3 text-emerald-600 shrink-0" />
-                            Enabled
-                          </span>
-                        </button>
+
 
                         {/* Option 3: Apple */}
                         <button
@@ -891,103 +787,20 @@ export default function AuthPage({ onLogin, onRegister, onNavigate }: AuthPagePr
                     </div>
                   </div>
                 </>
-              ) : (
-                /* Google or Apple sign-up CTA button */
-                <div className="p-5 bg-orange-50/50 border border-orange-200/50 rounded-2xl text-center space-y-4 my-2 animate-fade-in" id="provider-oauth-simulation-cta">
-                  <div className="space-y-1">
-                    <h5 className="text-xs font-bold text-amber-950 capitalize font-display">Synchronize {signupMethod} Profile</h5>
-                    <p className="text-[11px] text-gray-550 max-w-xs mx-auto leading-relaxed">
-                      To complete student registration using your <strong>{signupMethod.toUpperCase()} Account</strong>, launch the secure real-time authentication popup:
-                    </p>
-                  </div>
-                  
-                  {signupMethod === 'google' && (
-                    <button
-                      type="button"
-                      id="trigger-google-oauth-btn"
-                      onClick={handleRealGoogleSignIn}
-                      disabled={isLoggingInRealGoogle}
-                      className={`w-full p-3 rounded-xl inline-flex items-center justify-center gap-2.5 text-xs font-bold transition-all cursor-pointer shadow-sm ${
-                        isLoggingInRealGoogle 
-                          ? 'bg-gray-100 text-gray-400 border border-gray-200 cursor-not-allowed'
-                          : 'bg-white hover:bg-gray-100 border border-gray-200 text-gray-700 hover:shadow-xs'
-                      }`}
-                    >
-                      {isLoggingInRealGoogle ? (
-                        <span className="w-4 h-4 border-2 border-orange-500 border-t-transparent rounded-full animate-spin"></span>
-                      ) : (
-                        <svg className="w-4 h-4 shrink-0 block" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                          <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
-                          <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
-                          <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l3.66-2.85z" fill="#FBBC05"/>
-                          <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.85c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
-                        </svg>
-                      )}
-                      <span>{isLoggingInRealGoogle ? 'Launching Secure Popup...' : 'Connect Real Google Account (Firebase)'}</span>
-                    </button>
-                  )}
-
-                  {signupMethod === 'apple' && (
-                    <button
-                      type="button"
-                      id="trigger-apple-oauth-btn"
-                      onClick={() => {
-                        setAppleSimEmail(email || 'student.apple@icloud.com');
-                        setAppleSimName(name || 'Apple Student');
-                        setIsAppleModalOpen(true);
-                      }}
-                      className="w-full bg-black hover:bg-zinc-900 border border-black p-3 rounded-xl inline-flex items-center justify-center gap-2.5 text-xs font-bold text-white transition-all cursor-pointer"
-                    >
-                      <Apple className="w-4 h-4 text-white fill-white shrink-0" />
-                      <span>Launch Apple Keychain Handshake</span>
-                    </button>
-                  )}
-                </div>
-              )}
+              ) : null}
 
               {/* standard submission button for email/login/tutors */}
-              {(isLoginView || role === UserRole.TUTOR || (role === UserRole.STUDENT && signupMethod === 'email')) && (
-                <div className="space-y-4">
-                  <button
-                    type="submit"
-                    id="auth-submit-btn"
-                    className="w-full bg-orange-500 text-white font-bold text-sm py-3 rounded-xl hover:bg-orange-650 hover:-translate-y-0.5 transition-all focus:outline-hidden flex items-center justify-center gap-1.5 cursor-pointer shadow-lg shadow-orange-500/10"
-                  >
-                    <LogIn className="w-4 h-4" />
-                    <span>{isLoginView ? 'Authenticate Profile' : 'Complete Registration & Access Workspace'}</span>
-                    <ChevronRight className="w-4 h-4" />
-                  </button>
-
-                  <div className="relative flex py-1.5 items-center">
-                    <div className="flex-grow border-t border-gray-150"></div>
-                    <span className="flex-shrink mx-4 text-gray-400 text-[9px] font-bold uppercase tracking-wider font-sans">Or connect using</span>
-                    <div className="flex-grow border-t border-gray-150"></div>
-                  </div>
-
-                  <button
-                    type="button"
-                    onClick={handleRealGoogleSignIn}
-                    disabled={isLoggingInRealGoogle}
-                    className={`w-full py-2.5 rounded-xl flex items-center justify-center gap-2 text-xs font-bold transition-all cursor-pointer shadow-xs ${
-                      isLoggingInRealGoogle 
-                        ? 'bg-gray-100 text-gray-400 border border-gray-200 cursor-not-allowed'
-                        : 'bg-white hover:bg-gray-50 border border-gray-200 text-gray-700 hover:shadow-xs'
-                    }`}
-                  >
-                    {isLoggingInRealGoogle ? (
-                      <span className="w-4 h-4 border-2 border-orange-500 border-t-transparent rounded-full animate-spin"></span>
-                    ) : (
-                      <svg className="w-4.5 h-4.5 shrink-0 block" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                        <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
-                        <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
-                        <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l3.66-2.85z" fill="#FBBC05"/>
-                        <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.85c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
-                      </svg>
-                    )}
-                    <span>{isLoggingInRealGoogle ? 'Authenticating Popup...' : 'Sign In with Real Google Account'}</span>
-                  </button>
-                </div>
-              )}
+              <div className="space-y-4 pt-2">
+                <button
+                  type="submit"
+                  id="auth-submit-btn"
+                  className="w-full bg-orange-500 text-white font-bold text-sm py-3 rounded-xl hover:bg-orange-600 hover:-translate-y-0.5 transition-all focus:outline-hidden flex items-center justify-center gap-1.5 cursor-pointer shadow-lg shadow-orange-500/10"
+                >
+                  <LogIn className="w-4 h-4" />
+                  <span>{isLoginView ? 'Authenticate Profile' : 'Complete Registration & Access Workspace'}</span>
+                  <ChevronRight className="w-4 h-4" />
+                </button>
+              </div>
             </form>
           )}
 
@@ -1019,89 +832,7 @@ export default function AuthPage({ onLogin, onRegister, onNavigate }: AuthPagePr
 
       </div>
 
-      {/* simulated google login modal */}
-      {isGoogleModalOpen && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fade-in" id="google-auth-modal">
-          <div className="bg-white rounded-3xl shadow-2xl max-w-md w-full border border-gray-150 p-8 space-y-6 relative">
-            <button 
-              type="button"
-              onClick={() => setIsGoogleModalOpen(false)}
-              className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 text-lg cursor-pointer"
-            >
-              ✕
-            </button>
-            <div className="text-center space-y-3">
-              <div className="w-14 h-14 bg-gray-50 rounded-2xl flex items-center justify-center mx-auto border border-gray-100 shadow-xs">
-                <svg className="w-8 h-8" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
-                  <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
-                  <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l3.66-2.85z" fill="#FBBC05"/>
-                  <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.85c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
-                </svg>
-              </div>
-              <h4 className="text-lg font-bold text-gray-900">Sign Up with Google</h4>
-              <p className="text-xs text-gray-500 max-w-xs mx-auto leading-relaxed">
-                University Tutors is requesting secure access to synchronize your verified student identity.
-              </p>
-            </div>
 
-            <div className="space-y-3 pt-2">
-              <div>
-                <label className="text-[10px] font-bold text-gray-700 uppercase tracking-wider block mb-1">Google Target Name</label>
-                <input
-                  type="text"
-                  placeholder="e.g. Alex Mercer"
-                  value={googleSimName}
-                  onChange={(e) => setGoogleSimName(e.target.value)}
-                  className="w-full bg-gray-50 border border-gray-200 py-2.5 px-3.5 rounded-xl text-sm"
-                  required
-                />
-              </div>
-              <div>
-                <label className="text-[10px] font-bold text-gray-700 uppercase tracking-wider block mb-1">Google Email Address</label>
-                <input
-                  type="email"
-                  placeholder="name@university.edu"
-                  value={googleSimEmail}
-                  onChange={(e) => setGoogleSimEmail(e.target.value)}
-                  className="w-full bg-gray-50 border border-gray-200 py-2.5 px-3.5 rounded-xl text-sm"
-                  required
-                />
-              </div>
-            </div>
-
-            <div className="space-y-2 pt-4">
-              <button
-                type="button"
-                onClick={() => {
-                  if (!googleSimName || !googleSimEmail) {
-                    setErrorMsg('Please prefill Google OAuth info.');
-                    setIsGoogleModalOpen(false);
-                    return;
-                  }
-                  setIsGoogleModalOpen(false);
-                  // Setup verification
-                  setVerificationProvider('google');
-                  setVerificationSentTo(googleSimEmail.toLowerCase().trim());
-                  setName(googleSimName);
-                  setEmail(googleSimEmail.toLowerCase().trim());
-                  setSuccessMsg(`Google identity verified successfully for ${googleSimName}. Complete activation below.`);
-                }}
-                className="w-full bg-[#4285F4] hover:bg-[#357AE8] text-white font-bold text-xs py-3 rounded-xl flex items-center justify-center gap-2 transition-all cursor-pointer shadow-md"
-              >
-                <span>Authorize & Synchronize API</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => setIsGoogleModalOpen(false)}
-                className="w-full bg-gray-50 hover:bg-gray-100 text-gray-700 font-bold text-xs py-2.5 rounded-xl transition-all cursor-pointer text-center"
-              >
-                Cancel
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* simulated apple login modal */}
       {isAppleModalOpen && (
