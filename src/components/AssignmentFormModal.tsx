@@ -228,12 +228,13 @@ export default function AssignmentFormModal({
             <div className="border border-dashed border-gray-250 rounded-xl p-5 bg-gray-50 text-center relative hover:bg-orange-50/25 hover:border-orange-200 transition-colors cursor-pointer">
               <Upload className="w-6 h-6 text-gray-400 mx-auto mb-1.5" />
               <span className="text-xs font-bold text-gray-800 block">Click to attach assignment briefs</span>
-              <span className="text-[10px] text-gray-405 block mt-0.5">Maximum limit 5 documents (DOC, PDF, PPTX, JPG, ZIP up to 25MB)</span>
+              <span className="text-[10px] text-gray-405 block mt-0.5">Maximum limit 5 documents (PDF, DOCS, ZIP, Image, PPT, or other media up to 25MB)</span>
               
               <input 
                 type="file" 
                 id="assign-file-upload-input"
                 multiple
+                accept=".pdf,.doc,.docx,.zip,.rar,.ppt,.pptx,image/*,audio/*,video/*,application/*"
                 onChange={handleFileChange}
                 className="absolute inset-0 opacity-0 cursor-pointer"
               />

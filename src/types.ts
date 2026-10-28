@@ -31,6 +31,26 @@ export interface User {
   subjects?: string[];
   country?: string; // e.g., 'GB', 'US', 'CA', 'AU', 'NZ', 'IE'
   availableSlots?: string[]; // ISO string dates
+  // Enhanced Tutor Profile Fields
+  location?: string; // e.g. 'Miami, FL'
+  city?: string;
+  phoneNumber?: string;
+  education?: string; // e.g. 'University of Miami - B.S, Biomedical Engineering'
+  experience?: string; // e.g. 'A patient tutor, I will repeat myself...'
+  experiences?: string;
+  subjectExpertise?: string[]; // e.g. ['12th Grade Math', 'ACT Math', 'AP Biology']
+  availability?: string; // e.g. 'Weekdays at any time, Weekends at any time'
+  availabilities?: string;
+  canMeet?: string; // e.g. '20 miles at my regular hourly rate'
+  hobbies?: string; // e.g. 'I enjoy reading, singing, and watching sports'
+  isApproved?: boolean;
+  status?: string;
+  // Domain & Keyword Taxonomies
+  primaryDomain?: string;
+  specializedKeywords?: string[];
+  researchKeywords?: string[];
+  jobKeywords?: string[];
+  highGrowthKeywords?: string[];
 }
 
 export interface Service {

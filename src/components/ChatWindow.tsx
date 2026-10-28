@@ -345,16 +345,16 @@ export default function ChatWindow({
               <span>
                 {pendingQuote.advanceAmount !== undefined && pendingQuote.balanceAmount !== undefined ? (
                   pendingQuote.advanceAmount > 0 ? (
-                    `Accept & Pay Advance: $${pendingQuote.advanceAmount} USD (Rest on delivery)`
+                    `Accept Quote & Request Payment Link: $${pendingQuote.advanceAmount} USD (Advance)`
                   ) : (
-                    `Accept Quote: $${pendingQuote.amount} USD (Held in Escrow)`
+                    `Accept Quote: $${pendingQuote.amount} USD`
                   )
                 ) : (
-                  `Accept & Secure Escrow Pay ($${pendingQuote.amount} USD)`
+                  `Accept & Request Payment Link ($${pendingQuote.amount} USD)`
                 )}
               </span>
             </button>
-            <p className="text-[9px] text-center text-gray-400 font-medium">Price is finalized only after agreement. Secured via Stripe dynamic sandbox.</p>
+            <p className="text-[9px] text-center text-gray-400 font-medium">Price is finalized after discussion. A secure custom payment link will be sent to you by administrators.</p>
           </div>
         )}
 
@@ -527,15 +527,44 @@ export default function ChatWindow({
         </form>
       )}
 
+      {/* Quick Prompt Suggestion Chips for Students */}
+      {currentUser.role === UserRole.STUDENT && (
+        <div className="px-4 py-2 bg-slate-50 border-t border-gray-150 flex items-center gap-2 overflow-x-auto shrink-0">
+          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider shrink-0">Quick Actions:</span>
+          <button 
+            type="button"
+            onClick={() => handleInputChange('Can we review the assignment requirements?')} 
+            className="px-2.5 py-1 bg-white hover:bg-orange-50 hover:text-orange-600 border border-slate-200 rounded-lg text-xs text-slate-600 whitespace-nowrap transition-colors cursor-pointer"
+          >
+            📋 Request assignment review
+          </button>
+          <button 
+            type="button"
+            onClick={() => handleInputChange('Please send over a formal price quote for this task.')} 
+            className="px-2.5 py-1 bg-white hover:bg-orange-50 hover:text-orange-600 border border-slate-200 rounded-lg text-xs text-slate-600 whitespace-nowrap transition-colors cursor-pointer"
+          >
+            💰 Request formal quote
+          </button>
+          <button 
+            type="button"
+            onClick={() => handleInputChange('When are you available for a 1-on-1 tutoring session?')} 
+            className="px-2.5 py-1 bg-white hover:bg-orange-50 hover:text-orange-600 border border-slate-200 rounded-lg text-xs text-slate-600 whitespace-nowrap transition-colors cursor-pointer"
+          >
+            📅 Schedule 1-on-1 session
+          </button>
+        </div>
+      )}
+
       {/* Input Message Form */}
       <form onSubmit={handleSend} className="p-4 bg-gray-50 border-t border-gray-150 flex items-center gap-3">
         
         {/* Attachment upload item */}
-        <div className="relative">
+        <div className="relative" title="Upload PDF, DOCS, ZIP, PPT, Image, or any other media">
           <Upload className="w-5 h-5 text-gray-400 hover:text-orange-500 cursor-pointer" />
           <input 
             type="file" 
             id="chat-attachment-upload"
+            accept=".pdf,.doc,.docx,.zip,.rar,.ppt,.pptx,image/*,audio/*,video/*,application/*"
             onChange={handleSuggestFile}
             className="absolute inset-0 opacity-0 cursor-pointer" 
           />

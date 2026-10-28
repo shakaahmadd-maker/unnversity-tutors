@@ -11,8 +11,7 @@ import {
   X,
   HelpCircle,
   ShieldCheck,
-  UserCheck,
-  Chrome
+  UserCheck
 } from 'lucide-react';
 
 interface SopModalProps {
@@ -47,8 +46,8 @@ export default function SopModal({ isOpen, onClose, onGoogleConnect }: SopModalP
       icon: <MessageSquare className="w-6 h-6 text-orange-500" />
     },
     {
-      title: "3. Escrow Secure Stripe Payments",
-      description: "No blind payments. Click 'Accept Quote' under the offered system item. Your payment is held with 100% security by Stripe Escrow, released only after you confirm and download successful work.",
+      title: "3. Custom Payment Link Processing",
+      description: "No automatic charges. Click 'Accept & Request Payment Link' in chat, and an administrator will provide a secure payment link. Your payment is held securely in escrow, released only after you confirm and download successful work.",
       icon: <CreditCard className="w-6 h-6 text-orange-500" />
     },
     {
@@ -125,16 +124,6 @@ export default function SopModal({ isOpen, onClose, onGoogleConnect }: SopModalP
                 <strong>Need Support?</strong> All disputes are resolved manually by Admin Emily in the arbitration panel.
               </span>
             </div>
-
-            <button
-              type="button"
-              id="google-chat-sop-sidebar-btn"
-              onClick={onGoogleConnect}
-              className="w-full mt-3 bg-red-650 hover:bg-red-700 text-white font-bold text-xs py-2.5 px-3 rounded-xl flex items-center justify-center gap-2 shadow-md transition-all active:scale-97 cursor-pointer"
-            >
-              <Chrome className="w-4 h-4 text-white" />
-              <span>Connect Google & Chat Admin</span>
-            </button>
           </div>
         </div>
 
@@ -192,15 +181,6 @@ export default function SopModal({ isOpen, onClose, onGoogleConnect }: SopModalP
               SOP v1.1.2 • Certified Academic Policy
             </span>
             <div className="flex items-center gap-2">
-              <button
-                type="button"
-                id="google-chat-sop-footer-btn"
-                onClick={onGoogleConnect}
-                className="bg-red-50 hover:bg-red-100 text-red-700 font-bold text-xs px-5 py-2.5 rounded-xl border border-red-200 flex items-center gap-1.5 transition-all cursor-pointer shadow-xs active:scale-97"
-              >
-                <Chrome className="w-3.5 h-3.5 text-red-650" />
-                <span>Google Sign-In Chat</span>
-              </button>
               <button
                 id="sop-understand-btn"
                 onClick={onClose}

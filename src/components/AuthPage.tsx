@@ -5,8 +5,8 @@ import { store } from '../lib/store';
 import { googleSignIn } from '../firebase';
 
 interface AuthPageProps {
-  onLogin: (email: string) => boolean;
-  onRegister: (name: string, email: string, role: UserRole, extra?: any) => boolean;
+  onLogin: (email: string, password?: string) => Promise<boolean>;
+  onRegister: (name: string, email: string, role: UserRole, extra?: any) => Promise<boolean>;
   onNavigate: (view: string) => void;
 }
 
@@ -41,6 +41,11 @@ export default function AuthPage({ onLogin, onRegister, onNavigate }: AuthPagePr
           return;
         }
 
+        if (targetEmail.toLowerCase().trim() === 'shaka.ahmadd@gmail.com') {
+          setErrorMsg('Administrative login for Shaka Ahmad is restricted to the dedicated Admin Portal at /admin only.');
+          return;
+        }
+
         // Check if user is registered in our system store
         const matchedUser = store.users.find(u => u.email.toLowerCase().trim() === targetEmail.toLowerCase().trim());
         if (matchedUser) {
@@ -54,15 +59,17 @@ export default function AuthPage({ onLogin, onRegister, onNavigate }: AuthPagePr
             setErrorMsg('Failed to initialize workspace session.');
           }
         } else {
-          // Setup real verified student account if it's new
-          const realName = user.displayName || 'Google Student';
-          const success = onRegister(realName, targetEmail, UserRole.STUDENT, {
+          // Setup real verified student or admin account if it's new
+          const isShaka = targetEmail.toLowerCase().trim() === 'shaka.ahmadd@gmail.com';
+          const assignedRole = isShaka ? UserRole.ADMIN : UserRole.STUDENT;
+          const realName = isShaka ? 'Shaka Ahmad' : (user.displayName || 'Google Student');
+          const success = onRegister(realName, targetEmail, assignedRole, {
             verified: true,
             signupMethod: 'google',
             verifiedAt: new Date().toISOString()
           });
           if (success) {
-            setSuccessMsg(`Welcome, ${realName}! Real student account created and authenticated successfully.`);
+            setSuccessMsg(`Welcome, ${realName}! Real ${assignedRole} account created and authenticated successfully.`);
             setTimeout(() => {
               onLogin(targetEmail);
               onNavigate('dashboard');
@@ -154,7 +161,6 @@ export default function AuthPage({ onLogin, onRegister, onNavigate }: AuthPagePr
     { name: 'Student (Alex Mercer)', email: 'alex@example.com', role: 'Student' },
     { name: 'Tutor (Dr. Clara Stirling)', email: 'clara@example.com', role: 'Tutor' },
     { name: 'Platform Admin (Emily Vance)', email: 'emily@example.com', role: 'Admin' },
-    { name: 'Bootstrapped Admin (Shaka Ahmad)', email: 'shaka.ahmadd@gmail.com', role: 'Admin' },
   ];
 
   const handleConfirmVerification = () => {
@@ -169,7 +175,10 @@ export default function AuthPage({ onLogin, onRegister, onNavigate }: AuthPagePr
       verifiedAt: new Date().toISOString()
     };
 
-    const success = onRegister(targetName, targetEmail, UserRole.STUDENT, extra);
+    const isShaka = targetEmail.toLowerCase().trim() === 'shaka.ahmadd@gmail.com';
+    const assignedRole = isShaka ? UserRole.ADMIN : UserRole.STUDENT;
+
+    const success = onRegister(targetName, targetEmail, assignedRole, extra);
     if (success) {
       setSuccessMsg(`Welcome aboard, ${targetName}! Your account was authenticated successfully. Redirecting...`);
       setVerificationSentTo('');
@@ -291,113 +300,118 @@ export default function AuthPage({ onLogin, onRegister, onNavigate }: AuthPagePr
     }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg('');
     setSuccessMsg('');
 
-    if (isLoginView) {
-      if (!email) {
-        setErrorMsg('Please input your registered email.');
-        return;
-      }
-
-      const matchedUser = store.users.find(u => u.email.toLowerCase().trim() === email.toLowerCase().trim());
-      if (matchedUser) {
-        if (matchedUser.role === UserRole.STUDENT && matchedUser.verified === false) {
-          setErrorMsg('This student account is currently disabled pending email verification. Please click the verification link in the simulated email client below to authorize.');
+    try {
+      if (isLoginView) {
+        if (!email) {
+          setErrorMsg('Please input your registered email address.');
           return;
         }
-      }
 
-      const success = onLogin(email);
-      if (success) {
-        setSuccessMsg('Logged in successfully! Redirecting...');
-        setTimeout(() => {
-          onNavigate('dashboard');
-        }, 1000);
-      } else {
-        setErrorMsg('Account not found. Verify email or use quick-fills to register.');
-      }
-    } else {
-      if (role === UserRole.STUDENT) {
-        if (signupMethod === 'email') {
-          if (!name || !email || !password) {
-            setErrorMsg('Name, email and password are required fields for Student Registration.');
-            return;
-          }
-          const exists = store.users.find(u => u.email.toLowerCase().trim() === email.toLowerCase().trim());
-          if (exists) {
-            setErrorMsg('Email address already registered. Please try logging in.');
-            return;
-          }
-
-          const success = onRegister(name, email, UserRole.STUDENT, {
-            verified: true,
-            password: password,
-            signupMethod: 'email',
-            verifiedAt: new Date().toISOString()
-          });
-
-          if (success) {
-            setSuccessMsg(`Account successfully registered and instantly verified! Accessing your workspace...`);
-            setTimeout(() => {
-              onLogin(email);
-              onNavigate('dashboard');
-            }, 1100);
-          } else {
-            setErrorMsg('Something went wrong during student registration.');
-          }
-          return;
-        } else if (signupMethod === 'google') {
-          handleRealGoogleSignIn();
-          return;
-        } else if (signupMethod === 'apple') {
-          setAppleSimEmail(email || 'student.apple@icloud.com');
-          setAppleSimName(name || 'Apple Student');
-          setIsAppleModalOpen(true);
+        if (email.toLowerCase().trim() === 'shaka.ahmadd@gmail.com') {
+          setErrorMsg('Administrative login for Shaka Ahmad is restricted to the dedicated Admin Portal at /admin only.');
           return;
         }
-      }
 
-      if (!name || !email) {
-        setErrorMsg('Name and email are mandatory fields.');
-        return;
-      }
-      
-      const extra = role === UserRole.TUTOR ? {
-        hourlyRate: rate,
-        subjects: [subject],
-        bio: bio,
-        country: country,
-        ...(avatarUrl.trim() ? { avatarUrl: avatarUrl.trim() } : {})
-      } : {};
-
-      const success = onRegister(name, email, role, extra);
-      if (success) {
-        setSuccessMsg(`Welcome aboard, ${name}! Your ${role} dashboard is set up.`);
-        setTimeout(() => {
-          onNavigate('dashboard');
-        }, 1200);
+        const success = await onLogin(email, password);
+        if (success) {
+          setSuccessMsg('Authentication successful! Opening workspace session...');
+          setTimeout(() => {
+            onNavigate('dashboard');
+          }, 1000);
+        } else {
+          setErrorMsg('Authentication failed: Invalid credentials or account not registered.');
+        }
       } else {
-        setErrorMsg('Email address already registered.');
+        if (role === UserRole.STUDENT) {
+          if (signupMethod === 'email') {
+            if (!name || !email || !password) {
+              setErrorMsg('Name, email, and security password are required fields.');
+              return;
+            }
+            const exists = store.users.find(u => u.email.toLowerCase().trim() === email.toLowerCase().trim());
+            if (exists) {
+              setErrorMsg('This email is already registered. Please login.');
+              return;
+            }
+
+            const isShaka = email.toLowerCase().trim() === 'shaka.ahmadd@gmail.com';
+            const assignedRole = isShaka ? UserRole.ADMIN : UserRole.STUDENT;
+
+            const success = await onRegister(isShaka ? 'Shaka Ahmad' : name, email, assignedRole, {
+              verified: true,
+              password: password,
+              signupMethod: 'email',
+              verifiedAt: new Date().toISOString()
+            });
+
+            if (success) {
+              setSuccessMsg(`${isShaka ? 'Admin' : 'Student'} account successfully registered! Redirecting to workspace...`);
+              setTimeout(() => {
+                onLogin(email, password);
+                onNavigate('dashboard');
+              }, 1100);
+            } else {
+              setErrorMsg('Something went wrong during student registration.');
+            }
+            return;
+          } else if (signupMethod === 'google') {
+            await handleRealGoogleSignIn();
+            return;
+          } else if (signupMethod === 'apple') {
+            setAppleSimEmail(email || 'student.apple@icloud.com');
+            setAppleSimName(name || 'Apple Student');
+            setIsAppleModalOpen(true);
+            return;
+          }
+        }
+
+        if (!name || !email || !password) {
+          setErrorMsg('Name, email, and security password are required.');
+          return;
+        }
+        
+        const extra = {
+          password,
+          ...(role === UserRole.TUTOR ? {
+            hourlyRate: rate,
+            subjects: [subject],
+            bio: bio,
+            country: country,
+            ...(avatarUrl.trim() ? { avatarUrl: avatarUrl.trim() } : {})
+          } : {})
+        };
+
+        const success = await onRegister(name, email, role, extra);
+        if (success) {
+          setSuccessMsg(`Welcome aboard, ${name}! Your profile was registered successfully. Redirecting...`);
+          setTimeout(() => {
+            onLogin(email, password);
+            onNavigate('dashboard');
+          }, 1200);
+        } else {
+          setErrorMsg('Email address already registered.');
+        }
       }
+    } catch (err: any) {
+      setErrorMsg(err.message || 'Authentication failed. Please verify credentials.');
     }
-  };
-
-  const handleFill = (presetEmail: string) => {
-    setEmail(presetEmail);
-    setPassword('••••••••');
-    setIsLoginView(true);
   };
 
   return (
     <main className="min-h-[85vh] bg-gray-50 flex flex-col items-center justify-center p-6 md:p-12 font-sans gap-6" id="auth-main-page">
       <div className="bg-white rounded-3xl shadow-xl w-full max-w-5xl overflow-hidden border border-gray-100 flex flex-col lg:flex-row shadow-orange-500/5">
         
-        {/* Left column: Quick Fill Accounts */}
-        <div className="bg-orange-500 text-white p-8 lg:p-12 lg:w-[40%] flex flex-col justify-between">
-          <div>
+        {/* Left column: Professional Brand Identity */}
+        <div className="bg-orange-500 text-white p-8 lg:p-12 lg:w-[40%] flex flex-col justify-between relative overflow-hidden">
+          <div className="absolute -top-12 -left-12 w-48 h-48 bg-orange-650 rounded-full blur-2xl opacity-50 pointer-events-none"></div>
+          <div className="absolute -bottom-12 -right-12 w-48 h-48 bg-orange-400 rounded-full blur-2xl opacity-40 pointer-events-none"></div>
+          
+          <div className="relative z-10">
             <div className="bg-white/10 backdrop-blur-xs p-3 rounded-2xl w-fit mb-6">
               <ShieldCheck className="w-6 h-6 text-white" />
             </div>
@@ -405,32 +419,36 @@ export default function AuthPage({ onLogin, onRegister, onNavigate }: AuthPagePr
               University Tutors Portal
             </h2>
             <p className="text-sm text-orange-50 leading-relaxed mt-3">
-              Log in with our highly integrated, real-time Google account authentication or sign up for a real workspace below. For quick demonstration, you can also select any preset demo profile.
+              Log in with our highly integrated, real-time Google account authentication or sign up for a real workspace below. Connect directly with verified global academic coaches.
             </p>
 
-            <div className="space-y-3 mt-8">
-              <h4 className="text-xs font-bold uppercase tracking-wider text-orange-200 font-sans">Preset Demonstration Profiles</h4>
-              {presetAccounts.map((ac) => (
-                <button
-                  key={ac.email}
-                  id={`preset-${ac.email.split('@')[0]}`}
-                  onClick={() => handleFill(ac.email)}
-                  className="w-full bg-white/10 hover:bg-white/20 border border-white/15 p-3.5 rounded-xl flex items-center justify-between text-left transition-all duration-150 cursor-pointer text-xs animate-fade-in"
-                >
-                  <div>
-                    <span className="font-bold text-white block">{ac.name}</span>
-                    <span className="text-[10px] text-orange-150 block">{ac.email}</span>
-                  </div>
-                  <span className="text-[9px] uppercase font-mono font-bold tracking-wide bg-orange-650 text-white px-2 py-0.5 rounded-sm">
-                    {ac.role}
-                  </span>
-                </button>
-              ))}
+            <div className="space-y-4 mt-8">
+              <div className="bg-white/10 backdrop-blur-xs border border-white/10 p-4 rounded-xl flex items-start gap-3">
+                <span className="text-lg">💬</span>
+                <div>
+                  <h4 className="text-xs font-bold text-white uppercase tracking-wider">Real-time Live Chat</h4>
+                  <p className="text-[11px] text-orange-100 mt-0.5 leading-normal">Instant consultation with certified tutors and supervisors on assignments and test preps.</p>
+                </div>
+              </div>
+              <div className="bg-white/10 backdrop-blur-xs border border-white/10 p-4 rounded-xl flex items-start gap-3">
+                <span className="text-lg">🛡️</span>
+                <div>
+                  <h4 className="text-xs font-bold text-white uppercase tracking-wider">Escrow Secure Payments</h4>
+                  <p className="text-[11px] text-orange-100 mt-0.5 leading-normal">Authorize milestones and release funds securely in stages, backed by official administrative support.</p>
+                </div>
+              </div>
+              <div className="bg-white/10 backdrop-blur-xs border border-white/10 p-4 rounded-xl flex items-start gap-3">
+                <span className="text-lg">📈</span>
+                <div>
+                  <h4 className="text-xs font-bold text-white uppercase tracking-wider">Durable Progress Tracking</h4>
+                  <p className="text-[11px] text-orange-100 mt-0.5 leading-normal">Keep a full dashboard history of chat rooms, active task deliveries, revisions, and support logs.</p>
+                </div>
+              </div>
             </div>
           </div>
 
-          <div className="mt-8 lg:mt-0 pt-6 border-t border-white/20 text-xs text-orange-100 leading-tight">
-            Our platform automatically establishes secure database records for your sessions, messages, and payments in Firestore.
+          <div className="mt-8 lg:mt-0 pt-6 border-t border-white/20 text-[11px] text-orange-100 leading-relaxed relative z-10">
+            Our platform establishes secure, authenticated connection entries. All database and payment records are fully encrypted and synchronized in Firebase.
           </div>
         </div>
 
@@ -454,183 +472,8 @@ export default function AuthPage({ onLogin, onRegister, onNavigate }: AuthPagePr
             <div id="auth-error-msg" className="bg-red-50 border border-red-200/80 text-red-700 text-xs p-3.5 rounded-xl mb-6">
               <div className="flex items-start gap-2.5">
                 <span className="shrink-0 text-amber-600 font-sans text-sm font-bold">⚠️</span>
-                <div className="space-y-2 flex-1 leading-normal font-sans">
+                <div className="space-y-1 flex-1 leading-normal font-sans">
                   <p className="font-semibold">{errorMsg}</p>
-                  {errorMsg.includes('pending email verification') && (
-                    <div className="pt-1 flex flex-wrap gap-2">
-                      <button
-                        type="button"
-                        onClick={() => handleResendVerification(email)}
-                        className="text-[10px] bg-orange-500 hover:bg-orange-650 hover:-translate-y-0.5 text-white font-bold px-3 py-1.5 rounded-lg transition-all cursor-pointer inline-flex items-center gap-1.5 shadow-xs"
-                      >
-                        <Send className="w-3 h-3 text-white" />
-                        <span>Resend Verification Email (Sandbox)</span>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={async () => {
-                          const success = await store.verifyUserEmail(email);
-                          if (success) {
-                            setSuccessMsg(`Student account verified successfully for ${email}! Press log in again to enter.`);
-                            setErrorMsg('');
-                          } else {
-                            setErrorMsg('Verification failed. Is the account properly registered first?');
-                          }
-                        }}
-                        className="text-[10px] bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-3 py-1.5 rounded-lg transition-all cursor-pointer inline-flex items-center gap-1.5 shadow-xs"
-                      >
-                        <CheckSquare className="w-3 h-3" />
-                        <span>Instant Auto-Verify Student Account</span>
-                      </button>
-                    </div>
-                  )}
-
-                  {(errorMsg.includes('POPUP_CLOSED_BY_USER') || errorMsg.includes('CANCELLED_POPUP_REQUEST') || errorMsg.toLowerCase().includes('popup') || errorMsg.toLowerCase().includes('closed')) && (
-                    <div className="pt-3 mt-3 border-t border-red-200/50 space-y-3 animate-fade-in">
-                      <div className="bg-amber-50 border border-amber-200 text-amber-900 rounded-2xl p-4 text-[11.5px] leading-relaxed font-sans text-left space-y-2">
-                        <p className="font-bold text-amber-950 flex items-center gap-1.5">
-                          🛡️ Sandbox / iFrame Popup Guard Notice:
-                        </p>
-                        <p>
-                          Because this workspace runs inside an <strong>iFrame container</strong> at Google AI Studio, browser security protocols often block authentication popups or cross-origin session storage.
-                        </p>
-                        <p className="font-semibold text-amber-950 mt-1">💡 How to fix and log in immediately:</p>
-                        <ul className="list-disc pl-4 space-y-1.5 text-[11px] text-gray-800">
-                          <li>
-                            <strong className="text-amber-955">Method 1 (Recommended):</strong> Open the application in a dedicated separate tab to bypass all iframe limitations. <a href="https://ais-dev-lxhnmo75fkkuj5cd7dujpf-92836459425.asia-southeast1.run.app" target="_blank" rel="noreferrer" className="text-orange-600 underline font-bold hover:text-orange-700 inline-flex items-center gap-0.5">Click here to open in full tab</a>.
-                          </li>
-                          <li>
-                            <strong className="text-amber-955">Method 2 (Allow Popups):</strong> Look at your browser's URL address bar (top right corner). If you see a "Popup blocked" icon, click it and click <strong>"Allow popups from this domain"</strong>, then press the login button again.
-                          </li>
-                          <li>
-                            <strong className="text-amber-955">Method 3 (Instant/Bypass):</strong> Skip external Google API steps and register using our direct <strong>"Email / Security Password"</strong> form option. It authorizes instantly inside the iframe sandbox with zero warnings.
-                          </li>
-                          <li>
-                            <strong className="text-emerald-700 font-extrabold">Method 4 (Sandbox Simulation):</strong> Skip popups entirely by simulating an authenticated Google session for the active student account:
-                            <button
-                              type="button"
-                              id="simulate-authpage-google-login-btn"
-                              onClick={() => {
-                                const targetEmail = 'shaka.ahmadd@gmail.com';
-                                const matchedUser = store.users.find(u => u.email.toLowerCase().trim() === targetEmail);
-                                if (matchedUser) {
-                                  const loggedIn = onLogin(targetEmail);
-                                  if (loggedIn) {
-                                    setSuccessMsg('Welcome back, Shaka Ahmad! Simulated Google session activated.');
-                                    setErrorMsg('');
-                                    setTimeout(() => {
-                                      onNavigate('dashboard');
-                                    }, 1000);
-                                  }
-                                } else {
-                                  const success = onRegister('Shaka Ahmad', targetEmail, UserRole.STUDENT, {
-                                    verified: true,
-                                    signupMethod: 'google',
-                                    verifiedAt: new Date().toISOString()
-                                  });
-                                  if (success) {
-                                    setSuccessMsg('Welcome, Shaka Ahmad! Simulated student profile registered and initialized successfully.');
-                                    setErrorMsg('');
-                                    setTimeout(() => {
-                                      onLogin(targetEmail);
-                                      onNavigate('dashboard');
-                                    }, 1100);
-                                  }
-                                }
-                              }}
-                              className="mt-1.5 bg-emerald-600 hover:bg-emerald-700 active:scale-97 text-white font-bold text-[10.5px] px-3.5 py-1.5 rounded-lg transition-all cursor-pointer block shadow-sm border border-emerald-500"
-                            >
-                              ⚡ Run Instant Simulated Google SSO Bypass (shaka.ahmadd@gmail.com)
-                            </button>
-                          </li>
-                        </ul>
-                      </div>
-                    </div>
-                  )}
-
-                  {(errorMsg.toLowerCase().includes('google') || errorMsg.toLowerCase().includes('denied') || errorMsg.toLowerCase().includes('block') || errorMsg.toLowerCase().includes('fail') || errorMsg.toLowerCase().includes('cancel')) && 
-                   !errorMsg.includes('POPUP_CLOSED_BY_USER') && !errorMsg.includes('CANCELLED_POPUP_REQUEST') && (
-                    <div className="pt-3 mt-3 border-t border-red-200/50 space-y-3">
-                      <div className="bg-amber-50/80 border border-amber-200 text-amber-900 rounded-xl p-3 text-[11px] leading-relaxed font-sans text-left space-y-1.5">
-                        <p className="font-bold text-amber-950 flex items-center gap-1">
-                          🛠️ Google OAuth Consent Screen restriction detected:
-                        </p>
-                        <p>
-                          Your Google API integration is currently in <strong>"Testing"</strong> status inside your Google Console. By default, Google blocks all sign-ins in "Testing" mode unless the email is manually registered as a Test User.
-                        </p>
-                        <p className="font-semibold text-gray-800 mt-1">💡 How to Go Live / Move to Production (Zero Test User limits):</p>
-                        <ul className="list-disc pl-4 space-y-1 text-[10.5px]">
-                          <li>
-                            <strong>Go to Google Cloud Console:</strong> Search for your Google Console for project <strong>grounded-vision-499014-m3</strong>.
-                          </li>
-                          <li>
-                            <strong>Publish Your App:</strong> Go to <strong>APIs & Services &rarr; OAuth consent screen</strong>, and under "Publishing status", click the <strong>"Publish App"</strong> button. This transitions your app from <em>Testing</em> to <em>In Production</em> and removes all test user restrictions instantly!
-                          </li>
-                          <li>
-                            <strong>Alternative:</strong> Use our <strong>direct Email Sign Up</strong> which registers your account instantly with absolutely no Google verification or restrictions.
-                          </li>
-                        </ul>
-                      </div>
-                    </div>
-                  )}
-
-                  {errorMsg.includes('Account not found') && email && (
-                    <div className="pt-2 flex flex-col gap-1.5 sm:flex-row sm:flex-wrap">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const simpleName = email.split('@')[0];
-                          const capitalized = simpleName.charAt(0).toUpperCase() + simpleName.slice(1);
-                          const success = onRegister(capitalized, email, UserRole.STUDENT, {
-                            verified: true,
-                            signupMethod: 'email',
-                            verifiedAt: new Date().toISOString()
-                          });
-                          if (success) {
-                            setSuccessMsg(`Student account created and instantly verified for ${email}! Accessing your workspace...`);
-                            setErrorMsg('');
-                            setTimeout(() => {
-                              onLogin(email);
-                              onNavigate('dashboard');
-                            }, 1100);
-                          } else {
-                            setErrorMsg('Failure during quick account creation.');
-                          }
-                        }}
-                        className="text-[10px] bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-3 py-1.5 rounded-lg transition-all cursor-pointer inline-flex items-center gap-1.5 shadow-xs"
-                      >
-                        <CheckSquare className="w-3 h-3 text-white" />
-                        <span>Instant Register & Enter as Verified Student</span>
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const simpleName = email.split('@')[0];
-                          const capitalized = simpleName.charAt(0).toUpperCase() + simpleName.slice(1);
-                          const success = onRegister(capitalized, email, UserRole.TUTOR, {
-                            verified: true,
-                            signupMethod: 'email',
-                            verifiedAt: new Date().toISOString()
-                          });
-                          if (success) {
-                            setSuccessMsg(`Tutor account created and instantly verified for ${email}! Accessing your workspace...`);
-                            setErrorMsg('');
-                            setTimeout(() => {
-                              onLogin(email);
-                              onNavigate('dashboard');
-                            }, 1100);
-                          } else {
-                            setErrorMsg('Failure during quick account creation.');
-                          }
-                        }}
-                        className="text-[10px] bg-blue-600 hover:bg-blue-700 text-white font-bold px-3 py-1.5 rounded-lg transition-all cursor-pointer inline-flex items-center gap-1.5 shadow-xs"
-                      >
-                        <CheckSquare className="w-3 h-3 text-white" />
-                        <span>Instant Register & Enter as Verified Tutor</span>
-                      </button>
-                    </div>
-                  )}
                 </div>
               </div>
             </div>
@@ -815,7 +658,7 @@ export default function AuthPage({ onLogin, onRegister, onNavigate }: AuthPagePr
               {!isLoginView && (
                 <>
                   <div>
-                    <label className="text-xs font-bold text-gray-700 block mb-1">Full Representative Student/Tutor Name</label>
+                    <label className="text-xs font-bold text-gray-700 block mb-1">Full Representative Student Name</label>
                     <div className="relative">
                       <UserIcon className="w-4 h-4 text-gray-400 absolute left-3 top-3.5" />
                       <input
@@ -824,40 +667,19 @@ export default function AuthPage({ onLogin, onRegister, onNavigate }: AuthPagePr
                         placeholder="e.g. Liam Stirling"
                         value={name}
                         onChange={(e) => setName(e.target.value)}
-                        className="w-full bg-gray-50 border border-gray-200 focus:border-orange-500 focus:bg-white focus:outline-hidden py-2.5 pl-10 pr-4 rounded-xl text-sm transition-colors"
+                        className="w-full bg-gray-55 border border-gray-200 focus:border-orange-500 focus:bg-white focus:outline-hidden py-2.5 pl-10 pr-4 rounded-xl text-sm transition-colors"
                         required
                       />
                     </div>
                   </div>
 
-                  <div>
-                    <label className="text-xs font-bold text-gray-700 block mb-1">Select Role</label>
-                    <div className="grid grid-cols-2 gap-3">
-                      <button
-                        type="button"
-                        id="role-select-student"
-                        onClick={() => setRole(UserRole.STUDENT)}
-                        className={`py-2 rounded-xl text-xs font-bold border transition-colors cursor-pointer ${
-                          role === UserRole.STUDENT 
-                            ? 'bg-orange-500 text-white border-orange-500' 
-                            : 'bg-white border-gray-200 text-gray-650 hover:bg-gray-50'
-                        }`}
-                      >
-                        University Student
-                      </button>
-                      <button
-                        type="button"
-                        id="role-select-tutor"
-                        onClick={() => setRole(UserRole.TUTOR)}
-                        className={`py-2 rounded-xl text-xs font-bold border transition-colors cursor-pointer ${
-                          role === UserRole.TUTOR 
-                            ? 'bg-orange-500 text-white border-orange-500' 
-                            : 'bg-white border-gray-200 text-gray-650 hover:bg-gray-50'
-                        }`}
-                      >
-                        Certified Subject Tutor
-                      </button>
-                    </div>
+                  <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 text-[11px] leading-relaxed font-sans text-left space-y-1 my-2">
+                    <p className="font-bold text-amber-950 flex items-center gap-1.5">
+                      🎓 Student Registration Only
+                    </p>
+                    <p className="text-gray-700">
+                      Public registration is reserved for active students seeking tutor services. <strong>Certified Tutors</strong> and <strong>Sub-Admins</strong> are generated exclusively by the Superior Admin (<span className="font-semibold text-orange-700">shaka.ahmadd@gmail.com</span>).
+                    </p>
                   </div>
 
                   {/* ONLY FOR STUDENTS: Render the specific enabled signup options from the picture */}
@@ -1359,6 +1181,32 @@ export default function AuthPage({ onLogin, onRegister, onNavigate }: AuthPagePr
           </div>
         </div>
       )}
+
+      {/* Google OAuth human reviewer disclosure block */}
+      <div className="w-full max-w-5xl bg-white rounded-3xl border border-gray-200 p-6 md:p-8 mt-2 space-y-6 shadow-xs text-left">
+        <div>
+          <h4 className="text-xs font-bold text-gray-900 uppercase tracking-widest mb-3 border-b border-gray-100 pb-2">
+            Application Overview &amp; Google OAuth Disclosure
+          </h4>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-xs text-gray-650 leading-relaxed">
+            <div className="space-y-2 bg-orange-50/40 p-5 rounded-2xl border border-orange-100/50">
+              <span className="font-bold text-orange-950 block text-[11px] uppercase tracking-wider">Section A: The App Purpose</span>
+              <p className="font-medium text-gray-700">
+                <strong>University-tutors</strong> is an integrated academic support platform designed to connect students with expert educational consultants and tutors. This application facilitates secure, real-time consultation chats, document sharing for assignment briefs, and streamlined project tracking between students and administrative teams to enhance the overall learning experience.
+              </p>
+            </div>
+            <div className="space-y-2 bg-amber-50/40 p-5 rounded-2xl border border-amber-100/50">
+              <span className="font-bold text-amber-950 block text-[11px] uppercase tracking-wider">Section B: Google Data Usage</span>
+              <p className="font-medium text-gray-700">
+                When you sign in using your Google Account, <strong>University-tutors</strong> requests access to your basic profile information (such as your name and email address). We use this data exclusively to securely authenticate your account, personalize your dashboard, and verify your identity within our internal chat and support systems. We do not share, sell, or utilize your personal information for any secondary purposes.
+              </p>
+            </div>
+          </div>
+          <div className="mt-4 text-[10px] text-gray-400 text-center font-mono">
+            For more details, view our dedicated <button onClick={() => onNavigate('google-disclosure')} className="text-orange-600 hover:underline font-bold">Google Disclosure page</button> or read our full <button onClick={() => onNavigate('privacy')} className="text-orange-600 hover:underline font-bold">Privacy Policy</button>.
+          </div>
+        </div>
+      </div>
 
     </main>
   );

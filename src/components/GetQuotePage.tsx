@@ -1,82 +1,165 @@
-import React, { useState } from 'react';
-import { motion, AnimatePresence } from 'motion/react';
-import { 
-  GraduationCap, 
-  Sparkles, 
-  FileText, 
-  Calendar, 
-  BookOpen, 
-  DollarSign, 
-  Upload, 
-  X, 
-  ArrowRight, 
-  CheckCircle, 
-  ArrowLeft, 
-  User as UserIcon,
-  HelpCircle,
-  FileCode,
-  Globe,
-  Loader2
-} from 'lucide-react';
-import { store } from '../lib/store';
-import { User, UserRole, AssignmentStatus, Assignment } from '../types';
+import React, { useState, useRef } from 'react';
+import { User } from '../types';
 
 interface GetQuotePageProps {
-  currentUser: User | null;
-  onNavigate: (view: string) => void;
-  tutors: User[];
-  onOpenChat: (tutorId: string) => void;
+  currentUser?: User | null;
+  onNavigate?: (view: string) => void;
+  tutors?: User[];
+  onOpenChat?: (tutorId: string) => void;
 }
 
+// Light-weight custom vector SVG assets for visuals
+const BookOpenIcon = () => (
+  <svg xmlns="http://www.w3.org/2000/svg" className="w-8 h-8 text-orange-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+  </svg>
+);
+
+const CalendarIcon = () => (
+  <svg xmlns="http://www.w3.org/2000/svg" className="w-8 h-8 text-orange-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+  </svg>
+);
+
+const UploadCloudIcon = () => (
+  <svg xmlns="http://www.w3.org/2000/svg" className="w-10 h-10 text-orange-600 animate-bounce" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+  </svg>
+);
+
+const TrashIcon = () => (
+  <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 text-red-500 hover:text-red-700" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+  </svg>
+);
+
+const ChatBubbleIcon = () => (
+  <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 animate-pulse" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+  </svg>
+);
+
+const SparklesIcon = () => (
+  <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 text-orange-200 animate-pulse" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
+  </svg>
+);
+
+const ChevronRight = () => (
+  <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+  </svg>
+);
+
+const ChevronLeft = () => (
+  <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+  </svg>
+);
+
 export default function GetQuotePage({ currentUser, onNavigate, tutors, onOpenChat }: GetQuotePageProps) {
-  // Step State: 1 = Topic & Info, 2 = Details & Files, 3 = Tutor Pref & Confirmation
-  const [step, setStep] = useState<number>(1);
-  const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
-  const [successId, setSuccessId] = useState<string | null>(null);
+  const [currentStep, setCurrentStep] = useState(1);
+  const [isSubmitted, setIsSubmitted] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Form Fields State
-  const [title, setTitle] = useState('');
-  const [subject, setSubject] = useState('Mathematics & Statistics');
-  const [deadline, setDeadline] = useState('');
-  const [wordCount, setWordCount] = useState<number>(1000);
-  const [referenceStyle, setReferenceStyle] = useState('Harvard style citation');
-  const [sourcesCount, setSourcesCount] = useState<number>(3);
-  const [instructions, setInstructions] = useState('');
-  const [preferredTutorId, setPreferredTutorId] = useState('any');
+  // Core Form State
+  const [selectedService, setSelectedService] = useState('Online tutoring');
+  const [subject, setSubject] = useState('');
+  const [studyLevel, setStudyLevel] = useState('Undergraduate / College');
   
-  // File attachments state
-  const [isDragging, setIsDragging] = useState<boolean>(false);
-  const [uploadedFiles, setUploadedFiles] = useState<{ name: string; size: string; progress: number }[]>([]);
+  // Timeline State
+  const [timelineType, setTimelineType] = useState('Flexible'); // Urgent, Standard, Flexible
+  const [deadlineDate, setDeadlineDate] = useState('');
+  const [deadlineTime, setDeadlineTime] = useState('');
+  
+  // Uploaded Documents Simulated List
+  const [uploadedFiles, setUploadedFiles] = useState<{ id: string; name: string; size: string; progress: number }[]>([]);
+  const [isDragging, setIsDragging] = useState(false);
 
-  // On-the-fly registration form state for guest users
-  const [guestName, setGuestName] = useState('');
-  const [guestEmail, setGuestEmail] = useState('');
-  const [guestError, setGuestError] = useState('');
+  // Additional instructions/syllabus details
+  const [notes, setNotes] = useState('');
+  const [errors, setErrors] = useState<Record<string, string | null>>({});
 
-  const subjectsList = [
-    'Mathematics & Statistics',
-    'Computer Science & Programming',
-    'Economics & Finance',
-    'Business & Management',
-    'Data Science & Analytics',
-    'Physics & Quantum Mechanics',
-    'Engineering & CAD',
-    'Chemistry & Biochemistry',
-    'English Lit & Essays',
-    'History & Social Sciences',
-    'Other / Custom Topic'
+  // Core 4 Services Options
+  const servicesList = [
+    {
+      id: 'Online tutoring',
+      title: 'Online Tutoring',
+      description: 'Live interactive workspace focusing on deep concepts & syllabus comprehension.',
+      badge: 'Interactive Classes'
+    },
+    {
+      id: 'Online assignment tutoring',
+      title: 'Online Assignment Tutoring',
+      description: 'Collaborative analysis of complex problems, codes, laboratory reports, & homework.',
+      badge: 'Assignment Assistance'
+    },
+    {
+      id: 'Online courses work tutoring',
+      title: 'Online Course Work Tutoring',
+      description: 'Steady structural guidance tracking syllabus progression & course metrics.',
+      badge: 'Full Term Support'
+    },
+    {
+      id: 'Online writing services',
+      title: 'Online Writing Services',
+      description: 'Formatting mechanics, citation auditing, thesis planning, and developmental writing edits.',
+      badge: 'Premium Writing Assist'
+    }
   ];
 
-  const citationsList = [
-    'Harvard style citation',
-    'APA 7th Reference Style',
-    'MLA 9th Edition Standard',
-    'IEEE LaTeX Formatting',
-    'Chicago Manual of Style',
-    'Not applicable (STEM Code / Lab)'
+  // Specific Study Levels
+  const studyLevels = [
+    { level: 'High School', tag: 'Foundational', details: 'AP classes, IB diploma, college prep, & standard curricula.' },
+    { level: 'Undergraduate / College', tag: 'Highly Popular', details: 'Lower & upper division courses, major electives, & practical projects.' },
+    { level: 'Graduate / Master\'s', tag: 'Advanced Specialized', details: 'Statistical models, graduate level research, thesis editing.' },
+    { level: 'PhD / Doctoral Level', tag: 'Expert Rigor', details: 'Defense planning, research methodologies, academic publications.' }
   ];
 
-  // Drag and drop handlers
+  // Quick subject selections
+  const quickSubjects = [
+    'Calculus & Analysis',
+    'Organic Chemistry',
+    'Applied Statistics',
+    'Computer Science (Algorithmic Logic)',
+    'Financial Accounting',
+    'Analytical Essay Writing'
+  ];
+
+  // Validate current step prior to transition
+  const validateCurrentStep = () => {
+    const stepErrors: Record<string, string | null> = {};
+    if (currentStep === 1) {
+      if (!selectedService) {
+        stepErrors.selectedService = 'Please select a core service to proceed.';
+      }
+      if (!subject.trim()) {
+        stepErrors.subject = 'Please specify the target course or subject topic.';
+      }
+    } else if (currentStep === 2) {
+      if (!studyLevel) {
+        stepErrors.studyLevel = 'Please choose your current academic study level.';
+      }
+    } else if (currentStep === 3) {
+      if (timelineType === 'Urgent' && (!deadlineDate || !deadlineTime)) {
+        stepErrors.timeline = 'Please select a deadline date and time for urgent assistance.';
+      }
+    }
+    setErrors(stepErrors);
+    return Object.keys(stepErrors).filter(k => stepErrors[k] !== null).length === 0;
+  };
+
+  const handleNextStep = () => {
+    if (validateCurrentStep()) {
+      setCurrentStep((prev) => Math.min(prev + 1, 5));
+    }
+  };
+
+  const handlePrevStep = () => {
+    setCurrentStep((prev) => Math.max(prev - 1, 1));
+  };
+
+  // Drag & drop handlers for document upload page
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
     setIsDragging(true);
@@ -90,606 +173,520 @@ export default function GetQuotePage({ currentUser, onNavigate, tutors, onOpenCh
     e.preventDefault();
     setIsDragging(false);
     if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
-      addMockFiles(e.dataTransfer.files);
+      addSimulatedFiles(e.dataTransfer.files);
     }
   };
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
-      addMockFiles(e.target.files);
+      addSimulatedFiles(e.target.files);
     }
   };
 
-  const addMockFiles = (filesList: FileList) => {
-    const filesArray = Array.from(filesList);
-    const updated = filesArray.map(f => {
-      const sizeStr = (f.size / (1024 * 1024)).toFixed(2) + ' MB';
-      return {
-        name: f.name,
-        size: sizeStr,
-        progress: 0
-      };
-    });
-
-    setUploadedFiles(prev => [...prev, ...updated]);
-
-    // Animate progress simulation
-    updated.forEach((file, index) => {
-      let currentProgress = 0;
-      const interval = setInterval(() => {
-        currentProgress += Math.floor(Math.random() * 25) + 10;
-        if (currentProgress >= 100) {
-          currentProgress = 100;
-          clearInterval(interval);
-        }
-        setUploadedFiles(prev => prev.map(item => {
-          if (item.name === file.name) {
-            return { ...item, progress: currentProgress };
-          }
-          return item;
-        }));
-      }, 150);
-    });
+  const addSimulatedFiles = (filesList: FileList) => {
+    const newFiles = Array.from(filesList).map((file) => ({
+      id: Math.random().toString(36).substr(2, 9),
+      name: file.name,
+      size: (file.size / (1024 * 1024)).toFixed(2) + ' MB',
+      progress: 100
+    }));
+    setUploadedFiles((prev) => [...prev, ...newFiles]);
   };
 
-  const removeFile = (name: string) => {
-    setUploadedFiles(prev => prev.filter(f => f.name !== name));
+  const deleteUploadedFile = (id: string) => {
+    setUploadedFiles((prev) => prev.filter((file) => file.id !== id));
   };
 
-  // Submit quote handler
-  const handleSubmitQuote = async (e: React.FormEvent) => {
+  const handleFinalSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    setGuestError('');
-
-    // Require authentication or generate on-the-fly account
-    let userToUse = currentUser;
-
-    if (!userToUse) {
-      if (!guestName.trim() || !guestEmail.trim()) {
-        setGuestError('Please fill out your identity details to proceed.');
-        return;
-      }
-      
-      // On the fly registration logic
-      const success = store.register(guestName, guestEmail, UserRole.STUDENT, { verified: true });
-      if (!success) {
-        setGuestError('Could not create account. Academic email is already registered. Please sign in first.');
-        return;
-      }
-      store.login(guestEmail);
-      userToUse = store.currentUser;
-    }
-
-    if (!userToUse) {
-      setGuestError('Login validation error. Please try again.');
-      return;
-    }
-
-    if (!title.trim()) {
-      setGuestError('Please declare your assignment topic or task title.');
-      return;
-    }
-
-    setIsSubmitting(true);
-
-    try {
-      // Create and save to store State
-      const tutorToSet = preferredTutorId === 'any' ? (tutors[0]?.id || 'tutor_clara') : preferredTutorId;
-      const fileNames = uploadedFiles.map(f => f.name);
-      
-      const newAssignId = await store.submitAssignment({
-        studentId: userToUse.id,
-        tutorId: tutorToSet,
-        title: title,
-        subject: subject,
-        deadline: deadline || new Date(Date.now() + 86400000 * 3).toISOString().split('T')[0], // 3 days default
-        wordCount: wordCount,
-        referenceStyle: referenceStyle,
-        sourcesCount: sourcesCount,
-        instructions: instructions || 'Please check attachment parameters.',
-        fileUrls: uploadedFiles.map(() => 'https://example.com/mock-upload-document.pdf'),
-        fileNames: fileNames,
-        quoteAmount: wordCount > 0 ? Math.round(wordCount * 0.08) + 25 : 85
-      });
-
-      // Show success celebration
-      setSuccessId(newAssignId);
-    } catch (err: any) {
-      console.error(err);
-      setGuestError('An error occurred during escrow registration. Please check inputs.');
-    } finally {
-      setIsSubmitting(false);
+    if (validateCurrentStep()) {
+      setIsSubmitted(true);
     }
   };
-
-  const isFormStep1Valid = title.trim().length > 0 && subject.trim().length > 0;
 
   return (
-    <div className="min-h-screen bg-[#FCFCFD] text-[#0B1528] py-16 px-4 sm:px-6 lg:px-8 font-sans" id="dedicated-get-quote-page">
-      <div className="max-w-4xl mx-auto">
+    <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4 sm:p-6 md:p-8 font-sans selection:bg-orange-600 selection:text-white" id="service-selector-wizard">
+      <div className="max-w-5xl w-full bg-white rounded-3xl shadow-2xl overflow-hidden border border-slate-100 flex flex-col md:flex-row min-h-[640px]">
         
-        {/* Navigation back and small badge */}
-        <div className="flex justify-between items-center mb-8">
-          <button 
-            onClick={() => onNavigate('home')}
-            className="flex items-center gap-2 text-sm text-gray-500 hover:text-orange-500 font-semibold cursor-pointer transition-colors"
-          >
-            <ArrowLeft className="w-4 h-4" />
-            <span>Back to Homepage</span>
-          </button>
+        {/* Visual Accent Side Panel (Orange Gradient Branding) */}
+        <div className="md:w-1/3 bg-gradient-to-br from-orange-600 via-orange-500 to-amber-500 p-8 text-white flex flex-col justify-between relative overflow-hidden shrink-0">
+          {/* Subtle design elements */}
+          <div className="absolute top-0 right-0 w-44 h-44 bg-white/10 rounded-full blur-2xl transform translate-x-12 -translate-y-12"></div>
+          <div className="absolute bottom-0 left-0 w-36 h-36 bg-orange-700/20 rounded-full blur-xl transform -translate-x-6 translate-y-6"></div>
           
-          <div className="flex items-center gap-1 bg-amber-50 text-amber-700 text-[11px] font-bold uppercase tracking-wider px-3.5 py-1 rounded-full border border-amber-200">
-            <Sparkles className="w-3.5 h-3.5" />
-            <span>Strict Honor Code &amp; Academic Integrity Protected</span>
-          </div>
-        </div>
-
-        {/* Big Heading Hero */}
-        <div className="text-center md:text-left mb-10 space-y-4">
-          <h1 className="text-4xl md:text-5.5xl font-black italic uppercase tracking-tight text-[#0B1528] leading-none font-heading">
-            Request an <span className="text-[#F99B0C]">Escrow quotation</span>
-          </h1>
-          <p className="text-xs md:text-sm text-gray-500 max-w-2xl font-semibold leading-relaxed">
-            Fill out your academic project specifications. Our system automatically distributes them to dual-vetted native syllabus experts in your region. You will receive competitive bids directly on your student portal within 15 minutes.
-          </p>
-        </div>
-
-        {/* Progress Timeline steps */}
-        <div className="bg-white border border-gray-150 rounded-3xl p-4 md:p-6 mb-8 shadow-xs">
-          <div className="grid grid-cols-3 gap-2 text-center text-xs tracking-wider uppercase font-bold relative">
-            <div className={`py-1.5 rounded-xl transition-all ${step === 1 ? 'bg-orange-500 text-white shadow-md' : 'text-gray-500'}`}>
-              <span className="font-mono text-sm mr-1">01.</span> Specs
+          <div className="relative z-10 space-y-6">
+            <div className="flex items-center gap-2 bg-white/15 backdrop-blur-md px-3 py-1.5 rounded-full w-fit border border-white/20">
+              <span className="w-2 h-2 rounded-full bg-orange-200 animate-ping"></span>
+              <span className="text-[10px] font-black uppercase tracking-widest text-orange-50">Dashboard Matchmaker</span>
             </div>
-            <div className={`py-1.5 rounded-xl transition-all ${step === 2 ? 'bg-orange-500 text-white shadow-md' : 'text-gray-500'}`}>
-              <span className="font-mono text-sm mr-1">02.</span> Criteria &amp; Files
-            </div>
-            <div className={`py-1.5 rounded-xl transition-all ${step === 3 ? 'bg-orange-500 text-white shadow-md' : 'text-gray-500'}`}>
-              <span className="font-mono text-sm mr-1">03.</span> Tutor bid
+
+            <div>
+              <span className="text-[10px] font-bold uppercase tracking-widest text-orange-200 block mb-1">Authenticated Account Active</span>
+              <h1 className="text-3xl md:text-4xl font-black tracking-tight leading-none">
+                university<br />
+                <span className="text-orange-950 font-black">.tutor</span>
+              </h1>
             </div>
           </div>
-        </div>
 
-        {/* Main Content Area */}
-        <AnimatePresence mode="wait">
-          {successId ? (
-            /* Celebration step succeeds */
-            <motion.div 
-              key="success-card"
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0 }}
-              className="bg-white border-2 border-emerald-500 rounded-3xl p-8 text-center space-y-6 shadow-xl"
-            >
-              <div className="w-16 h-16 bg-emerald-100 rounded-full flex items-center justify-center mx-auto text-emerald-600 animate-pulse">
-                <CheckCircle className="w-10 h-10 stroke-[2.5]" />
-              </div>
-              <div className="space-y-3">
-                <h3 className="text-2xl md:text-3xl font-bold font-heading uppercase text-emerald-900 leading-tight">Quotation Registered successfully!</h3>
-                <p className="text-[#475569] text-xs md:text-sm max-w-lg mx-auto font-medium leading-relaxed">
-                  Excellent! Your project has been registered as pending assignment <strong className="text-gray-950">#{successId}</strong>. We have automatically notified 5 vetted native subject specialists aligned with your curriculum.
-                </p>
-              </div>
-
-              {/* Highlighting registered account details */}
-              <div className="bg-[#fffbf7] border border-orange-100 p-5 rounded-2xl text-left max-w-md mx-auto space-y-3">
-                <span className="text-xs font-bold text-orange-950 block uppercase tracking-wide">💡 Your Student Account is Ready</span>
-                <p className="text-[11px] text-orange-850 leading-relaxed font-semibold">
-                  You have been logged into your real-time academic sandbox environment. Visit your dashboard to manage, chat with advisors, and authorized secure payment releases instantly.
-                </p>
-                <div className="flex justify-between items-center text-[10px] font-mono text-gray-500 font-bold border-t border-orange-150 pt-2">
-                  <span>User Role: Student</span>
-                  <span>Direct Match Sync: Active</span>
+          {/* Stepper Progression Visualizer */}
+          <div className="relative z-10 py-8 space-y-4">
+            <span className="text-[10px] uppercase font-black tracking-widest text-orange-950">Matching Journey</span>
+            <div className="space-y-3">
+              {[
+                { s: 1, label: 'Service Selection' },
+                { s: 2, label: 'Study Level' },
+                { s: 3, label: 'Deadline & Timeline' },
+                { s: 4, label: 'Syllabus & Documents' },
+                { s: 5, label: 'Connect Instant Chat' }
+              ].map((stepItem) => (
+                <div key={stepItem.s} className="flex items-center gap-3">
+                  <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[11px] font-black transition-all duration-300 ${
+                    currentStep === stepItem.s 
+                      ? 'bg-orange-950 text-white ring-4 ring-orange-950/20 scale-110' 
+                      : currentStep > stepItem.s 
+                      ? 'bg-white text-orange-600 font-bold' 
+                      : 'bg-orange-400/30 text-orange-200'
+                  }`}>
+                    {currentStep > stepItem.s ? '✓' : stepItem.s}
+                  </div>
+                  <span className={`text-xs font-bold transition-all ${
+                    currentStep === stepItem.s ? 'text-white font-black' : 'text-orange-100/80'
+                  }`}>
+                    {stepItem.label}
+                  </span>
                 </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Helper Footnote on panel */}
+          <div className="relative z-10 pt-4 border-t border-white/20 text-xs text-orange-50/80 leading-snug">
+            Your dashboard session automatically updates the administrative matching team with these choices.
+          </div>
+        </div>
+
+        {/* Right Dynamic Form Section */}
+        <div className="flex-1 p-6 sm:p-10 md:p-12 flex flex-col justify-between bg-white relative">
+          
+          {isSubmitted ? (
+            /* CONVERSION SUCCESS SCREEN & GOOGLE CHAT LAUNCHER */
+            <div className="my-auto text-center space-y-6 py-8 animate-fade-in">
+              <div className="w-20 h-20 bg-orange-50 rounded-full flex items-center justify-center mx-auto border border-orange-200 shadow-sm">
+                <span className="text-4xl text-orange-600 font-black">✓</span>
+              </div>
+              <div className="space-y-2">
+                <span className="text-xs uppercase font-extrabold tracking-widest text-orange-600 bg-orange-50 px-3.5 py-1 rounded-full border border-orange-200">Session Initialized</span>
+                <h2 className="text-3xl md:text-4xl font-black text-slate-900 tracking-tight mt-3">Ready to Connect!</h2>
+                <p className="text-sm text-slate-500 max-w-md mx-auto leading-relaxed">
+                  Your project requirements for <strong className="text-slate-900">{selectedService} ({subject})</strong> have been successfully synced. We have initialized your tutor matching session.
+                </p>
               </div>
 
-              <div className="flex flex-col sm:flex-row gap-3 justify-center items-center font-bold">
+              {/* Action Box to Redirect to Dashboard */}
+              <div className="bg-slate-50 border-2 border-slate-100 p-6 rounded-2xl max-w-md mx-auto space-y-4 shadow-xs">
+                <div className="flex items-center justify-center gap-2 text-xs font-black uppercase text-orange-600 tracking-wider">
+                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping"></span>
+                  Standby Tutor Matching Engaged
+                </div>
+                
+                <button 
+                  onClick={() => onNavigate && onNavigate('dashboard')}
+                  className="w-full bg-orange-600 hover:bg-orange-700 text-white font-black text-base py-4 px-6 rounded-xl shadow-lg shadow-orange-600/25 transition-all transform active:scale-95 duration-200 flex items-center justify-center gap-3 cursor-pointer"
+                >
+                  <ChatBubbleIcon />
+                  Go to Dashboard Chat
+                </button>
+                
+                <p className="text-[11px] text-slate-400 leading-normal">
+                  Use the button above to go straight to your personal student dashboard where you can chat in real-time with our administrative team and your assigned expert tutor.
+                </p>
+              </div>
+
+              <div className="pt-4">
                 <button
                   onClick={() => {
-                    const finalTutorId = preferredTutorId === 'any' ? (tutors[0]?.id || 'tutor_clara') : preferredTutorId;
-                    onOpenChat(finalTutorId);
-                    onNavigate('dashboard');
-                  }}
-                  className="w-full sm:w-auto bg-gray-950 hover:bg-black text-white px-6 py-3 rounded-xl shadow-lg transition-all text-xs tracking-wider uppercase cursor-pointer"
-                >
-                  Enter Student Dashboard &amp; Start Chat
-                </button>
-                <button 
-                  onClick={() => {
-                    setStep(1);
-                    setSuccessId(null);
-                    setTitle('');
-                    setInstructions('');
+                    setIsSubmitted(false);
+                    setCurrentStep(1);
                     setUploadedFiles([]);
+                    setSubject('');
+                    setNotes('');
                   }}
-                  className="w-full sm:w-auto text-[#0B1528] hover:text-orange-500 hover:underline px-4 py-2 transition-colors text-xs"
+                  className="text-xs font-extrabold text-slate-400 hover:text-orange-600 transition underline decoration-dotted"
                 >
-                  Submit Another Quote
+                  Adjust specifications & open another query
                 </button>
               </div>
-            </motion.div>
+            </div>
           ) : (
-            <motion.div
-              key="form-navigation"
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -10 }}
-            >
-              <form onSubmit={handleSubmitQuote} className="bg-white border border-gray-150 rounded-[32px] p-6 sm:p-8 lg:p-10 shadow-xs space-y-8">
-                
-                {/* Form error block if guest validations fail */}
-                {guestError && (
-                  <div className="bg-red-50 border border-red-200 text-red-700 p-4 rounded-xl text-xs font-semibold leading-relaxed">
-                    🚨 {guestError}
+            <div className="h-full flex flex-col justify-between space-y-8">
+              
+              <div className="flex justify-between items-center pb-2 border-b border-slate-100">
+                <button 
+                  onClick={() => onNavigate?.('home')}
+                  className="flex items-center gap-1.5 text-xs font-black uppercase text-slate-450 hover:text-orange-600 transition cursor-pointer"
+                >
+                  ← Back to Home
+                </button>
+                <span className="text-[10px] font-mono font-bold text-slate-400 uppercase tracking-widest">Match Wizard v2.4</span>
+              </div>
+
+              {/* SCREEN 1: Core Service Selection */}
+              {currentStep === 1 && (
+                <div className="space-y-6 animate-fade-in">
+                  <div className="space-y-1 text-left">
+                    <h2 className="text-2xl md:text-3.5xl font-black text-slate-900 tracking-tight leading-none">
+                      Select Target Service
+                    </h2>
+                    <p className="text-slate-400 text-xs font-semibold text-left">Select from our verified academic tutoring segments.</p>
                   </div>
-                )}
 
-                {/* STEP 1: Core parameters */}
-                {step === 1 && (
-                  <div className="space-y-6 animate-fade-in text-left">
-                    <div className="border-b border-gray-100 pb-4">
-                      <span className="text-xs font-bold uppercase tracking-wider text-[#F99B0C]">Step 01</span>
-                      <h2 className="text-xl font-bold tracking-tight text-[#0B1528] mt-1">Specify Academic Parameters</h2>
-                    </div>
-
-                    <div className="space-y-4">
-                      {/* Topic Title */}
-                      <div className="space-y-1.5">
-                        <label className="text-xs font-bold text-gray-700 uppercase" htmlFor="topic-title">Assignment Title / Topic Name *</label>
-                        <input 
-                          id="topic-title"
-                          type="text" 
-                          required
-                          value={title}
-                          onChange={(e) => setTitle(e.target.value)}
-                          placeholder="e.g., Multivariable Derivatives Problem Set 3"
-                          className="w-full bg-white border border-[#E2E8F0] p-3.5 rounded-xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500"
-                        />
-                      </div>
-
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        {/* Course Category */}
-                        <div className="space-y-1.5">
-                          <label className="text-xs font-bold text-gray-700 uppercase" htmlFor="course-subject">Academic Category / Discipline *</label>
-                          <select 
-                            id="course-subject"
-                            value={subject}
-                            onChange={(e) => setSubject(e.target.value)}
-                            className="w-full bg-white border border-[#E2E8F0] p-3.5 rounded-xl text-xs font-bold focus:outline-none focus:ring-2 focus:ring-orange-500/20"
-                          >
-                            {subjectsList.map((s, idx) => (
-                              <option key={idx} value={s}>{s}</option>
-                            ))}
-                          </select>
-                        </div>
-
-                        {/* Deadline Date */}
-                        <div className="space-y-1.5">
-                          <label className="text-xs font-bold text-gray-700 uppercase" htmlFor="dead-line-picker">Target Deadline *</label>
-                          <input 
-                            id="dead-line-picker"
-                            type="date"
-                            value={deadline}
-                            onChange={(e) => setDeadline(e.target.value)}
-                            min={new Date().toISOString().split('T')[0]}
-                            className="w-full bg-white border border-[#E2E8F0] p-3.5 rounded-xl text-xs font-bold focus:outline-none focus:ring-2 focus:ring-orange-500/20"
-                          />
-                        </div>
-                      </div>
-
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        {/* Word Count (Estimated) */}
-                        <div className="space-y-1.5">
-                          <label className="text-xs font-bold text-gray-700 uppercase" htmlFor="word-count-num">Estimated Length / Words *</label>
-                          <div className="relative">
-                            <input 
-                              id="word-count-num"
-                              type="number"
-                              min="0"
-                              value={wordCount}
-                              onChange={(e) => setWordCount(parseInt(e.target.value) || 0)}
-                              className="w-full bg-white border border-[#E2E8F0] p-3.5 rounded-xl text-xs font-bold focus:outline-none focus:ring-2 focus:ring-orange-500/20 pl-10"
-                            />
-                            <BookOpen className="w-4 h-4 text-gray-400 absolute left-3.5 top-4" />
-                          </div>
-                          <span className="text-[10px] text-gray-400 font-semibold block uppercase">For STEM assignments, you can leave it at 0</span>
-                        </div>
-
-                        {/* Citation Style */}
-                        <div className="space-y-1.5">
-                          <label className="text-xs font-bold text-gray-700 uppercase" htmlFor="citation-style-pick">Citation &amp; Style Guidelines</label>
-                          <select 
-                            id="citation-style-pick"
-                            value={referenceStyle}
-                            onChange={(e) => setReferenceStyle(e.target.value)}
-                            className="w-full bg-white border border-[#E2E8F0] p-3.5 rounded-xl text-xs font-bold focus:outline-none"
-                          >
-                            {citationsList.map((c, idx) => (
-                              <option key={idx} value={c}>{c}</option>
-                            ))}
-                          </select>
-                        </div>
-                      </div>
-
-                      {/* Source Count */}
-                      <div className="space-y-1.5 max-w-xs">
-                        <label className="text-xs font-bold text-gray-700 uppercase" htmlFor="src-count">Required Reference Sources Count</label>
-                        <input 
-                          id="src-count"
-                          type="number"
-                          min="0"
-                          max="20"
-                          value={sourcesCount}
-                          onChange={(e) => setSourcesCount(parseInt(e.target.value) || 0)}
-                          className="w-full bg-white border border-[#E2E8F0] p-3.5 rounded-xl text-xs font-bold focus:outline-none"
-                        />
-                      </div>
-                    </div>
-
-                    <div className="pt-4 flex justify-end">
-                      <button
-                        type="button"
-                        disabled={!isFormStep1Valid}
-                        onClick={() => setStep(2)}
-                        className={`px-5 py-3 rounded-xl font-bold text-xs tracking-wider uppercase cursor-pointer transition-all flex items-center gap-2 ${
-                          isFormStep1Valid 
-                            ? 'bg-orange-500 hover:bg-orange-650 text-white shadow-lg shadow-orange-500/15 hover:-translate-y-0.5' 
-                            : 'bg-gray-100 text-gray-450 cursor-not-allowed'
+                  {/* 4 Core Services Config Grid */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                    {servicesList.map((service) => (
+                      <div
+                        key={service.id}
+                        onClick={() => setSelectedService(service.id)}
+                        className={`cursor-pointer p-4 rounded-2xl border-2 text-left transition-all duration-200 relative flex flex-col justify-between ${
+                          selectedService === service.id
+                            ? 'border-orange-600 bg-orange-50/40 ring-4 ring-orange-100'
+                            : 'border-slate-200 hover:border-slate-300 bg-white'
                         }`}
                       >
-                        <span>Configure Criteria &amp; Files</span>
-                        <ArrowRight className="w-3.5 h-3.5" />
-                      </button>
+                        <div>
+                          <span className="text-[9px] font-black uppercase tracking-wider text-orange-700 bg-orange-50 border border-orange-100 px-2.5 py-0.5 rounded-md mb-2 inline-block">
+                            {service.badge}
+                          </span>
+                          <h3 className="font-extrabold text-sm md:text-base text-slate-900 block leading-tight mt-1">{service.title}</h3>
+                          <p className="text-slate-500 text-[11px] leading-relaxed mt-1">{service.description}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Subject selector and search help */}
+                  <div className="space-y-2.5 pt-2 text-left">
+                    <label className="text-xs font-black uppercase tracking-wider text-slate-500 block">
+                      Target Course Title or Topic *
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="e.g. Inorganic Chemistry II, AP Calculus AB, Microeconomics..."
+                      value={subject}
+                      onChange={(e) => {
+                        setSubject(e.target.value);
+                        if (errors.subject) setErrors((prev) => ({ ...prev, subject: null }));
+                      }}
+                      className={`w-full border-2 rounded-xl px-4 py-3.5 text-slate-800 placeholder-slate-400 font-bold focus:outline-none focus:border-orange-500 focus:ring-4 focus:ring-orange-100 transition-all text-sm ${
+                        errors.subject ? 'border-red-500' : 'border-slate-200'
+                      }`}
+                    />
+                    {errors.subject && <p className="text-red-500 text-xs font-bold">{errors.subject}</p>}
+
+                    {/* Fast Suggestions */}
+                    <div className="flex flex-wrap gap-1.5 pt-1">
+                      {quickSubjects.map((qs) => (
+                        <button
+                          key={qs}
+                          type="button"
+                          onClick={() => {
+                            setSubject(qs);
+                            if (errors.subject) setErrors((prev) => ({ ...prev, subject: null }));
+                          }}
+                          className="px-2.5 py-1 rounded-lg text-[10px] font-black bg-slate-100 text-slate-650 hover:bg-orange-50 hover:text-orange-600 transition duration-150 cursor-pointer"
+                        >
+                          + {qs}
+                        </button>
+                      ))}
                     </div>
                   </div>
-                )}
+                </div>
+              )}
 
-                {/* STEP 2: Detail specifications & file uploads */}
-                {step === 2 && (
-                  <div className="space-y-6 animate-fade-in text-left">
-                    <div className="border-b border-gray-100 pb-4 flex justify-between items-center">
-                      <div>
-                        <span className="text-xs font-bold uppercase tracking-wider text-[#F99B0C]">Step 02</span>
-                        <h2 className="text-xl font-bold tracking-tight text-[#0B1528] mt-1">Provide Criteria &amp; Supporting Files</h2>
-                      </div>
-                      <button 
-                        type="button"
-                        onClick={() => setStep(1)}
-                        className="text-xs font-bold text-gray-500 hover:text-orange-500 transition-colors cursor-pointer"
+              {/* SCREEN 2: Academic Study Level Selection */}
+              {currentStep === 2 && (
+                <div className="space-y-6 animate-fade-in">
+                  <div className="space-y-1 text-left">
+                    <h2 className="text-2xl md:text-3.5xl font-black text-slate-900 tracking-tight leading-none">
+                      What is your Study Level?
+                    </h2>
+                    <p className="text-slate-400 text-xs font-semibold">Tutor pairings and resource libraries scale to match this depth.</p>
+                  </div>
+
+                  <div className="grid grid-cols-1 gap-3">
+                    {studyLevels.map((lvl) => (
+                      <div
+                        key={lvl.level}
+                        onClick={() => setStudyLevel(lvl.level)}
+                        className={`cursor-pointer p-4 rounded-xl border-2 transition-all duration-200 flex items-center justify-between gap-4 ${
+                          studyLevel === lvl.level
+                            ? 'border-orange-600 bg-orange-50/40 ring-4 ring-orange-100'
+                            : 'border-slate-200 hover:border-slate-300 bg-white'
+                        }`}
                       >
-                        Back
-                      </button>
-                    </div>
+                        <div className="text-left">
+                          <div className="flex items-center gap-2">
+                            <span className="font-extrabold text-sm text-slate-900">{lvl.level}</span>
+                            <span className="text-[9px] font-black uppercase tracking-wider text-orange-600 bg-orange-50 px-2 py-0.5 rounded">
+                              {lvl.tag}
+                            </span>
+                          </div>
+                          <p className="text-slate-500 text-[11px] mt-1 leading-normal">{lvl.details}</p>
+                        </div>
+                        <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 ${
+                          studyLevel === lvl.level ? 'border-orange-600 bg-orange-600 text-white' : 'border-slate-300'
+                        }`}>
+                          {studyLevel === lvl.level && <span className="text-[10px] font-bold">✓</span>}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
 
-                    <div className="space-y-5">
-                      {/* Detailed Instructions */}
-                      <div className="space-y-1.5">
-                        <label className="text-xs font-bold text-gray-700 uppercase" htmlFor="detail-notes">Instructions &amp; Special notes</label>
-                        <textarea
-                          id="detail-notes"
-                          rows={4}
-                          value={instructions}
-                          onChange={(e) => setInstructions(e.target.value)}
-                          placeholder="Introduce key academic objectives, grading rubrics, or details of reference materials you need our tutor to address."
-                          className="w-full bg-white border border-[#E2E8F0] p-4 rounded-2xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500"
+              {/* SCREEN 3: Deadline & Timeline */}
+              {currentStep === 3 && (
+                <div className="space-y-6 animate-fade-in">
+                  <div className="space-y-1 text-left">
+                    <h2 className="text-2xl md:text-3.5xl font-black text-slate-900 tracking-tight leading-none">
+                      Deadline &amp; Timeline
+                    </h2>
+                    <p className="text-slate-400 text-xs font-semibold text-left">Specify when you need your mentorship assistance.</p>
+                  </div>
+
+                  <div className="grid grid-cols-3 gap-3">
+                    {[
+                      { type: 'Urgent', desc: 'Next 24-48 Hours', badge: 'Fast Track' },
+                      { type: 'Standard', desc: '3 to 5 Days', badge: 'Normal Pace' },
+                      { type: 'Flexible', desc: 'Over a Week', badge: 'Best Price' }
+                    ].map((t) => (
+                      <button
+                        key={t.type}
+                        type="button"
+                        onClick={() => setTimelineType(t.type)}
+                        className={`p-4 rounded-xl border-2 text-left transition-all duration-200 flex flex-col justify-between cursor-pointer ${
+                          timelineType === t.type
+                            ? 'border-orange-600 bg-orange-50/40 ring-4 ring-orange-100'
+                            : 'border-slate-200 hover:border-slate-300 bg-white'
+                        }`}
+                      >
+                        <div>
+                          <span className="text-[9px] font-black uppercase tracking-wider text-orange-700 bg-orange-50 border border-orange-100 px-1.5 py-0.5 rounded-md mb-2 inline-block">
+                            {t.badge}
+                          </span>
+                          <h3 className="font-extrabold text-sm text-slate-900 leading-tight block">{t.type}</h3>
+                          <p className="text-slate-500 text-[10px] mt-1 leading-normal">{t.desc}</p>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+
+                  {timelineType === 'Urgent' && (
+                    <div className="grid grid-cols-2 gap-4 animate-fade-in">
+                      <div className="space-y-1.5 text-left">
+                        <label className="text-xs font-bold text-gray-750 uppercase">Deadline Date *</label>
+                        <input
+                          type="date"
+                          value={deadlineDate}
+                          onChange={(e) => setDeadlineDate(e.target.value)}
+                          min={new Date().toISOString().split('T')[0]}
+                          className="w-full bg-white border-2 border-slate-200 rounded-xl px-4 py-3 text-sm font-semibold focus:outline-none focus:border-orange-500 focus:ring-4 focus:ring-orange-100"
                         />
                       </div>
+                      <div className="space-y-1.5 text-left">
+                        <label className="text-xs font-bold text-gray-750 uppercase">Deadline Time *</label>
+                        <input
+                          type="time"
+                          value={deadlineTime}
+                          onChange={(e) => setDeadlineTime(e.target.value)}
+                          className="w-full bg-white border-2 border-slate-200 rounded-xl px-4 py-3 text-sm font-semibold focus:outline-none focus:border-orange-500 focus:ring-4 focus:ring-orange-100"
+                        />
+                      </div>
+                    </div>
+                  )}
+                  {errors.timeline && <p className="text-red-500 text-xs font-bold text-left">{errors.timeline}</p>}
+                </div>
+              )}
 
-                      {/* File Drag and Drop zone */}
-                      <div className="space-y-2">
-                        <label className="text-xs font-bold text-gray-700 uppercase">Attach Project Assets &amp; Guidelines</label>
-                        
-                        <div 
-                          className={`border-2 border-dashed rounded-2xl p-6 text-center transition-all cursor-pointer ${
-                            isDragging 
-                              ? 'border-orange-500 bg-orange-50/20' 
-                              : 'border-gray-250 hover:border-orange-400 bg-gray-50/50'
-                          }`}
-                          onDragOver={handleDragOver}
-                          onDragLeave={handleDragLeave}
-                          onDrop={handleDrop}
-                          onClick={() => document.getElementById('file-upload-input')?.click()}
-                        >
-                          <input 
-                            type="file" 
-                            id="file-upload-input" 
-                            multiple 
-                            onChange={handleFileChange}
-                            className="hidden" 
-                          />
-                          <Upload className="w-8 h-8 text-orange-500/80 mx-auto mb-2" />
-                          <p className="text-xs text-gray-700 font-bold">Drag and drop file specifications here, or <span className="text-orange-500 hover:underline">browse locally</span></p>
-                          <p className="text-[10px] text-gray-400 font-bold mt-1 uppercase">Supports PDFs, DOCX, ZIPs, TXT, Excel and images (Max 25MB total)</p>
-                        </div>
+              {/* SCREEN 4: Syllabus & Documents */}
+              {currentStep === 4 && (
+                <div className="space-y-6 animate-fade-in">
+                  <div className="space-y-1 text-left">
+                    <h2 className="text-2xl md:text-3.5xl font-black text-slate-900 tracking-tight leading-none">
+                      Syllabus &amp; Supporting Documents
+                    </h2>
+                    <p className="text-slate-400 text-xs font-semibold text-left">Attach any supporting syllabus files, instructions or guidelines.</p>
+                  </div>
 
-                        {/* List of uploaded files with simulation progress bars */}
-                        {uploadedFiles.length > 0 && (
-                          <div className="space-y-2 mt-4">
-                            {uploadedFiles.map((file, idx) => (
-                              <div key={idx} className="bg-white p-3 rounded-xl border border-gray-150 flex items-center justify-between text-xs font-medium animate-fade-in shadow-xs">
-                                <div className="flex items-center gap-2.5 max-w-[70%]">
-                                  <FileCode className="w-5 h-5 text-orange-500 shrink-0" />
-                                  <div className="truncate">
-                                    <p className="font-bold text-[#0B1528] truncate">{file.name}</p>
-                                    <p className="text-[10px] text-gray-400 font-bold uppercase">{file.size}</p>
-                                  </div>
-                                </div>
-                                <div className="flex items-center gap-4 shrink-0">
-                                  {file.progress < 100 ? (
-                                    <div className="flex items-center gap-2 text-orange-600 font-mono text-[10px] font-bold">
-                                      <span>Uploading {file.progress}%</span>
-                                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                                    </div>
-                                  ) : (
-                                    <span className="text-[10px] bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded-md border border-emerald-150 font-bold uppercase">Ready</span>
-                                  )}
-                                  <button
-                                    type="button"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      removeFile(file.name);
-                                    }}
-                                    className="p-1 rounded-full bg-gray-50 text-gray-400 hover:text-red-500 hover:bg-red-50 cursor-pointer"
-                                  >
-                                    <X className="w-3.5 h-3.5" />
-                                  </button>
-                                </div>
+                  <div 
+                    onDragOver={handleDragOver}
+                    onDragLeave={handleDragLeave}
+                    onDrop={handleDrop}
+                    onClick={() => fileInputRef.current?.click()}
+                    className={`border-2 border-dashed rounded-2xl p-8 text-center transition-all cursor-pointer ${
+                      isDragging 
+                        ? 'border-orange-500 bg-orange-50/20' 
+                        : 'border-slate-250 hover:border-orange-400 bg-slate-50/50'
+                    }`}
+                  >
+                    <input 
+                      type="file" 
+                      ref={fileInputRef}
+                      multiple 
+                      accept=".pdf,.doc,.docx,.zip,.rar,.ppt,.pptx,image/*,audio/*,video/*,application/*"
+                      onChange={handleFileSelect}
+                      className="hidden" 
+                    />
+                    <div className="flex justify-center mb-2">
+                      <UploadCloudIcon />
+                    </div>
+                    <p className="text-xs text-slate-700 font-bold">Drag and drop file specifications here, or <span className="text-orange-600 hover:underline">browse locally</span></p>
+                    <p className="text-[10px] text-slate-400 font-bold mt-1 uppercase">Supports PDFs, DOCS, ZIPs, PPT, Images, and other media (Max 25MB total)</p>
+                  </div>
+
+                  {uploadedFiles.length > 0 && (
+                    <div className="space-y-2 text-left">
+                      <h4 className="text-xs font-black uppercase text-slate-500 tracking-wider">Uploaded Documents ({uploadedFiles.length})</h4>
+                      <div className="max-h-36 overflow-y-auto space-y-2">
+                        {uploadedFiles.map((file) => (
+                          <div key={file.id} className="bg-slate-50 p-3 rounded-xl border border-slate-100 flex items-center justify-between text-xs font-medium animate-fade-in">
+                            <div className="flex items-center gap-2.5 truncate max-w-[80%]">
+                              <span className="text-lg">📄</span>
+                              <div className="truncate text-left">
+                                <p className="font-bold text-slate-900 truncate">{file.name}</p>
+                                <p className="text-[10px] text-slate-400 font-bold uppercase">{file.size}</p>
                               </div>
-                            ))}
+                            </div>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                deleteUploadedFile(file.id);
+                              }}
+                              className="p-1 rounded-full hover:bg-red-50 text-slate-400 hover:text-red-500 cursor-pointer"
+                            >
+                              <TrashIcon />
+                            </button>
                           </div>
-                        )}
+                        ))}
                       </div>
                     </div>
+                  )}
 
-                    <div className="pt-4 flex justify-between">
-                      <button
-                        type="button"
-                        onClick={() => setStep(1)}
-                        className="px-4 py-2 text-xs font-bold text-gray-500 hover:text-[#0B1528]"
-                      >
-                        Prev Step
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setStep(3)}
-                        className="bg-orange-500 hover:bg-orange-650 text-white font-bold text-xs tracking-wider uppercase px-5 py-3 rounded-xl shadow-lg shadow-orange-500/15 hover:-translate-y-0.5 transition-all flex items-center gap-2 cursor-pointer"
-                      >
-                        <span>Choose Preferred Tutor</span>
-                        <ArrowRight className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
+                  <div className="space-y-1.5 text-left">
+                    <label className="text-xs font-bold text-slate-750 uppercase">Additional Instructions &amp; Notes</label>
+                    <textarea
+                      rows={3}
+                      value={notes}
+                      onChange={(e) => setNotes(e.target.value)}
+                      placeholder="Introduce key academic objectives, specific coursework guidelines, or notes you want our tutors to focus on."
+                      className="w-full bg-white border-2 border-slate-200 rounded-xl p-3.5 text-xs font-semibold focus:outline-none focus:border-orange-500 focus:ring-4 focus:ring-orange-100"
+                    />
                   </div>
-                )}
+                </div>
+              )}
 
-                {/* STEP 3: Account Verification / Tutor Preference */}
-                {step === 3 && (
-                  <div className="space-y-6 animate-fade-in text-left">
-                    <div className="border-b border-gray-100 pb-4 flex justify-between items-center">
+              {/* SCREEN 5: Connect Instant Chat */}
+              {currentStep === 5 && (
+                <div className="space-y-6 animate-fade-in text-left">
+                  <div className="space-y-1 text-left">
+                    <h2 className="text-2xl md:text-3.5xl font-black text-slate-900 tracking-tight leading-none">
+                      Connect to Instant Chat
+                    </h2>
+                    <p className="text-slate-400 text-xs font-semibold text-left">Final step: connect with our academic matched mentor team.</p>
+                  </div>
+
+                  <div className="bg-orange-50/50 border border-orange-100 rounded-2xl p-5 space-y-4">
+                    <h3 className="font-extrabold text-sm text-slate-900">Summary of Specifications:</h3>
+                    <div className="grid grid-cols-2 gap-3 text-xs">
                       <div>
-                        <span className="text-xs font-bold uppercase tracking-wider text-[#F99B0C]">Step 03</span>
-                        <h2 className="text-xl font-bold tracking-tight text-[#0B1528] mt-1">Configure Matching &amp; Match parameters</h2>
+                        <span className="text-[10px] font-black uppercase text-slate-400">Selected Service:</span>
+                        <p className="font-bold text-slate-850">{selectedService}</p>
                       </div>
-                      <button 
-                        type="button"
-                        onClick={() => setStep(2)}
-                        className="text-xs font-bold text-gray-500 hover:text-orange-500 transition-colors cursor-pointer"
-                      >
-                        Back
-                      </button>
-                    </div>
-
-                    <div className="space-y-5">
-                      {/* Preferred Tutor Selection */}
-                      <div className="space-y-2">
-                        <label className="text-xs font-bold text-gray-700 uppercase" htmlFor="tutor-picker">Preferred Tutor Specialist</label>
-                        <select 
-                          id="tutor-picker"
-                          value={preferredTutorId}
-                          onChange={(e) => setPreferredTutorId(e.target.value)}
-                          className="w-full bg-white border border-[#E2E8F0] p-3.5 rounded-xl text-xs font-bold focus:outline-none"
-                        >
-                          <option value="any">🌟 System General bid (Fastest matching - recommended)</option>
-                          {tutors.map((t) => (
-                            <option key={t.id} value={t.id}>
-                              🎓 {t.name} (Review rating {t.rating || 4.9}★ • {t.subjects ? t.subjects[0] : 'Syllabus Expert'})
-                            </option>
-                          ))}
-                        </select>
+                      <div>
+                        <span className="text-[10px] font-black uppercase text-slate-400">Target Subject:</span>
+                        <p className="font-bold text-slate-850">{subject}</p>
                       </div>
-
-                      {/* Guest Sign-up / ID sync block */}
-                      {!currentUser ? (
-                        <div className="bg-[#fffcf8] border border-orange-150 p-5 rounded-2xl space-y-4">
-                          <div className="space-y-1">
-                            <span className="text-xs font-bold text-orange-950 uppercase tracking-wider block">🎓 Student Verification Required</span>
-                            <p className="text-[11px] text-orange-850 font-semibold leading-relaxed">
-                              You are currently submitting request as a Guest student. Enter your name and academic email address. The system will create your user file safely. No password required for initial quotation access!
-                            </p>
-                          </div>
-
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div className="space-y-1.5">
-                              <label className="text-[10px] font-bold text-gray-650 uppercase" htmlFor="guest-name">Full name *</label>
-                              <input 
-                                id="guest-name"
-                                type="text"
-                                required
-                                value={guestName}
-                                onChange={(e) => setGuestName(e.target.value)}
-                                placeholder="e.g., Alex Reed"
-                                className="w-full bg-white border border-[#E2E8F0] p-3 rounded-xl text-xs font-semibold focus:outline-none"
-                              />
-                            </div>
-                            <div className="space-y-1.5">
-                              <label className="text-[10px] font-bold text-gray-650 uppercase" htmlFor="guest-mail">Academic Email *</label>
-                              <input 
-                                id="guest-mail"
-                                type="email"
-                                required
-                                value={guestEmail}
-                                onChange={(e) => setGuestEmail(e.target.value)}
-                                placeholder="e.g., alex.reed@university.edu"
-                                className="w-full bg-white border border-[#E2E8F0] p-3 rounded-xl text-xs font-semibold focus:outline-none"
-                              />
-                            </div>
-                          </div>
-                        </div>
-                      ) : (
-                        <div className="bg-emerald-50/50 border border-emerald-150 p-4 rounded-xl flex items-center gap-3.5 text-xs font-semibold">
-                          <div className="w-9 h-9 rounded-full bg-emerald-100 flex items-center justify-center shrink-0">
-                            <UserIcon className="w-5 h-5 text-emerald-650" />
-                          </div>
-                          <div>
-                            <p className="text-emerald-900 font-bold">Logged In as {currentUser.name}</p>
-                            <p className="text-[10px] text-emerald-700 uppercase font-mono font-bold leading-none mt-1">Student ID Checklist: sync enabled</p>
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Escrow tuition details */}
-                      <div className="p-4 bg-gray-50 border border-gray-200 rounded-xl flex gap-3 text-xs leading-relaxed font-semibold">
-                        <Globe className="w-5 h-5 text-[#F99B0C] shrink-0" />
-                        <div>
-                          <p className="text-gray-900 font-bold">Secure Local Pricing Engine Protected</p>
-                          <p className="text-[10px] text-gray-500 font-bold mt-1">Your quotation estimate will calculate according to local UK/US coursework credit levels. No payments or advance deposits are charged until you explicitly hire an expert from your chat room.</p>
-                        </div>
+                      <div>
+                        <span className="text-[10px] font-black uppercase text-slate-400">Study Level:</span>
+                        <p className="font-bold text-slate-850">{studyLevel}</p>
+                      </div>
+                      <div>
+                        <span className="text-[10px] font-black uppercase text-slate-400">Timeline / Urgency:</span>
+                        <p className="font-bold text-slate-850">
+                          {timelineType} {timelineType === 'Urgent' ? `(By ${deadlineDate} ${deadlineTime})` : ''}
+                        </p>
                       </div>
                     </div>
+                    {notes && (
+                      <div className="border-t border-orange-100 pt-3">
+                        <span className="text-[10px] font-black uppercase text-slate-400">Special Notes:</span>
+                        <p className="text-slate-700 text-xs italic mt-1 font-medium leading-relaxed">"{notes}"</p>
+                      </div>
+                    )}
+                    {uploadedFiles.length > 0 && (
+                      <div className="border-t border-orange-100 pt-3">
+                        <span className="text-[10px] font-black uppercase text-slate-400">Documents Attached:</span>
+                        <p className="text-slate-850 font-bold mt-1 text-xs">✓ {uploadedFiles.length} file(s) uploaded</p>
+                      </div>
+                    )}
+                  </div>
 
-                    <div className="pt-4 flex justify-between">
-                      <button
-                        type="button"
-                        onClick={() => setStep(2)}
-                        className="px-4 py-2 text-xs font-bold text-gray-500 hover:text-[#0B1528]"
-                      >
-                        Prev Step
-                      </button>
-                      <button
-                        type="submit"
-                        disabled={isSubmitting}
-                        className="bg-orange-500 hover:bg-orange-650 text-white font-bold text-xs tracking-wider uppercase px-6 py-3.5 rounded-xl shadow-lg shadow-orange-500/20 hover:-translate-y-0.5 transition-all flex items-center gap-2 cursor-pointer"
-                      >
-                        {isSubmitting ? (
-                          <>
-                            <span>Registering Escrow Quote...</span>
-                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                          </>
-                        ) : (
-                          <>
-                            <span>Secure &amp; Register Quote</span>
-                            <CheckCircle className="w-4 h-4" />
-                          </>
-                        )}
-                      </button>
+                  <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl flex gap-3 text-xs leading-relaxed font-semibold">
+                    <span className="text-base text-orange-500 shrink-0">ℹ️</span>
+                    <div>
+                      <p className="text-slate-900 font-bold">Quotation Matching Notice</p>
+                      <p className="text-[10px] text-slate-500 font-bold mt-1">
+                        By submitting, your details are sent to our active matching team. You can launch your dashboard chat instantly to connect with an administrator or your matched tutor.
+                      </p>
                     </div>
                   </div>
+                </div>
+              )}
+
+              {/* Bottom Form Action Buttons */}
+              <div className="flex justify-between items-center pt-6 border-t border-slate-100 shrink-0">
+                {currentStep > 1 ? (
+                  <button
+                    type="button"
+                    onClick={handlePrevStep}
+                    className="flex items-center gap-2 text-xs font-black uppercase tracking-wider text-slate-500 hover:text-orange-600 transition cursor-pointer"
+                  >
+                    <ChevronLeft />
+                    Back
+                  </button>
+                ) : (
+                  <div />
                 )}
 
-              </form>
-            </motion.div>
+                {currentStep < 5 ? (
+                  <button
+                    type="button"
+                    onClick={handleNextStep}
+                    className="bg-orange-600 hover:bg-orange-700 text-white font-black text-xs tracking-wider uppercase px-6 py-3.5 rounded-xl shadow-lg shadow-orange-600/15 flex items-center gap-2 transform active:scale-95 transition-all cursor-pointer"
+                  >
+                    Continue
+                    <ChevronRight />
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={handleFinalSubmit}
+                    className="bg-orange-600 hover:bg-orange-700 text-white font-black text-xs tracking-wider uppercase px-6 py-3.5 rounded-xl shadow-lg shadow-orange-600/25 flex items-center gap-2 transform active:scale-95 transition-all cursor-pointer"
+                  >
+                    Confirm &amp; Start Chat
+                    <SparklesIcon />
+                  </button>
+                )}
+              </div>
+
+            </div>
           )}
-        </AnimatePresence>
+
+        </div>
 
       </div>
+
     </div>
   );
 }

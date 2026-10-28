@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   LayoutDashboard,
   PlusSquare,
@@ -48,19 +48,28 @@ import {
   Binary,
   Users,
   PenTool,
-  Trash2
+  Trash2,
+  Headset,
+  ShieldCheck,
+  DollarSign,
+  Phone,
+  Video,
+  MoreVertical,
+  Smile,
+  CheckCheck
 } from 'lucide-react';
 import { 
   User, 
+  UserRole,
   Assignment, 
   AssignmentStatus, 
   Chat, 
   Message, 
   Payment, 
   SupportTicket,
-  AssignmentReport
+  AssignmentReport,
+  Quote
 } from '../types';
-import { initAuth, googleSignIn, getAccessToken, logout as googleAuthLogout } from '../firebase';
 
 interface StudentDashboardProps {
   currentUser: User;
@@ -74,12 +83,16 @@ interface StudentDashboardProps {
   onSubmitAssignment: (data: any) => void;
   onOpenChat: (tutorId: string, initialMessage?: string) => void;
   onSelectChat: (chat: Chat) => void;
+  onSendMessage?: (chatId: string, senderId: string, content: string, fileUrl?: string, fileName?: string) => void;
+  onSubscribeToChatDetails?: (chatId: string) => void;
   onApproveWork: (assignId: string, rating: number, comment: string) => void;
   onRaiseRevision: (assignId: string, details: string) => void;
   onRaiseTicket: (sub: string, msg: string) => void;
   onLogout: () => void;
   onNavigate: (view: string) => void;
   assignmentReports?: AssignmentReport[];
+  quotes?: Quote[];
+  onAcceptQuote?: (quoteId: string) => void;
 }
 
 export default function StudentDashboard({
@@ -94,16 +107,46 @@ export default function StudentDashboard({
   onSubmitAssignment,
   onOpenChat,
   onSelectChat,
+  onSendMessage,
+  onSubscribeToChatDetails,
   onApproveWork,
   onRaiseRevision,
   onRaiseTicket,
   onLogout,
   onNavigate,
-  assignmentReports = []
+  assignmentReports = [],
+  quotes = [],
+  onAcceptQuote
 }: StudentDashboardProps) {
 
   // Dynamic Viewport Navigation State matching Sidebar
   const [activeTab, setActiveTab] = useState<string>('dashboard');
+  const [localSelectedChatId, setLocalSelectedChatId] = useState<string | null>(null);
+  const [studentReply, setStudentReply] = useState('');
+  const [channelSearchFilter, setChannelSearchFilter] = useState('');
+  const [isQuoteDrawerOpen, setIsQuoteDrawerOpen] = useState(false);
+  const [chatAttachedFileName, setChatAttachedFileName] = useState('');
+  const [showSafetyBanner, setShowSafetyBanner] = useState(true);
+
+  useEffect(() => {
+    if (activeTab === 'chat' && chats.length > 0) {
+      const support = chats.find(c => c.studentId === currentUser.id && (c.tutorId === 'admin_emily' || c.tutorId.startsWith('admin_')));
+      if (support && !localSelectedChatId) {
+        setLocalSelectedChatId(support.id);
+      }
+    }
+  }, [chats, activeTab, currentUser.id, localSelectedChatId]);
+
+  useEffect(() => {
+    if (localSelectedChatId && onSubscribeToChatDetails) {
+      onSubscribeToChatDetails(localSelectedChatId);
+    }
+  }, [localSelectedChatId, onSubscribeToChatDetails]);
+
+  const selectedChat = chats.find(c => c.id === localSelectedChatId);
+  const activeChatMessages = messages.filter(m => m.chatId === localSelectedChatId).sort(
+    (a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
+  );
   const [showReviewModal, setShowReviewModal] = useState<string | null>(null);
   const [showRevisionModal, setShowRevisionModal] = useState<string | null>(null);
   const [reviewRating, setReviewRating] = useState(5);
@@ -136,156 +179,6 @@ export default function StudentDashboard({
   // Settings states
   const [emailPref, setEmailPref] = useState(true);
   const [autoDeposit, setAutoDeposit] = useState(true);
-
-  // Google Chat Workspace states
-  const [googleNeedsAuth, setGoogleNeedsAuth] = useState(true);
-  const [googleUser, setGoogleUser] = useState<any>(null);
-  const [googleToken, setGoogleToken] = useState<string | null>(null);
-  const [isLoggingInGoogle, setIsLoggingInGoogle] = useState(false);
-  const [googleAuthError, setGoogleAuthError] = useState<string | null>(null);
-  const [googleSpaces, setGoogleSpaces] = useState<any[]>([]);
-  const [isLoadingSpaces, setIsLoadingSpaces] = useState(false);
-  const [errorSpaces, setErrorSpaces] = useState<string | null>(null);
-  const [selectedSpace, setSelectedSpace] = useState<string>('');
-  const [googleMessageMsg, setGoogleMessageMsg] = useState('');
-  const [isSendingGoogleMessage, setIsSendingGoogleMessage] = useState(false);
-  const [googleMessageSuccess, setGoogleMessageSuccess] = useState<string | null>(null);
-  const [confirmationMessageOpen, setConfirmationMessageOpen] = useState(false);
-  const [pendingMessageToSend, setPendingMessageToSend] = useState('');
-
-  // Automatically check Google Auth state on load
-  React.useEffect(() => {
-    const unsubscribe = initAuth(
-      (user, token) => {
-        setGoogleUser(user);
-        setGoogleToken(token);
-        setGoogleNeedsAuth(false);
-        fetchGoogleSpaces(token);
-      },
-      () => {
-        setGoogleUser(null);
-        setGoogleToken(null);
-        setGoogleNeedsAuth(true);
-      }
-    );
-    return () => {
-      if (typeof unsubscribe === 'function') {
-        unsubscribe();
-      }
-    };
-  }, []);
-
-  const handleGoogleLogin = async () => {
-    setIsLoggingInGoogle(true);
-    setGoogleAuthError(null);
-    try {
-      const result = await googleSignIn();
-      if (result) {
-        setGoogleUser(result.user);
-        setGoogleToken(result.accessToken);
-        setGoogleNeedsAuth(false);
-        fetchGoogleSpaces(result.accessToken);
-      }
-    } catch (err: any) {
-      console.error('Google Sign in failed:', err);
-      let customErr = err?.message || String(err);
-      if (customErr.includes('cancelled-popup-request') || err?.code === 'auth/cancelled-popup-request') {
-        customErr = 'Sign-In Request Cancelled: A previous popup operation was already running or got cancelled by another trigger. [CANCELLED_POPUP_REQUEST]';
-      } else if (customErr.includes('popup-closed-by-user') || err?.code === 'auth/popup-closed-by-user') {
-        customErr = 'Sign-In Popup Closed: The Google Authentication window was closed before completion or blocked by your browser. [POPUP_CLOSED_BY_USER]';
-      }
-      setGoogleAuthError(customErr);
-    } finally {
-      setIsLoggingInGoogle(false);
-    }
-  };
-
-  const handleGoogleLogout = async () => {
-    try {
-      await googleAuthLogout();
-      setGoogleUser(null);
-      setGoogleToken(null);
-      setGoogleNeedsAuth(true);
-      setGoogleSpaces([]);
-      setSelectedSpace('');
-    } catch (err) {
-      console.error('Google Sign out failed:', err);
-    }
-  };
-
-  const fetchGoogleSpaces = async (token: string) => {
-    setIsLoadingSpaces(true);
-    setErrorSpaces(null);
-    try {
-      const res = await fetch('https://chat.googleapis.com/v1/spaces', {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (!res.ok) {
-        throw new Error(`Google Chat API status ${res.status}`);
-      }
-      const data = await res.json();
-      setGoogleSpaces(data.spaces || []);
-      if (data.spaces && data.spaces.length > 0) {
-        setSelectedSpace(data.spaces[0].name);
-      }
-    } catch (err: any) {
-      console.error(err);
-      setErrorSpaces(err.message || 'Could not fetch workspace spaces directories.');
-    } finally {
-      setIsLoadingSpaces(false);
-    }
-  };
-
-  const requestSendMessageToSpace = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!googleMessageMsg.trim()) return;
-    setPendingMessageToSend(googleMessageMsg);
-    setConfirmationMessageOpen(true);
-  };
-
-  const confirmAndSendMessageToSpace = async () => {
-    setConfirmationMessageOpen(false);
-    if (!googleToken || !pendingMessageToSend.trim()) return;
-    
-    setIsSendingGoogleMessage(true);
-    setGoogleMessageSuccess(null);
-    
-    try {
-      const targetSpace = selectedSpace;
-      if (!targetSpace) {
-        // Safe simulation fallback when real Space config isn't ready
-        await new Promise((r) => setTimeout(r, 1200));
-        setGoogleMessageSuccess(`[SANDBOX SIMULATOR] Broadcast completed! Transmitted message: "${pendingMessageToSend}"`);
-        setGoogleMessageMsg('');
-        setPendingMessageToSend('');
-        return;
-      }
-      
-      const res = await fetch(`https://chat.googleapis.com/v1/${targetSpace}/messages`, {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${googleToken}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          text: pendingMessageToSend
-        })
-      });
-
-      if (!res.ok) {
-        throw new Error(`Google API responded with error code: ${res.status}`);
-      }
-
-      setGoogleMessageSuccess('Success! Message transmitted securely and posted to Google Chat space.');
-      setGoogleMessageMsg('');
-      setPendingMessageToSend('');
-    } catch (err: any) {
-      console.error(err);
-      alert(`Could not complete Google Chat transmission: ${err.message}`);
-    } finally {
-      setIsSendingGoogleMessage(false);
-    }
-  };
 
   // Matching Funnel States & Configuration Constants
   const SERVICES = {
@@ -470,7 +363,18 @@ export default function StudentDashboard({
   const studentChats = chats.filter(c => c.studentId === currentUser.id);
 
   // Helper to find tutor details
-  const getTutor = (tutorId: string) => tutors.find(t => t.id === tutorId);
+  const getTutor = (tutorId: string) => {
+    if (tutorId === 'admin_emily' || tutorId.startsWith('admin_')) {
+      return {
+        id: tutorId,
+        name: 'Platform Support / Admin',
+        avatarUrl: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150&auto=format&fit=crop&q=80',
+        role: UserRole.ADMIN,
+        bio: '24/7 Platform Support & Customer Service Representative Desk.'
+      } as User;
+    }
+    return tutors.find(t => t.id === tutorId);
+  };
 
   const handleApproveSubmit = (assignId: string) => {
     onApproveWork(assignId, reviewRating, reviewContent);
@@ -670,6 +574,7 @@ CONTACT EMAIL COMPASS: ${studentEmail}
 
       // Submit actual assignment data payload back to our Firestore orchestrators
       onSubmitAssignment({
+        studentId: currentUser.id,
         title: `${selectedSubject} (${selectedSubtopic}) ${serviceData.title}`,
         subject: selectedSubject,
         deadline: selectedDate,
@@ -678,7 +583,8 @@ CONTACT EMAIL COMPASS: ${studentEmail}
         sourcesCount: 3,
         instructions: instructionsBody,
         tutorId: matchedTutor ? matchedTutor.id : undefined,
-        fileUrls: attachedFiles.map(f => f.name)
+        fileUrls: attachedFiles.map(f => f.name.startsWith('http') ? f.name : `https://universitytutors.com/uploads/${encodeURIComponent(f.name)}`),
+        fileNames: attachedFiles.map(f => f.name)
       });
 
     }, 4000);
@@ -689,6 +595,9 @@ CONTACT EMAIL COMPASS: ${studentEmail}
     const subject = selectedSubject || 'General Study Help';
     const subtopic = selectedSubtopic || 'General';
     const duration = selectedDuration || '4 Hours';
+    
+    // Always route instantly to the platform admin as requested by user
+    const targetTutorId = 'admin_shaka';
 
     setMatchingPhase('idle');
     setVettingStepOneCompleted(false);
@@ -709,7 +618,7 @@ CONTACT EMAIL COMPASS: ${studentEmail}
 
     // Trigger dynamic CSR support chat instantly
     const messageTemplate = `Hi, I just secured an optimal match for "${subject}" ("${subtopic}", scheduled for ${duration}). I am ready to decide on a payment plan and align my exact requirements with a specialist right away!`;
-    onOpenChat('tutor_clara', messageTemplate);
+    onOpenChat(targetTutorId, messageTemplate);
   };
 
   const submitInlineRequest = (e: React.FormEvent) => {
@@ -728,13 +637,8 @@ CONTACT EMAIL COMPASS: ${studentEmail}
 
       {/* MOBILE HEADER BAR */}
       <div className="lg:hidden fixed top-0 left-0 right-0 h-16 bg-white border-b border-gray-100 flex items-center justify-between px-4 z-40">
-        <div className="flex items-center gap-2">
-          <div className="bg-orange-500 p-1.5 rounded-lg text-white">
-            <GraduationCap className="h-5 w-5" />
-          </div>
-          <span className="text-sm font-bold tracking-tight text-gray-950 uppercase font-mono">
-            EXAM <span className="text-orange-500">ASSIGNMENTS</span>
-          </span>
+        <div className="flex items-center">
+          <img src="/logo.webp" alt="Uni Tutors" referrerPolicy="no-referrer" className="h-10 w-auto object-contain" />
         </div>
         <button 
           onClick={() => setIsMobileSidebarOpen(!isMobileSidebarOpen)}
@@ -754,19 +658,9 @@ CONTACT EMAIL COMPASS: ${studentEmail}
       `} id="student-sidebar">
         
         <div className="space-y-6">
-          {/* Logo with graduation cap */}
-          <div className="flex items-center gap-2.5 pb-2 border-b border-orange-100/30">
-            <div className="bg-orange-500 p-2 rounded-xl text-white shadow-sm shrink-0">
-              <GraduationCap className="h-6 w-6 stroke-[2.5]" id="logo-mortarboard" />
-            </div>
-            <div className="text-left">
-              <div className="text-[13px] font-black tracking-tight text-gray-900 leading-none">
-                EXAM
-              </div>
-              <div className="text-xs font-mono font-medium tracking-widest text-[#F06225] leading-none mt-1">
-                ASSIGNMENTS
-              </div>
-            </div>
+          {/* Logo with uploaded logo image */}
+          <div className="flex items-center justify-between pb-2 border-b border-orange-100/30">
+            <img src="/logo.webp" alt="Uni Tutors" referrerPolicy="no-referrer" className="h-12 w-auto object-contain" id="logo-mortarboard" />
             
             <button 
               onClick={() => setIsMobileSidebarOpen(false)}
@@ -783,9 +677,7 @@ CONTACT EMAIL COMPASS: ${studentEmail}
               { id: 'new_request', label: 'New Request', icon: <PlusSquare className="w-4 h-4 text-orange-500" /> },
               { id: 'assignments', label: 'Assignments', icon: <BookOpen className="w-4 h-4" /> },
               { id: 'payments', label: 'Payments', icon: <CreditCard className="w-4 h-4" /> },
-              { id: 'teachers', label: 'Teachers', icon: <GraduationCap className="w-4 h-4" /> },
               { id: 'chat', label: 'Chat', icon: <MessageSquare className="w-4 h-4" /> },
-              { id: 'google_chat', label: 'Google Chat Workspace', icon: <MessageCircle className="w-4 h-4 text-emerald-600" /> },
               { id: 'reports', label: 'Reports', icon: <BarChart3 className="w-4 h-4" /> },
               { id: 'results', label: 'Results & Comments', icon: <Award className="w-4 h-4" /> },
               { id: 'notifications', label: 'Notifications', icon: <Bell className="w-4 h-4" /> },
@@ -900,7 +792,7 @@ CONTACT EMAIL COMPASS: ${studentEmail}
             <button
               onClick={() => {
                 // Instantly open a chat with Support specialist
-                onOpenChat('tutor_clara'); // Triggers Clara Stirling or General admin
+                onOpenChat('admin_shaka'); // Triggers Shaka Ahmad (Platform Admin)
               }}
               className="hidden sm:inline-flex items-center justify-center border border-gray-200 bg-white hover:bg-gray-50 text-gray-700 px-4 py-2 rounded-2xl text-[12px] font-bold shadow-3xs cursor-pointer transition-all"
               id="header-csr-consult"
@@ -994,7 +886,7 @@ CONTACT EMAIL COMPASS: ${studentEmail}
                     </button>
                     
                     <button
-                      onClick={() => onOpenChat('tutor_clara')}
+                      onClick={() => onOpenChat('admin_shaka')}
                       className="bg-transparent hover:bg-white/5 text-white border border-white/20 hover:border-white/40 px-6 py-3 rounded-2xl text-[13px] font-bold transition-all cursor-pointer"
                       id="hero-consult-btn"
                     >
@@ -1060,7 +952,7 @@ CONTACT EMAIL COMPASS: ${studentEmail}
                 <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-4">
                   {[
                     { label: 'Assignments', icon: <BookOpen className="w-5 h-5 text-orange-500" />, tab: 'assignments', circleColor: 'bg-orange-50' },
-                    { label: 'Teachers', icon: <GraduationCap className="w-5 h-5 text-blue-500" />, tab: 'teachers', circleColor: 'bg-blue-50' },
+                    { label: 'Support Chat', icon: <MessageSquare className="w-5 h-5 text-blue-500" />, tab: 'chat', circleColor: 'bg-blue-50' },
                     { label: 'Reports', icon: <BarChart3 className="w-5 h-5 text-emerald-500" />, tab: 'reports', circleColor: 'bg-emerald-50' },
                     { label: 'Results', icon: <Award className="w-5 h-5 text-indigo-500" />, tab: 'results', circleColor: 'bg-indigo-50' },
                     { label: 'Feedback', icon: <Heart className="w-5 h-5 text-pink-500" />, tab: 'feedback', circleColor: 'bg-pink-50' },
@@ -1599,13 +1491,14 @@ CONTACT EMAIL COMPASS: ${studentEmail}
                             id="funnel-uploader-file" 
                             className="hidden" 
                             multiple 
+                            accept=".pdf,.doc,.docx,.zip,.rar,.ppt,.pptx,image/*,audio/*,video/*,application/*"
                             onChange={handleFunnelFileSelect}
                           />
                           <div className="flex flex-col items-center justify-center space-y-2">
                             <Upload className="w-6.5 h-6.5 text-gray-400 group-hover:text-orange-600 group-hover:scale-105 transition-all" />
                             <div>
                               <p className="text-xs font-bold text-gray-700">Drag files here, or <span className="text-orange-600 font-extrabold group-hover:text-orange-700 underline">browse folders</span></p>
-                              <p className="text-[9.5px] text-gray-400 font-black mt-1 font-mono tracking-wider uppercase">PDF, Word, Images, ZIP, code (Max 15MB)</p>
+                              <p className="text-[9.5px] text-gray-400 font-black mt-1 font-mono tracking-wider uppercase">PDF, DOCS, ZIP, Image, PPT, Media (Max 15MB)</p>
                             </div>
                           </div>
                         </div>
@@ -2190,7 +2083,7 @@ CONTACT EMAIL COMPASS: ${studentEmail}
                                       className="bg-orange-500 hover:bg-orange-600 text-white font-bold px-2.5 py-1.5 rounded-xl text-[10px] flex items-center gap-1 cursor-pointer transition-all"
                                     >
                                       <ThumbsUp className="w-3.5 h-3.5" />
-                                      <span>Accept & Pay</span>
+                                      <span>Approve Delivery</span>
                                     </button>
                                     <button
                                       onClick={() => setShowRevisionModal(a.id)}
@@ -2231,8 +2124,8 @@ CONTACT EMAIL COMPASS: ${studentEmail}
           {activeTab === 'payments' && (
             <div className="bg-white rounded-3xl border border-gray-150 overflow-hidden shadow-xs animate-fade-in text-left">
               <div className="p-6 border-b border-gray-150">
-                <h3 className="font-bold text-base text-gray-950 font-sans tracking-tight">Receipts & Secure Payment Statements</h3>
-                <p className="text-xs text-gray-400 font-medium">Review escrow deposits held in PCI-compliant Stripe vaults pending academic delivery check.</p>
+                <h3 className="font-bold text-base text-gray-950 font-sans tracking-tight">Receipts & Custom Payment Invoices</h3>
+                <p className="text-xs text-gray-400 font-medium">Verify payment statuses and custom invoices. Secure payment links are shared directly with you after discussion.</p>
               </div>
 
               {studentPayments.length > 0 ? (
@@ -2278,504 +2171,524 @@ CONTACT EMAIL COMPASS: ${studentEmail}
             </div>
           )}
 
-          {/* ================================== */}
-          {/* TAB 5: TEACHERS / TUTORS DIRECTORY */}
-          {/* ================================== */}
-          {activeTab === 'teachers' && (
-            <div className="space-y-6 animate-fade-in text-left">
-              <div>
-                <h2 className="font-bold text-base text-gray-950 tracking-tight">Meet Our Elite Tutoring Network</h2>
-                <p className="text-xs text-gray-400 mt-1">Direct messaging channels to Oxbridge, Ivy League, and PhD academic writers.</p>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {tutors.map((tutor) => (
-                  <div key={tutor.id} className="bg-white border border-gray-150 rounded-2xl p-5 flex flex-col justify-between hover:border-orange-200 hover:shadow-md transition-all">
-                    <div className="space-y-4">
-                      <div className="flex gap-4 items-center">
-                        <img src={tutor.avatarUrl} alt="" className="w-12 h-12 rounded-full border object-cover" />
-                        <div>
-                          <h3 className="font-bold text-sm text-gray-950 block">{tutor.name}</h3>
-                          <p className="text-[10px] text-orange-500 font-mono tracking-wider uppercase font-bold leading-none mt-1">{tutor.country} Certified PhD Candidate</p>
-                        </div>
-                      </div>
-
-                      <p className="text-xs text-gray-500 leading-relaxed line-clamp-3">
-                        {tutor.bio || 'Expert reviewer specializing in higher education, curriculum planning, and research methodology consultation.'}
-                      </p>
-
-                      <div className="flex flex-wrap gap-1.5">
-                        {tutor.subjects?.map((sub, key) => (
-                          <span key={key} className="bg-gray-50 border text-gray-600 px-2 py-0.5 rounded text-[10px] font-medium font-sans">
-                            {sub}
-                          </span>
-                        )) || <span className="text-[10.5px] text-gray-400">Natural Sciences Syllabus</span>}
-                      </div>
-
-                      <div className="flex items-center gap-4 text-xs font-mono font-medium border-t-0 border-dashed border-gray-100 pt-3">
-                        <div>
-                          <span className="text-gray-400 block text-[9px] uppercase tracking-wide">Hour rate</span>
-                          <span className="font-bold text-orange-600">${tutor.hourlyRate || 45}/hr</span>
-                        </div>
-                        <div className="border-l pl-4">
-                          <span className="text-gray-400 block text-[9px] uppercase tracking-wide">Candidate Rating</span>
-                          <span className="font-bold text-gray-900 flex items-center gap-1">🌟 {tutor.rating || '4.9'} ({tutor.reviewCount || '24'} complete orders)</span>
-                        </div>
-                      </div>
-                    </div>
-
-                    <button
-                      onClick={() => onOpenChat(tutor.id)}
-                      className="mt-5 w-full bg-gray-900 hover:bg-orange-500 hover:text-white text-white p-2.5 rounded-xl text-[12px] font-bold transition-all cursor-pointer text-center"
-                    >
-                      Hire & Chat Now
-                    </button>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
+          {/* REMOVED HARDCODED DUMMY TUTORS DIRECTORY VIEW */}
 
           {/* ================================== */}
           {/* TAB 6: CHAT INTERFACE MESSENGER   */}
           {/* ================================== */}
           {activeTab === 'chat' && (
-            <div className="bg-white border rounded-3xl grid grid-cols-1 md:grid-cols-3 h-[580px] overflow-hidden shadow-xs animate-fade-in text-left">
+            <div className="bg-white border border-slate-200/80 rounded-3xl flex flex-col h-[720px] overflow-hidden shadow-sm text-left relative animate-fade-in">
               
-              {/* Contacted list panel */}
-              <div className="border-r border-gray-150 p-4 shrink-0 flex flex-col h-full bg-slate-50/50">
-                <h4 className="text-xs font-bold text-gray-900 uppercase tracking-wider pb-3 border-b flex items-center gap-2">
-                  <MessageSquare className="w-4 h-4 text-orange-500" />
-                  <span>Discussion channels ({studentChats.length})</span>
-                </h4>
+              {/* Discussion Channels + Center Chat Workspace */}
+              <div className="flex-1 flex overflow-hidden w-full relative">
 
-                <div className="space-y-1.5 overflow-y-auto mt-3 flex-1 pr-1">
-                  {studentChats.length > 0 ? (
-                    studentChats.map((c) => {
-                      const tutor = getTutor(c.tutorId);
-                      const lastMsg = messages.filter(m => m.chatId === c.id).slice(-1)[0];
+                {/* LEFT SIDEBAR: DISCUSSION CHANNELS */}
+                <aside className="w-72 md:w-80 lg:w-88 bg-white border-r border-slate-200/80 flex flex-col shrink-0 shadow-xs overflow-hidden">
+                  
+                  {/* Sidebar Title Header */}
+                  <div className="p-4 border-b border-slate-100">
+                    <div className="flex items-center justify-between mb-3">
+                      <h2 className="text-xs font-bold text-slate-900 flex items-center gap-2 tracking-wide uppercase">
+                        <MessageSquare className="w-4 h-4 text-orange-500" />
+                        <span>Discussion Channels</span>
+                      </h2>
+                      <span className="text-[11px] font-semibold bg-orange-50 text-orange-600 px-2.5 py-0.5 rounded-full border border-orange-200/50">
+                        {studentChats.length || 1} Active
+                      </span>
+                    </div>
+
+                    {/* Channel Search */}
+                    <div className="relative">
+                      <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                      <input 
+                        type="text" 
+                        value={channelSearchFilter}
+                        onChange={(e) => setChannelSearchFilter(e.target.value)}
+                        placeholder="Filter conversations..." 
+                        className="w-full pl-8 pr-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:bg-white focus:border-orange-500 focus:ring-1 focus:ring-orange-500 outline-none transition-all"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Channels Scroll Area */}
+                  <div className="flex-1 overflow-y-auto p-3 space-y-5">
+
+                    {(() => {
+                      const supportChat = studentChats.find(c => c.tutorId === 'admin_emily' || c.tutorId.startsWith('admin_'));
+                      const tutorChats = studentChats.filter(c => !c.tutorId.startsWith('admin_') && c.tutorId !== 'admin_emily');
+                      const filteredTutorChats = tutorChats.filter(c => {
+                        const tutor = getTutor(c.tutorId);
+                        const query = channelSearchFilter.toLowerCase();
+                        return !query || (tutor?.name.toLowerCase().includes(query)) || (c.subject.toLowerCase().includes(query));
+                      });
+
                       return (
-                        <button
-                          key={c.id}
-                          onClick={() => onSelectChat(c)}
-                          className="w-full text-left p-3.5 rounded-2xl hover:bg-white hover:shadow-xs transition-all border border-transparent hover:border-gray-150 flex gap-3 cursor-pointer items-center"
-                        >
-                          <img src={tutor?.avatarUrl} className="w-9 h-9 rounded-full border object-cover shrink-0" alt="" />
-                          <div className="truncate flex-1">
-                            <span className="font-bold text-xs text-gray-900 block leading-tight">{tutor?.name}</span>
-                            <span className="text-[10px] text-gray-500 truncate block mt-0.5 leading-none">{lastMsg?.content || 'Discussion active'}</span>
-                          </div>
-                        </button>
-                      );
-                    })
-                  ) : (
-                    <div className="p-8 text-center text-[11px] text-gray-400">
-                      Discuss briefs inside tutors' profiles or search list.
-                    </div>
-                  )}
-                </div>
-              </div>
+                        <>
+                          {/* SECTION 1: SUPPORT CHANNELS */}
+                          <div>
+                            <div className="px-2 mb-2 flex items-center justify-between">
+                              <span className="text-[10px] font-bold text-slate-400 tracking-wider uppercase">Support Channel</span>
+                              <span className="text-[10px] text-emerald-600 font-semibold flex items-center gap-1">
+                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span> 24/7 Available
+                              </span>
+                            </div>
 
-              {/* Active Chat message area */}
-              <div className="col-span-2 flex flex-col h-full justify-between bg-white relative">
-                
-                {/* Chat window Header */}
-                <div className="p-4 border-b flex items-center justify-between">
-                  <div className="flex items-center gap-2.5">
-                    <div className="w-2.5 h-2.5 bg-emerald-500 rounded-full animate-pulse" />
-                    <div>
-                      <span className="font-bold text-xs text-gray-900 block leading-none">University Student Desk Chat</span>
-                      <span className="text-[10px] text-gray-400 block mt-1">24/7 CSR agents and scientific tutors connected.</span>
-                    </div>
-                  </div>
-                  <HelpCircle className="w-4 h-4 text-gray-450" />
-                </div>
-
-                {/* Simulated feedback interface */}
-                <div className="flex-1 p-6 space-y-4 overflow-y-auto bg-[#FDFBF9]/40 flex flex-col justify-end">
-                  <div className="text-center p-4 bg-orange-55/60 border border-orange-100 rounded-2xl max-w-sm mx-auto text-[11px] text-gray-650">
-                    <Sparkles className="w-4 h-4 text-orange-500 mx-auto mb-1.5" />
-                    <strong>Academic Integrity Notice:</strong> All communications, instructions, and payments are guarded securely. Escrow release parameters apply statically.
-                  </div>
-
-                  <div className="bg-orange-500 text-white rounded-2xl rounded-tr-none px-4 py-2.5 text-xs text-left max-w-xs self-end shadow-sm">
-                    Hi, I submitted my Molecular Biology instruction file. When can I expect tutor bids and estimates?
-                  </div>
-
-                  <div className="bg-gray-100 text-gray-800 rounded-2xl rounded-tl-none px-4 py-2.5 text-xs text-left max-w-xs self-start">
-                    Hello! We have flagged other natural sciences tutors available right now. They will upload proposal quotes in our Escrow monitor within 15 minutes! Ready to assist.
-                  </div>
-                </div>
-
-                {/* Text write inputs */}
-                <div className="p-4 border-t flex items-center gap-3">
-                  <input 
-                    type="text" 
-                    placeholder="Type your message with credentials..."
-                    className="flex-1 bg-gray-50 border border-gray-200 rounded-xl py-2.5 px-4 text-xs focus:ring-1 focus:ring-orange-500/30 focus:outline-none"
-                  />
-                  <button className="p-2.5 bg-orange-500 text-white rounded-xl shadow-md cursor-pointer hover:bg-orange-600 transition-colors">
-                    <Send className="w-4 h-4" />
-                  </button>
-                </div>
-
-              </div>
-
-            </div>
-          )}
-
-          {/* ======================================= */}
-          {/* USER GOOGLE CHAT WORKSPACE SYNC TAB     */}
-          {/* ======================================= */}
-          {activeTab === 'google_chat' && (
-            <div className="bg-white rounded-3xl border border-gray-150 p-6 md:p-8 space-y-8 text-left shadow-xs animate-fade-in" id="google-chat-workspace-hub">
-              
-              {/* Top Banner Explainer */}
-              <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 pb-6 border-b border-gray-100">
-                <div className="space-y-1">
-                  <span className="bg-emerald-50 text-emerald-700 text-[10px] font-bold tracking-widest uppercase px-3 py-1 rounded-full border border-emerald-100 font-mono inline-block">
-                    Google Workspace Integration
-                  </span>
-                  <h3 className="font-bold text-lg md:text-xl text-gray-950 font-sans tracking-tight flex items-center gap-2">
-                    <MessageCircle className="w-5 h-5 text-emerald-600 shrink-0" />
-                    <span>Google Chat Broadcast Sync hub</span>
-                  </h3>
-                  <p className="text-xs text-gray-500 max-w-xl leading-relaxed">
-                    Link your Google account with permission to automatically discover assigned discussion rooms, sync homework milestones, and post real-time tutor guidance into your Google Chat spaces seamlessly.
-                  </p>
-                </div>
-
-                {/* Connection Status Badge */}
-                {!googleNeedsAuth && googleUser && (
-                  <button 
-                    onClick={handleGoogleLogout}
-                    className="flex items-center gap-2 bg-rose-50 text-rose-700 hover:bg-rose-100 text-xs font-bold px-3 py-2 rounded-xl transition-all cursor-pointer shadow-xs border border-rose-100"
-                  >
-                    <span>Disconnect ({googleUser.email})</span>
-                  </button>
-                )}
-              </div>
-
-              {googleNeedsAuth ? (
-                /* Google Authentication Card state */
-                <div className="max-w-md mx-auto py-10 px-6 bg-slate-50/50 border border-gray-150 rounded-2xl text-center space-y-6">
-                  <div className="w-16 h-16 bg-white rounded-2xl flex items-center justify-center mx-auto shadow-md border border-gray-100">
-                    <svg className="w-8 h-8" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2050/svg">
-                      <path d="M21.35 11.1H12V13.1H19.55C18.8 15.6 16.4 17.5 12 17.5C8.95 17.5 6.45 15 6.45 11.95C6.45 8.9 8.95 6.4 12 6.4C13.4 6.4 14.7 6.95 15.7 7.9L17.25 6.35C15.85 5.05 14 4.25 12 4.25C7.75 4.25 4.25 7.75 4.25 12C4.25 16.25 7.75 19.75 12 19.75C16.25 19.75 19.75 16.9 19.75 12C19.75 11.7 19.7 11.4 19.65 11.1H21.35Z" fill="#10B981" />
-                    </svg>
-                  </div>
-                  
-                  <div className="space-y-2">
-                    <h4 className="font-bold text-sm text-gray-900 font-sans">Connection Consent Required</h4>
-                    <p className="text-[11px] text-gray-500 max-w-sm mx-auto leading-relaxed">
-                      To scan directory channels and dispatch broadcast records directly to designated Google spaces on your behalf, we need your absolute consent.
-                    </p>
-                  </div>
-
-                  {/* Material Design Google Sign In Button - Compliant with guidelines */}
-                  <div className="flex justify-center pt-2">
-                    <button 
-                      onClick={handleGoogleLogin} 
-                      disabled={isLoggingInGoogle}
-                      className="gsi-material-button inline-flex items-center justify-center bg-white hover:bg-gray-50 text-gray-700 font-sans font-semibold text-xs border border-gray-200 rounded-lg shadow-xs hover:shadow-md transition-all active:scale-[0.99] cursor-pointer disabled:opacity-50 py-2.5 px-4"
-                    >
-                      <div className="gsi-material-button-content-wrapper flex items-center gap-3">
-                        <div className="gsi-material-button-icon shrink-0">
-                          <svg className="w-4 h-4 block" version="1.1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48">
-                            <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"></path>
-                            <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"></path>
-                            <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"></path>
-                            <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"></path>
-                          </svg>
-                        </div>
-                        <span className="gsi-material-button-contents text-xs font-bold text-gray-700">
-                          {isLoggingInGoogle ? 'Linking credentials...' : 'Sign in with Google'}
-                        </span>
-                      </div>
-                    </button>
-                  </div>
-                  
-                  {googleAuthError && (
-                    <div className="bg-amber-50 border border-amber-200 text-amber-900 rounded-xl p-3 text-left space-y-2.5 animate-fade-in text-[10.5px]">
-                      <p className="font-bold text-amber-950">⚠️ Connection Blocked by Browser:</p>
-                      <p className="font-sans text-[10px] text-gray-650 bg-white/80 p-2 rounded border border-amber-100">{googleAuthError}</p>
-                      <p className="leading-normal">
-                        To bypass iframe cookies and pop-up filters instantly, please <strong>open this workspace in a separate separate window</strong>:
-                        <a href="https://ais-dev-lxhnmo75fkkuj5cd7dujpf-92836459425.asia-southeast1.run.app" target="_blank" rel="noreferrer" className="text-orange-600 block underline font-bold mt-1 hover:text-orange-700">Open in Separate Window &rarr;</a>
-                      </p>
-                      <div className="pt-2 border-t border-amber-200/40">
-                        <p className="font-semibold text-amber-950 mb-1">💡 Sandbox Demo Fallback:</p>
-                        <button
-                          type="button"
-                          id="simulate-student-google-btn"
-                          onClick={() => {
-                            setGoogleUser({
-                              uid: 'simulated_google_user',
-                              displayName: 'Shaka Ahmad',
-                              email: 'shaka.ahmadd@gmail.com',
-                              photoURL: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&auto=format&fit=crop&q=80'
-                            } as any);
-                            setGoogleToken('mock_simulated_token');
-                            setGoogleNeedsAuth(false);
-                            setGoogleSpaces([
-                              { name: 'spaces/academic-advising-room-1', displayName: 'Primary Consultation Room #1' },
-                              { name: 'spaces/direct-dispute-resolution', displayName: 'Escrow and Arbitration Deck' }
-                            ]);
-                            setSelectedSpace('spaces/academic-advising-room-1');
-                          }}
-                          className="bg-emerald-600 hover:bg-emerald-700 active:scale-97 text-white font-bold text-[10px] px-3 py-2 rounded-xl transition-all cursor-pointer block text-center w-full shadow-sm"
-                        >
-                          ⚡ Bypass & Enable Simulated Google Workspace Sandbox
-                        </button>
-                      </div>
-                    </div>
-                  )}
-
-                  <p className="text-[10px] text-gray-400">Secured via OAuth SSL and standard in-memory session protection.</p>
-                </div>
-              ) : (
-                /* Authenticated State view workspace panels */
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                  
-                  {/* Left Column: Account info and spaces listing */}
-                  <div className="lg:col-span-1 space-y-6">
-                    
-                    {/* Logged in User Identity summary */}
-                    <div className="bg-slate-50/50 rounded-2xl border border-gray-150 p-4 space-y-3">
-                      <h4 className="text-[10px] uppercase font-mono tracking-wider text-gray-400 font-extrabold">Active Authorized Account</h4>
-                      <div className="flex items-center gap-3">
-                        {googleUser.photoURL ? (
-                          <img src={googleUser.photoURL} className="w-10 h-10 rounded-full border border-gray-200" alt="Google Profile" referrerPolicy="no-referrer" />
-                        ) : (
-                          <div className="w-10 h-10 rounded-full bg-emerald-500 text-white flex items-center justify-center font-bold text-sm">
-                            {(googleUser.displayName || googleUser.email || 'G')[0]}
-                          </div>
-                        )}
-                        <div className="text-left leading-tight truncate">
-                          <span className="font-bold text-xs text-gray-950 block">{googleUser.displayName || 'Authorized Member'}</span>
-                          <span className="text-[10px] text-gray-500 block truncate">{googleUser.email}</span>
-                        </div>
-                      </div>
-                      
-                      {/* Connection secure metadata */}
-                      <div className="pt-2 border-t flex items-center gap-2 text-[10px] text-emerald-800 font-medium">
-                        <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse inline-block" />
-                        <span>Google Chat Directory Connected</span>
-                      </div>
-                    </div>
-
-                    {/* Room Spaces Directory Panel */}
-                    <div className="bg-white border border-gray-150 rounded-2xl overflow-hidden shadow-xs">
-                      <div className="bg-slate-50/70 p-4 border-b border-gray-150 flex justify-between items-center">
-                        <span className="text-[10px] uppercase font-mono tracking-wider font-extrabold text-[#111]">
-                          Spaces Channel ({googleSpaces.length})
-                        </span>
-                        <button 
-                          onClick={() => fetchGoogleSpaces(googleToken || '')} 
-                          disabled={isLoadingSpaces}
-                          aria-label="Refresh Spaces"
-                          className="text-gray-400 hover:text-emerald-600 disabled:opacity-40"
-                        >
-                          <RefreshCw className={`w-3.5 h-3.5 cursor-pointer ${isLoadingSpaces ? 'animate-spin' : ''}`} />
-                        </button>
-                      </div>
-
-                      <div className="p-4 space-y-2">
-                        {isLoadingSpaces ? (
-                          <div className="py-8 text-center text-xs text-gray-400 font-medium animate-pulse">
-                            Scrutinizing authorized directories...
-                          </div>
-                        ) : errorSpaces ? (
-                          <div className="p-3 bg-rose-50 text-rose-800 rounded-xl text-[10px] font-sans">
-                            <span className="font-bold block">Sandbox Status notice:</span>
-                            <p>{errorSpaces}</p>
-                            <p className="mt-1 opacity-80 font-medium">Using sandbox simulation can be tested inside the communication panel immediately.</p>
-                          </div>
-                        ) : googleSpaces.length > 0 ? (
-                          <div className="space-y-1.5 max-h-[220px] overflow-y-auto">
-                            {googleSpaces.map((space) => {
-                              const isSelected = selectedSpace === space.name;
-                              return (
-                                <button
-                                  key={space.name}
-                                  onClick={() => setSelectedSpace(space.name)}
-                                  className={`w-full text-left p-3 rounded-xl border transition-all text-xs flex items-center justify-between cursor-pointer ${
-                                    isSelected 
-                                      ? 'bg-emerald-50 border-emerald-250 text-emerald-950 font-bold' 
-                                      : 'bg-white hover:bg-slate-50 border-gray-150 text-gray-700'
-                                  }`}
-                                  id={`space-channel-${space.name}`}
-                                >
-                                  <div className="truncate pr-2">
-                                    <span className="block truncate">{space.displayName || space.name}</span>
-                                    <span className="text-[9px] text-gray-400 block font-mono font-medium truncate mt-0.5">{space.name}</span>
+                            {supportChat ? (
+                              <div 
+                                onClick={() => {
+                                  setLocalSelectedChatId(supportChat.id);
+                                  if (onSubscribeToChatDetails) onSubscribeToChatDetails(supportChat.id);
+                                }} 
+                                className={`p-3 rounded-xl cursor-pointer transition-all border flex items-start gap-3 relative group ${
+                                  localSelectedChatId === supportChat.id
+                                    ? 'border-orange-200 bg-orange-50/50 shadow-xs'
+                                    : 'border-transparent hover:bg-slate-50'
+                                }`}
+                              >
+                                <div className="relative shrink-0">
+                                  <div className="w-10 h-10 rounded-xl bg-orange-500 text-white flex items-center justify-center font-bold shadow-md shadow-orange-500/20">
+                                    <Headset className="w-5 h-5" />
                                   </div>
-                                  {isSelected && <Check className="w-3.5 h-3.5 text-emerald-600 shrink-0" />}
-                                </button>
-                              );
-                            })}
+                                  <span className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 bg-emerald-500 border-2 border-white rounded-full"></span>
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex items-center justify-between mb-0.5">
+                                    <h4 className="text-xs font-bold text-slate-900 group-hover:text-orange-600 transition-colors truncate">Chat with Support/Admin</h4>
+                                    <span className="text-[10px] font-medium text-slate-400">Online</span>
+                                  </div>
+                                  <p className="text-xs text-slate-500 truncate">
+                                    {messages.filter(m => m.chatId === supportChat.id).slice(-1)[0]?.content || "24/7 Support Desk Active"}
+                                  </p>
+                                </div>
+                              </div>
+                            ) : (
+                              <div 
+                                onClick={() => onOpenChat('admin_shaka')}
+                                className="p-3 rounded-xl cursor-pointer transition-all border border-dashed border-orange-200 bg-orange-50/30 hover:bg-orange-50/60 flex items-start gap-3 relative group"
+                              >
+                                <div className="relative shrink-0">
+                                  <div className="w-10 h-10 rounded-xl bg-orange-500 text-white flex items-center justify-center font-bold shadow-md shadow-orange-500/20 animate-pulse">
+                                    <Headset className="w-5 h-5" />
+                                  </div>
+                                  <span className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 bg-emerald-500 border-2 border-white rounded-full"></span>
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex items-center justify-between mb-0.5">
+                                    <h4 className="text-xs font-bold text-slate-900 truncate">Chat with Support/Admin</h4>
+                                    <span className="text-[10px] font-bold text-orange-600">24/7</span>
+                                  </div>
+                                  <p className="text-xs text-orange-600 font-semibold truncate">Click to message 24/7 Support Desk</p>
+                                </div>
+                              </div>
+                            )}
                           </div>
-                        ) : (
-                          <div className="p-4 bg-orange-50/55 rounded-xl text-center space-y-2">
-                            <span className="text-xl">💬</span>
-                            <h5 className="text-[11px] font-bold text-orange-950">No Spaces Found</h5>
-                            <p className="text-[10px] text-gray-500 leading-normal">
-                              No compatible Google Chat spaces were found. Open your Google Chat app, create a Space, or refresh to display them here!
-                            </p>
-                            <button
-                              onClick={() => setSelectedSpace('')}
-                              className="bg-white hover:bg-gray-50 text-gray-700 font-bold text-[9px] border px-2.5 py-1.5 rounded-lg w-full cursor-pointer"
-                            >
-                              Activate Simulation Sandbox
-                            </button>
+
+                          {/* SECTION 2: MY TUTORS */}
+                          <div>
+                            <div className="px-2 mb-2 flex items-center justify-between">
+                              <span className="text-[10px] font-bold text-slate-400 tracking-wider uppercase">Chat with My Tutor</span>
+                              <span className="text-[10px] font-semibold text-slate-400">{tutorChats.length} Tutors</span>
+                            </div>
+
+                            <div className="space-y-1.5">
+                              {filteredTutorChats.map((c) => {
+                                const tutor = getTutor(c.tutorId);
+                                const lastMsg = messages.filter(m => m.chatId === c.id).slice(-1)[0];
+                                const isSelected = localSelectedChatId === c.id;
+                                return (
+                                  <div 
+                                    key={c.id} 
+                                    onClick={() => {
+                                      setLocalSelectedChatId(c.id);
+                                      if (onSubscribeToChatDetails) onSubscribeToChatDetails(c.id);
+                                    }} 
+                                    className={`p-3 rounded-xl cursor-pointer transition-all border flex items-start gap-3 relative group ${
+                                      isSelected
+                                        ? 'border-orange-200 bg-orange-50/50 shadow-xs'
+                                        : 'border-transparent hover:bg-slate-50'
+                                    }`}
+                                  >
+                                    <div className="relative shrink-0">
+                                      <img 
+                                        src={tutor?.avatarUrl || 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=120&auto=format&fit=crop&q=80'} 
+                                        alt="" 
+                                        className="w-10 h-10 rounded-xl object-cover ring-2 ring-slate-100" 
+                                      />
+                                      <span className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 bg-emerald-500 border-2 border-white rounded-full"></span>
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                      <div className="flex items-center justify-between mb-0.5">
+                                        <h4 className="text-xs font-bold text-slate-900 truncate">{tutor?.name || 'Academic Tutor'}</h4>
+                                        <span className="text-[10px] font-medium text-slate-400">
+                                          {lastMsg ? new Date(lastMsg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}
+                                        </span>
+                                      </div>
+                                      <p className="text-xs text-slate-500 truncate">{lastMsg?.content || 'Discussion active'}</p>
+                                    </div>
+                                  </div>
+                                );
+                              })}
+
+                              {tutorChats.length === 0 && (
+                                <div className="p-4 text-center text-[11px] text-slate-400 bg-slate-50 border border-dashed rounded-xl leading-relaxed">
+                                  No assigned tutors yet. Submit an assignment request to match with an expert tutor!
+                                </div>
+                              )}
+                            </div>
                           </div>
-                        )}
-                      </div>
-                    </div>
+                        </>
+                      );
+                    })()}
 
                   </div>
 
-                  {/* Right Column: Communication Terminal / Broadcast desk */}
-                  <div className="lg:col-span-2 space-y-6 text-left">
-                    
-                    <div className="bg-slate-50/50 rounded-2xl border border-gray-150 p-6 space-y-4">
-                      <div className="flex items-center gap-3">
-                        <div className="bg-emerald-500/10 text-emerald-600 p-2 rounded-xl">
-                          <Cpu className="w-5 h-5" />
+                  {/* Footer: Security Status Badge */}
+                  <div className="p-3 bg-slate-50 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500">
+                    <span className="flex items-center gap-1.5 font-medium">
+                      <ShieldCheck className="w-4 h-4 text-emerald-600" />
+                      Encrypted Workspace
+                    </span>
+                    <span className="text-emerald-700 bg-emerald-100/70 font-semibold px-2 py-0.5 rounded text-[10px]">Secure</span>
+                  </div>
+                </aside>
+
+                {/* CENTER CHAT DISPLAY WORKSPACE */}
+                <main className="flex-1 bg-white flex flex-col shadow-xs overflow-hidden relative">
+                  {selectedChat ? (
+                    <>
+                      {/* CHAT HEADER */}
+                      <div className="px-5 py-3.5 border-b border-slate-100 bg-white flex items-center justify-between shrink-0 z-10">
+                        {/* Active User Details */}
+                        <div className="flex items-center gap-3">
+                          <div className="relative">
+                            <img 
+                              src={selectedChat.tutorId.startsWith('admin_') 
+                                ? 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=120&auto=format&fit=crop&q=80' 
+                                : (getTutor(selectedChat.tutorId)?.avatarUrl || 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=120&auto=format&fit=crop&q=80')} 
+                              alt="Tutor" 
+                              className="w-11 h-11 rounded-xl object-cover ring-2 ring-slate-100" 
+                            />
+                            <span className="w-3.5 h-3.5 bg-emerald-500 border-2 border-white rounded-full absolute -bottom-0.5 -right-0.5"></span>
+                          </div>
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <h3 className="font-bold text-slate-900 text-sm md:text-base leading-tight">
+                                {selectedChat.tutorId.startsWith('admin_') || selectedChat.tutorId === 'admin_emily'
+                                  ? 'Official Support Desk (Emily Vance)'
+                                  : (getTutor(selectedChat.tutorId)?.name || 'Academic Tutor')}
+                              </h3>
+                              <span className="hidden sm:inline-block px-2 py-0.5 text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200/60 rounded-full">
+                                Active Now
+                              </span>
+                            </div>
+                            <p className="text-xs text-slate-500 font-medium">
+                              Subject: {selectedChat.subject || 'Direct Consultation'}
+                            </p>
+                          </div>
                         </div>
-                        <div>
-                          <h4 className="font-bold text-xs uppercase tracking-wider text-emerald-700 font-mono">
-                            Workspace Dispatch Terminal
-                          </h4>
-                          <span className="text-xs font-semibold text-gray-900 block mt-0.5">
-                            Target destination: <strong className="text-emerald-750 font-mono">{selectedSpace ? `Real Space: ${selectedSpace}` : 'Google Chat Sandbox Simulator'}</strong>
-                          </span>
+
+                        {/* Right Quick Toolbar */}
+                        <div className="flex items-center gap-2">
+                          <button 
+                            onClick={() => setIsQuoteDrawerOpen(!isQuoteDrawerOpen)} 
+                            className="flex items-center gap-1.5 px-3.5 py-2 bg-gradient-to-r from-orange-50 to-orange-100 hover:from-orange-100 hover:to-orange-200 text-orange-700 border border-orange-200 rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer"
+                          >
+                            <DollarSign className="w-4 h-4 text-orange-600" />
+                            <span>Quote & Files</span>
+                          </button>
+
+                          <div className="h-5 w-px bg-slate-200 mx-1 hidden md:block"></div>
+
+                          <button className="p-2 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors" title="Voice Call">
+                            <Phone className="w-4 h-4" />
+                          </button>
+                          <button className="p-2 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors" title="Video Consultation">
+                            <Video className="w-4 h-4" />
+                          </button>
+                          <button className="p-2 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors" title="More options">
+                            <MoreVertical className="w-4 h-4" />
+                          </button>
                         </div>
                       </div>
 
-                      {googleMessageSuccess && (
-                        <div className="p-3 bg-emerald-50 text-emerald-900 rounded-xl border border-emerald-100 text-xs font-medium animate-fade-in">
-                          ✓ {googleMessageSuccess}
+                      {/* ACADEMIC SAFETY SHIELD PINNED BANNER */}
+                      {showSafetyBanner && (
+                        <div className="bg-gradient-to-r from-amber-50/90 via-orange-50/50 to-amber-50/90 border-b border-amber-200/60 px-5 py-2.5 flex items-center justify-between text-xs text-amber-900 shrink-0">
+                          <div className="flex items-center gap-2.5">
+                            <div className="w-6 h-6 rounded-lg bg-amber-500/10 text-amber-600 flex items-center justify-center shrink-0">
+                              <ShieldCheck className="w-4 h-4" />
+                            </div>
+                            <span>
+                              <strong className="font-bold text-amber-950">Academic Safety Shield:</strong> All communications, instructions, and files are protected under strict platform security layers.
+                            </span>
+                          </div>
+                          <button onClick={() => setShowSafetyBanner(false)} className="text-amber-700/60 hover:text-amber-900 p-1 rounded transition-colors">
+                            <X className="w-3.5 h-3.5" />
+                          </button>
                         </div>
                       )}
 
-                      <form onSubmit={requestSendMessageToSpace} className="space-y-4">
-                        <div className="space-y-2">
-                          <label className="text-[10px] font-bold text-gray-700 block uppercase tracking-wide">
-                            Write Message Payload
-                          </label>
-                          <textarea
-                            rows={4}
-                            required
-                            value={googleMessageMsg}
-                            onChange={(e) => setGoogleMessageMsg(e.target.value)}
-                            placeholder="e.g., Hello Team Clara, I have just secured the tutoring Milestone payment. Clara Sterling, let's begin the review session on our shared whiteboard spreadsheet. Looking forward to assistance!"
-                            className="w-full bg-white border border-gray-250 rounded-xl p-3.5 focus:border-emerald-500 focus:outline-none text-xs text-gray-905 font-medium leading-relaxed shadow-xs"
-                          />
+                      {/* MESSAGE STREAM CANVAS */}
+                      <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-4 bg-slate-50/40">
+                        <div className="flex items-center justify-center my-2">
+                          <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 bg-slate-200/70 border border-slate-300/40 px-3 py-0.5 rounded-full">
+                            Academic Security System • Active Thread
+                          </span>
                         </div>
 
-                        {/* Fast suggestions buttons */}
-                        <div className="space-y-1.5">
-                          <span className="text-[9px] font-mono font-bold text-gray-400 block uppercase">Prefilled templates:</span>
-                          <div className="flex flex-wrap gap-2">
-                            {[
-                              'Tutoring contract secured on University Tutors sandbox.',
-                              'Milestone accepted. Clara Stirling, please review math guidelines.',
-                              'Help desk ticket open. Let\'s sync the shared spreadsheets.'
-                            ].map((phrase, idx) => (
-                              <button 
-                                key={idx}
-                                type="button"
-                                onClick={() => setGoogleMessageMsg(phrase)}
-                                className="text-[10px] bg-white border border-gray-200 hover:border-emerald-500 hover:text-emerald-650 px-2.5 py-1.5 rounded-lg transition-all cursor-pointer font-medium text-gray-600"
-                              >
-                                {phrase}
-                              </button>
-                            ))}
+                        <div className="max-w-xl mx-auto bg-amber-50/80 border border-amber-200 rounded-xl p-3.5 text-xs text-amber-800 flex items-start gap-3 shadow-xs">
+                          <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                          <p className="leading-relaxed">
+                            <strong class="font-bold text-amber-900">Connection established.</strong> Students can discuss assignment details or schedule 1-on-1 tutoring. All messages are encrypted.
+                          </p>
+                        </div>
+
+                        {activeChatMessages.map((m) => {
+                          const isSelf = m.senderId === currentUser.id;
+                          const isSystem = m.senderId === 'system';
+                          const senderObj = isSelf ? currentUser : getTutor(m.senderId);
+                          const senderName = isSystem ? "ACADEMIC SECURITY SYSTEM" : (isSelf ? "YOU" : (senderObj?.name || "Support / Tutor").toUpperCase());
+
+                          if (isSystem) {
+                            return (
+                              <div key={m.id} className="flex justify-center my-2">
+                                <span className="bg-amber-50/80 text-amber-900 border border-amber-200 px-4 py-2 rounded-2xl text-center text-xs font-semibold max-w-lg shadow-xs">
+                                  {m.content}
+                                </span>
+                              </div>
+                            );
+                          }
+
+                          return (
+                            <div key={m.id} className={`flex flex-col ${isSelf ? 'items-end' : 'items-start'} gap-1 my-2`}>
+                              {!isSelf && (
+                                <div className="flex items-center gap-2">
+                                  <img 
+                                    src={senderObj?.avatarUrl || 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=120&auto=format&fit=crop&q=80'} 
+                                    alt="" 
+                                    className="w-6 h-6 rounded-lg object-cover" 
+                                  />
+                                  <span className="text-[10px] font-bold text-slate-500">{senderName}</span>
+                                </div>
+                              )}
+
+                              <div className={`px-4 py-2.5 rounded-2xl max-w-md text-sm shadow-xs ${
+                                isSelf 
+                                  ? 'bg-gradient-to-r from-orange-500 to-orange-600 text-white rounded-br-xs' 
+                                  : 'bg-white border border-slate-200 text-slate-800 rounded-bl-xs'
+                              }`}>
+                                <p className="whitespace-pre-wrap">{m.content}</p>
+                                {m.fileUrl && (
+                                  <div className="mt-2.5 p-2 rounded-xl bg-slate-100/30 border border-slate-200/40 flex items-center justify-between text-xs">
+                                    <div className="flex items-center gap-1.5 truncate">
+                                      <FileText className="w-4 h-4 text-orange-500 shrink-0" />
+                                      <span className="truncate font-mono">{m.fileName || 'Attachment'}</span>
+                                    </div>
+                                    <a href={m.fileUrl} target="_blank" rel="noreferrer" className="text-orange-500 hover:underline font-bold shrink-0 ml-2">
+                                      Download
+                                    </a>
+                                  </div>
+                                )}
+                              </div>
+
+                              <span className="text-[10px] text-slate-400 font-medium flex items-center gap-1">
+                                {isSelf ? 'YOU • ' : ''}{new Date(m.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                {isSelf && <CheckCheck className="w-3.5 h-3.5 text-orange-500" />}
+                              </span>
+                            </div>
+                          );
+                        })}
+                      </div>
+
+                      {/* QUICK PROMPT SUGGESTION CHIPS */}
+                      <div className="px-5 py-2 bg-slate-50 border-t border-slate-100 flex items-center gap-2 overflow-x-auto shrink-0">
+                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider shrink-0">Quick Actions:</span>
+                        <button 
+                          type="button"
+                          onClick={() => setStudentReply('Can we review the assignment requirements?')} 
+                          className="px-2.5 py-1 bg-white hover:bg-orange-50 hover:text-orange-600 border border-slate-200 rounded-lg text-xs text-slate-600 whitespace-nowrap transition-colors cursor-pointer"
+                        >
+                          📋 Request assignment review
+                        </button>
+                        <button 
+                          type="button"
+                          onClick={() => setStudentReply('Please send over a formal price quote for this task.')} 
+                          className="px-2.5 py-1 bg-white hover:bg-orange-50 hover:text-orange-600 border border-slate-200 rounded-lg text-xs text-slate-600 whitespace-nowrap transition-colors cursor-pointer"
+                        >
+                          💰 Request formal quote
+                        </button>
+                        <button 
+                          type="button"
+                          onClick={() => setStudentReply('When are you available for a 1-on-1 tutoring session?')} 
+                          className="px-2.5 py-1 bg-white hover:bg-orange-50 hover:text-orange-600 border border-slate-200 rounded-lg text-xs text-slate-600 whitespace-nowrap transition-colors cursor-pointer"
+                        >
+                          📅 Schedule 1-on-1 session
+                        </button>
+                      </div>
+
+                      {/* CHAT INPUT COMPONENT */}
+                      <div className="p-3 md:p-4 bg-white border-t border-slate-100 shrink-0">
+                        <form 
+                          onSubmit={(e) => {
+                            e.preventDefault();
+                            if (!studentReply.trim() && !chatAttachedFileName) return;
+                            if (onSendMessage) {
+                              onSendMessage(
+                                selectedChat.id, 
+                                currentUser.id, 
+                                studentReply.trim(),
+                                chatAttachedFileName ? `https://example.com/uploads/${chatAttachedFileName}` : undefined,
+                                chatAttachedFileName || undefined
+                              );
+                            }
+                            setStudentReply('');
+                            setChatAttachedFileName('');
+                          }} 
+                          className="flex items-center gap-2"
+                        >
+                          <div className="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5 flex items-center gap-2 focus-within:bg-white focus-within:border-orange-500 focus-within:ring-2 focus-within:ring-orange-500/20 transition-all">
+                            <label className="p-1.5 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-200/60 transition-colors cursor-pointer" title="Attach file">
+                              <Paperclip className="w-4 h-4" />
+                              <input 
+                                type="file" 
+                                className="hidden" 
+                                onChange={(e) => {
+                                  if (e.target.files && e.target.files[0]) {
+                                    setChatAttachedFileName(e.target.files[0].name);
+                                  }
+                                }} 
+                              />
+                            </label>
+
+                            {chatAttachedFileName && (
+                              <span className="text-[10px] bg-orange-100 text-orange-700 px-2 py-0.5 rounded font-mono font-bold truncate max-w-[120px]">
+                                {chatAttachedFileName}
+                              </span>
+                            )}
+
+                            <input 
+                              type="text" 
+                              value={studentReply}
+                              onChange={(e) => setStudentReply(e.target.value)}
+                              placeholder="Type your message here or paste details..." 
+                              className="w-full bg-transparent text-sm text-slate-800 placeholder-slate-400 outline-none py-1"
+                            />
+
+                            <button type="button" className="p-1.5 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-200/60 transition-colors hidden sm:block">
+                              <Smile className="w-4 h-4" />
+                            </button>
                           </div>
-                        </div>
 
-                        <div className="pt-2 flex justify-end">
-                          <button
-                            type="submit"
-                            id="submit-dispatch-workspace-btn"
-                            disabled={isSendingGoogleMessage}
-                            className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs px-6 py-3 rounded-xl shadow-md cursor-pointer transition-colors flex items-center gap-2"
+                          <button 
+                            type="submit" 
+                            className="bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white p-3 rounded-xl shadow-xs flex items-center justify-center transition-all transform active:scale-95 cursor-pointer"
                           >
-                            <Send className="w-4 h-4 shrink-0" />
-                            <span>{isSendingGoogleMessage ? 'Sending transmission...' : 'Transmit to Google Chat Workspace'}</span>
+                            <Send className="w-4 h-4" />
+                          </button>
+                        </form>
+                      </div>
+
+                      {/* SLIDE-OVER TUTOR QUOTE & DETAILS PANEL */}
+                      <div className={`absolute top-0 right-0 h-full w-80 md:w-96 bg-white border-l border-slate-200 shadow-xl transform transition-transform duration-300 ease-in-out z-30 flex flex-col ${
+                        isQuoteDrawerOpen ? 'translate-x-0' : 'translate-x-full'
+                      }`}>
+                        <div className="p-4 border-b border-slate-100 flex items-center justify-between bg-slate-50">
+                          <div className="flex items-center gap-2">
+                            <DollarSign className="w-4 h-4 text-orange-600" />
+                            <h3 className="font-bold text-slate-900 text-sm">Tutor Quote & Details</h3>
+                          </div>
+                          <button onClick={() => setIsQuoteDrawerOpen(false)} className="text-slate-400 hover:text-slate-600 p-1.5 rounded-lg hover:bg-slate-200/50 cursor-pointer">
+                            <X className="w-4 h-4" />
                           </button>
                         </div>
-                      </form>
 
-                    </div>
+                        <div className="flex-1 overflow-y-auto p-4 space-y-4">
+                          {/* Active Assignment Summary */}
+                          <div className="bg-slate-50 border border-slate-200 rounded-xl p-3.5">
+                            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Current Order</span>
+                            <h4 className="font-bold text-slate-900 text-sm mt-0.5">{selectedChat.subject || 'Direct Tutoring Consultation'}</h4>
+                            <p className="text-xs text-slate-500 mt-1">
+                              Status: <span className="text-amber-600 font-semibold bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded">Active Discussion</span>
+                            </p>
+                          </div>
 
-                    {/* API Grounding & Tutorial Walkthrough Info */}
-                    <div className="p-5 bg-white border border-gray-150 rounded-2xl space-y-3">
-                      <h4 className="text-[10px] font-bold text-gray-400 font-mono uppercase tracking-wider">How to test and verify Google Chat rooms</h4>
-                      <ol className="list-decimal list-inside text-[11px] text-gray-500 space-y-2 leading-relaxed">
-                        <li>Ensure you configure of your Google Chat scopes: <code className="bg-slate-100 p-0.5 rounded font-mono text-[9px]">chat.spaces.readonly</code> and <code className="bg-slate-100 p-0.5 rounded font-mono text-[9px]">chat.messages</code>.</li>
-                        <li>Create or join a space in your real Google Chat app (you can find it in Gmail sidebar or at <a href="https://chat.google.com" target="_blank" rel="noreferrer" className="text-emerald-600 hover:underline">chat.google.com</a>).</li>
-                        <li>After joining, click the <strong>Refresh Spaces</strong> icon in this dashboard room directory menu. Your space names will automatically overlay here instantly!</li>
-                        <li>Select the channel and dispatch messages. Every message will broadcast straight to your actual live chat with permission from your account.</li>
-                      </ol>
-                    </div>
+                          {/* Pending Quote Card */}
+                          {(() => {
+                            const pendingQuote = quotes.find(q => q.chatId === selectedChat.id && q.status === 'pending');
+                            if (pendingQuote) {
+                              return (
+                                <div className="border border-orange-200 bg-orange-50/40 rounded-xl p-4 space-y-3">
+                                  <div className="flex items-center justify-between">
+                                    <span className="text-xs font-bold text-slate-800">Binding Price Quote</span>
+                                    <span className="text-lg font-black text-orange-600">${pendingQuote.amount}.00</span>
+                                  </div>
+                                  <p className="text-xs text-slate-600 leading-relaxed">
+                                    {pendingQuote.scopeOfWork || `Includes ${pendingQuote.estimatedHours} hours 1-on-1 coaching & step-by-step guidance.`}
+                                  </p>
+                                  {onAcceptQuote && (
+                                    <button 
+                                      onClick={() => {
+                                        onAcceptQuote(pendingQuote.id);
+                                        setIsQuoteDrawerOpen(false);
+                                      }} 
+                                      className="w-full py-2 bg-orange-500 hover:bg-orange-600 text-white font-bold text-xs rounded-lg shadow-xs transition-colors cursor-pointer"
+                                    >
+                                      Accept & Proceed to Escrow
+                                    </button>
+                                  )}
+                                </div>
+                              );
+                            }
+                            return (
+                              <div className="border border-slate-200 bg-slate-50/50 rounded-xl p-4 text-center text-xs text-slate-500 space-y-1">
+                                <p className="font-bold text-slate-700">No Pending Quotes</p>
+                                <p className="text-[11px]">Request a price quote from the tutor using the quick action chip below.</p>
+                              </div>
+                            );
+                          })()}
 
-                  </div>
-
-                </div>
-              )}
-
-              {/* MANDATORY CONFIRMATION DIALOG MODAL IF ACTIVE */}
-              {confirmationMessageOpen && (
-                <div className="fixed inset-0 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4 z-50">
-                  <div className="bg-white rounded-3xl border shadow-2xl p-6 md:p-8 max-w-md w-full text-left space-y-5 animate-fade-in" id="google-chat-confirm-overlay">
-                    <div className="flex items-start gap-4">
-                      <div className="bg-emerald-50 text-emerald-600 p-3 rounded-2xl">
-                        <AlertTriangle className="w-6 h-6 shrink-0" />
+                          {/* Shared Files Vault */}
+                          <div>
+                            <h4 className="text-xs font-bold text-slate-800 mb-2.5 flex items-center justify-between">
+                              <span>Shared Attachments</span>
+                              <span className="text-[10px] text-slate-400 font-normal">
+                                {activeChatMessages.filter(m => m.fileUrl).length} files
+                              </span>
+                            </h4>
+                            <div className="space-y-2">
+                              {activeChatMessages.filter(m => m.fileUrl).map((m) => (
+                                <div key={m.id} className="p-2.5 border border-slate-200 rounded-lg flex items-center justify-between hover:bg-slate-50">
+                                  <div className="flex items-center gap-2.5 min-w-0">
+                                    <FileText className="w-5 h-5 text-orange-500 shrink-0" />
+                                    <div className="truncate">
+                                      <p className="text-xs font-semibold text-slate-800 truncate">{m.fileName || 'Attachment'}</p>
+                                      <p className="text-[10px] text-slate-400">{new Date(m.timestamp).toLocaleDateString()}</p>
+                                    </div>
+                                  </div>
+                                  <a href={m.fileUrl} target="_blank" rel="noreferrer" className="p-1.5 text-slate-400 hover:text-slate-700">
+                                    <Download className="w-3.5 h-3.5" />
+                                  </a>
+                                </div>
+                              ))}
+                              {activeChatMessages.filter(m => m.fileUrl).length === 0 && (
+                                <p className="text-xs text-slate-400 italic">No files attached in this chat yet.</p>
+                              )}
+                            </div>
+                          </div>
+                        </div>
                       </div>
-                      <div className="space-y-1">
-                        <h4 className="font-bold text-sm text-gray-950 font-sans">
-                          Confirm Google Chat Transmission
-                        </h4>
-                        <p className="text-xs text-gray-500 leading-normal">
-                          You are about to execute a mutating workspace action. This will post the message below into your selected Google Chat channel on your behalf:
-                        </p>
-                      </div>
+                    </>
+                  ) : (
+                    <div className="flex-1 flex flex-col items-center justify-center text-center p-8 text-slate-400">
+                      <MessageSquare className="w-12 h-12 text-slate-300 mb-3" />
+                      <h5 className="font-bold text-slate-900 text-sm">Select a Discussion Channel</h5>
+                      <p className="text-xs text-slate-400 max-w-xs mt-1">
+                        Choose an administrative support ticket or an active tutor consultation channel from the left panel to begin chatting.
+                      </p>
                     </div>
-
-                    <div className="p-4 bg-slate-50 border border-gray-200 rounded-xl leading-relaxed text-xs text-gray-700 font-medium whitespace-pre-wrap">
-                      "{pendingMessageToSend}"
-                    </div>
-
-                    <div className="bg-emerald-50/50 p-3 rounded-xl border border-emerald-100/50 text-[10px] text-emerald-800 leading-relaxed font-sans">
-                      <strong>Destination:</strong> {selectedSpace ? `Real Workspace Channel (${selectedSpace})` : 'Google Chat Sandbox Simulator'}
-                    </div>
-
-                    <div className="flex items-center justify-end gap-3 pt-2">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setConfirmationMessageOpen(false);
-                          setPendingMessageToSend('');
-                        }}
-                        className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold text-xs rounded-xl"
-                      >
-                        Cancel Release
-                      </button>
-                      <button
-                        type="button"
-                        id="confirm-dispatch-broadcast-action"
-                        onClick={confirmAndSendMessageToSpace}
-                        className="px-5 py-2.5 bg-emerald-650 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl cursor-pointer"
-                      >
-                        Confirm Broadcast
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              )}
-
+                  )}
+                </main>
+              </div>
             </div>
           )}
 
@@ -2925,7 +2838,7 @@ CONTACT EMAIL COMPASS: ${studentEmail}
                 {[
                   { title: 'Escrow payment certified successfully', desc: '$120 deposit locked in verified Stripe holding structure. Safe to proceed under academic client rules.', type: 'payment', time: '10 minutes ago' },
                   { title: 'Biology Syllabus Candidate Search Active', desc: 'Syllabus requirement broadcasted to certified Natural Sciences phD instructors worldwide.', type: 'matching', time: '1 hour ago' },
-                  { title: 'Welcome to EXAM ASSIGNMENTS!', desc: 'Your student credentials are encrypted and archived locally. Ensure profile completeness for swift matching.', type: 'security', time: '3 hours ago' },
+                  { title: 'Welcome to UNIVERSITY TUTORS!', desc: 'Your student credentials are encrypted and archived locally. Ensure profile completeness for swift matching.', type: 'security', time: '3 hours ago' },
                   { title: 'Session invitation created from Emily CSR', desc: 'A Support desk Specialist is assigned to optimize your active essay guidelines matching.', type: 'support', time: '1 day ago' }
                 ].map((notif, idx) => (
                   <div key={idx} className="p-4 bg-gray-50 border border-gray-150/60 rounded-2xl flex items-start gap-3 text-xs">
@@ -3041,7 +2954,7 @@ CONTACT EMAIL COMPASS: ${studentEmail}
                 <span>Standard Operating Procedures (SOPs)</span>
               </h3>
               <p className="text-xs text-gray-500 leading-relaxed font-normal">
-                Ensuring continuous compliance with global educational guidelines is paramount inside EXAM ASSIGNMENTS:
+                Ensuring continuous compliance with global educational guidelines is paramount inside UNIVERSITY TUTORS:
               </p>
               <ol className="list-decimal pl-5 text-xs text-gray-650 space-y-3 font-medium">
                 <li><strong>Submitting Briefs:</strong> Provide syllabus parameters, Double-spacing limits, citation format parameters, and PDF textbooks directly in the dragzone upload pane.</li>
@@ -3103,19 +3016,6 @@ CONTACT EMAIL COMPASS: ${studentEmail}
                   />
                 </div>
 
-                <div className="flex items-center justify-between p-3.5 bg-gray-50 rounded-2xl border">
-                  <div>
-                    <span className="font-bold text-xs text-gray-900 block">Automatic Escrow Hold Release</span>
-                    <span className="text-[10.5px] text-gray-500 leading-tight font-normal">Auto-approve task matching and payout after 14 days of tutor deliverable.</span>
-                  </div>
-                  <input 
-                    type="checkbox" 
-                    checked={autoDeposit}
-                    onChange={(e) => setAutoDeposit(e.target.checked)}
-                    className="rounded border-gray-300 text-orange-500 focus:ring-orange-500 w-4 h-4 cursor-pointer" 
-                  />
-                </div>
-
                 <div className="flex items-center justify-between p-3.5 bg-red-50/50 rounded-2xl border border-red-100">
                   <div>
                     <span className="font-bold text-xs text-red-955 block font-sans">Deactivate Platform Credentials</span>
@@ -3145,7 +3045,7 @@ CONTACT EMAIL COMPASS: ${studentEmail}
         <button
           onClick={() => {
             setActiveTab('chat');
-            onOpenChat('tutor_clara'); // Directly link support chat
+            onOpenChat('admin_shaka'); // Directly link support chat
           }}
           className="fixed bottom-6 right-6 bg-[#FF8A00] hover:bg-[#E05216] text-white p-4 rounded-full shadow-2xl z-40 transition-all cursor-pointer flex items-center justify-center gap-2 font-bold font-sans tracking-wide text-xs group"
           id="floating-live-chat"
@@ -3162,8 +3062,8 @@ CONTACT EMAIL COMPASS: ${studentEmail}
       {showReviewModal && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 z-51">
           <div className="bg-white rounded-3xl max-w-md w-full border border-gray-100 p-6 space-y-5 text-left shadow-2xl" id="student-reviews-approval-dialog">
-            <h4 className="font-sans font-bold text-base text-gray-950">Approve Complete Work & Rate Tutor</h4>
-            <p className="text-xs text-gray-500 leading-relaxed">Approving releases held Stripe escrow funds to the tutor permanently. Share transparent feedback for future university students.</p>
+            <h4 className="font-sans font-bold text-base text-gray-950">Approve Completed Work & Rate Tutor</h4>
+            <p className="text-xs text-gray-500 leading-relaxed">Approving confirms successful delivery of the task. Please share your rating and feedback for the tutor.</p>
 
             <div>
               <label className="text-[10px] font-bold text-gray-700 block mb-1">Choose Rating (Stars):</label>
@@ -3202,7 +3102,7 @@ CONTACT EMAIL COMPASS: ${studentEmail}
                 onClick={() => handleApproveSubmit(showReviewModal)}
                 className="px-5 py-1.5 bg-orange-500 hover:bg-orange-650 text-white font-bold rounded-lg text-xs cursor-pointer"
               >
-                Confirm & Release Funds
+                Approve Delivery & Submit Rating
               </button>
             </div>
           </div>

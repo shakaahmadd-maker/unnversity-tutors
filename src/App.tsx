@@ -4,18 +4,28 @@ import Footer from './components/Footer';
 import CookieBanner from './components/CookieBanner';
 import SopModal from './components/SopModal';
 import AuthPage from './components/AuthPage';
+import AdminLoginPage from './components/AdminLoginPage';
 import MarketingPages from './components/MarketingPages';
 import StudentDashboard from './components/StudentDashboard';
 import TutorDashboard from './components/TutorDashboard';
 import AdminDashboard from './components/AdminDashboard';
 import AssignmentFormModal from './components/AssignmentFormModal';
+import BecomeTutorModal from './components/BecomeTutorModal';
 import ChatWindow from './components/ChatWindow';
 import GetQuotePage from './components/GetQuotePage';
-import GoogleConnectModal from './components/GoogleConnectModal';
+import TutorProfilePage from './components/TutorProfilePage';
+import TutorsDirectoryPage from './components/TutorsDirectoryPage';
+import WhatsAppChatModal from './components/WhatsAppChatModal';
+import CountryOnlineTutoringPage from './components/CountryOnlineTutoringPage';
+import SpecializedServicePage from './components/SpecializedServicePage';
+import WhatsAppPage from './components/WhatsAppPage';
+import { COUNTRY_ONLINE_TUTORING_PAGES } from './data/countryOnlineTutoringData';
+import { SPECIALIZED_SERVICE_PAGES_MAP } from './data/specializedTutoringServicesData';
+import { auth } from './firebase';
 
 import { store } from './lib/store';
 import { UserRole, Chat, User, Assignment, Payment, Invoice, ActivityLog, AppNotification, SOP, AssignmentReport, Agreement } from './types';
-import { Sparkles, HelpCircle, MessageSquare, Chrome } from 'lucide-react';
+import { Sparkles, HelpCircle, MessageSquare } from 'lucide-react';
 
 export default function App() {
   
@@ -38,15 +48,34 @@ export default function App() {
     sops: store.sops,
     assignmentReports: store.assignmentReports,
     agreements: store.agreements,
-    activeStudentsOnline: store.activeStudentsOnline
+    activeStudentsOnline: store.activeStudentsOnline,
+    emails: store.emails || [],
+    connectionStatus: store.connectionStatus || 'syncing',
+    lastSyncTime: store.lastSyncTime || null,
+    syncError: store.syncError || null
   });
 
   const [activeView, setActiveView] = useState<string>('home');
+  const [activeCountryTutoringSlug, setActiveCountryTutoringSlug] = useState<string>('usa');
+  const [activeSpecializedServiceSlug, setActiveSpecializedServiceSlug] = useState<string>('assignment-guidance');
+  const [locationFilter, setLocationFilter] = useState<string>('');
+  const [subjectFilter, setSubjectFilter] = useState<string>('');
+  const [selectedTutorProfile, setSelectedTutorProfile] = useState<User | null>(null);
   const [activeChat, setActiveChat] = useState<Chat | null>(null);
-  const [isSopModalOpen, setIsSopModalOpen] = useState<boolean>(true); // Auto open for first turn audit training
+  const [isSopModalOpen, setIsSopModalOpen] = useState<boolean>(false);
   const [isAssignModalOpen, setIsAssignModalOpen] = useState<boolean>(false);
-  const [isGoogleConnectModalOpen, setIsGoogleConnectModalOpen] = useState<boolean>(false);
+  const [isBecomeTutorOpen, setIsBecomeTutorOpen] = useState<boolean>(false);
+  const [isWhatsAppModalOpen, setIsWhatsAppModalOpen] = useState<boolean>(false);
   const [prefilledTutorForAssign, setPrefilledTutorForAssign] = useState<string>('');
+
+  // Open WhatsApp modal 10 seconds after user moves to a new page; keep it shut on page transition
+  useEffect(() => {
+    setIsWhatsAppModalOpen(false);
+    const timer = setTimeout(() => {
+      setIsWhatsAppModalOpen(true);
+    }, 10000);
+    return () => clearTimeout(timer);
+  }, [activeView, selectedTutorProfile]);
 
   useEffect(() => {
     // Sync React state on any store notify() pattern
@@ -69,7 +98,11 @@ export default function App() {
         sops: store.sops,
         assignmentReports: store.assignmentReports,
         agreements: store.agreements,
-        activeStudentsOnline: store.activeStudentsOnline
+        activeStudentsOnline: store.activeStudentsOnline,
+        emails: store.emails || [],
+        connectionStatus: store.connectionStatus || 'syncing',
+        lastSyncTime: store.lastSyncTime || null,
+        syncError: store.syncError || null
       });
     });
     return () => unsubscribe();
@@ -84,6 +117,87 @@ export default function App() {
   // Unified navigation handler that updates the window URL path and changes state
   const handleNavigate = (view: string) => {
     let path = '/' + view;
+
+    if (view.startsWith('location:')) {
+      const loc = view.replace('location:', '');
+      setLocationFilter(loc);
+      setSubjectFilter('');
+      setSelectedTutorProfile(null);
+      setActiveView('tutors-directory');
+      path = '/tutors-directory?location=' + encodeURIComponent(loc);
+      window.history.pushState(null, '', path);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
+
+    if (view.startsWith('subject:')) {
+      const subj = view.replace('subject:', '');
+      setSubjectFilter(subj);
+      setLocationFilter('');
+      setSelectedTutorProfile(null);
+      setActiveView('tutors-directory');
+      path = '/tutors-directory?subject=' + encodeURIComponent(subj);
+      window.history.pushState(null, '', path);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
+
+    if (view.startsWith('country-tutoring:')) {
+      const slug = view.replace('country-tutoring:', '').toLowerCase().trim();
+      setActiveCountryTutoringSlug(slug);
+      setSelectedTutorProfile(null);
+      setActiveView('country-online-tutoring');
+      path = '/online-tutoring-' + slug;
+      window.history.pushState(null, '', path);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
+
+    if (view.startsWith('online-tutoring-')) {
+      const slug = view.replace('online-tutoring-', '').toLowerCase().trim();
+      setActiveCountryTutoringSlug(slug);
+      setSelectedTutorProfile(null);
+      setActiveView('country-online-tutoring');
+      path = '/' + view;
+      window.history.pushState(null, '', path);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
+
+    if (
+      view === 'assignment-guidance' ||
+      view.startsWith('assignment-guidance-') ||
+      view === 'coursework-tutoring' ||
+      view.startsWith('coursework-tutoring-') ||
+      view === 'writing-tutoring' ||
+      view.startsWith('writing-tutoring-') ||
+      Boolean(SPECIALIZED_SERVICE_PAGES_MAP[view]) ||
+      Boolean(SPECIALIZED_SERVICE_PAGES_MAP['/' + view])
+    ) {
+      const cleanSlug = view.replace(/^\//, '').toLowerCase().trim();
+      setActiveSpecializedServiceSlug(cleanSlug);
+      setSelectedTutorProfile(null);
+      setActiveView('specialized-service');
+      path = '/' + cleanSlug;
+      window.history.pushState(null, '', path);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
+
+    if (view === 'tutors-directory') {
+      setSelectedTutorProfile(null);
+      setActiveView('tutors-directory');
+      path = '/tutors-directory';
+      window.history.pushState(null, '', path);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
+
+    if (view === 'sop') {
+      setIsSopModalOpen(true);
+      return;
+    }
+
     if (view === 'home' || view === '') {
       path = '/';
     } else if (view === 'about') {
@@ -98,12 +212,16 @@ export default function App() {
       path = '/contact';
     } else if (view === 'blog') {
       path = '/our-blog';
+    } else if (view === 'whatsapp') {
+      path = '/whatsapp';
     } else if (view === 'privacy') {
       path = '/privacy';
     } else if (view === 'terms') {
       path = '/terms';
     } else if (view === 'auth') {
       path = '/auth';
+    } else if (view === 'admin-login') {
+      path = '/admin';
     } else if (view === 'dashboard') {
       if (storeState.currentUser) {
         if (storeState.currentUser.role === UserRole.STUDENT) {
@@ -140,15 +258,21 @@ export default function App() {
         setActiveView('get-a-quote');
       } else if (decodedPath === '/services' || hash === '#services') {
         setActiveView('services');
-      } else if (decodedPath === '/student' || hash === '#student') {
-        store.login('alex@example.com');
-        setActiveView('dashboard');
-      } else if (decodedPath === '/tutor' || hash === '#tutor') {
-        store.login('clara@example.com');
-        setActiveView('dashboard');
+      } else if (
+        decodedPath === '/student' || hash === '#student' ||
+        decodedPath === '/tutor' || hash === '#tutor'
+      ) {
+        if (store.currentUser) {
+          setActiveView('dashboard');
+        } else {
+          setActiveView('auth');
+        }
       } else if (decodedPath === '/admin' || hash === '#admin') {
-        store.login('shaka.ahmadd@gmail.com');
-        setActiveView('dashboard');
+        if (store.currentUser && store.currentUser.role === UserRole.ADMIN) {
+          setActiveView('dashboard');
+        } else {
+          setActiveView('admin-login');
+        }
       } else if (
         decodedPath === '/about-us' || 
         decodedPath === '/about us' || 
@@ -182,12 +306,47 @@ export default function App() {
         hash === '#our blog'
       ) {
         setActiveView('blog');
+      } else if (
+        decodedPath === '/whatsapp' || 
+        decodedPath === '/whatsapp-desk' || 
+        hash === '#whatsapp'
+      ) {
+        setActiveView('whatsapp');
       } else if (decodedPath === '/privacy' || hash === '#privacy') {
         setActiveView('privacy');
       } else if (decodedPath === '/terms' || hash === '#terms') {
         setActiveView('terms');
       } else if (decodedPath === '/auth' || hash === '#auth') {
         setActiveView('auth');
+      } else if (
+        decodedPath.startsWith('/online-tutoring-') || 
+        hash.startsWith('#online-tutoring-')
+      ) {
+        const fullKey = decodedPath.startsWith('/online-tutoring-') 
+          ? decodedPath.replace('/online-tutoring-', '')
+          : hash.replace('#online-tutoring-', '');
+        const cleanKey = fullKey.split('?')[0].split('#')[0].trim();
+        setActiveCountryTutoringSlug(cleanKey || 'usa');
+        setActiveView('country-online-tutoring');
+      } else if (
+        decodedPath === '/assignment-guidance' ||
+        decodedPath.startsWith('/assignment-guidance-') ||
+        hash === '#assignment-guidance' ||
+        hash.startsWith('#assignment-guidance-') ||
+        decodedPath === '/coursework-tutoring' ||
+        decodedPath.startsWith('/coursework-tutoring-') ||
+        hash === '#coursework-tutoring' ||
+        hash.startsWith('#coursework-tutoring-') ||
+        decodedPath === '/writing-tutoring' ||
+        decodedPath.startsWith('/writing-tutoring-') ||
+        hash === '#writing-tutoring' ||
+        hash.startsWith('#writing-tutoring-') ||
+        Boolean(SPECIALIZED_SERVICE_PAGES_MAP[decodedPath.replace(/^\//, '')])
+      ) {
+        const rawSlug = decodedPath.startsWith('/') ? decodedPath.slice(1) : (hash.startsWith('#') ? hash.slice(1) : decodedPath);
+        const cleanSlug = rawSlug.split('?')[0].split('#')[0].trim();
+        setActiveSpecializedServiceSlug(cleanSlug || 'assignment-guidance');
+        setActiveView('specialized-service');
       } else if (
         decodedPath === '' || 
         decodedPath === '/' || 
@@ -259,26 +418,76 @@ export default function App() {
         ) {
           e.preventDefault();
           handleNavigate('blog');
+        } else if (
+          href === '/whatsapp' || 
+          href === '#whatsapp' || 
+          href.endsWith('/whatsapp')
+        ) {
+          e.preventDefault();
+          handleNavigate('whatsapp');
+        } else if (
+          href.startsWith('/online-tutoring-') || 
+          href.startsWith('#online-tutoring-') ||
+          href.includes('university-tutors.com/online-tutoring-')
+        ) {
+          e.preventDefault();
+          const cleanPath = href.split('university-tutors.com').pop() || href;
+          const slug = cleanPath
+            .replace(/^\/?(online-tutoring-|#online-tutoring-)/, '')
+            .replace(/^\//, '')
+            .replace('online-tutoring-', '')
+            .split('?')[0]
+            .split('#')[0]
+            .trim();
+          handleNavigate(`online-tutoring-${slug}`);
+        } else if (
+          href === '/assignment-guidance' ||
+          href.startsWith('/assignment-guidance-') ||
+          href.startsWith('#assignment-guidance') ||
+          href === '/coursework-tutoring' ||
+          href.startsWith('/coursework-tutoring-') ||
+          href.startsWith('#coursework-tutoring') ||
+          href === '/writing-tutoring' ||
+          href.startsWith('/writing-tutoring-') ||
+          href.startsWith('#writing-tutoring') ||
+          href.includes('university-tutors.com/assignment-guidance') ||
+          href.includes('university-tutors.com/coursework-tutoring') ||
+          href.includes('university-tutors.com/writing-tutoring')
+        ) {
+          e.preventDefault();
+          const cleanPath = href.split('university-tutors.com').pop() || href;
+          const slug = cleanPath
+            .replace(/^\/?#?/, '')
+            .split('?')[0]
+            .split('#')[0]
+            .trim();
+          handleNavigate(slug);
         } else if (href === '/home' || href === '/' || href === '#home') {
           e.preventDefault();
           handleNavigate('home');
-        } else if (href === '/student' || href === '#student') {
-          e.preventDefault();
-          window.history.pushState(null, '', '/student');
-          store.login('alex@example.com');
-          setActiveView('dashboard');
-          window.scrollTo({ top: 0, behavior: 'smooth' });
-        } else if (href === '/tutor' || href === '#tutor') {
-          e.preventDefault();
-          window.history.pushState(null, '', '/tutor');
-          store.login('clara@example.com');
-          setActiveView('dashboard');
-          window.scrollTo({ top: 0, behavior: 'smooth' });
         } else if (href === '/admin' || href === '#admin') {
           e.preventDefault();
-          window.history.pushState(null, '', '/admin');
-          store.login('shaka.ahmadd@gmail.com');
-          setActiveView('dashboard');
+          if (store.currentUser && store.currentUser.role === UserRole.ADMIN) {
+            window.history.pushState(null, '', '/admin');
+            setActiveView('dashboard');
+          } else {
+            window.history.pushState(null, '', '/admin');
+            setActiveView('admin-login');
+          }
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        } else if (
+          href === '/student' || href === '#student' ||
+          href === '/tutor' || href === '#tutor'
+        ) {
+          e.preventDefault();
+          if (store.currentUser) {
+            const rolePath = store.currentUser.role === UserRole.TUTOR ? '/tutor' : '/student';
+            window.history.pushState(null, '', rolePath);
+            setActiveView('dashboard');
+          } else {
+            window.history.pushState(null, '', '/auth');
+            setActiveView('auth');
+          }
           window.scrollTo({ top: 0, behavior: 'smooth' });
         }
       }
@@ -294,17 +503,19 @@ export default function App() {
   }, []);
 
   // Sync route after login updates
-  const handleLogin = (email: string): boolean => {
-    const success = store.login(email);
+  const handleLogin = async (email: string, password?: string): Promise<boolean> => {
+    const success = await store.login(email, password);
     if (success) {
-      window.history.pushState(null, '', '/student'); // default to student path after normal login
+      const user = store.currentUser;
+      const rolePath = user?.role === UserRole.TUTOR ? '/tutor' : user?.role === UserRole.ADMIN ? '/admin' : '/student';
+      window.history.pushState(null, '', rolePath); // default to role-specific path after normal login
       setActiveView('dashboard');
     }
     return success;
   };
 
-  const handleRegister = (name: string, email: string, role: UserRole, extra?: any): boolean => {
-    const success = store.register(name, email, role, extra);
+  const handleRegister = async (name: string, email: string, role: UserRole, extra?: any): Promise<boolean> => {
+    const success = await store.register(name, email, role, extra);
     if (success) {
       if (extra && extra.verified === false) {
         window.history.pushState(null, '', '/auth');
@@ -324,20 +535,10 @@ export default function App() {
     handleNavigate('home');
   };
 
-  // Quick Switch Audit Role handler
+  // Quick Switch Audit Role handler - Disabled in real production build
   const handleQuickLogin = (role: UserRole) => {
-    setActiveChat(null);
-    if (role === UserRole.STUDENT) {
-      window.history.pushState(null, '', '/student');
-      store.login('alex@example.com');
-    } else if (role === UserRole.TUTOR) {
-      window.history.pushState(null, '', '/tutor');
-      store.login('clara@example.com');
-    } else if (role === UserRole.ADMIN) {
-      window.history.pushState(null, '', '/admin');
-      store.login('shaka.ahmadd@gmail.com');
-    }
-    setActiveView('dashboard');
+    // Sandbox role switcher disabled for real auth
+    console.log("Quick switcher is disabled to protect real secure user accounts.");
   };
 
   // Chat initiation
@@ -351,27 +552,6 @@ export default function App() {
       store.sendMessage(chat.id, storeState.currentUser.id, initialMessage);
     }
     setActiveChat(chat);
-  };
-
-  const handleGoogleConnectSuccess = (email: string, name: string, avatarUrl?: string) => {
-    const trimmedEmail = email.toLowerCase().trim();
-    const matchedUser = storeState.users.find(u => u.email.toLowerCase().trim() === trimmedEmail);
-    if (!matchedUser) {
-      store.register(name, trimmedEmail, UserRole.STUDENT, {
-        verified: true,
-        avatarUrl: avatarUrl || `https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=150&auto=format&fit=crop&q=80`
-      });
-    }
-    store.login(trimmedEmail);
-    setTimeout(() => {
-      const updatedUser = store.currentUser;
-      if (updatedUser) {
-        const chat = store.getOrCreateChat(updatedUser.id, 'admin_emily', 'Official Administrative Support with Emily Vance');
-        store.sendMessage(chat.id, updatedUser.id, 'Hi Emily, I connected via Google/Gmail Account and want to start chatting directly!');
-        setActiveChat(chat);
-      }
-    }, 100);
-    setIsSopModalOpen(false);
   };
 
   const liveChat = activeChat ? storeState.chats.find(c => c.id === activeChat.id) || activeChat : null;
@@ -438,8 +618,8 @@ export default function App() {
     const assignId = await store.submitAssignment(data);
     setIsAssignModalOpen(false);
     
-    // Lead student to chat support immediately
-    const targetTutorId = data.tutorId || mentorsList[0]?.id || 'tutor_clara';
+    // Lead student to admin chat support immediately
+    const targetTutorId = 'admin_shaka';
     handleOpenChat(targetTutorId, `Hi, I just submitted an assignment brief titled "${data.title}" (Ref: #${assignId}). let's discuss details.`);
   };
 
@@ -469,12 +649,49 @@ export default function App() {
   };
 
   const handleChangeUserRole = (userId: string, targetRole: UserRole) => {
+    const isSuperiorAdmin = storeState.currentUser?.email?.toLowerCase().trim() === 'shaka.ahmadd@gmail.com';
+    if (!isSuperiorAdmin) {
+      console.error("Permission Denied: Only Superior Admin can change user roles.");
+      alert("Permission Denied: Only Superior Admin can change user roles.");
+      return;
+    }
     store.changeUserRole(userId, targetRole);
   };
 
-  const handleGenerateProfile = (name: string, email: string, role: UserRole, extra?: any): boolean => {
-    const success = store.register(name, email, role, { ...extra, verified: true });
-    return success;
+  const handleGenerateProfile = async (name: string, email: string, role: UserRole, extra?: any): Promise<boolean> => {
+    const isSuperiorAdmin = storeState.currentUser?.email?.toLowerCase().trim() === 'shaka.ahmadd@gmail.com';
+    if (!isSuperiorAdmin) {
+      throw new Error("Permission Denied: Only Superior Admin is authorized to generate profiles.");
+    }
+
+    try {
+      // Fetch the real Google Authentication ID Token for authorization
+      const idToken = auth.currentUser ? await auth.currentUser.getIdToken() : '';
+      const response = await fetch('/api/create-privileged-user', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${idToken}`
+        },
+        body: JSON.stringify({
+          name,
+          email,
+          role,
+          extra
+        })
+      });
+
+      if (!response.ok) {
+        const errData = await response.json();
+        throw new Error(errData.error || 'Server rejected request');
+      }
+
+      const data = await response.json();
+      return !!data.success;
+    } catch (err: any) {
+      console.error("Error creating privileged user via secure backend:", err);
+      throw err;
+    }
   };
 
   const handleAddBlog = (data: any) => {
@@ -489,6 +706,10 @@ export default function App() {
 
   const handleUpdateBlog = (blogId: string, title: string, content: string, image: string, category: string, tags: string[]) => {
     store.updateBlog(blogId, title, content, image, category, tags);
+  };
+
+  const handleSyncDefaultBlogs = async (): Promise<boolean> => {
+    return await store.syncDefaultBlogs();
   };
 
   const handleAddFaq = (data: any) => {
@@ -531,8 +752,8 @@ export default function App() {
     }
   };
 
-  // Separate tutors to pass to dropdown triggers
-  const mentorsList = storeState.users.filter(u => u.role === UserRole.TUTOR);
+  // Separate tutors to pass to dropdown triggers (only approved tutors visible on public website)
+  const mentorsList = storeState.users.filter(u => u.role === UserRole.TUTOR && (u.isApproved === true || u.status === 'approved' || (u.isApproved === undefined && u.status === undefined)));
   const studentsList = storeState.users.filter(u => u.role === UserRole.STUDENT);
 
   return (
@@ -552,6 +773,7 @@ export default function App() {
           onLogout={handleLogout}
           onQuickLogin={handleQuickLogin}
           studentsOnline={storeState.activeStudentsOnline}
+          onOpenBecomeTutor={() => setIsBecomeTutorOpen(true)}
         />
       )}
 
@@ -563,6 +785,11 @@ export default function App() {
           <AuthPage 
             onLogin={handleLogin}
             onRegister={handleRegister}
+            onNavigate={handleNavigate}
+          />
+        ) : activeView === 'admin-login' ? (
+          <AdminLoginPage 
+            onLogin={handleLogin}
             onNavigate={handleNavigate}
           />
         ) : activeView === 'dashboard' ? (
@@ -579,17 +806,22 @@ export default function App() {
                 messages={storeState.messages}
                 payments={storeState.payments}
                 supportTickets={storeState.supportTickets}
-                onSubmitAssignment={(data) => {
-                  setIsAssignModalOpen(true);
+                onSubmitAssignment={async (data) => {
+                  // Silently submit the assignment matched via wizard in the background
+                  await store.submitAssignment(data);
                 }}
                 onOpenChat={handleOpenChat}
                 onSelectChat={handleSelectChat}
+                onSendMessage={handleSendMessage}
+                onSubscribeToChatDetails={(chatId) => store.subscribeToChatDetails(chatId)}
                 onApproveWork={handleApproveWork}
                 onRaiseRevision={handleRaiseRevision}
                 onRaiseTicket={handleRaiseTicket}
                 onLogout={handleLogout}
                 onNavigate={handleNavigate}
                 assignmentReports={storeState.assignmentReports}
+                quotes={storeState.quotes}
+                onAcceptQuote={handleAcceptQuote}
               />
             ) : storeState.currentUser.role === UserRole.TUTOR ? (
               <TutorDashboard 
@@ -628,6 +860,7 @@ export default function App() {
                 onAddBlog={handleAddBlog}
                 onDeleteBlog={handleDeleteBlog}
                 onUpdateBlog={handleUpdateBlog}
+                onSyncDefaultBlogs={handleSyncDefaultBlogs}
                 onAddFaq={handleAddFaq}
                 onDeleteFaq={handleDeleteFaq}
                 onResolveDispute={handleResolveDispute}
@@ -637,6 +870,8 @@ export default function App() {
                 onDeleteChat={handleDeleteChat}
                 onSelectChat={handleSelectChat}
                 onSendMessage={handleSendMessage}
+                onSubscribeToChatDetails={(chatId) => store.subscribeToChatDetails(chatId)}
+                onGetOrCreateChat={store.getOrCreateChat.bind(store)}
 
                 onAssignTutor={store.assignTutorToAssignment.bind(store)}
                 onSetAssignmentPrice={store.setAssignmentPrice.bind(store)}
@@ -648,6 +883,10 @@ export default function App() {
                 onCreateAgreement={store.createAgreement.bind(store)}
                 emails={storeState.emails || []}
                 onSendTriggerEmail={store.sendTriggerEmail.bind(store)}
+                onSeedMockStudentData={store.seedMockStudentData.bind(store)}
+                connectionStatus={storeState.connectionStatus}
+                lastSyncTime={storeState.lastSyncTime}
+                syncError={storeState.syncError}
               />
             )
 
@@ -672,6 +911,102 @@ export default function App() {
             tutors={mentorsList}
             onOpenChat={handleOpenChat}
           />
+        ) : activeView === 'tutor-profile' && selectedTutorProfile ? (
+          <TutorProfilePage
+            tutor={selectedTutorProfile}
+            onNavigate={handleNavigate}
+            onOpenChat={handleOpenChat}
+            onSearchKeyword={(keyword) => {
+              setSubjectFilter(keyword);
+              setActiveView('tutors-directory');
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            }}
+            onBookSession={(tutor) => {
+              handleOpenChat(tutor.id);
+            }}
+          />
+        ) : activeView === 'country-online-tutoring' || activeView.startsWith('online-tutoring-') ? (
+          <CountryOnlineTutoringPage
+            countryKey={activeCountryTutoringSlug}
+            tutors={mentorsList}
+            onNavigate={handleNavigate}
+            onSelectCountry={(slug) => {
+              setActiveCountryTutoringSlug(slug);
+              handleNavigate(`online-tutoring-${slug}`);
+            }}
+            onSelectTutorProfile={(tutor) => {
+              setSelectedTutorProfile(tutor);
+              setActiveView('tutor-profile');
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            }}
+            onOpenChat={handleOpenChat}
+            onSearchCity={(city) => {
+              setLocationFilter(city);
+              setSubjectFilter('');
+              setSelectedTutorProfile(null);
+              setActiveView('tutors-directory');
+              window.history.pushState(null, '', '/tutors-directory?location=' + encodeURIComponent(city));
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            }}
+            onSearchSubject={(subj) => {
+              setSubjectFilter(subj);
+              setLocationFilter('');
+              setSelectedTutorProfile(null);
+              setActiveView('tutors-directory');
+              window.history.pushState(null, '', '/tutors-directory?subject=' + encodeURIComponent(subj));
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            }}
+          />
+        ) : activeView === 'specialized-service' || 
+            Boolean(SPECIALIZED_SERVICE_PAGES_MAP[activeView]) ||
+            activeView.startsWith('assignment-guidance') ||
+            activeView.startsWith('coursework-tutoring') ||
+            activeView.startsWith('writing-tutoring') ? (
+          <SpecializedServicePage
+            pageSlug={activeSpecializedServiceSlug}
+            tutors={mentorsList}
+            onNavigate={handleNavigate}
+            onSelectTutorProfile={(tutor) => {
+              setSelectedTutorProfile(tutor);
+              setActiveView('tutor-profile');
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            }}
+            onOpenChat={handleOpenChat}
+            onSearchCity={(city) => {
+              setLocationFilter(city);
+              setSubjectFilter('');
+              setSelectedTutorProfile(null);
+              setActiveView('tutors-directory');
+              window.history.pushState(null, '', '/tutors-directory?location=' + encodeURIComponent(city));
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            }}
+            onSearchSubject={(subj) => {
+              setSubjectFilter(subj);
+              setLocationFilter('');
+              setSelectedTutorProfile(null);
+              setActiveView('tutors-directory');
+              window.history.pushState(null, '', '/tutors-directory?subject=' + encodeURIComponent(subj));
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            }}
+          />
+        ) : activeView === 'tutors-directory' ? (
+          <TutorsDirectoryPage
+            locationFilter={locationFilter}
+            subjectFilter={subjectFilter}
+            onNavigate={handleNavigate}
+            onSelectTutorProfile={(tutor) => {
+              setSelectedTutorProfile(tutor);
+              setActiveView('tutor-profile');
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            }}
+            onOpenChat={handleOpenChat}
+            allStoreTutors={mentorsList}
+          />
+        ) : activeView === 'whatsapp' ? (
+          <WhatsAppPage
+            currentUser={storeState.currentUser}
+            onNavigate={handleNavigate}
+          />
         ) : (
           /* Marketing Views (Home, Services, About Us, FAQs, Contact Form, Blog System) */
           <MarketingPages 
@@ -683,90 +1018,88 @@ export default function App() {
             onTutorSelect={(tutorObj) => {
               handleOpenChat(tutorObj.id);
             }}
+            onSelectTutorProfile={(tutorObj) => {
+              setSelectedTutorProfile(tutorObj);
+              setActiveView('tutor-profile');
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            }}
             onRaisedConsult={handleOnCallConsultInput}
-            onGoogleConnect={() => setIsGoogleConnectModalOpen(true)}
           />
         )}
 
       </main>
 
-      {/* Floating Tutorial Help Trigger with Google Connection Indicator Badge */}
-      <div className="fixed bottom-6 right-6 z-40 flex flex-col items-end gap-2" id="floating-support-container">
-        {/* Pulsing Google Connect info card on top of the button */}
-        <div className="flex flex-col items-end gap-1.5 animate-bounce-slow" id="green-chat-widget">
-          {/* Action Heading Label */}
-          <span className="bg-emerald-600 border border-emerald-500 text-white font-extrabold text-[9px] uppercase tracking-wider px-2.5 py-1 rounded-lg shadow-md text-right select-none">
-            💬 Gmail Support Chat
-          </span>
-
-          <button 
-            id="google-chat-smiley-btn"
-            onClick={() => setIsGoogleConnectModalOpen(true)}
-            className="group flex items-center justify-center bg-transparent transition-all duration-300 hover:scale-110 active:scale-95 cursor-pointer relative"
-            title="Connect Google Account & Start Chat directly with Admin"
-          >
-            {/* The Green Smiley Bubble Shape specified in the User's Image */}
-            <div className="relative w-14 h-14 drop-shadow-xl">
-              <svg className="w-14 h-14" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
-                {/* Speech bubble shape with a rounded profile and a cute left tail */}
-                <path 
-                  d="M10 25C10 13.95 18.95 5 30 5H70C81.05 5 90 13.95 90 25V63C90 74.05 81.05 83 70 83H42L22 95V83H30C18.95 83 10 74.05 10 63V25Z" 
-                  fill="#00C25F" 
-                />
-                {/* Secondary inner glow arc to match the gradient in the image */}
-                <path 
-                  d="M14 25C14 16.16 21.16 9 30 9H70C78.84 9 86 16.16 86 25V35C86 26.16 78.84 19 70 19H30C21.16 19 14 26.16 14 35V25Z" 
-                  fill="white" 
-                  fillOpacity="0.12" 
-                />
-                {/* Curved white smile arc */}
-                <path 
-                  d="M32 46Q50 69 68 46" 
-                  stroke="white" 
-                  strokeWidth="9" 
-                  strokeLinecap="round" 
-                  fill="none" 
-                />
-              </svg>
-
-              {/* Pulsing notification badge in corner */}
-              <span className="absolute top-0.5 right-0.5 flex h-3.5 w-3.5">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-3.5 w-3.5 bg-red-500 border-2 border-white"></span>
-              </span>
-            </div>
-          </button>
-        </div>
-
+      {/* Floating Tutorial Help Trigger (Bottom Right) */}
+      <div 
+        className="fixed bottom-4 sm:bottom-6 right-4 sm:right-6 z-40 flex flex-col items-end gap-2" 
+        id="floating-support-container"
+      >
         <button
           id="trigger-sop-academy-tutorial"
           onClick={() => setIsSopModalOpen(true)}
-          className="bg-gray-900 border border-gray-800 hover:bg-black text-white hover:text-orange-400 p-4 rounded-full shadow-2xl transition-all cursor-pointer flex items-center justify-center font-bold"
+          className="bg-gray-900 border border-gray-800 hover:bg-black text-white hover:text-orange-400 p-3 sm:px-4 sm:py-3 rounded-full shadow-2xl transition-all cursor-pointer flex items-center justify-center font-bold"
           title="Open interactive SOP tutorial walkthrough"
         >
-          <HelpCircle className="w-5 h-5 text-orange-400 animate-bounce" />
-          <span className="text-xs ml-2 font-sans tracking-wide">Interactive Guide</span>
+          <HelpCircle className="w-5 h-5 text-orange-400 animate-bounce shrink-0" />
+          <span className="text-xs ml-2 font-sans tracking-wide hidden sm:inline">Interactive Guide</span>
         </button>
       </div>
 
+      {/* Floating WhatsApp Instant Chat Trigger (Bottom Left) */}
+      {!isWhatsAppModalOpen && (
+        <div 
+          className="fixed bottom-3 sm:bottom-6 left-3 sm:left-6 z-40 flex flex-col items-start gap-2" 
+          id="floating-whatsapp-container"
+        >
+          <button
+            id="trigger-whatsapp-chat-modal"
+            onClick={() => setIsWhatsAppModalOpen(true)}
+            className="group bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white w-11 h-11 sm:w-auto sm:h-auto p-2.5 sm:px-4 sm:py-2.5 rounded-full shadow-lg sm:shadow-2xl transition-all hover:scale-105 active:scale-95 cursor-pointer flex items-center justify-center font-bold gap-2 border border-emerald-400/40"
+            title="Open WhatsApp Instant Chat"
+          >
+            <div className="relative flex items-center justify-center shrink-0">
+              <svg className="w-5 h-5 sm:w-5 sm:h-5 fill-white" viewBox="0 0 24 24">
+                <path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946.003-6.556 5.338-11.891 11.893-11.891 3.181.001 6.167 1.24 8.413 3.488 2.245 2.248 3.481 5.236 3.48 8.414-.003 6.557-5.338 11.892-11.893 11.892-1.99-.001-3.951-.5-5.688-1.448l-6.205 1.654zm6.597-3.807c1.676.995 3.276 1.591 5.392 1.592 5.448 0 9.886-4.434 9.889-9.885.002-5.462-4.415-9.89-9.881-9.892-5.452 0-9.887 4.434-9.887 9.884-.001 2.225.651 3.891 1.746 5.634l-.999 3.648 3.742-.981zm11.387-5.464c-.074-.124-.272-.198-.57-.347-.297-.149-1.758-.868-2.031-.967-.272-.099-.47-.149-.669.149-.198.297-.768.967-.941 1.165-.173.198-.347.223-.644.074-.297-.149-1.255-.462-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.297-.347.446-.521.151-.172.2-.296.3-.495.099-.198.05-.372-.025-.521-.075-.148-.669-1.611-.916-2.206-.242-.579-.487-.501-.669-.51l-.57-.01c-.198 0-.52.074-.792.372s-1.04 1.016-1.04 2.479 1.065 2.876 1.213 3.074c.149.198 2.095 3.2 5.076 4.487.709.306 1.263.489 1.694.626.712.226 1.36.194 1.872.118.571-.085 1.758-.719 2.006-1.413.248-.695.248-1.29.173-1.414z"/>
+              </svg>
+              <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-emerald-300 rounded-full animate-ping"></span>
+            </div>
+            <span className="text-xs font-sans tracking-wide text-white uppercase font-bold hidden sm:inline">Instant Chat</span>
+          </button>
+        </div>
+      )}
+
       {/* 2. Footer (target flags, starting pricing, keyword no-follow links, academic disclaimers) */}
-      {activeView !== 'dashboard' && <Footer onNavigate={handleNavigate} />}
+      {activeView !== 'dashboard' && (
+        <Footer 
+          onNavigate={handleNavigate} 
+          onOpenBecomeTutor={() => setIsBecomeTutorOpen(true)}
+        />
+      )}
 
       {/* 3. Consent cookie banner disclosure */}
       <CookieBanner />
+
+      {/* Become a Tutor Application Modal */}
+      <BecomeTutorModal
+        isOpen={isBecomeTutorOpen}
+        onClose={() => setIsBecomeTutorOpen(false)}
+        onSubmit={async (data) => {
+          return await store.submitTutorApplication(data);
+        }}
+      />
 
       {/* 4. Interactive SOP walkthrough modal */}
       <SopModal 
         isOpen={isSopModalOpen}
         onClose={() => setIsSopModalOpen(false)}
-        onGoogleConnect={() => setIsGoogleConnectModalOpen(true)}
       />
 
-      {/* Google Connect Account Flow Modal */}
-      <GoogleConnectModal 
-        isOpen={isGoogleConnectModalOpen}
-        onClose={() => setIsGoogleConnectModalOpen(false)}
-        onSuccess={handleGoogleConnectSuccess}
+      {/* 5. WhatsApp Instant Chat Modal */}
+      <WhatsAppChatModal 
+        isOpen={isWhatsAppModalOpen}
+        onClose={() => setIsWhatsAppModalOpen(false)}
+        currentUser={storeState.currentUser}
+        whatsappNumber="19178094906"
       />
 
       {/* 5. Assignment submission parameters modal (only accessible to student accounts) */}

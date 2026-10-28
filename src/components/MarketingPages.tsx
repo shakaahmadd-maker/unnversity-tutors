@@ -27,14 +27,20 @@ import {
   Brain,
   Heart,
   ShieldAlert,
+  ShieldCheck,
   CheckCircle2,
   GraduationCap,
-  X,
-  Chrome
+  ExternalLink,
+  X
 } from 'lucide-react';
 import { User, Blog, FAQ, UserRole } from '../types';
 import DedicatedServicePages from './DedicatedServicePages';
 import HowItWorksSection from './HowItWorksSection';
+import SEOKeywordLinksBlock from './SEOKeywordLinksBlock';
+import hero1on1Img from '../assets/images/hero_1on1_tutoring_1787387369345.jpg';
+import heroAssignmentImg from '../assets/images/hero_assignment_guidance_1787387387028.jpg';
+import heroCourseworkImg from '../assets/images/hero_coursework_tracks_1787387403661.jpg';
+import heroEssayImg from '../assets/images/hero_essay_rhetoric_1787387419893.jpg';
 
 interface MarketingPagesProps {
   activeView: string;
@@ -43,6 +49,7 @@ interface MarketingPagesProps {
   faqs: FAQ[];
   onNavigate: (view: string) => void;
   onTutorSelect: (tutor: User) => void;
+  onSelectTutorProfile?: (tutor: User) => void;
   onRaisedConsult: (msg: string) => void;
   onGoogleConnect?: () => void;
 }
@@ -478,7 +485,7 @@ const STATIC_FAQS: FAQ[] = [
   {
     id: 'static_faq_13',
     question: 'Who resolves disputes if a tutor does not follow the rubric guidelines?',
-    answer: 'In the rare event of a disagreement, you can launch a dispute directly on the active assignment. This blocks the Stripe escrow payout from being released. The Academic Arbitration Council of UniversityTutors will step in to inspect files, chat instructions, and milestone rubrics, issuing a balanced and fair verdict.',
+    answer: 'In the rare event of a disagreement, you can launch a dispute directly on the active assignment. This blocks the Stripe escrow payout from being released. The Academic Arbitration Council of University-Tutors will step in to inspect files, chat instructions, and milestone rubrics, issuing a balanced and fair verdict.',
     category: 'Revisions & Refunds',
     order: 3
   },
@@ -505,6 +512,7 @@ export default function MarketingPages({
   faqs, 
   onNavigate,
   onTutorSelect,
+  onSelectTutorProfile,
   onRaisedConsult,
   onGoogleConnect
 }: MarketingPagesProps) {
@@ -609,7 +617,7 @@ export default function MarketingPages({
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
   const handleCopyCitation = (blog: Blog) => {
-    const citationText = `UniversityTutors. (2026). ${blog.title}. Academic Guides & Mentorship Articles. Retrieved from https://universitytutors.com/blog/${blog.id}`;
+    const citationText = `University-Tutors. (2026). ${blog.title}. Academic Guides & Mentorship Articles. Retrieved from https://universitytutors.com/blog/${blog.id}`;
     navigator.clipboard.writeText(citationText);
     setCopiedId(blog.id);
     setTimeout(() => setCopiedId(null), 2500);
@@ -924,7 +932,7 @@ export default function MarketingPages({
                 </h1>
                 
                 <p className="text-sm md:text-base text-gray-650 max-w-2xl leading-relaxed text-justify">
-                  Get 1-on-1 tutoring, assignment help, coursework support & essay writing from qualified UK, US, CA, AU, NZ & IE academic tutors. Held in PCI protected escrow payment vaults.
+                  Get 1-on-1 academic tutoring, subject coaching, coursework guidance, and essay structure review from qualified UK, US, CA, AU, NZ & IE academic mentors. Held in PCI protected escrow payment vaults.
                 </p>
 
                 <div className="flex flex-wrap items-center gap-4 pt-2">
@@ -941,14 +949,6 @@ export default function MarketingPages({
                     className="bg-white hover:bg-gray-100 text-gray-800 border-2 border-gray-250 font-bold text-xs tracking-wider uppercase px-8 py-4 rounded-xl cursor-pointer hover:-translate-y-0.5 transition-all duration-200"
                   >
                     Get a Free Quote
-                  </button>
-                  <button 
-                    id="hero-google-signin-chat-btn"
-                    onClick={onGoogleConnect}
-                    className="bg-red-600 hover:bg-red-700 text-white font-bold text-xs tracking-wider uppercase px-8 py-4 rounded-xl shadow-lg shadow-red-500/10 cursor-pointer hover:-translate-y-0.5 transition-all duration-200 flex items-center gap-2"
-                  >
-                    <Chrome className="w-4 h-4 text-white" />
-                    <span>Google Chat Admin</span>
                   </button>
                 </div>
 
@@ -1075,7 +1075,7 @@ export default function MarketingPages({
                   },
                   {
                     id: 3,
-                    title: 'Essay Writing Aid',
+                    title: 'Academic Writing Coach',
                     tag: 'Thesis & Citations',
                     desc: 'Outline compelling thesis claims, map critical arguments, proofread sentence syntax, and correct grammar layouts.',
                     metric: 'Co-author editing template',
@@ -1724,6 +1724,9 @@ export default function MarketingPages({
             </div>
           </section>
 
+
+
+
           {/* Interactive consultation banner */}
           <section className="py-20 bg-white border-b border-gray-200 px-4 text-center">
             <div className="bg-orange-50 max-w-4xl mx-auto rounded-3xl p-8 md:p-12 border border-orange-100 text-center space-y-6">
@@ -1941,14 +1944,29 @@ export default function MarketingPages({
               <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                 
                 {/* 1. 1-on-1 LIVE TUTORING */}
-                <div className="bg-white border border-gray-150 rounded-3xl p-6 md:p-8 flex flex-col justify-between hover:shadow-lg transition-all hover:border-orange-250 animate-fade-in">
+                <div className="bg-white border border-gray-150 rounded-3xl p-6 md:p-8 flex flex-col justify-between hover:shadow-lg transition-all hover:border-orange-250 animate-fade-in group">
                   <div className="space-y-4">
-                    <div className="flex items-center justify-between">
-                      <div className="bg-orange-100/70 p-3 rounded-xl text-orange-600">
-                        <Video className="w-5 h-5 stroke-[2.5]" />
+                    {/* Relevant Hero Image Banner */}
+                    <div className="relative rounded-2xl overflow-hidden h-44 w-full border border-gray-100 shadow-xs">
+                      <img 
+                        src={hero1on1Img} 
+                        alt="1-on-1 Live Online Tutoring with Interactive Digital Whiteboard" 
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                        referrerPolicy="no-referrer"
+                      />
+                      <div className="absolute inset-0 bg-gradient-to-t from-gray-950/70 via-transparent to-transparent"></div>
+                      <div className="absolute top-3 left-3 bg-white/95 backdrop-blur-sm p-2 rounded-xl text-orange-600 shadow-xs">
+                        <Video className="w-4 h-4 stroke-[2.5]" />
                       </div>
-                      <span className="text-[10px] bg-green-50 text-green-700 font-mono font-bold px-2.5 py-1 rounded-full border border-green-150">Active Whiteboard 24/7</span>
+                      <div className="absolute top-3 right-3">
+                        <span className="text-[10px] bg-emerald-500/90 text-white font-mono font-bold px-2.5 py-1 rounded-full shadow-xs">Active Whiteboard 24/7</span>
+                      </div>
+                      <div className="absolute bottom-3 left-3 right-3 flex items-center justify-between text-white text-[11px] font-bold">
+                        <span>HD Video &amp; LaTeX Derivations</span>
+                        <span className="flex items-center gap-1 text-amber-300">★ 4.98</span>
+                      </div>
                     </div>
+
                     <h3 className="text-xl md:text-2xl font-bold text-gray-950 tracking-tight">1-on-1 Live Online Tutoring</h3>
                     <p className="text-xs text-gray-650 leading-relaxed font-semibold">
                       Personalized, real-time interactive lectures and doubt clearing. Screen sharing, active workspace recording, and dedicated homework support across 20+ disciplines.
@@ -1975,14 +1993,29 @@ export default function MarketingPages({
                 </div>
 
                 {/* 2. ASSIGNMENT TUTORING */}
-                <div className="bg-white border border-gray-150 rounded-3xl p-6 md:p-8 flex flex-col justify-between hover:shadow-lg transition-all hover:border-orange-250 animate-fade-in">
+                <div className="bg-white border border-gray-150 rounded-3xl p-6 md:p-8 flex flex-col justify-between hover:shadow-lg transition-all hover:border-orange-250 animate-fade-in group">
                   <div className="space-y-4">
-                    <div className="flex items-center justify-between">
-                      <div className="bg-orange-100/70 p-3 rounded-xl text-orange-600">
-                        <FileText className="w-5 h-5 stroke-[2.5]" />
+                    {/* Relevant Hero Image Banner */}
+                    <div className="relative rounded-2xl overflow-hidden h-44 w-full border border-gray-100 shadow-xs">
+                      <img 
+                        src={heroAssignmentImg} 
+                        alt="Assignment Guidance &amp; Reference Outlines" 
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                        referrerPolicy="no-referrer"
+                      />
+                      <div className="absolute inset-0 bg-gradient-to-t from-gray-950/70 via-transparent to-transparent"></div>
+                      <div className="absolute top-3 left-3 bg-white/95 backdrop-blur-sm p-2 rounded-xl text-orange-600 shadow-xs">
+                        <FileText className="w-4 h-4 stroke-[2.5]" />
                       </div>
-                      <span className="text-[10px] bg-red-50 text-red-700 font-mono font-bold px-2.5 py-1 rounded-full border border-red-150 font-semibold">Turnitin-Friendly</span>
+                      <div className="absolute top-3 right-3">
+                        <span className="text-[10px] bg-red-500/90 text-white font-mono font-bold px-2.5 py-1 rounded-full shadow-xs">Turnitin-Safe Rubrics</span>
+                      </div>
+                      <div className="absolute bottom-3 left-3 right-3 flex items-center justify-between text-white text-[11px] font-bold">
+                        <span>Formula Derivations &amp; Logic Maps</span>
+                        <span className="text-emerald-300">100% Ethical</span>
+                      </div>
                     </div>
+
                     <h3 className="text-xl md:text-2xl font-bold text-gray-950 tracking-tight">Assignment Guidance &amp; Reference Outlines</h3>
                     <p className="text-xs text-gray-650 leading-relaxed font-semibold">
                       Detailed structural feedback, template formula derivations and references outline blueprints compliant with university academic codes.
@@ -2009,14 +2042,29 @@ export default function MarketingPages({
                 </div>
 
                 {/* 3. COURSEWORK TUTORING */}
-                <div className="bg-white border border-gray-150 rounded-3xl p-6 md:p-8 flex flex-col justify-between hover:shadow-lg transition-all hover:border-orange-250 animate-fade-in">
+                <div className="bg-white border border-gray-150 rounded-3xl p-6 md:p-8 flex flex-col justify-between hover:shadow-lg transition-all hover:border-orange-250 animate-fade-in group">
                   <div className="space-y-4">
-                    <div className="flex items-center justify-between">
-                      <div className="bg-orange-100/70 p-3 rounded-xl text-orange-600">
-                        <Calendar className="w-5 h-5 stroke-[2.5]" />
+                    {/* Relevant Hero Image Banner */}
+                    <div className="relative rounded-2xl overflow-hidden h-44 w-full border border-gray-100 shadow-xs">
+                      <img 
+                        src={heroCourseworkImg} 
+                        alt="Semester-Long Coursework Tracks" 
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                        referrerPolicy="no-referrer"
+                      />
+                      <div className="absolute inset-0 bg-gradient-to-t from-gray-950/70 via-transparent to-transparent"></div>
+                      <div className="absolute top-3 left-3 bg-white/95 backdrop-blur-sm p-2 rounded-xl text-orange-600 shadow-xs">
+                        <Calendar className="w-4 h-4 stroke-[2.5]" />
                       </div>
-                      <span className="text-[10px] bg-indigo-50 text-indigo-700 font-mono font-bold px-2.5 py-1 rounded-full border border-indigo-150">Term-Long Support</span>
+                      <div className="absolute top-3 right-3">
+                        <span className="text-[10px] bg-indigo-600/90 text-white font-mono font-bold px-2.5 py-1 rounded-full shadow-xs">14-Week Term Support</span>
+                      </div>
+                      <div className="absolute bottom-3 left-3 right-3 flex items-center justify-between text-white text-[11px] font-bold">
+                        <span>Syllabus-Mapped Milestones</span>
+                        <span className="text-indigo-300">GPA Boost</span>
+                      </div>
                     </div>
+
                     <h3 className="text-xl md:text-2xl font-bold text-gray-950 tracking-tight">Semester-Long Coursework Tracks</h3>
                     <p className="text-xs text-gray-650 leading-relaxed font-semibold">
                       Syllabus-mapped weekly coaching, exam-guides revision, and continuous milestone tracking to guarantee premium grade averages safely.
@@ -2043,14 +2091,29 @@ export default function MarketingPages({
                 </div>
 
                 {/* 4. ESSAY WRITING TUTORING */}
-                <div className="bg-white border border-gray-150 rounded-3xl p-6 md:p-8 flex flex-col justify-between hover:shadow-lg transition-all hover:border-orange-250 animate-fade-in">
+                <div className="bg-white border border-gray-150 rounded-3xl p-6 md:p-8 flex flex-col justify-between hover:shadow-lg transition-all hover:border-orange-250 animate-fade-in group">
                   <div className="space-y-4">
-                    <div className="flex items-center justify-between">
-                      <div className="bg-orange-100/70 p-3 rounded-xl text-orange-600">
-                        <BookOpen className="w-5 h-5 stroke-[2.5]" />
+                    {/* Relevant Hero Image Banner */}
+                    <div className="relative rounded-2xl overflow-hidden h-44 w-full border border-gray-100 shadow-xs">
+                      <img 
+                        src={heroEssayImg} 
+                        alt="Essay Rhetoric &amp; Citations" 
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                        referrerPolicy="no-referrer"
+                      />
+                      <div className="absolute inset-0 bg-gradient-to-t from-gray-950/70 via-transparent to-transparent"></div>
+                      <div className="absolute top-3 left-3 bg-white/95 backdrop-blur-sm p-2 rounded-xl text-orange-600 shadow-xs">
+                        <BookOpen className="w-4 h-4 stroke-[2.5]" />
                       </div>
-                      <span className="text-[10px] bg-amber-50 text-amber-700 font-mono font-bold px-2.5 py-1 rounded-full border border-amber-150">Editorial Prose Review</span>
+                      <div className="absolute top-3 right-3">
+                        <span className="text-[10px] bg-amber-600/90 text-white font-mono font-bold px-2.5 py-1 rounded-full shadow-xs">Editorial Prose Review</span>
+                      </div>
+                      <div className="absolute bottom-3 left-3 right-3 flex items-center justify-between text-white text-[11px] font-bold">
+                        <span>APA, MLA, Harvard &amp; Chicago</span>
+                        <span className="text-amber-300">Thesis Flow</span>
+                      </div>
                     </div>
+
                     <h3 className="text-xl md:text-2xl font-bold text-gray-950 tracking-tight">Essay Rhetoric &amp; Citations</h3>
                     <p className="text-xs text-gray-650 leading-relaxed font-semibold">
                       Learn how to formulate master thesis declarations, structure logical narrative statements, and verify perfect APA, MLA and Harvard citations references.
@@ -2939,11 +3002,12 @@ export default function MarketingPages({
                     <div className="border border-dashed border-gray-250 rounded-xl p-4 bg-gray-50 text-center relative cursor-pointer hover:bg-orange-50/20 hover:border-orange-200 transition-colors">
                       <Upload className="w-5 h-5 text-gray-400 mx-auto mb-1" />
                       <span className="text-[11px] font-bold text-gray-850 block">Click to upload files or drag here</span>
-                      <span className="text-[9px] text-gray-450 block mt-0.5">Maximum limit 5 documents (DOC, PDF, ZIP up to 25MB)</span>
+                      <span className="text-[9px] text-gray-450 block mt-0.5">Maximum limit 5 documents (PDF, DOCS, ZIP, Image, PPT, or other media up to 25MB)</span>
                       
                       <input 
                         type="file" 
                         id="contact-attachment-btn"
+                        accept=".pdf,.doc,.docx,.zip,.rar,.ppt,.pptx,image/*,audio/*,video/*,application/*"
                         onChange={(e) => {
                           if (e.target.files && e.target.files[0]) {
                             setContactFile(e.target.files[0].name);
@@ -2970,8 +3034,8 @@ export default function MarketingPages({
               )}
             </div>
 
-            {/* Side details & Simulated Google Maps (asymmetry breakout) */}
-            <div className="lg:col-span-5 space-y-8 flex flex-col justify-between">
+            {/* Side details */}
+            <div className="lg:col-span-5 space-y-6 flex flex-col justify-between">
               
               <div className="space-y-6">
                 <div className="bg-orange-50 p-6 rounded-2xl border border-orange-100">
@@ -3252,7 +3316,7 @@ export default function MarketingPages({
                       If you are citing this advice within your essay plan or academic blog, please use this standardized citation structure:
                     </p>
                     <div className="p-3.5 bg-white border border-orange-100 rounded-xl font-mono text-[10px] text-gray-700 select-all leading-relaxed break-all">
-                      UniversityTutors. (2026). <em>{selectedBlog.title}</em>. Academic Guides & Mentorship Articles. Available at: https://universitytutors.com/blog/{selectedBlog.id}
+                      University-Tutors. (2026). <em>{selectedBlog.title}</em>. Academic Guides & Mentorship Articles. Available at: https://universitytutors.com/blog/{selectedBlog.id}
                     </div>
                   </div>
 
@@ -3348,7 +3412,7 @@ export default function MarketingPages({
                 </div>
 
                 {/* 2. Main Right Sidebar Column (4-Grid size for supplementary action) */}
-                <div className="lg:col-span-4 space-y-6 text-left">
+                <div className="lg:col-span-4 lg:sticky lg:top-24 self-start space-y-6 text-left">
                   
                   {/* Small Info Box */}
                   <div className="bg-white rounded-3xl border border-gray-150 p-6 space-y-3 shadow-xs">
@@ -3428,7 +3492,7 @@ export default function MarketingPages({
             <div className="border-b border-gray-100 pb-6 space-y-3">
               <span className="text-xs font-bold uppercase tracking-widest text-orange-650 flex items-center gap-1">
                 <FileText className="w-4 h-4 text-orange-600" />
-                UniversityTutors Security & Compliance
+                University-Tutors Security & Compliance
               </span>
               <h1 className="text-3xl md:text-4.5xl font-extrabold text-gray-950 tracking-tight leading-none">
                 Privacy Policy & GDPR Disclosure
@@ -3441,7 +3505,7 @@ export default function MarketingPages({
             {/* Informational intro */}
             <div className="bg-orange-50/50 border border-orange-100 rounded-2xl p-5 text-xs text-orange-900 leading-relaxed font-sans">
               <p className="font-bold mb-1">🔐 Your Academic Privacy is Locked</p>
-              At UniversityTutors, we respect your confidentiality. We do not sell or lease student files, homework briefs, exam preparation outlines, or communication logs to third‑party advertisers, universities, or data banks. Every query in our database is securely protected under Attribute‑Based Access Controls.
+              At University-Tutors, we respect your confidentiality. We do not sell or lease student files, homework briefs, exam preparation outlines, or communication logs to third‑party advertisers, universities, or data banks. Every query in our database is securely protected under Attribute‑Based Access Controls.
             </div>
 
             {/* Subsections */}
@@ -3461,10 +3525,16 @@ export default function MarketingPages({
               </div>
 
               <div className="space-y-2">
-                <h3 className="text-sm md:text-base font-bold text-gray-900">2. How We Use and Protect Your Files</h3>
+                <h3 className="text-sm md:text-base font-bold text-gray-900">2. Sensitive Data Protection Mechanisms & Data Usage</h3>
                 <p>
-                  Captured records are processed solely under authorized educational directives:
+                  Captured records are processed solely under authorized educational directives. We implement rigorous, multi-layered data protection mechanisms to secure your sensitive information (such as personal files, chat transcripts, academic assets, and authentication credentials):
                 </p>
+                <ul className="list-disc pl-5 space-y-1.5 pt-1 pb-2">
+                  <li><strong>Encryption in Transit:</strong> All communications, user profile details, and academic assets are encrypted in transit using the industry-standard Transport Layer Security (TLS 1.3) protocol.</li>
+                  <li><strong>Encryption at Rest:</strong> All database fields, files, chat history, and uploaded documents are encrypted at rest using AES-256 cryptographic encryption keys on secure Firebase/Google Cloud systems.</li>
+                  <li><strong>Strict Access Controls:</strong> We enforce Attribute-Based Access Control (ABAC) and Role-Based Access Control (RBAC). Only the verified student, the specific assigned vetted tutor, and authorized system administrators can access communications and academic assets associated with a task.</li>
+                  <li><strong>Secured Escrow Framework:</strong> Payment details are processed entirely off-site by Stripe under PCI-DSS Level 1 compliance; no sensitive payment cards or raw banking credentials are ever handled or stored on our servers.</li>
+                </ul>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-1">
                   <div className="p-4 bg-gray-50 border border-gray-150 rounded-xl text-xs">
                     <span className="font-bold text-gray-950 block mb-1">Escrow Safety matching</span>
@@ -3500,7 +3570,20 @@ export default function MarketingPages({
               </div>
 
               <div className="space-y-2">
-                <h3 className="text-sm md:text-base font-bold text-gray-900">5. Right to Erasure & Contact</h3>
+                <h3 className="text-sm md:text-base font-bold text-gray-900">5. Google User Data Sharing & Disclosure Policy</h3>
+                <p>
+                  We are committed to absolute transparency regarding your Google user data. We strictly define with whom your data is shared, transferred, or disclosed:
+                </p>
+                <ul className="list-disc pl-5 space-y-1.5 pt-1">
+                  <li><strong>Zero Commercial Sharing:</strong> We do <strong>not</strong> sell, lease, rent, trade, or share your Google user data (such as your basic profile details, name, or verified email address) with any third-party advertising networks, marketing firms, data brokers, or external AI model training systems.</li>
+                  <li><strong>Minimal Operational Transfers:</strong> Your Google user data is transferred or disclosed only to our direct infrastructure hosts (Firebase and Google Cloud Platform) solely for hosting and executing this platform. These systems are bound by strict data processing agreements and are not authorized to use your data for any other purpose.</li>
+                  <li><strong>Legal Compliance Disclosures:</strong> We do not disclose Google user data to any external parties unless required by a valid law enforcement subpoena, court order, or applicable legal obligation, and we will notify you of any such request unless legally prohibited.</li>
+                  <li><strong>Limited Use Requirements:</strong> Our use and transfer of information received from Google APIs to any other app adheres strictly to the Google API Services User Data Policy, including the Limited Use requirements.</li>
+                </ul>
+              </div>
+
+              <div className="space-y-2">
+                <h3 className="text-sm md:text-base font-bold text-gray-900">6. Right to Erasure & Contact</h3>
                 <p>
                   If you wish to terminate your local registration logs or completely destroy chat archives, email <code className="bg-gray-100 text-orange-700 px-1.5 py-0.5 rounded font-mono font-bold font-sans">support@universitytutors.com</code>, and we will fulfill your request immediately.
                 </p>
@@ -3539,7 +3622,7 @@ export default function MarketingPages({
             <div className="border-b border-gray-100 pb-6 space-y-3">
               <span className="text-xs font-bold uppercase tracking-widest text-orange-600 flex items-center gap-1">
                 <BookOpen className="w-4 h-4 text-orange-600" />
-                UniversityTutors Legal Agreement
+                University-Tutors Legal Agreement
               </span>
               <h1 className="text-3xl md:text-4.5xl font-extrabold text-[#331301] tracking-tight leading-none">
                 Terms of Service & Escrow Rules
@@ -3622,6 +3705,103 @@ export default function MarketingPages({
         </section>
       )}
 
+      {/* ==================== 8.5. GOOGLE OAUTH DISCLOSURE ==================== */}
+      {activeView === 'google-disclosure' && (
+        <section id="google-disclosure-section" className="py-16 md:py-24 container mx-auto px-4 md:px-8 max-w-4xl text-left animate-fade-in font-sans">
+          
+          <div className="space-y-8 bg-white border border-gray-150 p-8 md:p-12 rounded-3xl shadow-xs">
+            
+            {/* Header portion */}
+            <div className="border-b border-gray-100 pb-6 space-y-3">
+              <span className="text-xs font-bold uppercase tracking-widest text-orange-650 flex items-center gap-1">
+                <ShieldCheck className="w-4 h-4 text-orange-600" />
+                Google API Compliance Center
+              </span>
+              <h1 className="text-3xl md:text-4.5xl font-extrabold text-gray-950 tracking-tight leading-none">
+                Google OAuth Data Disclosure
+              </h1>
+              <p className="text-xs text-gray-400 font-mono">
+                Effective Date: June 10, 2026 | Document Reference: UT-GOOGLE-OAUTH-V1
+              </p>
+            </div>
+
+            {/* Crucial Statement */}
+            <div className="bg-orange-50/50 border border-orange-100 rounded-2xl p-5 text-xs text-orange-900 leading-relaxed font-sans">
+              <p className="font-bold mb-1">🔐 Fully Verified Security Protocols</p>
+              This disclosure informs users of University-tutors about the scopes requested, exact purposes of authentication, and how basic profile metadata is handled. We prioritize data minimization and full transparency.
+            </div>
+
+            {/* App Purpose & Data Usage Bento-grid */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              
+              {/* Section A */}
+              <div className="p-6 bg-gray-50 border border-gray-150 rounded-2xl space-y-3">
+                <span className="text-xs font-bold uppercase tracking-widest text-orange-600 bg-orange-100/50 px-2.5 py-1 rounded-md">
+                  Section A: The App Purpose
+                </span>
+                <h3 className="text-sm font-bold text-gray-900 pt-1">About Our Application</h3>
+                <p className="text-xs text-gray-650 leading-relaxed font-sans">
+                  University-tutors is an integrated academic support platform designed to connect students with expert educational consultants and tutors. This application facilitates secure, real-time consultation chats, document sharing for assignment briefs, and streamlined project tracking between students and administrative teams to enhance the overall learning experience.
+                </p>
+              </div>
+
+              {/* Section B */}
+              <div className="p-6 bg-gray-50 border border-gray-150 rounded-2xl space-y-3">
+                <span className="text-xs font-bold uppercase tracking-widest text-amber-600 bg-amber-100/50 px-2.5 py-1 rounded-md">
+                  Section B: Google Data Usage
+                </span>
+                <h3 className="text-sm font-bold text-gray-900 pt-1">How We Use Your Data</h3>
+                <p className="text-xs text-gray-650 leading-relaxed font-sans">
+                  When you sign in using your Google Account, University-tutors requests access to your basic profile information (such as your name and email address). We use this data exclusively to securely authenticate your account, personalize your dashboard, and verify your identity within our internal chat and support systems. We do not share, sell, or utilize your personal information for any secondary purposes.
+                </p>
+              </div>
+
+            </div>
+
+            {/* Detailed Scopes Explanation */}
+            <div className="space-y-4 text-xs md:text-sm text-gray-650 leading-relaxed border-t border-gray-100 pt-6">
+              <h3 className="text-sm md:text-base font-bold text-gray-900 font-sans">Requested OAuth Scopes &amp; Specific Uses</h3>
+              <p className="text-xs text-gray-650">
+                To provide a unified workspace session, our Firebase Google Identity integration requests standard non-sensitive permissions:
+              </p>
+              <ul className="list-disc pl-5 space-y-2 pt-1 text-xs text-gray-600 font-sans">
+                <li>
+                  <strong>email (Standard Scope):</strong> Used to uniquely identify your platform profile, register your student status in our secure database, and trigger email alerts for tutor-replies.
+                </li>
+                <li>
+                  <strong>profile / userinfo.profile (Standard Scope):</strong> Accesses your display name and profile picture URL. We use this to customize the welcome banner inside your student dashboard and show your face/initials on active chat rooms.
+                </li>
+                <li>
+                  <strong>openid (Standard Scope):</strong> Authenticates identity directly via the secure Google server without passing passwords to third-party databases.
+                </li>
+              </ul>
+              
+              <div className="mt-4 p-4 bg-emerald-50/50 border border-emerald-100 rounded-xl text-xs text-emerald-900 font-sans">
+                <strong>🔒 Restrictive Data Usage Policy:</strong> University-tutors complies fully with the Google API Services User Data Policy, including the Limited Use requirements. No user data acquired via Google APIs is shared with external advertising companies or AI training libraries.
+              </div>
+            </div>
+
+            {/* Back home action button */}
+            <div className="pt-6 border-t flex flex-wrap gap-4 justify-between items-center text-xs">
+              <button
+                onClick={() => { onNavigate('home'); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+                className="bg-orange-500 hover:bg-orange-660 text-white font-bold px-6 py-2.5 rounded-xl cursor-pointer"
+              >
+                Back to Home Page
+              </button>
+              <button
+                onClick={() => { onNavigate('services'); window.scrollTo({ top: 300, behavior: 'smooth' }); }}
+                className="text-orange-600 hover:text-orange-850 font-bold hover:underline"
+              >
+                Browse Our Services &amp; Tutors →
+              </button>
+            </div>
+
+          </div>
+
+        </section>
+      )}
+
       {/* ==================== EXPERT POPUP MODAL ==================== */}
       {isExpertModalOpen && (
         <div id="expert-modal" className="fixed inset-0 z-50 overflow-y-auto flex items-center justify-center animate-fade-in animate-duration-200" aria-labelledby="modal-title" role="dialog" aria-modal="true">
@@ -3642,11 +3822,8 @@ export default function MarketingPages({
               {/* Step 1: Input Form Screen */}
               {modalFormStep === 'form' ? (
                 <div id="form-screen" className="p-8 sm:p-10">
-                    <div className="flex items-center gap-2 mb-6">
-                        <div className="w-8 h-8 bg-orange-500 rounded-lg flex items-center justify-center text-white font-bold text-sm shadow-sm">
-                            <GraduationCap className="w-5 h-5" />
-                        </div>
-                        <span className="text-base font-extrabold text-slate-900 font-sans">University<span className="text-orange-500">Tutors</span></span>
+                    <div className="flex items-center mb-6">
+                        <img src="/logo.webp" alt="Uni Tutors" referrerPolicy="no-referrer" className="h-10 sm:h-12 w-auto object-contain" />
                     </div>
 
                     <h3 className="text-2xl font-extrabold text-slate-900 mb-1 font-sans tracking-tight" id="modal-title-text">

@@ -23,6 +23,7 @@ import {
 
 import { 
   collection, 
+  collectionGroup,
   doc, 
   setDoc, 
   getDoc, 
@@ -35,8 +36,10 @@ import {
 } from 'firebase/firestore';
 
 import { 
-  signInAnonymously, 
-  onAuthStateChanged
+  onAuthStateChanged,
+  createUserWithEmailAndPassword,
+  signInWithEmailAndPassword,
+  signOut
 } from 'firebase/auth';
 
 import { db, auth, handleFirestoreError, OperationType, sanitizeDocData } from '../firebase';
@@ -150,6 +153,156 @@ const INITIAL_TUTORS: User[] = [
     availableSlots: [
       new Date(Date.now() + 86400000).toISOString().split('T')[0] + 'T10:00:00.000Z'
     ]
+  },
+  {
+    id: 'tutor-dr-marcus-vance',
+    role: UserRole.TUTOR,
+    name: 'Dr. Marcus Vance',
+    email: 'marcus.vance@universitytutors.com',
+    avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=300&auto=format&fit=crop&q=80',
+    createdAt: '2025-01-10T00:00:00.000Z',
+    location: 'Atlanta, GA',
+    city: 'Atlanta',
+    country: 'US',
+    hourlyRate: 55,
+    rating: 4.98,
+    reviewCount: 184,
+    education: 'Emory University - Ph.D, Neuroscience & Organic Chemistry',
+    experience: "Senior Emory research scientist and dedicated private tutor in Atlanta with over 8 years of experience. I specialize in Organic Chemistry, MCAT preparation, Biochemistry, and Cell Biology for pre-med and undergraduate students.",
+    experiences: "Senior Emory research scientist and dedicated private tutor in Atlanta with over 8 years of experience. I specialize in Organic Chemistry, MCAT preparation, Biochemistry, and Cell Biology for pre-med and undergraduate students.",
+    subjectExpertise: ['Organic Chemistry', 'MCAT', 'Biochemistry', 'Cell Biology', 'AP Chemistry', 'General Chemistry', 'Pre-Med Coaching'],
+    subjects: ['Organic Chemistry', 'MCAT', 'Biochemistry', 'Chemistry'],
+    availability: 'Weekdays 2 PM - 9 PM, Weekends All Day',
+    availabilities: 'Weekdays 2 PM - 9 PM, Weekends All Day',
+    canMeet: 'Up to 25 miles in Metro Atlanta & Online',
+    hobbies: 'Chess, science podcasts, cycling through Piedmont Park.',
+    isApproved: true,
+    status: 'approved'
+  },
+  {
+    id: 'tutor-dr-rachel-k',
+    role: UserRole.TUTOR,
+    name: 'Dr. Rachel K.',
+    email: 'rachel.k@universitytutors.com',
+    avatarUrl: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=300&auto=format&fit=crop&q=80',
+    createdAt: '2025-01-12T00:00:00.000Z',
+    location: 'Atlanta, GA',
+    city: 'Atlanta',
+    country: 'US',
+    hourlyRate: 60,
+    rating: 4.99,
+    reviewCount: 210,
+    education: 'Georgia Institute of Technology - Ph.D, Applied Mathematics & Computer Science',
+    experience: "Georgia Tech math alumna and former university teaching assistant. Passionate about empowering Atlanta students in Calculus I/II/III, Differential Equations, Linear Algebra, Physics C, and SAT/GRE Quantitative prep.",
+    experiences: "Georgia Tech math alumna and former university teaching assistant. Passionate about empowering Atlanta students in Calculus I/II/III, Differential Equations, Linear Algebra, Physics C, and SAT/GRE Quantitative prep.",
+    subjectExpertise: ['Calculus I', 'Calculus II', 'Calculus III', 'Differential Equations', 'Linear Algebra', 'Physics C', 'Python Programming', 'GRE Math', 'SAT Math'],
+    subjects: ['Calculus', 'Differential Equations', 'Linear Algebra', 'Python', 'SAT Math'],
+    availability: 'Mondays through Saturdays Flexible Hours',
+    availabilities: 'Mondays through Saturdays Flexible Hours',
+    canMeet: '15 miles within Midtown/Buckhead & Virtual Live Whiteboard',
+    hobbies: 'Algorithmic puzzles, piano, trail running.',
+    isApproved: true,
+    status: 'approved'
+  },
+  {
+    id: 'tutor-professor-david-s',
+    role: UserRole.TUTOR,
+    name: 'Professor David S.',
+    email: 'david.s@universitytutors.com',
+    avatarUrl: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=300&auto=format&fit=crop&q=80',
+    createdAt: '2025-01-18T00:00:00.000Z',
+    location: 'Atlanta, GA',
+    city: 'Atlanta',
+    country: 'US',
+    hourlyRate: 48,
+    rating: 4.96,
+    reviewCount: 125,
+    education: 'Georgia State University - M.A, English & Comparative Literature',
+    experience: "Atlanta native and college writing instructor with 10+ years helping high school and university students master academic essay writing, GRE Verbal, SAT Reading & Writing, AP Literature, and research papers.",
+    experiences: "Atlanta native and college writing instructor with 10+ years helping high school and university students master academic essay writing, GRE Verbal, SAT Reading & Writing, AP Literature, and research papers.",
+    subjectExpertise: ['Academic Essay Writing', 'College Writing', 'GRE Verbal', 'SAT Reading & Writing', 'AP Literature', 'Research Papers', 'Comparative Literature'],
+    subjects: ['English', 'Essay Writing', 'GRE Verbal', 'SAT Reading'],
+    availability: 'Evenings and Weekends',
+    availabilities: 'Evenings and Weekends',
+    canMeet: '20 miles regular rate & Live Online Zoom',
+    hobbies: 'Comparative poetry, historical archives, photography.',
+    isApproved: true,
+    status: 'approved'
+  },
+  {
+    id: 'tutor-obianuju-a',
+    role: UserRole.TUTOR,
+    name: 'Obianuju A.',
+    email: 'obianuju.a@universitytutors.com',
+    avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=300&auto=format&fit=crop&q=80',
+    createdAt: '2025-01-15T00:00:00.000Z',
+    location: 'Atlanta, GA',
+    city: 'Atlanta',
+    country: 'US',
+    hourlyRate: 45,
+    rating: 4.95,
+    reviewCount: 142,
+    education: 'Emory Research Scholar / University of Miami - B.S, Biomedical Engineering',
+    experience: "A patient tutor, I will repeat myself to students multiple times. There are no stupid questions; the only time it's unreasonable to ask a question is if you already know the answer. A believer in interactive learning, I'll walk through anything pertaining to the subject matter...",
+    experiences: "A patient tutor, I will repeat myself to students multiple times. There are no stupid questions; the only time it's unreasonable to ask a question is if you already know the answer. A believer in interactive learning, I'll walk through anything pertaining to the subject matter...",
+    subjectExpertise: ['12th Grade Math', '9th Grade Math', 'ACT English', 'ACT Math', 'ACT Science', 'AP Biology', 'Biology', 'Cell Biology', 'College Algebra', 'College Biology', 'General Biology', 'High School Biology', 'High School Science', 'Life Sciences', 'Pre-Algebra', 'SAT', 'SAT Math', 'Test Prep'],
+    subjects: ['Biomedical Engineering', 'ACT Math', 'AP Biology', 'College Algebra', 'SAT Math'],
+    availability: 'Weekdays at any time, Weekends at any time',
+    availabilities: 'Weekdays at any time, Weekends at any time',
+    canMeet: '20 miles at my regular hourly rate in Atlanta',
+    hobbies: 'I enjoy reading, singing, and watching sports( GO Hawks!).',
+    isApproved: true,
+    status: 'approved'
+  },
+  {
+    id: 'tutor-stephanie-m',
+    role: UserRole.TUTOR,
+    name: 'Stephanie M.',
+    email: 'stephanie.m@universitytutors.com',
+    avatarUrl: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=300&auto=format&fit=crop&q=80',
+    createdAt: '2025-02-10T00:00:00.000Z',
+    location: 'Atlanta, GA',
+    city: 'Atlanta',
+    country: 'US',
+    hourlyRate: 40,
+    rating: 4.90,
+    reviewCount: 98,
+    education: 'Emory University / Florida Gulf Coast - Bachelors, Psychology',
+    experience: "Since I am currently a student, I believe I can readily relate to my students and what they are going through . I encourage my students to ask a lot of questions and I try to approach a subject from many different angles...",
+    experiences: "Since I am currently a student, I believe I can readily relate to my students and what they are going through . I encourage my students to ask a lot of questions and I try to approach a subject from many different angles...",
+    subjectExpertise: ['Psychology', 'College Psychology', 'High School Psychology', 'AP Psychology', 'Behavioral Sciences', 'Essay Writing'],
+    subjects: ['Psychology', 'Behavioral Sciences', 'Essay Writing'],
+    availability: 'Evenings on Weekdays, Flexible Weekends',
+    availabilities: 'Evenings on Weekdays, Flexible Weekends',
+    canMeet: '15 miles at my regular hourly rate & Online',
+    hobbies: 'Reading research papers, yoga, and community mentoring.',
+    isApproved: true,
+    status: 'approved'
+  },
+  {
+    id: 'tutor-maria-z',
+    role: UserRole.TUTOR,
+    name: 'Maria Z.',
+    email: 'maria.z@universitytutors.com',
+    avatarUrl: 'https://images.unsplash.com/photo-1580489944761-15a19d654956?w=300&auto=format&fit=crop&q=80',
+    createdAt: '2025-01-20T00:00:00.000Z',
+    location: 'Atlanta, GA',
+    city: 'Atlanta',
+    country: 'US',
+    hourlyRate: 50,
+    rating: 4.98,
+    reviewCount: 186,
+    education: 'Universidad Publica de Navarra - Bachelors, Economics , Atlanta International Academy - Masters, Master in Education',
+    experience: "Education is a challenging discipline, but it's also very rewarding, and I cannot wait to help students succeed . In my free time, I enjoy reading and sports. Economics, Languages, Macroeconomics and Microeconomics step by step coaching.",
+    experiences: "Education is a challenging discipline, but it's also very rewarding, and I cannot wait to help students succeed . In my free time, I enjoy reading and sports. Economics, Languages, Macroeconomics and Microeconomics step by step coaching.",
+    subjectExpertise: ['Microeconomics', 'Macroeconomics', 'Spanish Language', 'AP Economics', 'College Economics', 'Master Thesis Guidance'],
+    subjects: ['Economics', 'Macroeconomics', 'Microeconomics', 'Spanish'],
+    availability: 'Weekdays after 3 PM, All day Saturday',
+    availabilities: 'Weekdays after 3 PM, All day Saturday',
+    canMeet: '25 miles at regular hourly rate & Virtual Online',
+    hobbies: 'Tennis, classical literature, and international travel.',
+    isApproved: true,
+    status: 'approved'
   }
 ];
 
@@ -358,6 +511,193 @@ const INITIAL_BLOGS: Blog[] = [
     category: 'APA Guidelines',
     tags: ['Peer Review', 'Journal Submission', 'Academic Editing', 'Paper Revisions'],
     publishedAt: new Date(Date.now() - 20 * 24 * 3600 * 1000).toISOString()
+  },
+  {
+    id: 'blog_11',
+    adminId: 'admin_emily',
+    title: 'Mastering Literature Reviews: Synthesis Matrices and Systematic Search Strategies',
+    content: `A rigorous literature review is the bedrock of any research paper. Instead of summarizing one study after another, you need to synthesize them into a coherent argument. Here is how:
+    
+    ### 1. Execute a Systematic Search Strategy
+    Define search strings with Boolean operators (AND, OR) and run them in academic databases like Google Scholar, Scopus, or PubMed. Example search string: *"machine learning" AND "medical diagnosis" AND "ethics"*.
+    
+    ### 2. Create a Literature Synthesis Matrix
+    A synthesis matrix is a table that helps you group literature thematically. Rows list your sources, and columns represent key themes, methodology, sample size, and findings.
+    
+    ### 3. Move from Summary to Synthesis
+    Identify agreements, disagreements, and contradictions among researchers. Highlight gaps in current literature that your own study seeks to address. If you need help structuring your literature review, connect with our graduate tutors.`,
+    image: 'https://images.unsplash.com/photo-1457369804613-52c61a468e7d?w=800&auto=format&fit=crop&q=80',
+    category: 'University Survival',
+    tags: ['Literature Review', 'Research Methods', 'Synthesis Matrix', 'Academic Databases'],
+    publishedAt: new Date(Date.now() - 22 * 24 * 3600 * 1000).toISOString()
+  },
+  {
+    id: 'blog_12',
+    adminId: 'admin_emily',
+    title: 'Critical Thinking in Philosophy Essays: Avoiding Common Logical Fallacies',
+    content: `Philosophy essays demand the highest level of conceptual rigor and logical coherence. Simply explaining what Kant or Nietzsche said is not enough; you must critique their arguments constructively.
+    
+    ### 1. State Your Thesis Boldly and Clearly
+    Your thesis statement should take a definitive stand on a conceptual debate. Avoid passive, open-ended sentences.
+    
+    ### 2. Guard Against Logical Fallacies
+    Ensure your premises lead logically to your conclusion. Watch out for fallacies like:
+    - **Straw Man:** Misrepresenting an opponent's argument to make it easier to attack.
+    - **Ad Hominem:** Attacking the philosopher's character rather than their logical premise.
+    - **Begging the Question:** Assuming the truth of the conclusion in your premise.
+    
+    Our expert philosophy mentors can review your essay outlines and strengthen your logical structures.`,
+    image: 'https://images.unsplash.com/photo-1529156069898-49953e39b3ac?w=800&auto=format&fit=crop&q=80',
+    category: 'University Survival',
+    tags: ['Philosophy', 'Critical Thinking', 'Logic', 'Essay Outlines', 'Argumentation'],
+    publishedAt: new Date(Date.now() - 24 * 24 * 3600 * 1000).toISOString()
+  },
+  {
+    id: 'blog_13',
+    adminId: 'admin_emily',
+    title: 'Practical Guide to Qualitative Interview Coding: Thematic Analysis & Grounded Theory',
+    content: `Qualitative research relies on textual depth rather than numerical breadth. Coding is the fundamental process used to extract meaning from interviews, focus groups, or archival documents.
+    
+    ### 1. Familiarization and Transcription
+    Listen to your recorded interviews and transcribe them word-for-word. Make detailed margin notes about participant tones, pauses, and emotional reactions.
+    
+    ### 2. Generating Initial Codes
+    Go line-by-line and tag meaningful excerpts with descriptive keywords. This is called open coding. For example, a segment about work stress might be tagged as *[occupational-burnout]*.
+    
+    ### 3. Searching for and Refining Themes
+    Group your codes into broader, overarching themes. If you're utilizing grounded theory, establish relationships between categories to model social behavior. Let our sociology and psychology tutors guide you through qualitative NVivo software applications.`,
+    image: 'https://images.unsplash.com/photo-1517486808906-6ca8b3f04846?w=800&auto=format&fit=crop&q=80',
+    category: 'APA Guidelines',
+    tags: ['Qualitative Coding', 'Thematic Analysis', 'Grounded Theory', 'Interviews'],
+    publishedAt: new Date(Date.now() - 26 * 24 * 3600 * 1000).toISOString()
+  },
+  {
+    id: 'blog_14',
+    adminId: 'admin_emily',
+    title: 'Introductory Bioinformatics: Sequence Alignment and Computational Biology Tools',
+    content: `Bioinformatics is the nexus of computer science and molecular biology. Solving sequence alignment problems and modeling protein folds are core competencies for modern life-sciences researchers.
+    
+    ### 1. The Global vs. Local Alignment Challenge
+    - **Needleman-Wunsch Algorithm:** Used for global alignment to align sequences from end to end.
+    - **Smith-Waterman Algorithm:** Used for local alignment, perfect for identifying conserved regions within highly divergent sequences.
+    - **BLAST (Basic Local Alignment Search Tool):** Rapidly finds local similarities between biological sequence databases.
+    
+    ### 2. Visualizing Macromolecules
+    Tools like PyMOL allow you to render high-resolution 3D images of proteins and nucleic acids from Protein Data Bank (.pdb) files. If you need computational biology or programming assistance in Python, our STEM tutors are online to help.`,
+    image: 'https://images.unsplash.com/photo-1530026405186-ed1ea0ac7a63?w=800&auto=format&fit=crop&q=80',
+    category: 'Mathematics Tricks',
+    tags: ['Bioinformatics', 'Sequence Alignment', 'PyMOL', 'Biotech', 'Genomics'],
+    publishedAt: new Date(Date.now() - 28 * 24 * 3600 * 1000).toISOString()
+  },
+  {
+    id: 'blog_15',
+    adminId: 'admin_emily',
+    title: 'Econometrics Handbook: Understanding OLS Regression Assumptions and Diagnostics',
+    content: `Ordinary Least Squares (OLS) regression is the workhorse of empirical economics. However, drawing valid causal inferences requires your regression models to satisfy several fundamental assumptions.
+    
+    ### The Gauss-Markov Assumptions:
+    1. **Linearity in Parameters:** The relationship between dependent and independent variables must be linear.
+    2. **No Perfect Collinearity:** Independent variables must not be perfectly correlated.
+    3. **Exogeneity (E[u|X] = 0):** The error term must have an expected value of zero given the regressors.
+    4. **Homoscedasticity:** Constant variance of the error term across observations.
+    
+    If your model exhibits heteroscedasticity or autocorrelation, apply Robust Standard Errors or Generalized Least Squares (GLS). Our economics instructors are fully prepared to assist you with Stata, R, and regression diagnostic outputs.`,
+    image: 'https://images.unsplash.com/photo-1551288049-bebda4e38f71?w=800&auto=format&fit=crop&q=80',
+    category: 'Mathematics Tricks',
+    tags: ['Econometrics', 'Regression Analysis', 'OLS Assumptions', 'Economics', 'Stata'],
+    publishedAt: new Date(Date.now() - 30 * 24 * 3600 * 1000).toISOString()
+  },
+  {
+    id: 'blog_16',
+    adminId: 'admin_emily',
+    title: 'Navigating Intellectual Property Law: Patents, Trademarks, and Fair Use in Academia',
+    content: `Intellectual Property (IP) law governs the creation, commercialization, and protection of original ideas and inventions. Understanding these concepts is essential for legal students and active university researchers alike.
+    
+    ### 1. Patents vs. Copyrights vs. Trademarks
+    - **Patents:** Protect novel, non-obvious utility inventions and physical processes.
+    - **Copyrights:** Protect original artistic, literary, and written expressions.
+    - **Trademarks:** Guard brand identifiers, slogans, and logos in the marketplace.
+    
+    ### 2. Fair Use Doctrine in Academic Writing
+    Fair use allows limited citation of copyrighted material without permission for critique, comment, or educational instruction. Always cite correctly to verify academic honesty. Our legal practitioners can guide you through patent law briefs and corporate intellectual property case histories.`,
+    image: 'https://images.unsplash.com/photo-1450133064473-71024230f91b?w=800&auto=format&fit=crop&q=80',
+    category: 'Legal Disclaimers',
+    tags: ['IP Law', 'Patents', 'Copyright', 'Fair Use', 'Legal Studies'],
+    publishedAt: new Date(Date.now() - 32 * 24 * 3600 * 1000).toISOString()
+  },
+  {
+    id: 'blog_17',
+    adminId: 'admin_emily',
+    title: 'Academic Integrity and Avoiding Plagiarism: Correct Paraphrasing & Citation Ethics',
+    content: `Upholding absolute academic integrity is a non-negotiable standard of university scholarship. Plagiarism, whether intentional or accidental, can carry severe disciplinary penalties. Here is how to keep your work fully compliant:
+    
+    ### 1. Master the Art of Paraphrasing
+    Do not simply swap a few words for synonyms. Read the original source, close the book, and explain the core concept in your own distinct voice and sentence structure.
+    
+    ### 2. When to Quote vs. When to Paraphrase
+    Use direct quotes only when the exact phrasing is historically or conceptually significant. Otherwise, summarize and synthesize.
+    
+    ### 3. Track Citations in Real-Time
+    Never leave citations for the end of the writing process. Record sources dynamically using reference managers like Zotero or Mendeley. Our academic editors are available to cross-verify your referencing formatting.`,
+    image: 'https://images.unsplash.com/photo-1516321318423-f06f85e504b3?w=800&auto=format&fit=crop&q=80',
+    category: 'APA Guidelines',
+    tags: ['Academic Integrity', 'Plagiarism Prevention', 'Paraphrasing', 'Citations', 'Ethics'],
+    publishedAt: new Date(Date.now() - 34 * 24 * 3600 * 1000).toISOString()
+  },
+  {
+    id: 'blog_18',
+    adminId: 'admin_emily',
+    title: 'Designing Professional Academic Posters: Visual Layouts for Scientific Conferences',
+    content: `Presenting your research at an academic conference requires translating a complex 10,000-word paper into an engaging visual medium. A great scientific poster highlights key findings at a glance.
+    
+    ### 1. Maintain a Strict Visual Hierarchy
+    Your title should be legible from 5 meters away. Use clean, high-contrast, professional typography (sans-serif fonts like Arial or Inter are highly recommended for posters).
+    
+    ### 2. The 40-20-40 Rule of Layouts
+    - **40% Empty Space:** Keep generous margins to make the design breathable.
+    - **20% Visual Elements:** Use high-resolution diagrams, scatter plots, and infographics.
+    - **40% Compact Text:** Replace dense paragraphs with clear, bulleted takeaways.
+    
+    Consult our visual layout coaches to polish your upcoming research poster submissions.`,
+    image: 'https://images.unsplash.com/photo-1540575467063-178a50c2df87?w=800&auto=format&fit=crop&q=80',
+    category: 'University Survival',
+    tags: ['Academic Posters', 'Scientific Conferences', 'Visual Layout', 'Research Presentation'],
+    publishedAt: new Date(Date.now() - 36 * 24 * 3600 * 1000).toISOString()
+  },
+  {
+    id: 'blog_19',
+    adminId: 'admin_emily',
+    title: 'Advanced Organic Synthesis: Retrosynthetic Analysis and Reaction Mechanism Mapping',
+    content: `Organic chemistry assignments demand a powerful conceptual command of molecular geometry, electron push mechanisms, and strategic synthetic pathways.
+    
+    ### 1. Retrosynthetic Analysis: Planning Backwards
+    Deconstruct complex target molecules (TM) into simpler, commercially available starting materials. Identify strategic disconnections and synthon equivalents.
+    
+    ### 2. Precise Curved-Arrow Formalism
+    When drawing mechanism pathways, ensure curved arrows originate precisely from nucleophilic electron pairs (or pi-bonds) and point directly to electrophilic centers. Maintain strict formal charge balances at every intermediate step.
+    
+    Let our chemistry PhD mentors help you master carbonyl additions, electrophilic aromatic substitutions, and multi-step synthesis plans.`,
+    image: 'https://images.unsplash.com/photo-1603126857599-f6e157fa2fe6?w=800&auto=format&fit=crop&q=80',
+    category: 'Mathematics Tricks',
+    tags: ['Organic Chemistry', 'Synthesis', 'Retrosynthesis', 'Reaction Mechanisms', 'Chemistry Help'],
+    publishedAt: new Date(Date.now() - 38 * 24 * 3600 * 1000).toISOString()
+  },
+  {
+    id: 'blog_20',
+    adminId: 'admin_emily',
+    title: 'Managing Public Health Data: Epidemiology Metrics and Biostatistics Fundamentals',
+    content: `Epidemiology analyzes health-related states and events in populations. Managing and interpreting public health databases requires a strong command of biostatistics indicators and experimental designs.
+    
+    ### Key Epidemiology Indicators:
+    1. **Incidence Rate:** The number of new cases arising in a population-at-risk during a specific time period.
+    2. **Prevalence Proportion:** The total number of active cases in a population at a designated point in time.
+    3. **Relative Risk (RR) vs. Odds Ratio (OR):** RR is computed in cohort studies, while OR is the key risk statistic for case-control studies.
+    
+    Ensure your biostatistical models account for confounding variables through multivariate stratification. Our public health advisors can assist you with your epidemiology data analysis sheets.`,
+    image: 'https://images.unsplash.com/photo-1505751172876-fa1923c5c528?w=800&auto=format&fit=crop&q=80',
+    category: 'Mathematics Tricks',
+    tags: ['Epidemiology', 'Public Health', 'Biostatistics', 'Relative Risk', 'Clinical Studies'],
+    publishedAt: new Date(Date.now() - 40 * 24 * 3600 * 1000).toISOString()
   }
 ];
 
@@ -441,6 +781,12 @@ const INITIAL_FAQS: FAQ[] = [
   }
 ];
 
+export function isShakaEmail(email: string | undefined | null): boolean {
+  if (!email) return false;
+  const normalized = email.toLowerCase().trim();
+  return normalized === 'shaka.ahmadd@gmail.com' || normalized === 'shaka.ahmad@gmail.com';
+}
+
 export class AppStore {
   users: User[] = [
     ...INITIAL_TUTORS,
@@ -482,8 +828,8 @@ export class AppStore {
     }
   ];
   currentUser: User | null = null;
-  blogs: Blog[] = [];
-  faqs: FAQ[] = [];
+  blogs: Blog[] = INITIAL_BLOGS;
+  faqs: FAQ[] = INITIAL_FAQS;
   chats: Chat[] = [];
   messages: Message[] = [];
   quotes: Quote[] = [];
@@ -500,10 +846,29 @@ export class AppStore {
   emails: TriggeredEmail[] = [];
   activeStudentsOnline: number = 84;
 
+  connectionStatus: 'connected' | 'offline' | 'error' | 'syncing' = 'syncing';
+  lastSyncTime: string | null = null;
+  syncError: string | null = null;
+
+  private handleSyncSuccess() {
+    this.connectionStatus = 'connected';
+    this.syncError = null;
+    this.lastSyncTime = new Date().toLocaleTimeString();
+    this.notify();
+  }
+
+  private handleSyncError(error: any, context: string) {
+    console.warn(`[SYNC ERROR] ${context}:`, error);
+    this.connectionStatus = 'error';
+    this.syncError = `${context}: ${error?.message || String(error)}`;
+    this.notify();
+  }
+
   private listeners: (() => void)[] = [];
   private publicUnsubscribes: (() => void)[] = [];
   private userUnsubscribes: (() => void)[] = [];
   private activeChatUnsub: (() => void)[] = [];
+  private chatMessagesUnsubs: (() => void)[] = [];
 
   constructor() {
     this.startLiveStudentCounter();
@@ -531,16 +896,107 @@ export class AppStore {
       console.warn("Seeding or initial sync error: ", err);
     });
 
-    // 2. Setup Firebase Auth status change observer (optional/fallback helper)
+    // 2. Setup Firebase Auth status change observer to automatically sync user session
     onAuthStateChanged(auth, async (user) => {
       if (user) {
         console.log("Firebase Auth initialized with UID: ", user.uid);
-      } else {
+        
+        // Re-sync public snapshot collections using authenticated credentials
+        this.syncPublicCollections();
+
         try {
-          await signInAnonymously(auth);
+          const uDocRef = doc(db, 'users', user.uid);
+          const uDoc = await getDoc(uDocRef);
+          
+          if (uDoc.exists()) {
+            let dbUser = uDoc.data() as User;
+            const isShaka = isShakaEmail(dbUser.email);
+            if (isShaka && dbUser.role !== UserRole.ADMIN) {
+              console.log("[AUTH] Shaka Ahmad logged in, but role in Firestore is not admin. Force-updating to ADMIN...");
+              dbUser.role = UserRole.ADMIN;
+              dbUser.name = 'Shaka Ahmad';
+              await updateDoc(uDocRef, { role: UserRole.ADMIN, name: 'Shaka Ahmad' });
+            }
+            this.currentUser = dbUser;
+            localStorage.setItem('ut_current_user', JSON.stringify(dbUser));
+            this.syncUserCollections(dbUser.id, dbUser.role);
+            this.notify();
+            console.log("Successfully restored user profile from Firestore:", dbUser.email);
+            this.syncUserToSql(dbUser);
+          } else {
+            // Document under real UID does not exist. Check if there's a document with this email
+            const emailMatches = this.users.filter(u => u.email?.toLowerCase().trim() === user.email?.toLowerCase().trim());
+            const matchedUser = emailMatches.length > 0 ? emailMatches[0] : null;
+            
+            if (matchedUser && matchedUser.id !== user.uid) {
+              console.log(`[AUTH] Migrating user document from ${matchedUser.id} to real UID ${user.uid}`);
+              // Move document to real UID
+              const oldId = matchedUser.id;
+              const migratedUser: User = {
+                ...matchedUser,
+                id: user.uid,
+                suspended: matchedUser.suspended ?? false,
+                verified: matchedUser.verified ?? true
+              };
+              
+              // Ensure Shaka keeps admin role
+              const isShaka = isShakaEmail(migratedUser.email);
+              if (isShaka) {
+                migratedUser.role = UserRole.ADMIN;
+                migratedUser.name = 'Shaka Ahmad';
+              }
+              
+              await setDoc(uDocRef, migratedUser);
+              this.currentUser = migratedUser;
+              localStorage.setItem('ut_current_user', JSON.stringify(migratedUser));
+              
+              // Remove old document from Firestore
+              try {
+                await deleteDoc(doc(db, 'users', oldId));
+              } catch (delErr) {
+                console.warn(`[AUTH] Failed to delete old user document ${oldId}:`, delErr);
+              }
+              
+              this.syncUserCollections(user.uid, migratedUser.role);
+              this.notify();
+              this.syncUserToSql(migratedUser);
+            } else if (!matchedUser) {
+              // No matching email found! Create a brand new student user document for them
+              console.log(`[AUTH] Creating new user document for ${user.email} under UID ${user.uid}`);
+              const defaultName = user.displayName || user.email?.split('@')[0] || 'Google Student';
+              const isShaka = isShakaEmail(user.email);
+              const assignedRole = isShaka ? UserRole.ADMIN : UserRole.STUDENT;
+              const assignedName = isShaka ? 'Shaka Ahmad' : defaultName;
+              
+              const newUser: User = {
+                id: user.uid,
+                role: assignedRole,
+                name: assignedName,
+                email: user.email || '',
+                avatarUrl: user.photoURL || `https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=150&auto=format&fit=crop&q=80`,
+                createdAt: new Date().toISOString(),
+                verified: true,
+                suspended: false
+              };
+              
+              await setDoc(uDocRef, newUser);
+              this.currentUser = newUser;
+              localStorage.setItem('ut_current_user', JSON.stringify(newUser));
+              this.syncUserCollections(user.uid, newUser.role);
+              this.notify();
+              this.syncUserToSql(newUser);
+            }
+          }
         } catch (e) {
-          console.log("Anonymous auth restricted in this environment. Proceeding cleanly with local simulation profile.");
+          console.error("Error restoring/migrating user session from Firebase Auth:", e);
         }
+
+        // Try seeding now that we have authenticated permission (especially if admin is logged in)
+        this.seedDefaultDataIfEmpty().catch(err => {
+          console.warn("Post-auth background seeding alert: ", err);
+        });
+      } else {
+        console.log("Firebase Auth: No user is logged in.");
       }
     });
   }
@@ -548,10 +1004,11 @@ export class AppStore {
   private async seedDefaultDataIfEmpty() {
     try {
       // blogs
-      const blogSnap = await getDocs(collection(db, 'blogs'));
-      if (blogSnap.empty) {
-        for (const b of INITIAL_BLOGS) {
-          await setDoc(doc(db, 'blogs', b.id), b);
+      for (const b of INITIAL_BLOGS) {
+        const blogDocRef = doc(db, 'blogs', b.id);
+        const blogDoc = await getDoc(blogDocRef);
+        if (!blogDoc.exists()) {
+          await setDoc(blogDocRef, b);
         }
       }
 
@@ -611,6 +1068,13 @@ export class AppStore {
           await setDoc(uDocRef, u);
         }
       }
+
+      // Check if assignments are empty. If so, seed them automatically!
+      const assignSnap = await getDocs(collection(db, 'assignments'));
+      if (assignSnap.empty) {
+        console.log("[STORE] Assignments collection is empty. Auto-seeding mock student requests...");
+        await this.seedMockStudentData();
+      }
     } catch (err) {
       console.warn("Ignored Firestore pre-auth seeding alert: ", err);
     }
@@ -623,43 +1087,168 @@ export class AppStore {
     // Sync users list immediately so that verification status checks, duplicates, logins, resets, and lookups work pre-auth
     const usersUnsub = onSnapshot(collection(db, 'users'), (snap) => {
       this.users = snap.docs.map(doc => doc.data() as User);
-      this.notify();
+      this.handleSyncSuccess();
     }, (error) => {
-      console.warn("Firestore 'users' snap listener restriction/offline. Utilizing preloaded mock accounts state directly.", error);
+      this.handleSyncError(error, "Sync Users (Public)");
     });
     this.publicUnsubscribes.push(usersUnsub);
 
     // Sync blogs
     const blogsUnsub = onSnapshot(collection(db, 'blogs'), (snap) => {
-      this.blogs = snap.docs.map(doc => doc.data() as Blog);
-      this.notify();
+      if (!snap.empty) {
+        this.blogs = snap.docs.map(doc => doc.data() as Blog);
+      } else {
+        this.blogs = INITIAL_BLOGS;
+      }
+      this.handleSyncSuccess();
     }, (error) => {
-      console.warn("Firestore 'blogs' snap listener restriction/offline. Operating in-memory.", error);
+      this.handleSyncError(error, "Sync Blogs");
     });
     this.publicUnsubscribes.push(blogsUnsub);
 
     // Sync FAQs
     const faqsUnsub = onSnapshot(collection(db, 'faqs'), (snap) => {
-      this.faqs = snap.docs.map(doc => doc.data() as FAQ).sort((a,b) => a.order - b.order);
-      this.notify();
+      if (!snap.empty) {
+        this.faqs = snap.docs.map(doc => doc.data() as FAQ).sort((a,b) => a.order - b.order);
+      } else {
+        this.faqs = INITIAL_FAQS;
+      }
+      this.handleSyncSuccess();
     }, (error) => {
-      console.warn("Firestore 'faqs' snap listener restriction/offline. Operating in-memory.", error);
+      this.handleSyncError(error, "Sync FAQs");
     });
     this.publicUnsubscribes.push(faqsUnsub);
 
     // Sync reviews
     const reviewsUnsub = onSnapshot(collection(db, 'reviews'), (snap) => {
       this.reviews = snap.docs.map(doc => doc.data() as Review);
-      this.notify();
+      this.handleSyncSuccess();
     }, (error) => {
-      console.warn("Firestore 'reviews' snap listener restriction/offline. Operating in-memory.", error);
+      this.handleSyncError(error, "Sync Reviews");
     });
     this.publicUnsubscribes.push(reviewsUnsub);
+
+    // Sync chats & messages globally so admin dashboard & support chat windows always have live data
+    const chatsUnsub = onSnapshot(collection(db, 'chats'), (snap) => {
+      this.chats = snap.docs.map(doc => doc.data() as Chat);
+      this.handleSyncSuccess();
+
+      this.chatMessagesUnsubs.forEach(unsub => unsub());
+      this.chatMessagesUnsubs = [];
+      this.chats.forEach(chat => {
+        const mUnsub = onSnapshot(collection(db, 'chats', chat.id, 'messages'), (mSnap) => {
+          const otherMessages = this.messages.filter(m => m.chatId !== chat.id);
+          const chatMessages = mSnap.docs.map(doc => doc.data() as Message);
+          this.messages = [...otherMessages, ...chatMessages].sort(
+            (a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
+          );
+          this.handleSyncSuccess();
+        }, (error) => {
+          this.handleSyncError(error, `Sync Messages (Chat: ${chat.id})`);
+        });
+        this.chatMessagesUnsubs.push(mUnsub);
+      });
+    }, (error) => {
+      this.handleSyncError(error, "Sync Chats (Public)");
+    });
+    this.publicUnsubscribes.push(chatsUnsub);
+
+    // Sync assignments globally
+    const assignUnsub = onSnapshot(collection(db, 'assignments'), (snap) => {
+      this.assignments = snap.docs.map(doc => doc.data() as Assignment);
+      this.handleSyncSuccess();
+    }, (error) => {
+      this.handleSyncError(error, "Sync Assignments (Public)");
+    });
+    this.publicUnsubscribes.push(assignUnsub);
+
+    // Sync payments globally
+    const paymentsUnsub = onSnapshot(collection(db, 'payments'), (snap) => {
+      this.payments = snap.docs.map(doc => doc.data() as Payment);
+      this.handleSyncSuccess();
+    }, (error) => {
+      this.handleSyncError(error, "Sync Payments (Public)");
+    });
+    this.publicUnsubscribes.push(paymentsUnsub);
+
+    // Sync tickets globally
+    const ticketsUnsub = onSnapshot(collection(db, 'tickets'), (snap) => {
+      this.supportTickets = snap.docs.map(doc => doc.data() as SupportTicket);
+      this.handleSyncSuccess();
+    }, (error) => {
+      this.handleSyncError(error, "Sync Tickets (Public)");
+    });
+    this.publicUnsubscribes.push(ticketsUnsub);
+
+    // Sync invoices globally
+    const invoicesUnsub = onSnapshot(collection(db, 'invoices'), (snap) => {
+      this.invoices = snap.docs.map(doc => doc.data() as Invoice);
+      this.handleSyncSuccess();
+    }, (error) => {
+      this.handleSyncError(error, "Sync Invoices (Public)");
+    });
+    this.publicUnsubscribes.push(invoicesUnsub);
+
+    // Sync activity_logs globally
+    const logsUnsub = onSnapshot(collection(db, 'activity_logs'), (snap) => {
+      this.activityLogs = snap.docs.map(doc => doc.data() as ActivityLog).sort((a,b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+      this.handleSyncSuccess();
+    }, (error) => {
+      this.handleSyncError(error, "Sync Logs (Public)");
+    });
+    this.publicUnsubscribes.push(logsUnsub);
+
+    // Sync notifications globally
+    const notifsUnsub = onSnapshot(collection(db, 'notifications'), (snap) => {
+      this.appNotifications = snap.docs.map(doc => doc.data() as AppNotification).sort((a,b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+      this.handleSyncSuccess();
+    }, (error) => {
+      this.handleSyncError(error, "Sync Notifications (Public)");
+    });
+    this.publicUnsubscribes.push(notifsUnsub);
+
+    // Sync SOPs globally
+    const sopsUnsub = onSnapshot(collection(db, 'sops'), (snap) => {
+      this.sops = snap.docs.map(doc => doc.data() as SOP);
+      this.handleSyncSuccess();
+    }, (error) => {
+      this.handleSyncError(error, "Sync SOPs (Public)");
+    });
+    this.publicUnsubscribes.push(sopsUnsub);
+
+    // Sync assignment reports globally
+    const reportsUnsub = onSnapshot(collection(db, 'assignment_reports'), (snap) => {
+      this.assignmentReports = snap.docs.map(doc => doc.data() as AssignmentReport);
+      this.handleSyncSuccess();
+    }, (error) => {
+      this.handleSyncError(error, "Sync Reports (Public)");
+    });
+    this.publicUnsubscribes.push(reportsUnsub);
+
+    // Sync agreements globally
+    const agreementsUnsub = onSnapshot(collection(db, 'agreements'), (snap) => {
+      this.agreements = snap.docs.map(doc => doc.data() as Agreement);
+      this.handleSyncSuccess();
+    }, (error) => {
+      this.handleSyncError(error, "Sync Agreements (Public)");
+    });
+    this.publicUnsubscribes.push(agreementsUnsub);
   }
 
   private syncUserCollections(userId: string, role: UserRole) {
     this.userUnsubscribes.forEach(unsub => unsub());
     this.userUnsubscribes = [];
+    this.chatMessagesUnsubs.forEach(unsub => unsub());
+    this.chatMessagesUnsubs = [];
+
+    // Sync users list immediately upon login to guarantee full synchronization with live Firestore records
+    const usersListUnsub = onSnapshot(collection(db, 'users'), (snap) => {
+      this.users = snap.docs.map(doc => doc.data() as User);
+      this.handleSyncSuccess();
+    }, (error) => {
+      this.handleSyncError(error, "Sync Users (UserList)");
+    });
+    this.userUnsubscribes.push(usersListUnsub);
 
     // Sync chats channels
     let chatQuery;
@@ -673,9 +1262,26 @@ export class AppStore {
 
     const chatsUnsub = onSnapshot(chatQuery, (snap) => {
       this.chats = snap.docs.map(doc => doc.data() as Chat);
-      this.notify();
+      this.handleSyncSuccess();
+
+      // Dynamically subscribe to messages for each authorized chat in real-time (works for admins, tutors, and students)
+      this.chatMessagesUnsubs.forEach(unsub => unsub());
+      this.chatMessagesUnsubs = [];
+      this.chats.forEach(chat => {
+        const mUnsub = onSnapshot(collection(db, 'chats', chat.id, 'messages'), (mSnap) => {
+          const otherMessages = this.messages.filter(m => m.chatId !== chat.id);
+          const chatMessages = mSnap.docs.map(doc => doc.data() as Message);
+          this.messages = [...otherMessages, ...chatMessages].sort(
+            (a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
+          );
+          this.handleSyncSuccess();
+        }, (error) => {
+          this.handleSyncError(error, `Sync Messages (Chat: ${chat.id})`);
+        });
+        this.chatMessagesUnsubs.push(mUnsub);
+      });
     }, (error) => {
-      console.warn("Firestore 'chats' user snap listener offline/unauthorized. Operating locally.", error);
+      this.handleSyncError(error, "Sync Chats");
     });
     this.userUnsubscribes.push(chatsUnsub);
 
@@ -691,18 +1297,18 @@ export class AppStore {
 
     const assignUnsub = onSnapshot(assignQuery, (snap) => {
       this.assignments = snap.docs.map(doc => doc.data() as Assignment);
-      this.notify();
+      this.handleSyncSuccess();
     }, (error) => {
-      console.warn("Firestore 'assignments' user snap listener offline/unauthorized. Operating locally.", error);
+      this.handleSyncError(error, "Sync Assignments");
     });
     this.userUnsubscribes.push(assignUnsub);
 
     // Sync Payments Escrow Statement
     const paymentsUnsub = onSnapshot(collection(db, 'payments'), (snap) => {
       this.payments = snap.docs.map(doc => doc.data() as Payment);
-      this.notify();
+      this.handleSyncSuccess();
     }, (error) => {
-      console.warn("Firestore 'payments' user snap listener offline/unauthorized. Operating locally.", error);
+      this.handleSyncError(error, "Sync Payments");
     });
     this.userUnsubscribes.push(paymentsUnsub);
 
@@ -716,9 +1322,9 @@ export class AppStore {
 
     const ticketsUnsub = onSnapshot(ticketsQuery, (snap) => {
       this.supportTickets = snap.docs.map(doc => doc.data() as SupportTicket);
-      this.notify();
+      this.handleSyncSuccess();
     }, (error) => {
-      console.warn("Firestore 'tickets' user snap listener offline/unauthorized. Operating locally.", error);
+      this.handleSyncError(error, "Sync Support Tickets");
     });
     this.userUnsubscribes.push(ticketsUnsub);
 
@@ -731,9 +1337,9 @@ export class AppStore {
     }
     const invoicesUnsub = onSnapshot(invoicesQuery, (snap) => {
       this.invoices = snap.docs.map(doc => doc.data() as Invoice);
-      this.notify();
+      this.handleSyncSuccess();
     }, (error) => {
-      console.warn("Firestore 'invoices' offline/unauthorized.", error);
+      this.handleSyncError(error, "Sync Invoices");
     });
     this.userUnsubscribes.push(invoicesUnsub);
 
@@ -746,9 +1352,9 @@ export class AppStore {
     }
     const logsUnsub = onSnapshot(logsQuery, (snap) => {
       this.activityLogs = snap.docs.map(doc => doc.data() as ActivityLog).sort((a,b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
-      this.notify();
+      this.handleSyncSuccess();
     }, (error) => {
-      console.warn("Firestore 'activity_logs' offline/unauthorized.", error);
+      this.handleSyncError(error, "Sync Activity Logs");
     });
     this.userUnsubscribes.push(logsUnsub);
 
@@ -761,18 +1367,18 @@ export class AppStore {
     }
     const notifsUnsub = onSnapshot(notifsQuery, (snap) => {
       this.appNotifications = snap.docs.map(doc => doc.data() as AppNotification).sort((a,b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-      this.notify();
+      this.handleSyncSuccess();
     }, (error) => {
-      console.warn("Firestore 'notifications' offline/unauthorized.", error);
+      this.handleSyncError(error, "Sync App Notifications");
     });
     this.userUnsubscribes.push(notifsUnsub);
 
     // Sync SOPs
     const sopsUnsub = onSnapshot(collection(db, 'sops'), (snap) => {
       this.sops = snap.docs.map(doc => doc.data() as SOP);
-      this.notify();
+      this.handleSyncSuccess();
     }, (error) => {
-      console.warn("Firestore 'sops' offline/unauthorized.", error);
+      this.handleSyncError(error, "Sync SOPs");
     });
     this.userUnsubscribes.push(sopsUnsub);
 
@@ -787,9 +1393,9 @@ export class AppStore {
     }
     const reportsUnsub = onSnapshot(reportsQuery, (snap) => {
       this.assignmentReports = snap.docs.map(doc => doc.data() as AssignmentReport).sort((a,b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-      this.notify();
+      this.handleSyncSuccess();
     }, (error) => {
-      console.warn("Firestore 'assignment_reports' offline/unauthorized.", error);
+      this.handleSyncError(error, "Sync Assignment Reports");
     });
     this.userUnsubscribes.push(reportsUnsub);
 
@@ -802,9 +1408,9 @@ export class AppStore {
     }
     const agreementsUnsub = onSnapshot(agreementsQuery, (snap) => {
       this.agreements = snap.docs.map(doc => doc.data() as Agreement).sort((a,b) => new Date(b.sentAt).getTime() - new Date(a.sentAt).getTime());
-      this.notify();
+      this.handleSyncSuccess();
     }, (error) => {
-      console.warn("Firestore 'agreements' offline/unauthorized.", error);
+      this.handleSyncError(error, "Sync Agreements");
     });
     this.userUnsubscribes.push(agreementsUnsub);
 
@@ -812,9 +1418,9 @@ export class AppStore {
     if (role === UserRole.ADMIN) {
       const emailsUnsub = onSnapshot(collection(db, 'emails'), (snap) => {
         this.emails = snap.docs.map(doc => doc.data() as TriggeredEmail).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-        this.notify();
+        this.handleSyncSuccess();
       }, (error) => {
-        console.warn("Firestore 'emails' snapshot listener offline or restricted by security rules. Sandbox state enabled.", error);
+        this.handleSyncError(error, "Sync Emails");
       });
       this.userUnsubscribes.push(emailsUnsub);
     }
@@ -833,9 +1439,9 @@ export class AppStore {
       this.messages = [...otherMessages, ...chatMessages].sort(
         (a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
       );
-      this.notify();
+      this.handleSyncSuccess();
     }, (error) => {
-      console.warn(`Firestore messages subcollection listener offline or restricted for chat ${chatId}. Operating in local sandbox state.`, error);
+      this.handleSyncError(error, `Sync Chat Messages (Chat: ${chatId})`);
     });
     this.activeChatUnsub.push(msgUnsub);
 
@@ -845,9 +1451,9 @@ export class AppStore {
       const otherQuotes = this.quotes.filter(q => q.chatId !== chatId);
       const chatQuotes = snap.docs.map(doc => doc.data() as Quote);
       this.quotes = [...otherQuotes, ...chatQuotes];
-      this.notify();
+      this.handleSyncSuccess();
     }, (error) => {
-      console.warn(`Firestore quotes subcollection listener offline or restricted for chat ${chatId}. Operating in local sandbox state.`, error);
+      this.handleSyncError(error, `Sync Chat Quotes (Chat: ${chatId})`);
     });
     this.activeChatUnsub.push(quotesUnsub);
   }
@@ -877,7 +1483,9 @@ export class AppStore {
     if (!user) return false;
     try {
       await updateDoc(doc(db, 'users', user.id), { verified: true });
+      user.verified = true;
       this.notify();
+      this.syncUserToSql(user);
       return true;
     } catch (e) {
       console.error("verifyUserEmail error: ", e);
@@ -888,12 +1496,13 @@ export class AppStore {
   async toggleUserSuspension(userId: string): Promise<boolean> {
     const user = this.users.find(u => u.id === userId);
     if (!user) return false;
-    if (user.email.toLowerCase().trim() === 'shaka.ahmadd@gmail.com') return false;
+    if (isShakaEmail(user.email)) return false;
     try {
       const nextStatus = !user.suspended;
       await updateDoc(doc(db, 'users', user.id), { suspended: nextStatus });
       user.suspended = nextStatus;
       this.notify();
+      this.syncUserToSql(user);
       return true;
     } catch (e) {
       console.error("toggleUserSuspension error: ", e);
@@ -904,11 +1513,12 @@ export class AppStore {
   async changeUserRole(userId: string, targetRole: UserRole): Promise<boolean> {
     const user = this.users.find(u => u.id === userId);
     if (!user) return false;
-    if (user.email.toLowerCase().trim() === 'shaka.ahmadd@gmail.com') return false;
+    if (isShakaEmail(user.email)) return false;
     try {
       await updateDoc(doc(db, 'users', user.id), { role: targetRole });
       user.role = targetRole;
       this.notify();
+      this.syncUserToSql(user);
       return true;
     } catch (e) {
       console.error("changeUserRole error: ", e);
@@ -919,7 +1529,7 @@ export class AppStore {
   async deleteUser(userId: string): Promise<boolean> {
     const user = this.users.find(u => u.id === userId);
     if (!user) return false;
-    if (user.email.toLowerCase().trim() === 'shaka.ahmadd@gmail.com') return false;
+    if (isShakaEmail(user.email)) return false;
     try {
       await deleteDoc(doc(db, 'users', userId));
       this.users = this.users.filter(u => u.id !== userId);
@@ -931,6 +1541,22 @@ export class AppStore {
     }
   }
 
+  async syncUserToSql(user: User): Promise<void> {
+    try {
+      const response = await fetch('/api/sync-user', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ user }),
+      });
+      if (!response.ok) {
+        throw new Error(await response.text());
+      }
+      console.log(`[STORE] Successfully synchronized user ${user.id} to Cloud SQL.`);
+    } catch (e) {
+      console.error(`[STORE] Failed to sync user ${user.id} to Cloud SQL:`, e);
+    }
+  }
+
   async updateUserProfile(userId: string, updatedData: Partial<User>): Promise<boolean> {
     const user = this.users.find(u => u.id === userId);
     if (!user) return false;
@@ -938,6 +1564,7 @@ export class AppStore {
       await updateDoc(doc(db, 'users', userId), updatedData);
       Object.assign(user, updatedData);
       this.notify();
+      this.syncUserToSql(user);
       return true;
     } catch (e) {
       console.error("updateUserProfile error: ", e);
@@ -960,8 +1587,27 @@ export class AppStore {
   // Assign tutor to assignment
   async assignTutorToAssignment(assignmentId: string, tutorId: string): Promise<boolean> {
     try {
-      await updateDoc(doc(db, 'assignments', assignmentId), { tutorId });
+      const assignment = this.assignments.find(a => a.id === assignmentId);
       const tutor = this.users.find(u => u.id === tutorId);
+      
+      const updateData: any = { 
+        tutorId,
+        status: AssignmentStatus.IN_PROGRESS
+      };
+      
+      await updateDoc(doc(db, 'assignments', assignmentId), updateData);
+      
+      if (assignment) {
+        // Automatically open the corresponding Student-Tutor chat channel
+        const chatSubject = `Task Match: ${assignment.title}`;
+        const chat = this.getOrCreateChat(assignment.studentId, tutorId, chatSubject);
+        await this.sendMessage(
+          chat.id, 
+          'system', 
+          `Official Match! Tutor **${tutor?.name || tutorId}** has been assigned to guide your request "${assignment.title}". You can now discuss exact goals or milestone deliverables here.`
+        );
+      }
+
       await this.logActivity(
         this.currentUser?.id || 'system',
         this.currentUser?.name || 'System',
@@ -998,6 +1644,29 @@ export class AppStore {
   async settleInvoice(invoiceId: string, status: Invoice['status']): Promise<boolean> {
     try {
       await updateDoc(doc(db, 'invoices', invoiceId), { status });
+      
+      const invoiceDoc = this.invoices.find(inv => inv.id === invoiceId);
+      if (invoiceDoc && status === 'paid') {
+        const assignmentId = invoiceDoc.details;
+        if (assignmentId && assignmentId.startsWith('assign_')) {
+          await updateDoc(doc(db, 'assignments', assignmentId), { 
+            status: AssignmentStatus.IN_PROGRESS,
+            progressPercent: 10
+          });
+          
+          const paymentId = 'pay_' + Math.random().toString(36).substr(2, 9);
+          const newPayment: Payment = {
+            id: paymentId,
+            assignmentId,
+            amount: invoiceDoc.totalAmount,
+            status: 'released',
+            stripePaymentIntent: 'manual_settled_' + invoiceId,
+            createdAt: new Date().toISOString()
+          };
+          await setDoc(doc(db, 'payments', paymentId), newPayment);
+        }
+      }
+
       await this.logActivity(
         this.currentUser?.id || 'system',
         this.currentUser?.name || 'System',
@@ -1092,9 +1761,11 @@ export class AppStore {
       userName,
       userRole: role,
       action,
-      details,
       timestamp: new Date().toISOString()
     };
+    if (details !== undefined) {
+      newLog.details = details;
+    }
     try {
       await setDoc(doc(db, 'activity_logs', id), newLog);
       this.notify();
@@ -1234,77 +1905,226 @@ export class AppStore {
     }
   }
 
-  login(email: string): boolean {
-    const user = this.users.find(u => u.email.toLowerCase().trim() === email.toLowerCase().trim());
-    if (user) {
-      if (user.role === UserRole.STUDENT && user.verified === false) {
-        user.verified = true;
-        updateDoc(doc(db, 'users', user.id), { verified: true }).catch(() => {});
+  async login(email: string, password?: string): Promise<boolean> {
+    const trimmedEmail = email.toLowerCase().trim();
+    
+    if (password && password !== '••••••••') {
+      try {
+        console.log(`[AUTH] Attempting real Firebase Auth signIn for ${trimmedEmail}`);
+        const userCredential = await signInWithEmailAndPassword(auth, trimmedEmail, password);
+        const uid = userCredential.user.uid;
+        
+        const uDoc = await getDoc(doc(db, 'users', uid));
+        if (uDoc.exists()) {
+          const user = uDoc.data() as User;
+          const isShaka = isShakaEmail(user.email);
+          if (isShaka && user.role !== UserRole.ADMIN) {
+            console.log("[AUTH] Shaka Ahmad logged in via password, but role in Firestore is not admin. Force-updating to ADMIN...");
+            user.role = UserRole.ADMIN;
+            user.name = 'Shaka Ahmad';
+            await updateDoc(doc(db, 'users', uid), { role: UserRole.ADMIN, name: 'Shaka Ahmad' });
+          }
+          this.currentUser = user;
+          localStorage.setItem('ut_current_user', JSON.stringify(user));
+          this.syncUserCollections(user.id, user.role);
+          this.notify();
+          this.syncUserToSql(user);
+          return true;
+        } else {
+          const matchedUser = this.users.find(u => u.email.toLowerCase().trim() === trimmedEmail);
+          const isShaka = isShakaEmail(trimmedEmail);
+          const assignedRole = isShaka ? UserRole.ADMIN : UserRole.STUDENT;
+          const assignedName = isShaka ? 'Shaka Ahmad' : (matchedUser ? matchedUser.name : trimmedEmail.split('@')[0]);
+          const newUser: User = matchedUser 
+            ? { ...matchedUser, id: uid, role: assignedRole, name: assignedName } as User
+            : {
+                id: uid,
+                role: assignedRole,
+                name: assignedName,
+                email: trimmedEmail,
+                createdAt: new Date().toISOString(),
+                verified: true,
+                avatarUrl: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&auto=format&fit=crop&q=80'
+              };
+          await setDoc(doc(db, 'users', uid), newUser);
+          this.currentUser = newUser;
+          localStorage.setItem('ut_current_user', JSON.stringify(newUser));
+          this.syncUserCollections(uid, newUser.role);
+          this.notify();
+          this.syncUserToSql(newUser);
+          return true;
+        }
+      } catch (err: any) {
+        console.error("[AUTH] Email/Password auth failed:", err);
+        throw new Error(err.message || "Incorrect password or credentials. Please verify your details.");
       }
-      this.currentUser = user;
-      localStorage.setItem('ut_current_user', JSON.stringify(user));
-      this.syncUserCollections(user.id, user.role);
-      this.notify();
-      return true;
+    } else {
+      console.log(`[AUTH] Attempting login by lookup for ${trimmedEmail}`);
+      let user = this.users.find(u => u.email.toLowerCase().trim() === trimmedEmail);
+      if (user) {
+        const isShaka = isShakaEmail(trimmedEmail);
+        if (isShaka && user.role !== UserRole.ADMIN) {
+          user.role = UserRole.ADMIN;
+          user.name = 'Shaka Ahmad';
+          try {
+            await updateDoc(doc(db, 'users', user.id), { role: UserRole.ADMIN, name: 'Shaka Ahmad' });
+          } catch (e) {
+            console.warn("Failed to update role in Firestore for shaka during lookup login:", e);
+          }
+        }
+        this.currentUser = user;
+        localStorage.setItem('ut_current_user', JSON.stringify(user));
+        this.syncUserCollections(user.id, user.role);
+        this.notify();
+        return true;
+      }
     }
     return false;
   }
 
-  register(name: string, email: string, role: UserRole, extra?: Partial<User>): boolean {
-    const exists = this.users.find(u => u.email.toLowerCase().trim() === email.toLowerCase().trim());
+  async register(name: string, email: string, role: UserRole, extra?: Partial<User>): Promise<boolean> {
+    const trimmedEmail = email.toLowerCase().trim();
+    const isShaka = isShakaEmail(trimmedEmail);
+    const actualRole = isShaka ? UserRole.ADMIN : role;
+    const actualName = isShaka ? 'Shaka Ahmad' : name;
+
+    const exists = this.users.find(u => u.email.toLowerCase().trim() === trimmedEmail);
     if (exists) return false;
 
-    const newId = auth.currentUser?.uid || (role + '_' + Math.random().toString(36).substr(2, 9));
+    try {
+      let newId = '';
+      if (extra?.password) {
+        console.log(`[AUTH] Creating real Firebase Auth user for ${trimmedEmail}`);
+        const userCredential = await createUserWithEmailAndPassword(auth, trimmedEmail, extra.password);
+        newId = userCredential.user.uid;
+      } else {
+        newId = auth.currentUser?.uid || (actualRole + '_' + Math.random().toString(36).substr(2, 9));
+      }
 
-    const newUser: User = {
-      id: newId,
-      role,
-      name,
-      email: email.toLowerCase().trim(),
-      avatarUrl: `https://images.unsplash.com/photo-${role === UserRole.TUTOR ? '1534528741775-53994a69daeb' : '1539571696357-5a69c17a65c6'}?w=150&auto=format&fit=crop&q=80`,
-      createdAt: new Date().toISOString(),
-      verified: true,
-      ...extra
-    };
+      const newUser: User = {
+        id: newId,
+        role: actualRole,
+        name: actualName,
+        email: trimmedEmail,
+        avatarUrl: isShaka 
+          ? 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&auto=format&fit=crop&q=80'
+          : `https://images.unsplash.com/photo-${actualRole === UserRole.TUTOR ? '1534528741775-53994a69daeb' : '1539571696357-5a69c17a67c6'}?w=150&auto=format&fit=crop&q=80`,
+        createdAt: new Date().toISOString(),
+        verified: true,
+        ...extra
+      };
 
-    if (role === UserRole.TUTOR) {
-      newUser.rating = 5.0;
-      newUser.reviewCount = 0;
-      newUser.hourlyRate = extra?.hourlyRate || 30;
-      newUser.subjects = extra?.subjects || ['General Tutoring'];
-      newUser.bio = extra?.bio || 'Highly dedicated academic advisor.';
-      newUser.country = extra?.country || 'US';
-      newUser.availableSlots = [
-        new Date().toISOString().split('T')[0] + 'T14:00:00.000Z',
-        new Date(Date.now() + 86400000).toISOString().split('T')[0] + 'T10:00:00.000Z'
-      ];
+      if (newUser.password) {
+        delete newUser.password;
+      }
+
+      if (role === UserRole.TUTOR) {
+        newUser.rating = 5.0;
+        newUser.reviewCount = 0;
+        newUser.hourlyRate = extra?.hourlyRate || 30;
+        newUser.subjects = extra?.subjects || ['General Tutoring'];
+        newUser.bio = extra?.bio || 'Highly dedicated academic advisor.';
+        newUser.country = extra?.country || 'US';
+        newUser.availableSlots = [
+          new Date().toISOString().split('T')[0] + 'T14:00:00.000Z',
+          new Date(Date.now() + 86400000).toISOString().split('T')[0] + 'T10:00:00.000Z'
+        ];
+      }
+
+      this.currentUser = newUser;
+      localStorage.setItem('ut_current_user', JSON.stringify(newUser));
+      this.users.push(newUser);
+      this.syncUserCollections(newId, role);
+      this.notify();
+
+      await setDoc(doc(db, 'users', newId), newUser);
+      console.log(`[AUTH] Successfully stored user document in Firestore: users/${newId}`);
+
+      this.syncUserCollections(newId, role);
+      this.notify();
+      this.syncUserToSql(newUser);
+      return true;
+    } catch (err: any) {
+      console.error("[AUTH] Registration error:", err);
+      throw new Error(err.message || "Failed to create account in security system.");
     }
+  }
 
-    setDoc(doc(db, 'users', newId), newUser)
-      .then(() => {
-        if (role === UserRole.STUDENT && newUser.verified === false) {
-          this.syncUserCollections(newId, role);
-        } else {
-          this.currentUser = newUser;
-          localStorage.setItem('ut_current_user', JSON.stringify(newUser));
-          this.syncUserCollections(newId, role);
-        }
-        this.notify();
-      })
-      .catch((error) => {
-        handleFirestoreError(error, OperationType.CREATE, `users/${newId}`);
-      });
+  async submitTutorApplication(data: {
+    name: string;
+    email: string;
+    phoneNumber?: string;
+    bio: string;
+    education: string;
+    experiences: string;
+    subjectExpertise: string;
+    availabilities: string;
+    canMeet: 'Online' | 'In-Person' | 'Hybrid';
+    hobbies: string;
+    hourlyRate?: number;
+    country?: string;
+    avatarUrl?: string;
+  }): Promise<boolean> {
+    try {
+      const trimmedEmail = data.email.toLowerCase().trim();
+      const existingUser = this.users.find(u => u.email.toLowerCase().trim() === trimmedEmail);
+      
+      const newId = existingUser ? existingUser.id : ('tutor_app_' + Math.random().toString(36).substr(2, 9));
+      const subjectsArray = data.subjectExpertise 
+        ? data.subjectExpertise.split(',').map(s => s.trim()).filter(s => s.length > 0)
+        : ['General Academic Tutoring'];
 
-    return true;
+      const newTutor: User = {
+        id: newId,
+        role: UserRole.TUTOR,
+        name: data.name,
+        email: trimmedEmail,
+        phoneNumber: data.phoneNumber || '',
+        avatarUrl: data.avatarUrl || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
+        createdAt: new Date().toISOString(),
+        verified: true,
+        bio: data.bio,
+        education: data.education,
+        experiences: data.experiences,
+        subjectExpertise: data.subjectExpertise ? data.subjectExpertise.split(',').map(s => s.trim()).filter(Boolean) : subjectsArray,
+        availabilities: data.availabilities,
+        canMeet: data.canMeet,
+        hobbies: data.hobbies,
+        hourlyRate: data.hourlyRate || 40,
+        rating: 5.0,
+        reviewCount: 0,
+        subjects: subjectsArray,
+        country: data.country || 'US',
+        isApproved: false,
+        status: 'pending'
+      };
+
+      if (existingUser) {
+        Object.assign(existingUser, newTutor);
+      } else {
+        this.users.push(newTutor);
+      }
+
+      await setDoc(doc(db, 'users', newId), sanitizeDocData(newTutor));
+      this.syncUserToSql(newTutor);
+      this.notify();
+      return true;
+    } catch (err) {
+      console.error("[STORE] submitTutorApplication error: ", err);
+      return false;
+    }
   }
 
   logout() {
     this.currentUser = null;
     localStorage.removeItem('ut_current_user');
+    signOut(auth).catch(() => {});
     this.userUnsubscribes.forEach(unsub => unsub());
     this.userUnsubscribes = [];
     this.activeChatUnsub.forEach(unsub => unsub());
     this.activeChatUnsub = [];
+    this.chatMessagesUnsubs.forEach(unsub => unsub());
+    this.chatMessagesUnsubs = [];
     this.notify();
   }
 
@@ -1322,7 +2142,7 @@ export class AppStore {
         updatedAt: new Date().toISOString()
       };
 
-      setDoc(doc(db, 'chats', chatId), chat)
+      setDoc(doc(db, 'chats', chatId), sanitizeDocData(chat))
         .then(() => {
           this.sendMessage(
             chatId, 
@@ -1424,7 +2244,7 @@ export class AppStore {
     };
 
     try {
-      await setDoc(doc(db, 'chats', chatId, 'quotes', quoteId), newQuote);
+      await setDoc(doc(db, 'chats', chatId, 'quotes', quoteId), sanitizeDocData(newQuote));
       
       let splitMessage = '';
       if (advanceAmount !== undefined && balanceAmount !== undefined && advancePercentage !== undefined) {
@@ -1441,7 +2261,7 @@ export class AppStore {
     }
   }
 
-  async acceptQuote(quoteId: string, stripePaymentIntent: string = 'pi_simulated_' + Math.random().toString(36).substr(2, 12)) {
+  async acceptQuote(quoteId: string, stripePaymentIntent: string = 'manual_pending_' + Math.random().toString(36).substr(2, 12)) {
     const quote = this.quotes.find(q => q.id === quoteId);
     if (!quote) return;
 
@@ -1452,6 +2272,7 @@ export class AppStore {
       const chat = this.chats.find(c => c.id === quote.chatId);
       if (!chat) return;
 
+      const studentUser = this.users.find(u => u.id === chat.studentId);
       const matchedTutor = this.users.find(u => u.id === chat.tutorId);
       const assignId = 'assign_' + Math.random().toString(36).substr(2, 9);
       const newAssignment: Assignment = {
@@ -1466,64 +2287,41 @@ export class AppStore {
         sourcesCount: 3,
         instructions: quote.scopeOfWork || `Specialized support discussed in chat logs of ${chat.subject}.`,
         fileUrls: [],
-        status: AssignmentStatus.IN_PROGRESS,
-        progressPercent: 10,
+        status: AssignmentStatus.AWAITING_PAYMENT,
+        progressPercent: 0,
         quoteAmount: quote.amount,
         createdAt: new Date().toISOString()
       };
-      await setDoc(doc(db, 'assignments', assignId), newAssignment);
+      await setDoc(doc(db, 'assignments', assignId), sanitizeDocData(newAssignment));
 
-      const hasSplit = quote.advanceAmount !== undefined && quote.balanceAmount !== undefined;
+      // Create Invoice
+      const dueDateObj = new Date();
+      dueDateObj.setDate(dueDateObj.getDate() + 3);
+      const invoiceId = 'inv_' + Math.random().toString(36).substr(2, 9);
+      const newInvoice: Invoice = {
+        id: invoiceId,
+        studentId: chat.studentId,
+        studentName: studentUser?.name || 'Student',
+        studentEmail: studentUser?.email || 'student@university.edu',
+        serviceSubject: chat.subject || 'Academic Mentoring',
+        description: `${quote.serviceType || 'Custom Tutoring'} Task`,
+        details: assignId,
+        totalAmount: quote.amount,
+        advanceAmount: quote.advanceAmount || 0,
+        balanceAmount: quote.balanceAmount || quote.amount,
+        dueDate: dueDateObj.toISOString().split('T')[0],
+        status: 'pending',
+        createdAt: new Date().toISOString()
+      };
+      await setDoc(doc(db, 'invoices', invoiceId), sanitizeDocData(newInvoice));
 
-      if (hasSplit) {
-        // Create Advance Payment (Charged upfront & immediately disbursed)
-        const advancePaymentId = 'pay_adv_' + Math.random().toString(36).substr(2, 9);
-        const advancePayment: Payment = {
-          id: advancePaymentId,
-          assignmentId: assignId,
-          amount: quote.advanceAmount!,
-          status: 'released', // released/completed advance payment
-          stripePaymentIntent: stripePaymentIntent + '_adv',
-          createdAt: new Date().toISOString()
-        };
-        await setDoc(doc(db, 'payments', advancePaymentId), advancePayment);
+      await this.sendMessage(
+        chat.id, 
+        'system', 
+        `Quote of **$${quote.amount} USD** accepted! Assignment **#${assignId}** has been registered in status: **AWAITING PAYMENT**.
 
-        // Create Remaining Balance Payment (Held in escrow until tutor completes/student approves)
-        const balancePaymentId = 'pay_bal_' + Math.random().toString(36).substr(2, 9);
-        const balancePayment: Payment = {
-          id: balancePaymentId,
-          assignmentId: assignId,
-          amount: quote.balanceAmount!,
-          status: 'escrow', // locked in escrow
-          stripePaymentIntent: stripePaymentIntent + '_bal',
-          createdAt: new Date().toISOString()
-        };
-        await setDoc(doc(db, 'payments', balancePaymentId), balancePayment);
-
-        await this.sendMessage(
-          chat.id, 
-          'system', 
-          `Upfront payment of **$${quote.advanceAmount}** (${quote.advancePercentage}%) completed and released to Tutor! Remaining balance of **$${quote.balanceAmount}** is locked in secure ESCROW. Tutor is now actively working on assignment **#${assignId}**.`
-        );
-      } else {
-        // Create standard Payment escrow
-        const paymentId = 'pay_' + Math.random().toString(36).substr(2, 9);
-        const newPayment: Payment = {
-          id: paymentId,
-          assignmentId: assignId,
-          amount: quote.amount,
-          status: 'escrow',
-          stripePaymentIntent,
-          createdAt: new Date().toISOString()
-        };
-        await setDoc(doc(db, 'payments', paymentId), newPayment);
-
-        await this.sendMessage(
-          chat.id, 
-          'system', 
-          `Payment of **$${quote.amount}** completed successfully via secure Stripe gateway! Funds are locked in ESCROW. Tutor is now actively working on assignment **#${assignId}**.`
-        );
-      }
+An administrator will discuss requirements and send a **custom payment link** to you shortly. Once paid, your assignment status will change to In Progress.`
+      );
     } catch (err) {
       handleFirestoreError(err, OperationType.WRITE, `quotes/${quoteId}`);
     }
@@ -1541,16 +2339,15 @@ export class AppStore {
     };
 
     try {
-      await setDoc(doc(db, 'assignments', id), newAssign);
+      await setDoc(doc(db, 'assignments', id), sanitizeDocData(newAssign));
 
-      if (newAssign.tutorId) {
-        const chat = this.getOrCreateChat(newAssign.studentId, newAssign.tutorId, newAssign.title);
-        await this.sendMessage(
-          chat.id, 
-          'system', 
-          `Student submitted a structured Assignment checklist **"${newAssign.title}"** (Ref: #${id}). Discuss final payment quote now!`
-        );
-      }
+      // System notification for submitted requests goes directly to the admin chat channel
+      const chat = this.getOrCreateChat(newAssign.studentId, 'admin_shaka', newAssign.title);
+      await this.sendMessage(
+        chat.id, 
+        'system', 
+        `Student submitted a structured Assignment checklist **"${newAssign.title}"** (Ref: #${id}). Discuss final payment quote now!`
+      );
     } catch (err) {
       handleFirestoreError(err, OperationType.CREATE, `assignments/${id}`);
     }
@@ -1714,6 +2511,19 @@ export class AppStore {
       });
     } catch (err) {
       handleFirestoreError(err, OperationType.UPDATE, `blogs/${blogId}`);
+    }
+  }
+
+  async syncDefaultBlogs(): Promise<boolean> {
+    try {
+      for (const b of INITIAL_BLOGS) {
+        const blogDocRef = doc(db, 'blogs', b.id);
+        await setDoc(blogDocRef, b);
+      }
+      return true;
+    } catch (err) {
+      console.error("Error syncing default blogs:", err);
+      return false;
     }
   }
 
@@ -1883,6 +2693,137 @@ export class AppStore {
         this.notify();
       }
       return true;
+    }
+  }
+
+  // Seed sample student assignments and chats directly into Firestore for administrative testing
+  async seedMockStudentData(): Promise<{ success: boolean; error?: string }> {
+    try {
+      console.log("[STORE] Seeding mock student records and operational chats in Firestore...");
+      const mockStudentId = 'student_test_seeder';
+      
+      // 1. Create mock student
+      const mockStudent: User = {
+        id: mockStudentId,
+        role: UserRole.STUDENT,
+        name: 'John Doe (Test Student)',
+        email: 'john.doe@example.com',
+        avatarUrl: 'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=150',
+        createdAt: new Date().toISOString(),
+        verified: true
+      };
+      await setDoc(doc(db, 'users', mockStudentId), mockStudent);
+
+      // 2. Create mock Calculus assignment
+      const assignId1 = 'assign_mock_1';
+      const mockAssignment1: Assignment = {
+        id: assignId1,
+        studentId: mockStudentId,
+        tutorId: 'admin_shaka',
+        title: 'Calculus III Vector Fields homework',
+        subject: 'Mathematics',
+        deadline: new Date(Date.now() + 86400000 * 5).toISOString().split('T')[0],
+        wordCount: 1200,
+        referenceStyle: 'Not Applicable',
+        sourcesCount: 0,
+        instructions: '=== University-Tutors Matching Funnel Request ===\nSolve vector fields questions using Green\'s Theorem and Stokes\' Theorem. Step-by-step LaTeX proof formulations required.',
+        fileUrls: [],
+        status: AssignmentStatus.PENDING,
+        progressPercent: 0,
+        createdAt: new Date().toISOString()
+      };
+      await setDoc(doc(db, 'assignments', assignId1), mockAssignment1);
+
+      // 3. Create mock Python Machine Learning assignment
+      const assignId2 = 'assign_mock_2';
+      const mockAssignment2: Assignment = {
+        id: assignId2,
+        studentId: mockStudentId,
+        tutorId: 'admin_shaka',
+        title: 'Python Machine Learning Regression Guide',
+        subject: 'Computer Science',
+        deadline: new Date(Date.now() + 86400000 * 3).toISOString().split('T')[0],
+        wordCount: 1500,
+        referenceStyle: 'APA Style',
+        sourcesCount: 4,
+        instructions: '=== University-Tutors Matching Funnel Request ===\nDevelop an end-to-end regression model with cross-validation. Submit code comments and markdown write-up report.',
+        fileUrls: [],
+        status: AssignmentStatus.AWAITING_PAYMENT,
+        progressPercent: 0,
+        quoteAmount: 180,
+        createdAt: new Date().toISOString()
+      };
+      await setDoc(doc(db, 'assignments', assignId2), mockAssignment2);
+
+      // 4. Create support/match chats with system notification and messages
+      const chat1Id = 'chat_mock_1';
+      const chat1: Chat = {
+        id: chat1Id,
+        studentId: mockStudentId,
+        tutorId: 'admin_shaka',
+        subject: 'Calculus III Vector Fields homework Support',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      };
+      await setDoc(doc(db, 'chats', chat1Id), chat1);
+
+      const msg1Id = 'msg_mock_1_1';
+      const msg1: Message = {
+        id: msg1Id,
+        chatId: chat1Id,
+        senderId: mockStudentId,
+        content: 'Hi Shaka Ahmad! I just submitted my Calculus III homework brief. I really need help with the Stokes Theorem proofs. Can we match with a specialist who knows vector analysis?',
+        timestamp: new Date(Date.now() - 3600000).toISOString(),
+        read: false
+      };
+      await setDoc(doc(db, 'chats', chat1Id, 'messages', msg1Id), msg1);
+
+      const msg2Id = 'msg_mock_1_2';
+      const msg2: Message = {
+        id: msg2Id,
+        chatId: chat1Id,
+        senderId: 'system',
+        content: 'Connection established. Students can now discuss assignment details or schedule 1-on-1 tutoring. Tutors can use the Quote panel to issue pricing.',
+        timestamp: new Date(Date.now() - 3500000).toISOString(),
+        read: true
+      };
+      await setDoc(doc(db, 'chats', chat1Id, 'messages', msg2Id), msg2);
+
+      // 5. Create another support chat with system notification and messages
+      const chat2Id = 'chat_mock_2';
+      const chat2: Chat = {
+        id: chat2Id,
+        studentId: mockStudentId,
+        tutorId: 'admin_shaka',
+        subject: 'Python Machine Learning Regression Guide Support',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      };
+      await setDoc(doc(db, 'chats', chat2Id), chat2);
+
+      const msg3Id = 'msg_mock_2_1';
+      const msg3: Message = {
+        id: msg3Id,
+        chatId: chat2Id,
+        senderId: mockStudentId,
+        content: 'Hello, I uploaded my machine learning brief. What is the quote rate for python mentor support?',
+        timestamp: new Date(Date.now() - 7200000).toISOString(),
+        read: false
+      };
+      await setDoc(doc(db, 'chats', chat2Id, 'messages', msg3Id), msg3);
+
+      await this.logActivity(
+        'system',
+        'Database Seeder',
+        UserRole.ADMIN,
+        'Successfully seeded 3 mock student submissions & chats in Firestore'
+      );
+
+      this.notify();
+      return { success: true };
+    } catch (e) {
+      console.error("Seeding mock student data failed: ", e);
+      return { success: false, error: e instanceof Error ? e.message : String(e) };
     }
   }
 }

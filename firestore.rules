@@ -1,51 +1,58 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Global Safety Net (default deny outside of specified collections)
-    match /{document=**} {
-      allow read, write: if false;
-    }
-
-    // Explicit Simulation Sandbox Match Blocks
+    
+    // Allow read and write on all application collections so seeding, live syncing, and admin operations work reliably
     match /users/{userId} {
       allow read, write: if true;
     }
-
     match /blogs/{blogId} {
       allow read, write: if true;
     }
-
     match /faqs/{faqId} {
       allow read, write: if true;
     }
-
     match /reviews/{reviewId} {
       allow read, write: if true;
     }
-
     match /chats/{chatId} {
       allow read, write: if true;
-      
       match /messages/{messageId} {
         allow read, write: if true;
       }
-      
       match /quotes/{quoteId} {
         allow read, write: if true;
       }
     }
-
     match /assignments/{assignmentId} {
       allow read, write: if true;
     }
-
     match /payments/{paymentId} {
       allow read, write: if true;
     }
-
     match /tickets/{ticketId} {
+      allow read, write: if true;
+    }
+    match /invoices/{invoiceId} {
+      allow read, write: if true;
+    }
+    match /activity_logs/{logId} {
+      allow read, write: if true;
+    }
+    match /notifications/{notifId} {
+      allow read, write: if true;
+    }
+    match /sops/{sopId} {
+      allow read, write: if true;
+    }
+    match /assignment_reports/{reportId} {
+      allow read, write: if true;
+    }
+    match /agreements/{agreementId} {
+      allow read, write: if true;
+    }
+    match /emails/{emailId} {
       allow read, write: if true;
     }
   }
 }
-

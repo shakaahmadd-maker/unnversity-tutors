@@ -23,6 +23,10 @@ import {
   MessageSquare
 } from 'lucide-react';
 import { User } from '../types';
+import hero1on1Img from '../assets/images/hero_1on1_tutoring_1787387369345.jpg';
+import heroAssignmentImg from '../assets/images/hero_assignment_guidance_1787387387028.jpg';
+import heroCourseworkImg from '../assets/images/hero_coursework_tracks_1787387403661.jpg';
+import heroEssayImg from '../assets/images/hero_essay_rhetoric_1787387419893.jpg';
 
 interface DedicatedServicePagesProps {
   selectedServiceId: string;
@@ -361,6 +365,46 @@ export default function DedicatedServicePages({
                   Empower your academic journey with bespoke lesson plans designed around your school syllabus. Our curriculum-aligned expert academic coaching bridges learning gaps, guarantees top performance, and boosts homework confidence.
                 </p>
 
+                {/* Hero Visual Banner with Relevant Image & Live Overlays */}
+                <div className="relative rounded-3xl overflow-hidden border border-gray-200/80 shadow-xl group">
+                  <img 
+                    src={hero1on1Img} 
+                    alt="1-on-1 Live Online Academic Tutoring with Interactive Digital Whiteboard" 
+                    className="w-full h-72 sm:h-96 object-cover group-hover:scale-102 transition-transform duration-700"
+                    referrerPolicy="no-referrer"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-gray-950/85 via-gray-950/30 to-transparent pointer-events-none"></div>
+
+                  {/* Top Status Overlays */}
+                  <div className="absolute top-4 left-4 right-4 flex flex-wrap items-center justify-between gap-2 pointer-events-none">
+                    <div className="bg-gray-950/85 backdrop-blur-md px-3.5 py-1.5 rounded-xl border border-white/20 text-[10px] sm:text-xs text-white font-bold tracking-wide flex items-center gap-2 shadow-lg">
+                      <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                      <span>HD Audio &amp; Interactive Whiteboard Active</span>
+                    </div>
+                    <div className="bg-orange-500/90 backdrop-blur-md px-3 py-1.5 rounded-xl text-[10px] sm:text-xs text-white font-bold tracking-wide flex items-center gap-1 shadow-lg">
+                      <Clock className="w-3.5 h-3.5" />
+                      <span>Avg. Match: &lt; 45s</span>
+                    </div>
+                  </div>
+
+                  {/* Bottom Information Overlays */}
+                  <div className="absolute bottom-4 left-4 right-4 text-white text-left space-y-2 pointer-events-none">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div>
+                        <span className="text-[10px] font-mono font-bold uppercase tracking-widest text-orange-400 block">Personalized 1-on-1 Workspace</span>
+                        <h4 className="text-sm sm:text-base font-extrabold text-white">Curriculum-Aligned STEM &amp; Humanities Coaching</h4>
+                      </div>
+                      <div className="flex items-center gap-1 bg-white/20 backdrop-blur-md px-3 py-1 rounded-xl text-xs font-bold text-white border border-white/20">
+                        <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
+                        <span>4.98/5 Rating (12k+ sessions)</span>
+                      </div>
+                    </div>
+                    <p className="text-[11px] text-gray-200 line-clamp-2 max-w-xl">
+                      Live video lectures, LaTeX math derivations, and real-time screen sharing recorded automatically for exam revisions.
+                    </p>
+                  </div>
+                </div>
+
                 {/* Trust Indicators */}
                 <div className="grid grid-cols-3 gap-4 pt-4 border-t border-gray-100">
                   <div className="space-y-1">
@@ -369,7 +413,7 @@ export default function DedicatedServicePages({
                   </div>
                   <div className="space-y-1">
                     <p className="text-lg font-extrabold text-orange-600">Top 1%</p>
-                    <p className="text-[10px] text-gray-500 font-bold">Vetted Ivy & PhD Mentors</p>
+                    <p className="text-[10px] text-gray-500 font-bold">Vetted Ivy &amp; PhD Mentors</p>
                   </div>
                   <div className="space-y-1">
                     <p className="text-lg font-extrabold text-zinc-900">Unlimited</p>
@@ -654,9 +698,60 @@ export default function DedicatedServicePages({
                   Stuck on a rigorous chemistry lab report, financial modeling case study or complex assignment prompt sheets? Work 1-on-1 with accredited university advisors who review your rubric criteria and compile flawless reference layouts ethically.
                 </p>
 
-                <div className="bg-orange-50 border border-orange-100 rounded-xl p-3 inline-flex items-center gap-2">
-                  <span className="w-2 h-2 rounded-full bg-orange-600 animate-pulse"></span>
-                  <span className="text-[10px] font-bold text-orange-800 font-mono uppercase">Emergency Queue Response Time &lt; 15 Mins</span>
+                {/* Hero Visual Banner with Relevant Image & Overlays */}
+                <div className="relative rounded-3xl overflow-hidden border border-gray-200/80 shadow-xl group">
+                  <img 
+                    src={heroAssignmentImg} 
+                    alt="University student reviewing structured assignment rubrics and research blueprints" 
+                    className="w-full h-72 sm:h-96 object-cover group-hover:scale-102 transition-transform duration-700"
+                    referrerPolicy="no-referrer"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-gray-950/85 via-gray-950/30 to-transparent pointer-events-none"></div>
+
+                  {/* Top Status Overlays */}
+                  <div className="absolute top-4 left-4 right-4 flex flex-wrap items-center justify-between gap-2 pointer-events-none">
+                    <div className="bg-gray-950/85 backdrop-blur-md px-3.5 py-1.5 rounded-xl border border-white/20 text-[10px] sm:text-xs text-white font-bold tracking-wide flex items-center gap-2 shadow-lg">
+                      <Shield className="w-3.5 h-3.5 text-orange-400" />
+                      <span>100% Ethical &amp; Turnitin-Safe Reference Models</span>
+                    </div>
+                    <div className="bg-red-500/90 backdrop-blur-md px-3 py-1.5 rounded-xl text-[10px] sm:text-xs text-white font-bold tracking-wide flex items-center gap-1 shadow-lg">
+                      <span className="w-2 h-2 rounded-full bg-white animate-pulse"></span>
+                      <span>Emergency Queue &lt; 15 Mins</span>
+                    </div>
+                  </div>
+
+                  {/* Bottom Information Overlays */}
+                  <div className="absolute bottom-4 left-4 right-4 text-white text-left space-y-2 pointer-events-none">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div>
+                        <span className="text-[10px] font-mono font-bold uppercase tracking-widest text-orange-400 block">Rubric Compliance Engine</span>
+                        <h4 className="text-sm sm:text-base font-extrabold text-white">Step-by-Step Methodology, Formula Derivations &amp; Blueprints</h4>
+                      </div>
+                      <div className="flex items-center gap-1 bg-white/20 backdrop-blur-md px-3 py-1 rounded-xl text-xs font-bold text-white border border-white/20">
+                        <CheckCircle className="w-3.5 h-3.5 text-emerald-400" />
+                        <span>University Code Compliant</span>
+                      </div>
+                    </div>
+                    <p className="text-[11px] text-gray-200 line-clamp-2 max-w-xl">
+                      Master complex problem sets, case studies, and lab reports with line-by-line grading criteria audits and structured outlines.
+                    </p>
+                  </div>
+                </div>
+
+                {/* Trust Indicators */}
+                <div className="grid grid-cols-3 gap-4 pt-4 border-t border-gray-100">
+                  <div className="space-y-1">
+                    <p className="text-lg font-extrabold text-zinc-900">Zero</p>
+                    <p className="text-[10px] text-gray-500 font-bold">Ghostwriting / 100% Ethical</p>
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-lg font-extrabold text-orange-600">Strict</p>
+                    <p className="text-[10px] text-gray-500 font-bold">Rubric Alignment Scoring</p>
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-lg font-extrabold text-zinc-900">24/7</p>
+                    <p className="text-[10px] text-gray-500 font-bold">On-Demand Mentor Queue</p>
+                  </div>
                 </div>
               </div>
 
@@ -779,11 +874,60 @@ export default function DedicatedServicePages({
                   Don't wait until final exam panic compromises your semester averages during Week 12. Connect with a dedicated subject companion who tracks your syllabus weekly, reviews worksheets, and coordinates perfect quiz revisions.
                 </p>
 
-                <div className="grid grid-cols-2 gap-2 text-xs text-gray-700 font-bold max-w-md">
-                  <span className="flex items-center gap-1.5"><Check className="text-orange-600 w-4 h-4 shrink-0" /> Unified tutor assigned all term</span>
-                  <span className="flex items-center gap-1.5"><Check className="text-orange-600 w-4 h-4 shrink-0" /> Weekly homework checkouts</span>
-                  <span className="flex items-center gap-1.5"><Check className="text-orange-600 w-4 h-4 shrink-0" /> Proactive exam revision sheets</span>
-                  <span className="flex items-center gap-1.5"><Check className="text-orange-600 w-4 h-4 shrink-0" /> Cost-effective bundles</span>
+                {/* Hero Visual Banner with Relevant Image & Overlays */}
+                <div className="relative rounded-3xl overflow-hidden border border-gray-200/80 shadow-xl group">
+                  <img 
+                    src={heroCourseworkImg} 
+                    alt="University student in library tracking semester coursework syllabus and milestone roadmap" 
+                    className="w-full h-72 sm:h-96 object-cover group-hover:scale-102 transition-transform duration-700"
+                    referrerPolicy="no-referrer"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-gray-950/85 via-gray-950/30 to-transparent pointer-events-none"></div>
+
+                  {/* Top Status Overlays */}
+                  <div className="absolute top-4 left-4 right-4 flex flex-wrap items-center justify-between gap-2 pointer-events-none">
+                    <div className="bg-gray-950/85 backdrop-blur-md px-3.5 py-1.5 rounded-xl border border-white/20 text-[10px] sm:text-xs text-white font-bold tracking-wide flex items-center gap-2 shadow-lg">
+                      <Calendar className="w-3.5 h-3.5 text-indigo-400" />
+                      <span>14-Week Syllabus Synchronization</span>
+                    </div>
+                    <div className="bg-indigo-600/90 backdrop-blur-md px-3 py-1.5 rounded-xl text-[10px] sm:text-xs text-white font-bold tracking-wide flex items-center gap-1 shadow-lg">
+                      <TrendingUp className="w-3.5 h-3.5" />
+                      <span>Avg. +1.4 GPA Boost</span>
+                    </div>
+                  </div>
+
+                  {/* Bottom Information Overlays */}
+                  <div className="absolute bottom-4 left-4 right-4 text-white text-left space-y-2 pointer-events-none">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div>
+                        <span className="text-[10px] font-mono font-bold uppercase tracking-widest text-indigo-300 block">Term-Long Academic Security</span>
+                        <h4 className="text-sm sm:text-base font-extrabold text-white">Dedicated 1-on-1 Subject Mentor Across the Entire Term</h4>
+                      </div>
+                      <div className="flex items-center gap-1 bg-white/20 backdrop-blur-md px-3 py-1 rounded-xl text-xs font-bold text-white border border-white/20">
+                        <Award className="w-3.5 h-3.5 text-amber-400" />
+                        <span>Milestone Escrow Security</span>
+                      </div>
+                    </div>
+                    <p className="text-[11px] text-gray-200 line-clamp-2 max-w-xl">
+                      Weekly 1-on-1 check-ins, pre-midterm problem set auditing, and tailored study packs aligned directly to your professor's class schedule.
+                    </p>
+                  </div>
+                </div>
+
+                {/* Trust Indicators */}
+                <div className="grid grid-cols-3 gap-4 pt-4 border-t border-gray-100">
+                  <div className="space-y-1">
+                    <p className="text-lg font-extrabold text-zinc-900">Unified</p>
+                    <p className="text-[10px] text-gray-500 font-bold">Same Expert All Term</p>
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-lg font-extrabold text-orange-600">Weekly</p>
+                    <p className="text-[10px] text-gray-500 font-bold">Worksheet &amp; Quiz Audits</p>
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-lg font-extrabold text-zinc-900">Proactive</p>
+                    <p className="text-[10px] text-gray-500 font-bold">Pre-Finals Diagnostic Exams</p>
+                  </div>
                 </div>
               </div>
 
@@ -902,13 +1046,71 @@ export default function DedicatedServicePages({
                   Struggling with prose structure flows, weak thesis assertions, or complicated citation styles like bibliography registers (APA, MLA, Harvard, Chicago)? We help you evaluate prompt topics, organize layouts, and master authoritative essay composition.
                 </p>
 
-                <button
-                  onClick={() => displayToast("Downloading Free Premium Essay Checklist PDF: Models proper thesis hook structures, database citation formats, and formatting outlines.")}
-                  className="bg-amber-100 hover:bg-amber-150 border border-amber-200 text-amber-900 font-bold text-xs px-4 py-2.5 rounded-xl transition inline-flex items-center gap-2 shadow-2xs"
-                >
-                  <Download className="w-4 h-4 text-amber-800" />
-                  <span>Download Free Academic Essay Handbook Checklist (PDF)</span>
-                </button>
+                {/* Hero Visual Banner with Relevant Image & Overlays */}
+                <div className="relative rounded-3xl overflow-hidden border border-gray-200/80 shadow-xl group">
+                  <img 
+                    src={heroEssayImg} 
+                    alt="University student editing academic essay draft and style guides on desk" 
+                    className="w-full h-72 sm:h-96 object-cover group-hover:scale-102 transition-transform duration-700"
+                    referrerPolicy="no-referrer"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-gray-950/85 via-gray-950/30 to-transparent pointer-events-none"></div>
+
+                  {/* Top Status Overlays */}
+                  <div className="absolute top-4 left-4 right-4 flex flex-wrap items-center justify-between gap-2 pointer-events-none">
+                    <div className="bg-gray-950/85 backdrop-blur-md px-3.5 py-1.5 rounded-xl border border-white/20 text-[10px] sm:text-xs text-white font-bold tracking-wide flex items-center gap-2 shadow-lg">
+                      <BookOpen className="w-3.5 h-3.5 text-amber-400" />
+                      <span>APA, MLA, Harvard &amp; Chicago Verified</span>
+                    </div>
+                    <div className="bg-amber-600/90 backdrop-blur-md px-3 py-1.5 rounded-xl text-[10px] sm:text-xs text-white font-bold tracking-wide flex items-center gap-1 shadow-lg">
+                      <Sparkles className="w-3.5 h-3.5" />
+                      <span>Thesis Tone Optimizer</span>
+                    </div>
+                  </div>
+
+                  {/* Bottom Information Overlays */}
+                  <div className="absolute bottom-4 left-4 right-4 text-white text-left space-y-2 pointer-events-none">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div>
+                        <span className="text-[10px] font-mono font-bold uppercase tracking-widest text-amber-300 block">Critical Editorial Coaching</span>
+                        <h4 className="text-sm sm:text-base font-extrabold text-white">Authoritative Argument Flows &amp; Scholarly Vocabulary</h4>
+                      </div>
+                      <div className="flex items-center gap-1 bg-white/20 backdrop-blur-md px-3 py-1 rounded-xl text-xs font-bold text-white border border-white/20">
+                        <FileText className="w-3.5 h-3.5 text-amber-400" />
+                        <span>SOP &amp; Research Theses</span>
+                      </div>
+                    </div>
+                    <p className="text-[11px] text-gray-200 line-clamp-2 max-w-xl">
+                      Elevate raw drafts into authoritative academic prose with structured paragraph transitions and flawless citation mechanics.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-3">
+                  <button
+                    onClick={() => displayToast("Downloading Free Premium Essay Checklist PDF: Models proper thesis hook structures, database citation formats, and formatting outlines.")}
+                    className="bg-amber-100 hover:bg-amber-150 border border-amber-200 text-amber-900 font-bold text-xs px-4 py-2.5 rounded-xl transition inline-flex items-center gap-2 shadow-2xs cursor-pointer"
+                  >
+                    <Download className="w-4 h-4 text-amber-800" />
+                    <span>Download Free Academic Essay Handbook Checklist (PDF)</span>
+                  </button>
+                </div>
+
+                {/* Trust Indicators */}
+                <div className="grid grid-cols-3 gap-4 pt-4 border-t border-gray-100">
+                  <div className="space-y-1">
+                    <p className="text-lg font-extrabold text-zinc-900">Line-by-Line</p>
+                    <p className="text-[10px] text-gray-500 font-bold">Editorial Prose Critiques</p>
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-lg font-extrabold text-orange-600">All Formats</p>
+                    <p className="text-[10px] text-gray-500 font-bold">APA / MLA / Harvard / Chicago</p>
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-lg font-extrabold text-zinc-900">SOP &amp; Thesis</p>
+                    <p className="text-[10px] text-gray-500 font-bold">Admissions &amp; Dissertation Mentors</p>
+                  </div>
+                </div>
               </div>
 
               {/* Prose before/after visual comparing review */}

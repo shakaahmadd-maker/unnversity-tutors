@@ -8,8 +8,9 @@ export const db = getFirestore(app, (firebaseConfig as any).firestoreDatabaseId)
 export const auth = getAuth(app);
 
 const provider = new GoogleAuthProvider();
-provider.addScope('https://www.googleapis.com/auth/chat.spaces.readonly');
-provider.addScope('https://www.googleapis.com/auth/chat.messages');
+provider.addScope('openid');
+provider.addScope('email');
+provider.addScope('profile');
 
 let isSigningIn = false;
 let cachedAccessToken: string | null = null;
