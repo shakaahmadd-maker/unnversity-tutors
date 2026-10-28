@@ -4,16 +4,24 @@ import * as schema from './schema';
 
 const { Pool } = pkg;
 
+// Only read DATABASE_URL from process.env - no hardcoded credentials or defaults
 export const hasDatabaseUrl = Boolean(process.env.DATABASE_URL && process.env.DATABASE_URL.trim() !== '');
+
+const shouldEnableSsl = Boolean(
+  process.env.DATABASE_URL &&
+  (process.env.DATABASE_URL.includes('sslmode=require') ||
+   process.env.DATABASE_URL.includes('sslmode=no-verify') ||
+   process.env.DATABASE_URL.includes('supabase.co') ||
+   process.env.DATABASE_URL.includes('neon.tech') ||
+   process.env.DATABASE_URL.includes('render.com'))
+);
 
 export const pool = hasDatabaseUrl
   ? new Pool({
       connectionString: process.env.DATABASE_URL,
-      connectionTimeoutMillis: 2500,
+      connectionTimeoutMillis: 3000,
       max: 20,
-      ssl: process.env.DATABASE_URL?.includes('sslmode=require')
-        ? { rejectUnauthorized: false }
-        : false,
+      ssl: shouldEnableSsl ? { rejectUnauthorized: false } : undefined,
     })
   : null;
 
@@ -43,7 +51,7 @@ export async function checkDbConnection(): Promise<boolean> {
     return true;
   } catch (err: any) {
     isConnectedState = false;
-    console.log('[DB] PostgreSQL is currently unreachable. Operating with resilient in-memory storage.');
+    console.log('[DB] PostgreSQL is unreachable. Operating with resilient in-memory fallback.');
     return false;
   }
 }

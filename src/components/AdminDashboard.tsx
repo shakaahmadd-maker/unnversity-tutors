@@ -454,7 +454,7 @@ export default function AdminDashboard({
     }
   };
 
-  // FIREBASE TRIGGER EMAIL EXTENSION COMPOSER STATES
+  // NOTIFICATION & TRIGGER EMAIL COMPOSER STATES
   const [trEmailTo, setTrEmailTo] = useState('');
   const [trEmailSubject, setTrEmailSubject] = useState('');
   const [trEmailHtml, setTrEmailHtml] = useState('');
@@ -532,12 +532,12 @@ export default function AdminDashboard({
         trEmailHtml.trim()
       );
       if (ok) {
-        setTrEmailSuccess(`Firestore triggered email document successfully created mapping! The firestore-send-email cloud extension will process the delivery.`);
+        setTrEmailSuccess(`PostgreSQL triggered email document successfully created mapping! The smtp-mailer cloud extension will process the delivery.`);
         setTrEmailSubject('');
         setTrEmailHtml('');
         setTrEmailTemplate('custom');
       } else {
-        setTrEmailError('Failed to log document into Firestore.');
+        setTrEmailError('Failed to log document into PostgreSQL.');
       }
     } else {
       setTrEmailError('Google cloud Trigger-Email driver is offline or unavailable.');
@@ -1211,7 +1211,7 @@ export default function AdminDashboard({
                   </div>
                 </div>
 
-                {/* LIVE FIRESTORE DATABASE SYNC AUDIT PANEL */}
+                {/* LIVE POSTGRESQL DATABASE SYNC AUDIT PANEL */}
                 <div className="bg-gray-50/50 p-4 border-b border-gray-150 flex flex-col gap-4 text-left text-xs font-sans animate-fade-in" id="admin-db-sync-audit-panel">
                   <div className="flex flex-wrap items-center justify-between gap-3">
                     <div className="flex items-center gap-2.5">
@@ -1223,7 +1223,7 @@ export default function AdminDashboard({
                         {unsyncedUsers.length === 0 ? (
                           <>
                             <span className="h-1.5 w-1.5 rounded-full bg-emerald-500"></span>
-                            Synced with Firestore
+                            Synced with PostgreSQL
                           </>
                         ) : (
                           <>
@@ -1233,7 +1233,7 @@ export default function AdminDashboard({
                         )}
                       </span>
                       <span className="text-gray-400 font-medium">
-                        Cross-referencing `store.users` state against remote Firestore collection...
+                        Cross-referencing `store.users` state against remote PostgreSQL collection...
                       </span>
                     </div>
 
@@ -1247,7 +1247,7 @@ export default function AdminDashboard({
                         onClick={runUsersSyncAudit}
                         disabled={isAuditingUsers}
                         className="bg-white hover:bg-gray-50 border border-gray-200 text-gray-700 hover:text-gray-800 px-3 py-1.5 rounded-xl font-bold transition-all shadow-xs flex items-center gap-1.5 cursor-pointer disabled:opacity-50 text-[11px]"
-                        title="Re-run Firestore cross-reference ledger check"
+                        title="Re-run PostgreSQL cross-reference ledger check"
                       >
                         <RefreshCw className={`w-3 h-3 text-gray-500 ${isAuditingUsers ? 'animate-spin' : ''}`} />
                         <span>{isAuditingUsers ? 'Auditing...' : 'Run Diagnostics'}</span>
@@ -1256,7 +1256,7 @@ export default function AdminDashboard({
                       {onSeedMockStudentData && (
                         <button
                           onClick={async () => {
-                            if (confirm("Would you like to seed 3 mock student assignments and conversations directly into your Firestore database for instant testing?")) {
+                            if (confirm("Would you like to seed 3 mock student assignments and conversations directly into your PostgreSQL database for instant testing?")) {
                               setIsSeedingMock(true);
                               const res = await onSeedMockStudentData();
                               setIsSeedingMock(false);
@@ -1270,7 +1270,7 @@ export default function AdminDashboard({
                           }}
                           disabled={isSeedingMock}
                           className="bg-orange-600 hover:bg-orange-700 text-white px-3 py-1.5 rounded-xl font-bold transition-all shadow-xs flex items-center gap-1.5 cursor-pointer disabled:opacity-50 text-[11px]"
-                          title="Generate sample student submissions and support chats directly in Firestore"
+                          title="Generate sample student submissions and support chats directly in PostgreSQL"
                         >
                           <Sparkles className={`w-3 h-3 text-white ${isSeedingMock ? 'animate-bounce' : ''}`} />
                           <span>{isSeedingMock ? 'Seeding...' : 'Seed Sample Submissions'}</span>
@@ -1282,7 +1282,7 @@ export default function AdminDashboard({
                   {auditError && (
                     <div className="bg-red-50 border border-red-150 rounded-xl p-3 text-red-700 text-[11px] font-semibold flex items-center gap-2">
                       <AlertCircle className="w-4 h-4 shrink-0 text-red-500" />
-                      <span>Firestore Sync Audit Error: {auditError}</span>
+                      <span>PostgreSQL Sync Audit Error: {auditError}</span>
                     </div>
                   )}
 
@@ -1292,10 +1292,10 @@ export default function AdminDashboard({
                         <AlertCircle className="w-4.5 h-4.5 text-amber-600 shrink-0 mt-0.5" />
                         <div>
                           <h4 className="font-bold text-amber-900 text-[12px] tracking-tight">
-                            Unsynced User Records Detected in Firestore (e.g. 'Waqas Ahmad')
+                            Unsynced User Records Detected in PostgreSQL (e.g. 'Waqas Ahmad')
                           </h4>
                           <p className="text-amber-700 text-[11px] leading-relaxed mt-1">
-                            The users listed below exist in your Firestore database but are missing from the current local store array (`store.users`). This discrepancy typically arises when records are created via direct database seeding scripts or external administrative operations, and the local real-time listener hasn't loaded them. 
+                            The users listed below exist in your PostgreSQL database but are missing from the current local store array (`store.users`). This discrepancy typically arises when records are created via direct database seeding scripts or external administrative operations, and the local real-time listener hasn't loaded them. 
                           </p>
                         </div>
                       </div>
@@ -2742,7 +2742,7 @@ export default function AdminDashboard({
 
                 {assignmentReports.length === 0 ? (
                   <div className="py-16 text-center text-gray-400 text-xs font-sans space-y-2">
-                    <span>💡 <b>No reports registered in live Cloud Firestore.</b> Showing simulated system audit reports below:</span>
+                    <span>💡 <b>No reports registered in live Cloud PostgreSQL.</b> Showing simulated system audit reports below:</span>
                     <div className="max-w-xl mx-auto p-4 border border-dashed rounded-2xl bg-gray-50/50 space-y-3 mt-4 text-left font-sans shadow-xs">
                       <div className="flex justify-between font-bold text-gray-950 text-[11px]">
                         <span>Report Ref #REP-9003 - APA Microeconomics Thesis Work</span>
@@ -3249,17 +3249,17 @@ export default function AdminDashboard({
                                 {chatConnectionResult.error ? (
                                   <>
                                     <WifiOff className="w-4 h-4 text-red-600" />
-                                    <span className="text-red-900">Firestore Listener Diagnostics: Connection Failure</span>
+                                    <span className="text-red-900">PostgreSQL Listener Diagnostics: Connection Failure</span>
                                   </>
                                 ) : chatConnectionResult.active ? (
                                   <>
                                     <Wifi className="w-4 h-4 text-emerald-600 animate-pulse" />
-                                    <span className="text-emerald-900">Firestore Listener Diagnostics: ACTIVE &amp; CONNECTED</span>
+                                    <span className="text-emerald-900">PostgreSQL Listener Diagnostics: ACTIVE &amp; CONNECTED</span>
                                   </>
                                 ) : (
                                   <>
                                     <WifiOff className="w-4 h-4 text-amber-600 animate-pulse" />
-                                    <span className="text-amber-900">Firestore Listener Diagnostics: STANDBY / OFFLINE</span>
+                                    <span className="text-amber-900">PostgreSQL Listener Diagnostics: STANDBY / OFFLINE</span>
                                   </>
                                 )}
                               </h5>
@@ -3283,7 +3283,7 @@ export default function AdminDashboard({
                                 </span>
                               </div>
                               <div className="space-y-1">
-                                <span className="text-gray-400 font-semibold block">REMOTE DB HEALTH (FIRESTORE)</span>
+                                <span className="text-gray-400 font-semibold block">REMOTE DB HEALTH (POSTGRESQL)</span>
                                 <span className="font-bold block text-gray-800">
                                   {chatConnectionResult.error 
                                     ? `🔴 Read Error: ${chatConnectionResult.error}` 
@@ -3296,7 +3296,7 @@ export default function AdminDashboard({
                             {/* LAST 5 MESSAGES RETRIEVED */}
                             <div className="space-y-1.5">
                               <span className="text-[10px] text-gray-400 font-mono uppercase tracking-wider font-extrabold block">
-                                Last 5 Messages in Database (Direct Firestore Isolation Audit)
+                                Last 5 Messages in Database (Direct PostgreSQL Isolation Audit)
                               </span>
                               {chatConnectionResult.lastMessages.length === 0 ? (
                                 <div className="p-3 bg-white/50 rounded-xl border border-dashed text-center text-gray-400 italic">
@@ -3534,7 +3534,7 @@ export default function AdminDashboard({
                 <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                   <div>
                     <h3 className="font-bold text-base text-gray-950 font-sans tracking-tight">University Blog Manager Desk</h3>
-                    <p className="text-xs text-gray-400 mt-1 font-medium">Audit, compose, edit, or delete student-facing blogs and educational articles directly within Firestore.</p>
+                    <p className="text-xs text-gray-400 mt-1 font-medium">Audit, compose, edit, or delete student-facing blogs and educational articles directly within PostgreSQL.</p>
                   </div>
                   
                   {/* Action Controls Panel */}
@@ -3561,7 +3561,7 @@ export default function AdminDashboard({
                           if (onSyncDefaultBlogs) {
                             const ok = await onSyncDefaultBlogs();
                             if (ok) {
-                              alert("All 20 default blogs have been successfully synchronized and updated in Firestore!");
+                              alert("All 20 default blogs have been successfully synchronized and updated in PostgreSQL!");
                             } else {
                               alert("Failed to synchronize blogs with the database.");
                             }
@@ -4293,7 +4293,7 @@ export default function AdminDashboard({
             </div>
           )}
 
-          {/* FIREBASE TRIGGER EMAIL EXTENSION CONSOLE */}
+          {/* NOTIFICATION & TRIGGER EMAIL DISPATCH CONSOLE */}
           {activeTab === 'trigger_emails' && (
             <div className="space-y-6 text-left animate-fade-in" id="admin-trigger-emails-desk">
               
@@ -4301,13 +4301,13 @@ export default function AdminDashboard({
               <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 text-white md:flex items-center justify-between gap-6 shadow-xl">
                 <div className="space-y-1 max-w-2xl">
                   <span className="bg-emerald-600/25 border border-emerald-500/30 text-emerald-300 font-mono text-[9px] uppercase tracking-widest px-2.5 py-1 rounded-full font-bold inline-block">
-                    🔥 Verified Firestore Cloud Extension
+                    🔥 Verified PostgreSQL Cloud Extension
                   </span>
                   <h3 className="font-bold text-xl text-white font-sans tracking-tight pt-1">
-                    Trigger Email Console <span className="font-mono text-xs text-orange-400 font-normal">(`firestore-send-email`)</span>
+                    Trigger Email Console <span className="font-mono text-xs text-orange-400 font-normal">(`smtp-mailer`)</span>
                   </h3>
                   <p className="text-xs text-slate-300 leading-relaxed pt-1 font-medium">
-                    This administrative console operates directly over the official database-driven <strong className="text-white">Trigger Email from Firestore</strong> extension. Writing mail documents to the secured <code className="bg-slate-800 text-orange-300 px-1.5 py-0.5 rounded text-[10.5px]">emails</code> collection automatically triggers the serverless SMTP pipeline. Only verified admin accounts are cleared to invoke this channel.
+                    This administrative console operates directly over the official database-driven <strong className="text-white">Trigger Email from PostgreSQL</strong> extension. Writing mail documents to the secured <code className="bg-slate-800 text-orange-300 px-1.5 py-0.5 rounded text-[10.5px]">emails</code> collection automatically triggers the serverless SMTP pipeline. Only verified admin accounts are cleared to invoke this channel.
                   </p>
                 </div>
                 <div className="mt-4 md:mt-0 px-4 py-3 bg-slate-800 rounded-2xl border border-slate-700/60 shrink-0 text-center">
@@ -4325,7 +4325,7 @@ export default function AdminDashboard({
                 <div className="xl:col-span-7 bg-white rounded-3xl border border-gray-150 p-6 shadow-xs space-y-6">
                   <div>
                     <h4 className="font-bold text-sm text-gray-900">1. Dispatch Mail Form</h4>
-                    <p className="text-xs text-gray-400 font-medium">Fill the fields or load templates to construct your Firestore SMTP message.</p>
+                    <p className="text-xs text-gray-400 font-medium">Fill the fields or load templates to construct your PostgreSQL SMTP message.</p>
                   </div>
 
                   <form onSubmit={handleSendTriggerEmailSubmit} className="space-y-4">
@@ -4421,7 +4421,7 @@ export default function AdminDashboard({
                         className="w-full bg-orange-500 hover:bg-orange-600 active:scale-98 text-white font-bold text-xs py-3 px-6 rounded-xl transition-all shadow-md shadow-orange-500/10 cursor-pointer flex items-center justify-center gap-2"
                       >
                         <Send className="w-4 h-4" />
-                        <span>Write to `emails` Firestore collection & Dispatch mail</span>
+                        <span>Write to `emails` PostgreSQL collection & Dispatch mail</span>
                       </button>
                     </div>
                   </form>
@@ -4439,7 +4439,7 @@ export default function AdminDashboard({
 
                 </div>
 
-                {/* RIGHT SIDE: THE REAL-TIME FIRESTORE DELIVERY LEDGER */}
+                {/* RIGHT SIDE: THE REAL-TIME POSTGRESQL DELIVERY LEDGER */}
                 <div className="xl:col-span-5 space-y-4">
                   
                   <div className="bg-white rounded-3xl border border-gray-150 p-6 shadow-xs">

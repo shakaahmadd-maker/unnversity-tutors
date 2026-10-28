@@ -572,7 +572,7 @@ CUSTOM SYLLABUS DIRECTIVES: ${customFocusInput || 'None'}
 CONTACT EMAIL COMPASS: ${studentEmail}
       `.trim();
 
-      // Submit actual assignment data payload back to our Firestore orchestrators
+      // Submit actual assignment data payload back to PostgreSQL backend
       onSubmitAssignment({
         studentId: currentUser.id,
         title: `${selectedSubject} (${selectedSubtopic}) ${serviceData.title}`,

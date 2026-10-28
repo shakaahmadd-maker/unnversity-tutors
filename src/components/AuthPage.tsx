@@ -371,7 +371,7 @@ export default function AuthPage({ onLogin, onRegister, onNavigate }: AuthPagePr
           </div>
 
           <div className="mt-8 lg:mt-0 pt-6 border-t border-white/20 text-[11px] text-orange-100 leading-relaxed relative z-10">
-            Our platform establishes secure, authenticated connection entries. All database and payment records are fully encrypted and synchronized in Firebase.
+            Our platform establishes secure, authenticated connection entries. All database and payment records are fully encrypted and stored in PostgreSQL.
           </div>
         </div>
 

@@ -3531,7 +3531,7 @@ export default function MarketingPages({
                 </p>
                 <ul className="list-disc pl-5 space-y-1.5 pt-1 pb-2">
                   <li><strong>Encryption in Transit:</strong> All communications, user profile details, and academic assets are encrypted in transit using the industry-standard Transport Layer Security (TLS 1.3) protocol.</li>
-                  <li><strong>Encryption at Rest:</strong> All database fields, files, chat history, and uploaded documents are encrypted at rest using AES-256 cryptographic encryption keys on secure Firebase/Google Cloud systems.</li>
+                  <li><strong>Encryption at Rest:</strong> All database fields, files, chat history, and uploaded documents are encrypted at rest using AES-256 cryptographic encryption keys on secure PostgreSQL database and cloud storage systems.</li>
                   <li><strong>Strict Access Controls:</strong> We enforce Attribute-Based Access Control (ABAC) and Role-Based Access Control (RBAC). Only the verified student, the specific assigned vetted tutor, and authorized system administrators can access communications and academic assets associated with a task.</li>
                   <li><strong>Secured Escrow Framework:</strong> Payment details are processed entirely off-site by Stripe under PCI-DSS Level 1 compliance; no sensitive payment cards or raw banking credentials are ever handled or stored on our servers.</li>
                 </ul>
@@ -3576,7 +3576,7 @@ export default function MarketingPages({
                 </p>
                 <ul className="list-disc pl-5 space-y-1.5 pt-1">
                   <li><strong>Zero Commercial Sharing:</strong> We do <strong>not</strong> sell, lease, rent, trade, or share your Google user data (such as your basic profile details, name, or verified email address) with any third-party advertising networks, marketing firms, data brokers, or external AI model training systems.</li>
-                  <li><strong>Minimal Operational Transfers:</strong> Your Google user data is transferred or disclosed only to our direct infrastructure hosts (Firebase and Google Cloud Platform) solely for hosting and executing this platform. These systems are bound by strict data processing agreements and are not authorized to use your data for any other purpose.</li>
+                  <li><strong>Minimal Operational Transfers:</strong> Your user data is transferred or disclosed only to our direct infrastructure hosts solely for hosting and executing this platform. These systems are bound by strict data processing agreements and are not authorized to use your data for any other purpose.</li>
                   <li><strong>Legal Compliance Disclosures:</strong> We do not disclose Google user data to any external parties unless required by a valid law enforcement subpoena, court order, or applicable legal obligation, and we will notify you of any such request unless legally prohibited.</li>
                   <li><strong>Limited Use Requirements:</strong> Our use and transfer of information received from Google APIs to any other app adheres strictly to the Google API Services User Data Policy, including the Limited Use requirements.</li>
                 </ul>
@@ -3762,7 +3762,7 @@ export default function MarketingPages({
             <div className="space-y-4 text-xs md:text-sm text-gray-650 leading-relaxed border-t border-gray-100 pt-6">
               <h3 className="text-sm md:text-base font-bold text-gray-900 font-sans">Requested OAuth Scopes &amp; Specific Uses</h3>
               <p className="text-xs text-gray-650">
-                To provide a unified workspace session, our Firebase Google Identity integration requests standard non-sensitive permissions:
+                To provide a unified workspace session, our identity authentication integration requests standard non-sensitive permissions:
               </p>
               <ul className="list-disc pl-5 space-y-2 pt-1 text-xs text-gray-600 font-sans">
                 <li>
