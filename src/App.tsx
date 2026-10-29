@@ -1,24 +1,26 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, lazy, Suspense } from 'react';
 import Header from './components/Header';
 import Footer from './components/Footer';
 import CookieBanner from './components/CookieBanner';
-import SopModal from './components/SopModal';
-import AuthPage from './components/AuthPage';
-import AdminLoginPage from './components/AdminLoginPage';
-import MarketingPages from './components/MarketingPages';
-import StudentDashboard from './components/StudentDashboard';
-import TutorDashboard from './components/TutorDashboard';
-import AdminDashboard from './components/AdminDashboard';
-import AssignmentFormModal from './components/AssignmentFormModal';
-import BecomeTutorModal from './components/BecomeTutorModal';
-import ChatWindow from './components/ChatWindow';
-import GetQuotePage from './components/GetQuotePage';
-import TutorProfilePage from './components/TutorProfilePage';
-import TutorsDirectoryPage from './components/TutorsDirectoryPage';
-import WhatsAppChatModal from './components/WhatsAppChatModal';
-import CountryOnlineTutoringPage from './components/CountryOnlineTutoringPage';
-import SpecializedServicePage from './components/SpecializedServicePage';
-import WhatsAppPage from './components/WhatsAppPage';
+
+// Dynamic code splitting for performance and fast First Contentful Paint
+const SopModal = lazy(() => import('./components/SopModal'));
+const AuthPage = lazy(() => import('./components/AuthPage'));
+const AdminLoginPage = lazy(() => import('./components/AdminLoginPage'));
+const MarketingPages = lazy(() => import('./components/MarketingPages'));
+const StudentDashboard = lazy(() => import('./components/StudentDashboard'));
+const TutorDashboard = lazy(() => import('./components/TutorDashboard'));
+const AdminDashboard = lazy(() => import('./components/AdminDashboard'));
+const AssignmentFormModal = lazy(() => import('./components/AssignmentFormModal'));
+const BecomeTutorModal = lazy(() => import('./components/BecomeTutorModal'));
+const ChatWindow = lazy(() => import('./components/ChatWindow'));
+const GetQuotePage = lazy(() => import('./components/GetQuotePage'));
+const TutorProfilePage = lazy(() => import('./components/TutorProfilePage'));
+const TutorsDirectoryPage = lazy(() => import('./components/TutorsDirectoryPage'));
+const WhatsAppChatModal = lazy(() => import('./components/WhatsAppChatModal'));
+const CountryOnlineTutoringPage = lazy(() => import('./components/CountryOnlineTutoringPage'));
+const SpecializedServicePage = lazy(() => import('./components/SpecializedServicePage'));
+const WhatsAppPage = lazy(() => import('./components/WhatsAppPage'));
 import { COUNTRY_ONLINE_TUTORING_PAGES } from './data/countryOnlineTutoringData';
 import { SPECIALIZED_SERVICE_PAGES_MAP } from './data/specializedTutoringServicesData';
 
@@ -777,7 +779,12 @@ export default function App() {
 
       {/* Main viewport displays */}
       <main className="flex-1">
-        
+        <Suspense fallback={
+          <div className="min-h-[50vh] flex flex-col items-center justify-center py-24 gap-3 text-orange-600" id="view-suspense-loader">
+            <div className="w-8 h-8 border-3 border-orange-500 border-t-transparent rounded-full animate-spin"></div>
+            <span className="text-xs font-semibold text-gray-400">Loading page...</span>
+          </div>
+        }>
         {/* Render main dashboards or static marketing views */}
         {activeView === 'auth' ? (
           <AuthPage 
@@ -1024,7 +1031,7 @@ export default function App() {
             onRaisedConsult={handleOnCallConsultInput}
           />
         )}
-
+        </Suspense>
       </main>
 
       {/* Floating Tutorial Help Trigger (Bottom Right) */}
@@ -1077,68 +1084,71 @@ export default function App() {
       {/* 3. Consent cookie banner disclosure */}
       <CookieBanner />
 
-      {/* Become a Tutor Application Modal */}
-      <BecomeTutorModal
-        isOpen={isBecomeTutorOpen}
-        onClose={() => setIsBecomeTutorOpen(false)}
-        onSubmit={async (data) => {
-          return await store.submitTutorApplication(data);
-        }}
-      />
-
-      {/* 4. Interactive SOP walkthrough modal */}
-      <SopModal 
-        isOpen={isSopModalOpen}
-        onClose={() => setIsSopModalOpen(false)}
-      />
-
-      {/* 5. WhatsApp Instant Chat Modal */}
-      <WhatsAppChatModal 
-        isOpen={isWhatsAppModalOpen}
-        onClose={() => setIsWhatsAppModalOpen(false)}
-        currentUser={storeState.currentUser}
-        whatsappNumber="19178094906"
-      />
-
-      {/* 5. Assignment submission parameters modal (only accessible to student accounts) */}
-      {isAssignModalOpen && storeState.currentUser && (
-        <AssignmentFormModal 
-          isOpen={isAssignModalOpen}
-          onClose={() => setIsAssignModalOpen(false)}
-          onSubmit={handleAssignmentSubmit}
-          studentId={storeState.currentUser.id}
-          tutors={mentorsList}
-          prefilledTutorId={prefilledTutorForAssign}
+      {/* Lazy Modals Suspense container */}
+      <Suspense fallback={null}>
+        {/* Become a Tutor Application Modal */}
+        <BecomeTutorModal
+          isOpen={isBecomeTutorOpen}
+          onClose={() => setIsBecomeTutorOpen(false)}
+          onSubmit={async (data) => {
+            return await store.submitTutorApplication(data);
+          }}
         />
-      )}
 
-      {/* 6. Live Chat room overlay slideover dialog drawer */}
-      {liveChat && storeState.currentUser && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-3xl max-w-lg w-full relative border shadow-2xl overflow-hidden animate-fade-in" id="active-chat-drawer-backdrop">
-            <button
-              id="close-chat-drawer-btn"
-              onClick={() => setActiveChat(null)}
-              className="absolute top-5 right-5 bg-white border hover:bg-gray-100 p-1.5 rounded-full text-gray-505 shadow-sm z-50"
-            >
-              ✕
-            </button>
-            <ChatWindow 
-              chat={liveChat}
-              messages={storeState.messages}
-              currentUser={storeState.currentUser}
-              onSendMessage={handleSendMessage}
-              onOfferQuote={handleOfferQuote}
-              onAcceptQuote={handleAcceptQuote}
-              onMarkMessagesAsRead={handleMarkMessagesAsRead}
-              onSetTypingStatus={handleSetTypingStatus}
-              quotes={storeState.quotes}
-              tutors={mentorsList}
-              students={studentsList}
-            />
+        {/* 4. Interactive SOP walkthrough modal */}
+        <SopModal 
+          isOpen={isSopModalOpen}
+          onClose={() => setIsSopModalOpen(false)}
+        />
+
+        {/* 5. WhatsApp Instant Chat Modal */}
+        <WhatsAppChatModal 
+          isOpen={isWhatsAppModalOpen}
+          onClose={() => setIsWhatsAppModalOpen(false)}
+          currentUser={storeState.currentUser}
+          whatsappNumber="19178094906"
+        />
+
+        {/* 5. Assignment submission parameters modal (only accessible to student accounts) */}
+        {isAssignModalOpen && storeState.currentUser && (
+          <AssignmentFormModal 
+            isOpen={isAssignModalOpen}
+            onClose={() => setIsAssignModalOpen(false)}
+            onSubmit={handleAssignmentSubmit}
+            studentId={storeState.currentUser.id}
+            tutors={mentorsList}
+            prefilledTutorId={prefilledTutorForAssign}
+          />
+        )}
+
+        {/* 6. Live Chat room overlay slideover dialog drawer */}
+        {liveChat && storeState.currentUser && (
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 z-50">
+            <div className="bg-white rounded-3xl max-w-lg w-full relative border shadow-2xl overflow-hidden animate-fade-in" id="active-chat-drawer-backdrop">
+              <button
+                id="close-chat-drawer-btn"
+                onClick={() => setActiveChat(null)}
+                className="absolute top-5 right-5 bg-white border hover:bg-gray-100 p-1.5 rounded-full text-gray-505 shadow-sm z-50"
+              >
+                ✕
+              </button>
+              <ChatWindow 
+                chat={liveChat}
+                messages={storeState.messages}
+                currentUser={storeState.currentUser}
+                onSendMessage={handleSendMessage}
+                onOfferQuote={handleOfferQuote}
+                onAcceptQuote={handleAcceptQuote}
+                onMarkMessagesAsRead={handleMarkMessagesAsRead}
+                onSetTypingStatus={handleSetTypingStatus}
+                quotes={storeState.quotes}
+                tutors={mentorsList}
+                students={studentsList}
+              />
+            </div>
           </div>
-        </div>
-      )}
+        )}
+      </Suspense>
 
     </div>
   );

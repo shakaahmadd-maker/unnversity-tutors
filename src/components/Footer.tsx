@@ -134,14 +134,11 @@ export default function Footer({ onNavigate, onOpenBecomeTutor }: FooterProps) {
               <img 
                 src="/logo.webp" 
                 alt="Uni Tutors" 
-                referrerPolicy="no-referrer"
+                width={215}
+                height={44}
+                loading="lazy"
+                decoding="async"
                 className="h-11 sm:h-13 md:h-15 w-auto max-w-[220px] object-contain"
-                onError={(e) => {
-                  const target = e.currentTarget;
-                  if (!target.src.endsWith('/logo.png')) {
-                    target.src = '/logo.png';
-                  }
-                }}
               />
             </div>
             <p className="text-xs text-[#542104]/90 leading-relaxed font-medium">

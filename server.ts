@@ -2,6 +2,7 @@ import dotenv from 'dotenv';
 dotenv.config();
 
 import express from 'express';
+import compression from 'compression';
 import path from 'path';
 import fs from 'fs';
 import crypto from 'crypto';
@@ -195,6 +196,7 @@ async function seedInitialDatabase() {
 async function startServer() {
   const app = express();
 
+  app.use(compression());
   app.use(express.json());
   app.use(cookieParser());
 
@@ -1398,8 +1400,28 @@ async function startServer() {
       path.join(process.cwd(), 'dist');
 
     console.info(`[STATIC] Serving production assets from: ${distPath}`);
-    app.use(express.static(distPath));
+
+    // Hashed assets (JS/CSS/media) from Vite build get 1 year immutable cache
+    const assetsDir = path.join(distPath, 'assets');
+    if (fs.existsSync(assetsDir)) {
+      app.use('/assets', express.static(assetsDir, {
+        maxAge: '1y',
+        immutable: true,
+      }));
+    }
+
+    // Other static files (favicon, logo, icons) get 1 day cache
+    app.use(express.static(distPath, {
+      maxAge: '1d',
+      setHeaders: (res, filePath) => {
+        if (filePath.endsWith('.html')) {
+          res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+        }
+      },
+    }));
+
     app.get('*', (_req, res) => {
+      res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
       res.sendFile(path.join(distPath, 'index.html'));
     });
   }

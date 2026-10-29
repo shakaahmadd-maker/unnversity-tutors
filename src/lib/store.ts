@@ -101,7 +101,7 @@ const INITIAL_TUTORS: User[] = [
     role: UserRole.TUTOR,
     name: 'Dr. Marcus Vance',
     email: 'marcus.vance@universitytutors.com',
-    avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=300&auto=format&fit=crop&q=80',
+    avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=120&auto=format&fit=crop&q=80',
     createdAt: '2025-01-10T00:00:00.000Z',
     location: 'Atlanta, GA',
     city: 'Atlanta',
@@ -123,7 +123,7 @@ const INITIAL_BLOGS: Blog[] = [
     adminId: 'admin_emily',
     title: 'Mastering the Undergraduate Dissertation: 5 Critical Roadmap Milestones',
     content: `Writing your final undergraduate dissertation or project is arguably the most intellectually grueling milestone of your academic degree. However, establishing a systemic chronological plan avoids late-semester panic.`,
-    image: 'https://images.unsplash.com/photo-1506880018603-83d5b814b5a6?w=800&auto=format&fit=crop&q=80',
+    image: 'https://images.unsplash.com/photo-1506880018603-83d5b814b5a6?w=400&auto=format&fit=crop&q=80',
     category: 'University Survival',
     tags: ['Dissertation', 'Undergraduate', 'Methodology', 'Research Paper'],
     publishedAt: new Date(Date.now() - 2 * 24 * 3600 * 1000).toISOString()
@@ -133,7 +133,7 @@ const INITIAL_BLOGS: Blog[] = [
     adminId: 'admin_emily',
     title: 'The Harvard and APA 7th Edition Style Manual: Navigating Tricky In-Text Rules',
     content: `Maintaining absolute formatting consistency is key to securing top-tier academic marks. Many students get tripped up when transitioning between Harvard and APA 7th structures.`,
-    image: 'https://images.unsplash.com/photo-1456513080510-7bf3a84b82f8?w=800&auto=format&fit=crop&q=80',
+    image: 'https://images.unsplash.com/photo-1456513080510-7bf3a84b82f8?w=400&auto=format&fit=crop&q=80',
     category: 'APA Guidelines',
     tags: ['Referencing', 'Academic Writing', 'APA Style', 'Harvard Style'],
     publishedAt: new Date(Date.now() - 4 * 24 * 3600 * 1000).toISOString()
@@ -264,46 +264,58 @@ export class AppStore {
   private startPolling() {
     if (typeof window !== 'undefined') {
       this.pollTimer = setInterval(() => {
-        this.fetchData();
-      }, 5000);
+        // Only background poll if logged in and tab is active
+        if (this.currentUser && !document.hidden) {
+          this.fetchData();
+        }
+      }, 15000);
     }
   }
 
   public async fetchData() {
     try {
-      // 1. Fetch users
-      const usersRes = await fetch('/api/users');
-      if (usersRes.ok) {
-        const uData = await usersRes.json();
-        if (Array.isArray(uData.users) && uData.users.length > 0) {
-          const formattedUsers = uData.users.map((u: any) => ({
-            ...u,
-            subjects: typeof u.subjects === 'string' ? JSON.parse(u.subjects || '[]') : u.subjects,
-            subjectExpertise: typeof u.subjectExpertise === 'string' ? JSON.parse(u.subjectExpertise || '[]') : u.subjectExpertise,
-          }));
-          this.users = formattedUsers;
+      // 1. Fetch public users/tutors list (needed for public landing page)
+      const usersPromise = fetch('/api/users').then(async (res) => {
+        if (res.ok) {
+          const uData = await res.json();
+          if (Array.isArray(uData.users) && uData.users.length > 0) {
+            this.users = uData.users.map((u: any) => ({
+              ...u,
+              subjects: typeof u.subjects === 'string' ? JSON.parse(u.subjects || '[]') : u.subjects,
+              subjectExpertise: typeof u.subjectExpertise === 'string' ? JSON.parse(u.subjectExpertise || '[]') : u.subjectExpertise,
+            }));
+          }
         }
+      }).catch(() => {});
+
+      // For public visitors who are not logged in, DO NOT make private dashboard requests
+      if (!this.currentUser) {
+        await usersPromise;
+        this.connectionStatus = 'connected';
+        this.lastSyncTime = new Date().toLocaleTimeString();
+        this.syncError = null;
+        this.notify();
+        return;
       }
 
-      // 2. Fetch orders / assignments
-      const ordersRes = await fetch('/api/orders');
-      if (ordersRes.ok) {
-        const oData = await ordersRes.json();
-        if (Array.isArray(oData.orders)) {
-          this.assignments = oData.orders.map((o: any) => ({
-            ...o,
-            wordCount: o.wordCount || 250,
-            fileUrls: typeof o.fileUrls === 'string' ? JSON.parse(o.fileUrls || '[]') : (o.fileUrls || []),
-            fileNames: typeof o.fileNames === 'string' ? JSON.parse(o.fileNames || '[]') : (o.fileNames || []),
-          }));
+      // 2. For logged-in users, run all private requests in parallel
+      const ordersPromise = fetch('/api/orders').then(async (res) => {
+        if (res.ok) {
+          const oData = await res.json();
+          if (Array.isArray(oData.orders)) {
+            this.assignments = oData.orders.map((o: any) => ({
+              ...o,
+              wordCount: o.wordCount || 250,
+              fileUrls: typeof o.fileUrls === 'string' ? JSON.parse(o.fileUrls || '[]') : (o.fileUrls || []),
+              fileNames: typeof o.fileNames === 'string' ? JSON.parse(o.fileNames || '[]') : (o.fileNames || []),
+            }));
+          }
         }
-      }
+      }).catch(() => {});
 
-      // 3. Fetch chat rooms
-      try {
-        const roomsRes = await fetch('/api/chat-rooms');
-        if (roomsRes.ok) {
-          const rData = await roomsRes.json();
+      const roomsPromise = fetch('/api/chat-rooms').then(async (res) => {
+        if (res.ok) {
+          const rData = await res.json();
           if (Array.isArray(rData.rooms) && rData.rooms.length > 0) {
             this.chatRooms = rData.rooms;
             this.chats = rData.rooms.map((r: any) => {
@@ -322,65 +334,48 @@ export class AppStore {
             });
           }
         }
-      } catch (rErr) {
-        console.warn('[STORE] Notice fetching chat rooms:', rErr);
-      }
+      }).catch(() => {});
 
-      // 4. Fetch messages
-      const msgsRes = await fetch('/api/messages');
-      if (msgsRes.ok) {
-        const mData = await msgsRes.json();
-        if (Array.isArray(mData.messages)) {
-          this.messages = mData.messages.map((m: any) => ({
-            ...m,
-            timestamp: m.createdAt,
-          }));
-
-          // If no chat rooms were loaded, derive fallback chats from messages
-          if (this.chats.length === 0) {
-            const chatMap = new Map<string, Chat>();
-            for (const m of this.messages) {
-              if (!chatMap.has(m.chatId)) {
-                chatMap.set(m.chatId, {
-                  id: m.chatId,
-                  studentId: m.senderId,
-                  tutorId: m.receiverId || 'admin_emily',
-                  subject: 'Academic Mentorship',
-                  createdAt: m.timestamp,
-                  updatedAt: m.timestamp,
-                });
-              }
-            }
-            this.chats = Array.from(chatMap.values());
+      const msgsPromise = fetch('/api/messages').then(async (res) => {
+        if (res.ok) {
+          const mData = await res.json();
+          if (Array.isArray(mData.messages)) {
+            this.messages = mData.messages.map((m: any) => ({
+              ...m,
+              timestamp: m.createdAt,
+            }));
           }
         }
-      }
+      }).catch(() => {});
 
-      // 4. Fetch quotes
-      const quotesRes = await fetch('/api/quotes');
-      if (quotesRes.ok) {
-        const qData = await quotesRes.json();
-        if (Array.isArray(qData.quotes)) {
-          this.quotes = qData.quotes;
+      const quotesPromise = fetch('/api/quotes').then(async (res) => {
+        if (res.ok) {
+          const qData = await res.json();
+          if (Array.isArray(qData.quotes)) {
+            this.quotes = qData.quotes;
+          }
         }
-      }
+      }).catch(() => {});
 
-      // 5. Fetch audit logs
-      const logsRes = await fetch('/api/audit-logs');
-      if (logsRes.ok) {
-        const lData = await logsRes.json();
-        if (Array.isArray(lData.logs)) {
-          this.activityLogs = lData.logs.map((l: any) => ({
-            id: l.id,
-            userId: l.userId || '',
-            userName: l.userName || '',
-            userRole: (l.userRole || 'student') as UserRole,
-            action: l.action,
-            details: l.details,
-            timestamp: l.createdAt,
-          }));
+      const isStaff = this.currentUser?.role === UserRole.ADMIN || (this.currentUser?.role as string) === 'admin';
+      const auditPromise = isStaff ? fetch('/api/audit-logs').then(async (res) => {
+        if (res.ok) {
+          const lData = await res.json();
+          if (Array.isArray(lData.logs)) {
+            this.activityLogs = lData.logs.map((l: any) => ({
+              id: l.id,
+              userId: l.userId || '',
+              userName: l.userName || '',
+              userRole: (l.userRole || 'student') as UserRole,
+              action: l.action,
+              details: l.details,
+              timestamp: l.createdAt,
+            }));
+          }
         }
-      }
+      }).catch(() => {}) : Promise.resolve();
+
+      await Promise.all([usersPromise, ordersPromise, roomsPromise, msgsPromise, quotesPromise, auditPromise]);
 
       this.connectionStatus = 'connected';
       this.lastSyncTime = new Date().toLocaleTimeString();

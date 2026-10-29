@@ -100,7 +100,7 @@ function enrichTutorWithDomainKeywords(baseTutor: Partial<User>, domainId: strin
     role: UserRole.TUTOR,
     name: baseTutor.name || 'Verified University Faculty',
     email: baseTutor.email || `faculty.${domainId}@universitytutors.com`,
-    avatarUrl: baseTutor.avatarUrl || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=300&auto=format&fit=crop&q=80',
+    avatarUrl: baseTutor.avatarUrl || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=120&auto=format&fit=crop&q=80',
     createdAt: baseTutor.createdAt || '2025-01-15T00:00:00.000Z',
     location: baseTutor.location || 'Miami, FL',
     city: baseTutor.city || 'Miami',
@@ -129,7 +129,7 @@ export const CURATED_SPECIALIZED_TUTORS: User[] = [
   enrichTutorWithDomainKeywords({
     id: 'tutor-dr-elena-rostova-ai',
     name: 'Dr. Elena Rostova',
-    avatarUrl: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=300&auto=format&fit=crop&q=80',
+    avatarUrl: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=120&auto=format&fit=crop&q=80',
     location: 'San Francisco, CA',
     city: 'San Francisco',
     hourlyRate: 75,
@@ -144,7 +144,7 @@ export const CURATED_SPECIALIZED_TUTORS: User[] = [
   enrichTutorWithDomainKeywords({
     id: 'tutor-dr-vikram-patel-data',
     name: 'Dr. Vikram Patel',
-    avatarUrl: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=300&auto=format&fit=crop&q=80',
+    avatarUrl: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=120&auto=format&fit=crop&q=80',
     location: 'Boston, MA',
     city: 'Boston',
     hourlyRate: 65,
@@ -159,7 +159,7 @@ export const CURATED_SPECIALIZED_TUTORS: User[] = [
   enrichTutorWithDomainKeywords({
     id: 'tutor-alex-morrison-cyber',
     name: 'Alex Morrison, CISSP',
-    avatarUrl: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=300&auto=format&fit=crop&q=80',
+    avatarUrl: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=120&auto=format&fit=crop&q=80',
     location: 'Washington DC',
     city: 'Washington',
     hourlyRate: 68,
@@ -174,7 +174,7 @@ export const CURATED_SPECIALIZED_TUTORS: User[] = [
   enrichTutorWithDomainKeywords({
     id: 'tutor-sarah-jenkins-swe',
     name: 'Sarah Jenkins',
-    avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=300&auto=format&fit=crop&q=80',
+    avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=120&auto=format&fit=crop&q=80',
     location: 'Seattle, WA',
     city: 'Seattle',
     hourlyRate: 62,
@@ -189,7 +189,7 @@ export const CURATED_SPECIALIZED_TUTORS: User[] = [
   enrichTutorWithDomainKeywords({
     id: 'tutor-dr-clara-vanderbilt-water',
     name: 'Dr. Clara Vanderbilt',
-    avatarUrl: 'https://images.unsplash.com/photo-1580489944761-15a19d654956?w=300&auto=format&fit=crop&q=80',
+    avatarUrl: 'https://images.unsplash.com/photo-1580489944761-15a19d654956?w=120&auto=format&fit=crop&q=80',
     location: 'Toronto, CA',
     city: 'Toronto',
     hourlyRate: 70,
@@ -204,7 +204,7 @@ export const CURATED_SPECIALIZED_TUTORS: User[] = [
   enrichTutorWithDomainKeywords({
     id: 'tutor-prof-lucas-montgomery-climate',
     name: 'Prof. Lucas Montgomery',
-    avatarUrl: 'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=300&auto=format&fit=crop&q=80',
+    avatarUrl: 'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=120&auto=format&fit=crop&q=80',
     location: 'Vancouver, CA',
     city: 'Vancouver',
     hourlyRate: 60,
@@ -219,7 +219,7 @@ export const CURATED_SPECIALIZED_TUTORS: User[] = [
   enrichTutorWithDomainKeywords({
     id: 'tutor-dr-mateo-santos-energy',
     name: 'Dr. Mateo Santos',
-    avatarUrl: 'https://images.unsplash.com/photo-1501196354995-cbb51c65aaea?w=300&auto=format&fit=crop&q=80',
+    avatarUrl: 'https://images.unsplash.com/photo-1501196354995-cbb51c65aaea?w=120&auto=format&fit=crop&q=80',
     location: 'Austin, TX',
     city: 'Austin',
     hourlyRate: 64,
@@ -234,7 +234,7 @@ export const CURATED_SPECIALIZED_TUTORS: User[] = [
   enrichTutorWithDomainKeywords({
     id: 'tutor-dr-aisha-rahman-biotech',
     name: 'Dr. Aisha Rahman',
-    avatarUrl: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=300&auto=format&fit=crop&q=80',
+    avatarUrl: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=120&auto=format&fit=crop&q=80',
     location: 'Boston, MA',
     city: 'Boston',
     hourlyRate: 68,
@@ -249,7 +249,7 @@ export const CURATED_SPECIALIZED_TUTORS: User[] = [
   enrichTutorWithDomainKeywords({
     id: 'tutor-dr-samuel-levin-healthtech',
     name: 'Dr. Samuel Levin, MD/MS',
-    avatarUrl: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=300&auto=format&fit=crop&q=80',
+    avatarUrl: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=120&auto=format&fit=crop&q=80',
     location: 'New York, NY',
     city: 'New York',
     hourlyRate: 72,
@@ -264,7 +264,7 @@ export const CURATED_SPECIALIZED_TUTORS: User[] = [
   enrichTutorWithDomainKeywords({
     id: 'tutor-dr-jin-woo-robotics',
     name: 'Dr. Jin-Woo Park',
-    avatarUrl: 'https://images.unsplash.com/photo-1522075469751-3a6694fb2f61?w=300&auto=format&fit=crop&q=80',
+    avatarUrl: 'https://images.unsplash.com/photo-1522075469751-3a6694fb2f61?w=120&auto=format&fit=crop&q=80',
     location: 'Atlanta, GA',
     city: 'Atlanta',
     hourlyRate: 66,
@@ -279,7 +279,7 @@ export const CURATED_SPECIALIZED_TUTORS: User[] = [
   enrichTutorWithDomainKeywords({
     id: 'tutor-dr-marcus-schmidt-mech',
     name: 'Dr. Marcus Schmidt',
-    avatarUrl: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=300&auto=format&fit=crop&q=80',
+    avatarUrl: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=120&auto=format&fit=crop&q=80',
     location: 'Detroit, MI',
     city: 'Detroit',
     hourlyRate: 58,
@@ -294,7 +294,7 @@ export const CURATED_SPECIALIZED_TUTORS: User[] = [
   enrichTutorWithDomainKeywords({
     id: 'tutor-maya-lin-civil',
     name: 'Maya Lin, PE',
-    avatarUrl: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=300&auto=format&fit=crop&q=80',
+    avatarUrl: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=120&auto=format&fit=crop&q=80',
     location: 'Chicago, IL',
     city: 'Chicago',
     hourlyRate: 58,
@@ -309,7 +309,7 @@ export const CURATED_SPECIALIZED_TUTORS: User[] = [
   enrichTutorWithDomainKeywords({
     id: 'tutor-dr-khalil-mansoor-chemeng',
     name: 'Dr. Khalil Mansoor',
-    avatarUrl: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=300&auto=format&fit=crop&q=80',
+    avatarUrl: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=120&auto=format&fit=crop&q=80',
     location: 'Houston, TX',
     city: 'Houston',
     hourlyRate: 62,
@@ -324,7 +324,7 @@ export const CURATED_SPECIALIZED_TUTORS: User[] = [
   enrichTutorWithDomainKeywords({
     id: 'tutor-dr-olivia-stone-materials',
     name: 'Dr. Olivia Stone',
-    avatarUrl: 'https://images.unsplash.com/photo-1580489944761-15a19d654956?w=300&auto=format&fit=crop&q=80',
+    avatarUrl: 'https://images.unsplash.com/photo-1580489944761-15a19d654956?w=120&auto=format&fit=crop&q=80',
     location: 'Philadelphia, PA',
     city: 'Philadelphia',
     hourlyRate: 60,
@@ -339,7 +339,7 @@ export const CURATED_SPECIALIZED_TUTORS: User[] = [
   enrichTutorWithDomainKeywords({
     id: 'tutor-david-chen-fintech',
     name: 'David Chen, CFA',
-    avatarUrl: 'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=300&auto=format&fit=crop&q=80',
+    avatarUrl: 'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=120&auto=format&fit=crop&q=80',
     location: 'New York, NY',
     city: 'New York',
     hourlyRate: 65,
@@ -354,7 +354,7 @@ export const CURATED_SPECIALIZED_TUTORS: User[] = [
   enrichTutorWithDomainKeywords({
     id: 'tutor-maria-z-econ',
     name: 'Maria Z.',
-    avatarUrl: 'https://images.unsplash.com/photo-1580489944761-15a19d654956?w=300&auto=format&fit=crop&q=80',
+    avatarUrl: 'https://images.unsplash.com/photo-1580489944761-15a19d654956?w=120&auto=format&fit=crop&q=80',
     location: 'Atlanta, GA',
     city: 'Atlanta',
     hourlyRate: 50,
@@ -369,7 +369,7 @@ export const CURATED_SPECIALIZED_TUTORS: User[] = [
   enrichTutorWithDomainKeywords({
     id: 'tutor-capt-thomas-vance-aero',
     name: 'Dr. Thomas Vance',
-    avatarUrl: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=300&auto=format&fit=crop&q=80',
+    avatarUrl: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=120&auto=format&fit=crop&q=80',
     location: 'Los Angeles, CA',
     city: 'Los Angeles',
     hourlyRate: 70,
@@ -384,7 +384,7 @@ export const CURATED_SPECIALIZED_TUTORS: User[] = [
   enrichTutorWithDomainKeywords({
     id: 'tutor-dr-harrison-wu-semi',
     name: 'Dr. Harrison Wu',
-    avatarUrl: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=300&auto=format&fit=crop&q=80',
+    avatarUrl: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=120&auto=format&fit=crop&q=80',
     location: 'San Jose, CA',
     city: 'San Jose',
     hourlyRate: 72,
@@ -399,7 +399,7 @@ export const CURATED_SPECIALIZED_TUTORS: User[] = [
   enrichTutorWithDomainKeywords({
     id: 'tutor-dr-nadia-kasim-neuro',
     name: 'Dr. Nadia Kasim',
-    avatarUrl: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=300&auto=format&fit=crop&q=80',
+    avatarUrl: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=120&auto=format&fit=crop&q=80',
     location: 'Atlanta, GA',
     city: 'Atlanta',
     hourlyRate: 58,
@@ -414,7 +414,7 @@ export const CURATED_SPECIALIZED_TUTORS: User[] = [
   enrichTutorWithDomainKeywords({
     id: 'tutor-adv-victoria-reynolds-law',
     name: 'Victoria Reynolds, J.D.',
-    avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=300&auto=format&fit=crop&q=80',
+    avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=120&auto=format&fit=crop&q=80',
     location: 'Washington DC',
     city: 'Washington',
     hourlyRate: 65,
@@ -429,7 +429,7 @@ export const CURATED_SPECIALIZED_TUTORS: User[] = [
   enrichTutorWithDomainKeywords({
     id: 'tutor-dr-marcus-vance-chem',
     name: 'Dr. Marcus Vance',
-    avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=300&auto=format&fit=crop&q=80',
+    avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=120&auto=format&fit=crop&q=80',
     location: 'Atlanta, GA',
     city: 'Atlanta',
     hourlyRate: 55,
@@ -444,7 +444,7 @@ export const CURATED_SPECIALIZED_TUTORS: User[] = [
   enrichTutorWithDomainKeywords({
     id: 'tutor-dr-rachel-k-math',
     name: 'Dr. Rachel K.',
-    avatarUrl: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=300&auto=format&fit=crop&q=80',
+    avatarUrl: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=120&auto=format&fit=crop&q=80',
     location: 'Atlanta, GA',
     city: 'Atlanta',
     hourlyRate: 60,
@@ -459,7 +459,7 @@ export const CURATED_SPECIALIZED_TUTORS: User[] = [
   enrichTutorWithDomainKeywords({
     id: 'tutor-stephanie-m-psych',
     name: 'Stephanie M.',
-    avatarUrl: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=300&auto=format&fit=crop&q=80',
+    avatarUrl: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=120&auto=format&fit=crop&q=80',
     location: 'Atlanta, GA',
     city: 'Atlanta',
     hourlyRate: 45,
@@ -474,7 +474,7 @@ export const CURATED_SPECIALIZED_TUTORS: User[] = [
   enrichTutorWithDomainKeywords({
     id: 'tutor-professor-david-s-writing',
     name: 'Professor David S.',
-    avatarUrl: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=300&auto=format&fit=crop&q=80',
+    avatarUrl: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=120&auto=format&fit=crop&q=80',
     location: 'Atlanta, GA',
     city: 'Atlanta',
     hourlyRate: 48,

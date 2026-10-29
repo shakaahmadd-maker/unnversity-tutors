@@ -72,7 +72,7 @@ const CARDS_DATA: CardData[] = [
     id: 1,
     title: "Instant Help When You Need It",
     description: "Get immediate assistance through our live chat, connecting you with experts who can quickly resolve your questions and concerns.",
-    image: "https://images.unsplash.com/photo-1516321318423-f06f85e504b3?w=800&auto=format&fit=crop&q=80",
+    image: "https://images.unsplash.com/photo-1516321318423-f06f85e504b3?w=400&auto=format&fit=crop&q=80",
     badgeType: "instant",
     extraDetails: {
       headline: "How our Instant Live Chat Routing Works",
@@ -92,7 +92,7 @@ const CARDS_DATA: CardData[] = [
     id: 2,
     title: "24/7 Access to Real Representatives",
     description: "Access study materials, videos, and direct support from our team anytime, anywhere. Our round-the-clock availability means support at your own pace.",
-    image: "https://images.unsplash.com/photo-1573497019940-1c28c88b4f3e?w=800&auto=format&fit=crop&q=80",
+    image: "https://images.unsplash.com/photo-1573497019940-1c28c88b4f3e?w=400&auto=format&fit=crop&q=80",
     badgeType: "agents",
     extraDetails: {
       headline: "Human-Centric Customer Success Teams",
@@ -112,7 +112,7 @@ const CARDS_DATA: CardData[] = [
     id: 3,
     title: "Accessible Learning for All",
     description: "Our platform is flexible and accessible on your phone, tablet, or computer. Continue learning wherever you are with a seamless digital interface.",
-    image: "https://images.unsplash.com/photo-1512941937669-90a1b58e7e9c?w=800&auto=format&fit=crop&q=80",
+    image: "https://images.unsplash.com/photo-1512941937669-90a1b58e7e9c?w=400&auto=format&fit=crop&q=80",
     badgeType: "accessible",
     extraDetails: {
       headline: "Cross-Platform Syncing & Responsive Technology",
@@ -132,7 +132,7 @@ const CARDS_DATA: CardData[] = [
     id: 4,
     title: "Expert-Driven Academic Support",
     description: "Get personalized assistance from top-rated experts who provide in-depth understanding and guidance on complex, high-level academic topics.",
-    image: "https://images.unsplash.com/photo-1522202176988-66273c2fd55f?w=800&auto=format&fit=crop&q=80",
+    image: "https://images.unsplash.com/photo-1522202176988-66273c2fd55f?w=400&auto=format&fit=crop&q=80",
     badgeType: "expert",
     extraDetails: {
       headline: "Vetted Faculty & Technical Professionals",
@@ -152,7 +152,7 @@ const CARDS_DATA: CardData[] = [
     id: 5,
     title: "Real-Time Progress Monitoring",
     description: "Stay on top of your academic performance with a live progress dashboard that helps you track assignments, deadlines, and improvements.",
-    image: "https://images.unsplash.com/photo-1551288049-bebda4e38f71?w=800&auto=format&fit=crop&q=80",
+    image: "https://images.unsplash.com/photo-1551288049-bebda4e38f71?w=400&auto=format&fit=crop&q=80",
     badgeType: "progress",
     extraDetails: {
       headline: "Next-Gen Academic Performance Dashboard",
@@ -172,7 +172,7 @@ const CARDS_DATA: CardData[] = [
     id: 6,
     title: "Syllabus-Based Custom Quotation",
     description: "No generic standard pricing. Receive custom, fair binding quotes negotiated directly with experts tailored perfectly to your specific requirements.",
-    image: "https://images.unsplash.com/photo-1544377193-33dcf4d68fb5?w=800&auto=format&fit=crop&q=80",
+    image: "https://images.unsplash.com/photo-1544377193-33dcf4d68fb5?w=400&auto=format&fit=crop&q=80",
     badgeType: "pricing",
     extraDetails: {
       headline: "Negotiate Fair Pricing per Milestone",
@@ -1214,7 +1214,7 @@ export default function MarketingPages({
                 </div>
                 {/* Right Image Column */}
                 <div className="md:col-span-12 lg:col-span-5 relative h-72 lg:h-auto min-h-[340px] overflow-hidden order-1 md:order-2">
-                  <img src="https://images.unsplash.com/photo-1456513080510-7bf3a84b82f8?auto=format&fit=crop&w=800&q=80" 
+                  <img src="https://images.unsplash.com/photo-1456513080510-7bf3a84b82f8?auto=format&fit=crop&w=400&q=80" 
                        alt="Professional Academic Assignment Desk" 
                        className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 ease-out group-hover:scale-[1.04]"
                        referrerPolicy="no-referrer"
@@ -1266,7 +1266,7 @@ export default function MarketingPages({
                 </div>
                 {/* Right Image Column */}
                 <div className="md:col-span-12 lg:col-span-5 relative h-72 lg:h-auto min-h-[340px] overflow-hidden order-1 md:order-2">
-                  <img src="https://images.unsplash.com/photo-1455390582262-044cdead277a?auto=format&fit=crop&w=800&q=80" 
+                  <img src="https://images.unsplash.com/photo-1455390582262-044cdead277a?auto=format&fit=crop&w=400&q=80" 
                        alt="Academic Content Writing" 
                        className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 ease-out group-hover:scale-[1.04]"
                        referrerPolicy="no-referrer"
@@ -1303,7 +1303,7 @@ export default function MarketingPages({
                     {/* Image Container with floating bubble icon */}
                     <div className="relative h-60 sm:h-64 overflow-hidden">
                       <img 
-                        src="https://images.unsplash.com/photo-1506784983877-45594efa4cbe?auto=format&fit=crop&w=800&q=80" 
+                        src="https://images.unsplash.com/photo-1506784983877-45594efa4cbe?auto=format&fit=crop&w=400&q=80" 
                         alt="Not Enough Time" 
                         className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                         referrerPolicy="no-referrer"
@@ -1336,7 +1336,7 @@ export default function MarketingPages({
                     {/* Image Container */}
                     <div className="relative h-60 sm:h-64 overflow-hidden">
                       <img 
-                        src="https://images.unsplash.com/photo-1427504494785-3a9ca7044f45?auto=format&fit=crop&w=800&q=80" 
+                        src="https://images.unsplash.com/photo-1427504494785-3a9ca7044f45?auto=format&fit=crop&w=400&q=80" 
                         alt="Subjects are Hard" 
                         className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                         referrerPolicy="no-referrer"
@@ -1369,7 +1369,7 @@ export default function MarketingPages({
                     {/* Image Container */}
                     <div className="relative h-60 sm:h-64 overflow-hidden">
                       <img 
-                        src="https://images.unsplash.com/photo-1517486808906-6ca8b3f04846?auto=format&fit=crop&w=800&q=80" 
+                        src="https://images.unsplash.com/photo-1517486808906-6ca8b3f04846?auto=format&fit=crop&w=400&q=80" 
                         alt="Less Stress" 
                         className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                         referrerPolicy="no-referrer"
@@ -1402,7 +1402,7 @@ export default function MarketingPages({
                     {/* Image Container */}
                     <div className="relative h-60 sm:h-64 overflow-hidden">
                       <img 
-                        src="https://images.unsplash.com/photo-1434030216411-0b793f4b4173?auto=format&fit=crop&w=800&q=80" 
+                        src="https://images.unsplash.com/photo-1434030216411-0b793f4b4173?auto=format&fit=crop&w=400&q=80" 
                         alt="Saving Grades" 
                         className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                         referrerPolicy="no-referrer"
@@ -1435,7 +1435,7 @@ export default function MarketingPages({
                     {/* Image Container */}
                     <div className="relative h-60 sm:h-64 overflow-hidden">
                       <img 
-                        src="https://images.unsplash.com/photo-1515378791036-0648a3ef77b2?auto=format&fit=crop&w=800&q=80" 
+                        src="https://images.unsplash.com/photo-1515378791036-0648a3ef77b2?auto=format&fit=crop&w=400&q=80" 
                         alt="Temporary Problems" 
                         className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                         referrerPolicy="no-referrer"

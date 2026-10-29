@@ -113,15 +113,11 @@ export default function Header({
             <img 
               src="/logo.webp" 
               alt="Uni Tutors" 
-              referrerPolicy="no-referrer"
+              width={215}
+              height={44}
+              fetchPriority="high"
+              decoding="async"
               className="h-11 sm:h-13 md:h-15 w-auto max-w-[220px] object-contain transition-transform group-hover:scale-102"
-              onError={(e) => {
-                // Fallback to logo.png if webp format encounters client decoding issue
-                const target = e.currentTarget;
-                if (!target.src.endsWith('/logo.png')) {
-                  target.src = '/logo.png';
-                }
-              }}
             />
           </button>
 
