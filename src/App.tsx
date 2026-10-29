@@ -560,7 +560,7 @@ export default function App() {
   };
 
   const handleSendMessage = (chatId: string, senderId: string, content: string, fileUrl?: string, fileName?: string) => {
-    store.sendMessage(chatId, senderId, content, fileUrl, fileName);
+    return store.sendMessage(chatId, senderId, content, fileUrl, fileName);
   };
 
   const handleMarkMessagesAsRead = (chatId: string, userId: string) => {

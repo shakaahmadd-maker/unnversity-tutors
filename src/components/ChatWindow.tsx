@@ -18,7 +18,7 @@ interface ChatWindowProps {
   chat: Chat;
   messages: Message[];
   currentUser: User;
-  onSendMessage: (chatId: string, senderId: string, content: string, fileUrl?: string, fileName?: string) => void;
+  onSendMessage: (chatId: string, senderId: string, content: string, fileUrl?: string, fileName?: string) => Promise<any> | void;
   onOfferQuote?: (
     chatId: string, 
     amount: number, 
@@ -36,6 +36,7 @@ interface ChatWindowProps {
   quotes: Quote[];
   tutors: User[];
   students: User[];
+  isLoading?: boolean;
 }
 
 export default function ChatWindow({
@@ -49,10 +50,13 @@ export default function ChatWindow({
   onSetTypingStatus,
   quotes,
   tutors,
-  students
+  students,
+  isLoading
 }: ChatWindowProps) {
 
   const [inputMsg, setInputMsg] = useState('');
+  const [sendError, setSendError] = useState<string | null>(null);
+  const [isSending, setIsSending] = useState(false);
   const [quoteAmount, setQuoteAmount] = useState<number>(120);
   const [quoteHours, setQuoteHours] = useState<number>(4);
   const [quoteServiceType, setQuoteServiceType] = useState<string>('Assignment Tutoring');
@@ -122,9 +126,15 @@ export default function ChatWindow({
     }
   };
 
-  const handleSend = (e: React.FormEvent) => {
+  const handleSend = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!inputMsg.trim() && !attachedFile) return;
+    const trimmed = inputMsg.trim();
+    if (!trimmed && !attachedFile) return;
+
+    if (trimmed.length > 5000) {
+      setSendError('Message exceeds maximum 5,000 character limit.');
+      return;
+    }
 
     if (typingTimeoutRef.current) {
       clearTimeout(typingTimeoutRef.current);
@@ -134,16 +144,24 @@ export default function ChatWindow({
       onSetTypingStatus(chat.id, currentUser.role, false);
     }
 
-    onSendMessage(
-      chat.id,
-      currentUser.id,
-      inputMsg,
-      attachedFile ? `https://example.com/uploads/${attachedFile}` : undefined,
-      attachedFile ? attachedFile : undefined
-    );
+    setIsSending(true);
+    setSendError(null);
 
-    setInputMsg('');
-    setAttachedFile('');
+    try {
+      await onSendMessage(
+        chat.id,
+        currentUser.id,
+        trimmed,
+        attachedFile ? `https://example.com/uploads/${attachedFile}` : undefined,
+        attachedFile ? attachedFile : undefined
+      );
+      setInputMsg('');
+      setAttachedFile('');
+    } catch (err: any) {
+      setSendError(err.message || 'Failed to send message. Please try again.');
+    } finally {
+      setIsSending(false);
+    }
   };
 
   const handleSuggestFile = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -209,6 +227,25 @@ export default function ChatWindow({
       {/* Main Messages Body */}
       <div className="flex-1 overflow-y-auto p-5 space-y-4 bg-gray-50/30 text-xs">
         
+        {isLoading && (
+          <div className="flex items-center justify-center py-12 text-gray-400 gap-2" id="chat-loading-indicator">
+            <span className="w-4 h-4 border-2 border-orange-500 border-t-transparent rounded-full animate-spin"></span>
+            <span className="text-xs font-medium">Loading room messages...</span>
+          </div>
+        )}
+
+        {!isLoading && chatMessages.length === 0 && (
+          <div className="flex flex-col items-center justify-center h-full min-h-[300px] text-center p-8 space-y-3" id="chat-empty-state">
+            <div className="w-12 h-12 rounded-2xl bg-orange-50 border border-orange-150 flex items-center justify-center text-orange-600 shadow-xs">
+              <Sparkles className="w-6 h-6" />
+            </div>
+            <h4 className="font-bold text-gray-800 text-sm font-sans">No messages in this chat room yet</h4>
+            <p className="text-xs text-gray-500 max-w-sm leading-relaxed">
+              Send your first message or project instructions to start collaborating directly and securely.
+            </p>
+          </div>
+        )}
+
         {chatMessages.map((msg) => {
           if (msg.isSystem) {
             return (
@@ -555,44 +592,76 @@ export default function ChatWindow({
         </div>
       )}
 
+      {/* Send error notification banner */}
+      {sendError && (
+        <div className="bg-red-50 border-t border-b border-red-200 px-4 py-2 text-xs text-red-700 flex items-center justify-between animate-fade-in" id="chat-send-error-banner">
+          <div className="flex items-center gap-2">
+            <AlertCircle className="w-4 h-4 text-red-500 shrink-0" />
+            <span className="font-semibold">{sendError}</span>
+          </div>
+          <button 
+            type="button" 
+            onClick={() => setSendError(null)} 
+            className="text-red-600 hover:text-red-900 font-bold px-2 py-0.5 rounded cursor-pointer"
+          >
+            ✕
+          </button>
+        </div>
+      )}
+
       {/* Input Message Form */}
-      <form onSubmit={handleSend} className="p-4 bg-gray-50 border-t border-gray-150 flex items-center gap-3">
-        
-        {/* Attachment upload item */}
-        <div className="relative" title="Upload PDF, DOCS, ZIP, PPT, Image, or any other media">
-          <Upload className="w-5 h-5 text-gray-400 hover:text-orange-500 cursor-pointer" />
-          <input 
-            type="file" 
-            id="chat-attachment-upload"
-            accept=".pdf,.doc,.docx,.zip,.rar,.ppt,.pptx,image/*,audio/*,video/*,application/*"
-            onChange={handleSuggestFile}
-            className="absolute inset-0 opacity-0 cursor-pointer" 
+      <form onSubmit={handleSend} className="p-4 bg-gray-50 border-t border-gray-150 flex flex-col gap-2">
+        <div className="flex items-center gap-3">
+          {/* Attachment upload item */}
+          <div className="relative" title="Upload PDF, DOCS, ZIP, PPT, Image, or any other media">
+            <Upload className="w-5 h-5 text-gray-400 hover:text-orange-500 cursor-pointer" />
+            <input 
+              type="file" 
+              id="chat-attachment-upload"
+              accept=".pdf,.doc,.docx,.zip,.rar,.ppt,.pptx,image/*,audio/*,video/*,application/*"
+              onChange={handleSuggestFile}
+              className="absolute inset-0 opacity-0 cursor-pointer" 
+            />
+          </div>
+
+          <input
+            type="text"
+            id="chat-input-message"
+            placeholder="Discuss homework prompts or milestones..."
+            maxLength={5000}
+            value={inputMsg}
+            onChange={(e) => handleInputChange(e.target.value)}
+            disabled={isSending}
+            className="flex-1 bg-white border border-gray-200 focus:border-orange-500 focus:outline-hidden py-2.5 px-4 rounded-xl font-medium disabled:opacity-50"
           />
+
+          {attachedFile && (
+            <span className="text-[9px] bg-orange-100 text-orange-700 px-2 py-1.5 rounded-lg max-w-[120px] truncate block font-mono font-bold">
+              ✓ {attachedFile}
+            </span>
+          )}
+
+          <button 
+            type="submit" 
+            id="chat-submit-btn"
+            disabled={isSending || (!inputMsg.trim() && !attachedFile)}
+            className="bg-orange-500 hover:bg-orange-600 disabled:opacity-50 text-white p-2.5 rounded-xl transition-all cursor-pointer shadow-sm flex items-center justify-center min-w-[36px]"
+          >
+            {isSending ? (
+              <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
+            ) : (
+              <Send className="w-4 h-4" />
+            )}
+          </button>
         </div>
 
-        <input
-          type="text"
-          id="chat-input-message"
-          placeholder="Discuss homework prompts or milestones..."
-          value={inputMsg}
-          onChange={(e) => handleInputChange(e.target.value)}
-          className="flex-1 bg-white border border-gray-200 focus:border-orange-500 focus:outline-hidden py-2.5 px-4 rounded-xl font-medium"
-        />
-
-        {attachedFile && (
-          <span className="text-[9px] bg-orange-100 text-orange-700 px-2 py-1.5 rounded-lg max-w-[120px] truncate block font-mono font-bold">
-            ✓ {attachedFile}
-          </span>
-        )}
-
-        <button 
-          type="submit" 
-          id="chat-submit-btn"
-          className="bg-orange-500 hover:bg-orange-600 text-white p-2.5 rounded-xl transition-all cursor-pointer shadow-sm"
-        >
-          <Send className="w-4 h-4" />
-        </button>
-
+        {/* Character count & status footer */}
+        <div className="flex justify-between items-center text-[10px] text-gray-400 px-1 font-mono">
+          <span>{inputMsg.length > 0 ? `${inputMsg.length} / 5,000 characters` : 'Max 5,000 characters'}</span>
+          {inputMsg.length > 4500 && (
+            <span className="text-amber-600 font-bold">Approaching length limit</span>
+          )}
+        </div>
       </form>
 
     </div>

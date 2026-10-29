@@ -1,4 +1,4 @@
-import { pgTable, text, boolean, integer, doublePrecision } from 'drizzle-orm/pg-core';
+import { pgTable, text, boolean, integer, doublePrecision, index } from 'drizzle-orm/pg-core';
 
 // 1. Users Table (Students, Tutors, and Admins / Subadmins)
 export const users = pgTable('users', {
@@ -72,20 +72,49 @@ export const inquiries = pgTable('inquiries', {
   createdAt: text('created_at').notNull(),
 });
 
-// 4. Messages Table (Real-time & Order Chats)
+// 4. Chat Rooms Table (Multi-user and Direct Chat Rooms)
+export const chatRooms = pgTable('chat_rooms', {
+  id: text('id').primaryKey(),
+  title: text('title').notNull(),
+  orderId: text('order_id').references(() => orders.id),
+  type: text('type').notNull().default('direct'), // 'direct' | 'order' | 'support' | 'group'
+  createdBy: text('created_by').notNull().references(() => users.id),
+  createdAt: text('created_at').notNull(),
+  updatedAt: text('updated_at').notNull(),
+});
+
+// 5. Chat Room Members Table (Membership and Permissions)
+export const chatRoomMembers = pgTable('chat_room_members', {
+  id: text('id').primaryKey(),
+  roomId: text('room_id').notNull().references(() => chatRooms.id),
+  userId: text('user_id').notNull().references(() => users.id),
+  role: text('role').notNull().default('member'), // 'creator' | 'member' | 'tutor' | 'admin' | 'subadmin'
+  joinedAt: text('joined_at').notNull(),
+}, (table) => [
+  index('idx_chat_room_members_room').on(table.roomId),
+  index('idx_chat_room_members_user').on(table.userId),
+]);
+
+// 6. Messages Table (Real-time, Room, & Order Chats)
 export const messages = pgTable('messages', {
   id: text('id').primaryKey(),
-  chatId: text('chat_id').notNull(),
-  orderId: text('order_id'),
-  senderId: text('sender_id').notNull(),
-  receiverId: text('receiver_id'),
+  chatId: text('chat_id').notNull(), // Preserved for existing data compatibility
+  roomId: text('room_id').references(() => chatRooms.id),
+  orderId: text('order_id').references(() => orders.id),
+  senderId: text('sender_id').notNull().references(() => users.id),
+  receiverId: text('receiver_id').references(() => users.id),
   content: text('content').notNull(),
   fileUrl: text('file_url'),
   fileName: text('file_name'),
   isSystem: boolean('is_system').default(false),
   read: boolean('read').default(false),
   createdAt: text('created_at').notNull(),
-});
+  updatedAt: text('updated_at'),
+}, (table) => [
+  index('idx_messages_room_id').on(table.roomId),
+  index('idx_messages_sender_id').on(table.senderId),
+  index('idx_messages_chat_id').on(table.chatId),
+]);
 
 // 5. Quotes Table (Tutor / Admin Quotes for Orders & Inquiries)
 export const quotes = pgTable('quotes', {

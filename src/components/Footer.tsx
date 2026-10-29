@@ -351,6 +351,14 @@ export default function Footer({ onNavigate, onOpenBecomeTutor }: FooterProps) {
             >
               System SOP
             </button>
+            <span className="text-[#ffab85] select-none text-[10px] hidden sm:inline" aria-hidden="true">•</span>
+            <button 
+              id="footer-cc-admin" 
+              onClick={() => { onNavigate('admin-login'); window.scrollTo({ top: 0, behavior: 'smooth' }); }} 
+              className="hover:underline hover:text-orange-800 hover:bg-[#ffd9be]/50 text-[#542104] transition-all cursor-pointer py-1.5 px-2.5 rounded-md active:scale-95 text-xs font-semibold"
+            >
+              Admin Portal
+            </button>
           </div>
         </div>
 

@@ -205,7 +205,11 @@ export class AppStore {
   blogs: Blog[] = INITIAL_BLOGS;
   faqs: FAQ[] = INITIAL_FAQS;
   chats: Chat[] = [];
+  chatRooms: any[] = [];
   messages: Message[] = [];
+  isLoadingRooms: boolean = false;
+  isLoadingMessages: boolean = false;
+  chatError: string | null = null;
   quotes: Quote[] = [];
   assignments: Assignment[] = [];
   payments: Payment[] = [];
@@ -295,7 +299,34 @@ export class AppStore {
         }
       }
 
-      // 3. Fetch messages
+      // 3. Fetch chat rooms
+      try {
+        const roomsRes = await fetch('/api/chat-rooms');
+        if (roomsRes.ok) {
+          const rData = await roomsRes.json();
+          if (Array.isArray(rData.rooms) && rData.rooms.length > 0) {
+            this.chatRooms = rData.rooms;
+            this.chats = rData.rooms.map((r: any) => {
+              const members = r.members || [];
+              const memberIds = members.map((m: any) => m.userId);
+              const studentId = memberIds[0] || r.createdBy;
+              const tutorId = memberIds.find((id: string) => id !== studentId) || 'tutor_clara';
+              return {
+                id: r.id,
+                studentId,
+                tutorId,
+                subject: r.title || 'Academic Mentorship',
+                createdAt: r.createdAt,
+                updatedAt: r.updatedAt,
+              };
+            });
+          }
+        }
+      } catch (rErr) {
+        console.warn('[STORE] Notice fetching chat rooms:', rErr);
+      }
+
+      // 4. Fetch messages
       const msgsRes = await fetch('/api/messages');
       if (msgsRes.ok) {
         const mData = await msgsRes.json();
@@ -305,21 +336,23 @@ export class AppStore {
             timestamp: m.createdAt,
           }));
 
-          // Derive unique chats from messages if chats array is sparse
-          const chatMap = new Map<string, Chat>();
-          for (const m of this.messages) {
-            if (!chatMap.has(m.chatId)) {
-              chatMap.set(m.chatId, {
-                id: m.chatId,
-                studentId: m.senderId,
-                tutorId: m.receiverId || 'admin_emily',
-                subject: 'Academic Mentorship',
-                createdAt: m.timestamp,
-                updatedAt: m.timestamp,
-              });
+          // If no chat rooms were loaded, derive fallback chats from messages
+          if (this.chats.length === 0) {
+            const chatMap = new Map<string, Chat>();
+            for (const m of this.messages) {
+              if (!chatMap.has(m.chatId)) {
+                chatMap.set(m.chatId, {
+                  id: m.chatId,
+                  studentId: m.senderId,
+                  tutorId: m.receiverId || 'admin_emily',
+                  subject: 'Academic Mentorship',
+                  createdAt: m.timestamp,
+                  updatedAt: m.timestamp,
+                });
+              }
             }
+            this.chats = Array.from(chatMap.values());
           }
-          this.chats = Array.from(chatMap.values());
         }
       }
 
@@ -384,19 +417,34 @@ export class AppStore {
     });
   }
 
-  subscribeToChatDetails(chatId: string) {
-    // Fetches live messages for the chat
-    fetch(`/api/messages?chatId=${encodeURIComponent(chatId)}`)
-      .then(res => res.json())
-      .then(data => {
+  async subscribeToChatDetails(chatId: string) {
+    this.isLoadingMessages = true;
+    this.chatError = null;
+    this.notify();
+    try {
+      // Query room messages from new endpoint with fallback
+      let res = await fetch(`/api/chat-rooms/${encodeURIComponent(chatId)}/messages`);
+      if (!res.ok && res.status !== 401 && res.status !== 403) {
+        res = await fetch(`/api/messages?chatId=${encodeURIComponent(chatId)}`);
+      }
+      if (res.ok) {
+        const data = await res.json();
         if (Array.isArray(data.messages)) {
-          const otherMsgs = this.messages.filter(m => m.chatId !== chatId);
+          const otherMsgs = this.messages.filter(m => m.chatId !== chatId && m.roomId !== chatId);
           const newMsgs = data.messages.map((m: any) => ({ ...m, timestamp: m.createdAt }));
           this.messages = [...otherMsgs, ...newMsgs];
-          this.notify();
+          this.chatError = null;
         }
-      })
-      .catch(() => {});
+      } else {
+        const errJson = await res.json().catch(() => ({}));
+        this.chatError = errJson.error || 'Access to this chat room was denied.';
+      }
+    } catch (err: any) {
+      this.chatError = err?.message || 'Error connecting to chat server.';
+    } finally {
+      this.isLoadingMessages = false;
+      this.notify();
+    }
   }
 
   // ==========================================
@@ -612,6 +660,19 @@ export class AppStore {
     };
     this.chats.push(newChat);
     this.notify();
+
+    // Persist room to backend
+    fetch('/api/chat-rooms', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        id: newChat.id,
+        title: subject,
+        type: 'direct',
+        memberIds: [studentId, tutorId],
+      })
+    }).catch(err => console.warn('[STORE] Notice registering room on backend:', err));
+
     return newChat;
   }
 
@@ -630,12 +691,21 @@ export class AppStore {
     isSystem?: boolean,
     orderId?: string
   ) {
+    // Client-side length validation
+    if (!content || !content.trim()) {
+      throw new Error('Message content cannot be empty.');
+    }
+    if (content.length > 5000) {
+      throw new Error('Message length exceeds the 5,000 character limit.');
+    }
+
     const msgId = `msg_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
     const newMsg: Message = {
       id: msgId,
       chatId,
+      roomId: chatId,
       senderId,
-      content,
+      content: content.trim(),
       fileUrl,
       fileName,
       timestamp: new Date().toISOString(),
@@ -643,26 +713,55 @@ export class AppStore {
       read: false
     };
 
+    // Optimistically add to UI
     this.messages.push(newMsg);
     this.notify();
 
-    fetch('/api/messages', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        id: msgId,
-        chatId,
-        orderId,
-        senderId,
-        content,
-        fileUrl,
-        fileName,
-        isSystem: Boolean(isSystem),
-        createdAt: newMsg.timestamp,
-      })
-    }).catch(() => {});
+    try {
+      const res = await fetch(`/api/chat-rooms/${encodeURIComponent(chatId)}/messages`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: msgId,
+          orderId,
+          content: content.trim(),
+          fileUrl,
+          fileName,
+          isSystem: Boolean(isSystem),
+        }),
+      });
 
-    return newMsg;
+      if (!res.ok) {
+        // Fallback to /api/messages if /api/chat-rooms/:id not matched
+        const fallbackRes = await fetch('/api/messages', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            id: msgId,
+            chatId,
+            roomId: chatId,
+            orderId,
+            content: content.trim(),
+            fileUrl,
+            fileName,
+            isSystem: Boolean(isSystem),
+            createdAt: newMsg.timestamp,
+          }),
+        });
+        if (!fallbackRes.ok) {
+          const errData = await fallbackRes.json().catch(() => ({}));
+          const errMessage = errData.error || `Server error (${fallbackRes.status}): Failed to send message.`;
+          this.messages = this.messages.filter(m => m.id !== msgId);
+          this.notify();
+          throw new Error(errMessage);
+        }
+      }
+      return newMsg;
+    } catch (err: any) {
+      this.messages = this.messages.filter(m => m.id !== msgId);
+      this.notify();
+      throw err;
+    }
   }
 
   markMessagesAsRead(chatId: string, currentUserId: string) {

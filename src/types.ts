@@ -60,6 +60,26 @@ export interface Service {
   icon: string;
 }
 
+export interface ChatRoomMember {
+  id: string;
+  roomId: string;
+  userId: string;
+  role: 'creator' | 'member' | 'tutor' | 'admin' | 'subadmin';
+  joinedAt: string;
+}
+
+export interface ChatRoom {
+  id: string;
+  title: string;
+  orderId?: string;
+  type: 'direct' | 'order' | 'support' | 'group';
+  createdBy: string;
+  createdAt: string;
+  updatedAt: string;
+  members?: ChatRoomMember[];
+  latestMessage?: Message;
+}
+
 export interface Chat {
   id: string;
   studentId: string;
@@ -74,6 +94,8 @@ export interface Chat {
 export interface Message {
   id: string;
   chatId: string;
+  roomId?: string;
+  orderId?: string;
   senderId: string;
   receiverId?: string;
   content: string;
@@ -82,6 +104,7 @@ export interface Message {
   timestamp: string;
   isSystem?: boolean;
   read?: boolean;
+  updatedAt?: string;
 }
 
 export interface Quote {

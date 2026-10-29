@@ -68,9 +68,28 @@ export interface InquiryRecord {
   createdAt: string;
 }
 
+export interface ChatRoomRecord {
+  id: string;
+  title: string;
+  orderId?: string | null;
+  type: string; // 'direct' | 'order' | 'support' | 'group'
+  createdBy: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ChatRoomMemberRecord {
+  id: string;
+  roomId: string;
+  userId: string;
+  role: string; // 'creator' | 'member' | 'tutor' | 'admin' | 'subadmin'
+  joinedAt: string;
+}
+
 export interface MessageRecord {
   id: string;
   chatId: string;
+  roomId?: string | null;
   orderId?: string | null;
   senderId: string;
   receiverId?: string | null;
@@ -80,6 +99,7 @@ export interface MessageRecord {
   isSystem?: boolean;
   read?: boolean;
   createdAt: string;
+  updatedAt?: string | null;
 }
 
 export interface QuoteRecord {
@@ -125,6 +145,8 @@ export class MemoryStore {
   private users: Map<string, UserRecord> = new Map();
   private orders: Map<string, OrderRecord> = new Map();
   private inquiries: Map<string, InquiryRecord> = new Map();
+  private chatRooms: Map<string, ChatRoomRecord> = new Map();
+  private chatRoomMembers: Map<string, ChatRoomMemberRecord[]> = new Map();
   private messages: MessageRecord[] = [];
   private quotes: Map<string, QuoteRecord> = new Map();
   private auditLogs: AuditLogRecord[] = [];
@@ -245,6 +267,20 @@ export class MemoryStore {
     for (const t of initialTutors) {
       this.users.set(t.id, t);
     }
+
+    // Seed default welcome chat room
+    const welcomeRoom: ChatRoomRecord = {
+      id: 'room_welcome',
+      title: 'Academic Consultation & Welcome Desk',
+      type: 'support',
+      createdBy: 'admin_shaka',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+    this.createChatRoom(welcomeRoom, [
+      { userId: 'admin_shaka', role: 'admin' },
+      { userId: 'tutor_clara', role: 'tutor' },
+    ]);
   }
 
   // --- Users ---
@@ -314,6 +350,84 @@ export class MemoryStore {
 
   public setInquiry(inquiry: InquiryRecord): void {
     this.inquiries.set(inquiry.id, inquiry);
+  }
+
+  // --- Chat Rooms ---
+  public createChatRoom(room: ChatRoomRecord, memberUserIds: { userId: string; role?: string }[]): ChatRoomRecord {
+    this.chatRooms.set(room.id, room);
+    const members: ChatRoomMemberRecord[] = memberUserIds.map((m, idx) => ({
+      id: `crm_${room.id}_${m.userId}_${idx}`,
+      roomId: room.id,
+      userId: m.userId,
+      role: m.role || 'member',
+      joinedAt: new Date().toISOString(),
+    }));
+    this.chatRoomMembers.set(room.id, members);
+    return room;
+  }
+
+  public getChatRoomsForUser(userId: string, isAdmin?: boolean): (ChatRoomRecord & { members: ChatRoomMemberRecord[]; latestMessage?: MessageRecord })[] {
+    const results: (ChatRoomRecord & { members: ChatRoomMemberRecord[]; latestMessage?: MessageRecord })[] = [];
+    for (const [roomId, room] of this.chatRooms.entries()) {
+      const members = this.chatRoomMembers.get(roomId) || [];
+      const isMember = members.some(m => m.userId === userId);
+      if (isMember || isAdmin) {
+        const roomMessages = this.getRoomMessages(roomId);
+        const latestMessage = roomMessages[roomMessages.length - 1];
+        results.push({
+          ...room,
+          members,
+          latestMessage,
+        });
+      }
+    }
+    return results.sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
+  }
+
+  public getChatRoom(roomId: string): ChatRoomRecord | undefined {
+    return this.chatRooms.get(roomId);
+  }
+
+  public getRoomMembers(roomId: string): ChatRoomMemberRecord[] {
+    return this.chatRoomMembers.get(roomId) || [];
+  }
+
+  public isRoomMember(roomId: string, userId: string, isAdmin?: boolean): boolean {
+    if (isAdmin) return true;
+    const members = this.chatRoomMembers.get(roomId) || [];
+    return members.some(m => m.userId === userId);
+  }
+
+  public addRoomMember(roomId: string, userId: string, role: string = 'member'): ChatRoomMemberRecord {
+    const members = this.chatRoomMembers.get(roomId) || [];
+    const existing = members.find(m => m.userId === userId);
+    if (existing) return existing;
+    const newMember: ChatRoomMemberRecord = {
+      id: `crm_${roomId}_${userId}_${Date.now()}`,
+      roomId,
+      userId,
+      role,
+      joinedAt: new Date().toISOString(),
+    };
+    members.push(newMember);
+    this.chatRoomMembers.set(roomId, members);
+    return newMember;
+  }
+
+  public removeRoomMember(roomId: string, userId: string): boolean {
+    const members = this.chatRoomMembers.get(roomId) || [];
+    const filtered = members.filter(m => m.userId !== userId);
+    if (filtered.length !== members.length) {
+      this.chatRoomMembers.set(roomId, filtered);
+      return true;
+    }
+    return false;
+  }
+
+  public getRoomMessages(roomId: string): MessageRecord[] {
+    return this.messages
+      .filter(m => m.roomId === roomId || m.chatId === roomId)
+      .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
   }
 
   // --- Messages ---

@@ -3,12 +3,13 @@ dotenv.config();
 
 import express from 'express';
 import path from 'path';
+import fs from 'fs';
 import crypto from 'crypto';
 import cookieParser from 'cookie-parser';
 import { createServer as createViteServer } from 'vite';
 import { db, isDbConnected, checkDbConnection } from './src/db/index';
-import { users, orders, inquiries, messages, quotes, auditLogs } from './src/db/schema';
-import { eq, desc } from 'drizzle-orm';
+import { users, orders, inquiries, messages, quotes, auditLogs, chatRooms, chatRoomMembers } from './src/db/schema';
+import { eq, desc, and, inArray } from 'drizzle-orm';
 import { runMigrations } from './src/db/migrate';
 import { memoryStore } from './src/db/memoryStore';
 
@@ -802,26 +803,360 @@ async function startServer() {
   });
 
   // ==========================================
-  // MESSAGES
+  // CHAT ROOMS & MESSAGES
   // ==========================================
 
-  // GET /api/messages
-  app.get('/api/messages', async (req, res) => {
+  // Authentication requirement helper
+  const requireAuth = (req: express.Request, res: express.Response, next: express.NextFunction) => {
+    if (!(req as any).user) {
+      return res.status(401).json({ error: 'Unauthorized: Authentication required. Please log in.' });
+    }
+    next();
+  };
+
+  // Authorization helper to check if a user is allowed to access a chat room
+  const canUserAccessRoom = async (userId: string, userRole: string, roomId: string): Promise<boolean> => {
+    // Explicit role rules: Admins and subadmins have platform oversight for support and dispute moderation
+    if (userRole === 'admin' || userRole === 'subadmin') {
+      return true;
+    }
+    if (isDbConnected() && db) {
+      try {
+        const memberRows = await db.select().from(chatRoomMembers).where(
+          and(eq(chatRoomMembers.roomId, roomId), eq(chatRoomMembers.userId, userId))
+        ).limit(1);
+        if (memberRows.length > 0) return true;
+      } catch (dbErr: any) {
+        console.warn('[API] Notice checking room membership in DB:', dbErr.message);
+      }
+    }
+    return memoryStore.isRoomMember(roomId, userId, userRole === 'admin' || userRole === 'subadmin');
+  };
+
+  // POST /api/chat-rooms - Create a chat room
+  app.post('/api/chat-rooms', requireAuth, async (req, res) => {
     try {
+      const currentUser = (req as any).user;
+      const { title, orderId, type, memberIds } = req.body;
+
+      if (!title || typeof title !== 'string' || title.trim().length === 0) {
+        return res.status(400).json({ error: 'Chat room title is required.' });
+      }
+
+      const roomId = req.body.id || 'room_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6);
+      const now = new Date().toISOString();
+
+      const newRoom = {
+        id: roomId,
+        title: title.trim().slice(0, 200),
+        orderId: orderId || null,
+        type: type || 'direct',
+        createdBy: currentUser.id,
+        createdAt: now,
+        updatedAt: now,
+      };
+
+      // Prepare room members: always includes the authenticated creator
+      const uniqueMemberIds = new Set<string>([currentUser.id]);
+      if (Array.isArray(memberIds)) {
+        for (const mId of memberIds) {
+          if (mId && typeof mId === 'string' && mId.trim().length > 0) {
+            uniqueMemberIds.add(mId.trim());
+          }
+        }
+      }
+
+      const membersList = Array.from(uniqueMemberIds).map((uid, idx) => ({
+        id: `crm_${roomId}_${uid}_${idx}`,
+        roomId,
+        userId: uid,
+        role: uid === currentUser.id ? 'creator' : 'member',
+        joinedAt: now,
+      }));
+
+      // Save to memory store
+      memoryStore.createChatRoom(newRoom, membersList);
+
+      // Save to database if connected
+      if (isDbConnected() && db) {
+        try {
+          await db.insert(chatRooms).values(newRoom);
+          for (const m of membersList) {
+            await db.insert(chatRoomMembers).values(m);
+          }
+        } catch (dbErr: any) {
+          console.warn('[API] Notice inserting chat room into DB:', dbErr.message);
+        }
+      }
+
+      await logAudit('CHAT_ROOM_CREATE', `Created chat room ${roomId} (${newRoom.title})`, currentUser.id, undefined, currentUser.role, req);
+
+      return res.status(201).json({
+        success: true,
+        room: {
+          ...newRoom,
+          members: membersList,
+        },
+      });
+    } catch (err: any) {
+      return res.status(500).json({ error: err.message });
+    }
+  });
+
+  // GET /api/chat-rooms - List user's accessible chat rooms
+  app.get('/api/chat-rooms', requireAuth, async (req, res) => {
+    try {
+      const currentUser = (req as any).user;
+      const isAdmin = currentUser.role === 'admin' || currentUser.role === 'subadmin';
+
+      if (isDbConnected() && db) {
+        try {
+          let userRooms: any[] = [];
+          if (isAdmin && req.query.all === 'true') {
+            userRooms = await db.select().from(chatRooms).orderBy(desc(chatRooms.updatedAt));
+          } else {
+            const memberOf = await db.select().from(chatRoomMembers).where(eq(chatRoomMembers.userId, currentUser.id));
+            const roomIds = memberOf.map(m => m.roomId);
+            if (roomIds.length > 0) {
+              userRooms = await db.select().from(chatRooms).where(inArray(chatRooms.id, roomIds)).orderBy(desc(chatRooms.updatedAt));
+            } else if (isAdmin) {
+              userRooms = await db.select().from(chatRooms).orderBy(desc(chatRooms.updatedAt)).limit(50);
+            }
+          }
+
+          // Populate members and latest message for each room
+          const populated = await Promise.all(userRooms.map(async (r) => {
+            const members = await db.select().from(chatRoomMembers).where(eq(chatRoomMembers.roomId, r.id));
+            const latestMsg = await db.select().from(messages).where(eq(messages.roomId, r.id)).orderBy(desc(messages.createdAt)).limit(1);
+            return {
+              ...r,
+              members,
+              latestMessage: latestMsg[0] || null,
+            };
+          }));
+
+          return res.status(200).json({ rooms: populated });
+        } catch (dbErr: any) {
+          console.warn('[API] Notice fetching chat rooms from DB:', dbErr.message);
+        }
+      }
+
+      const memoryRooms = memoryStore.getChatRoomsForUser(currentUser.id, isAdmin);
+      return res.status(200).json({ rooms: memoryRooms });
+    } catch (err: any) {
+      return res.status(500).json({ error: err.message });
+    }
+  });
+
+  // POST /api/chat-rooms/:id/members - Add a member to a chat room
+  app.post('/api/chat-rooms/:id/members', requireAuth, async (req, res) => {
+    try {
+      const currentUser = (req as any).user;
+      const roomId = req.params.id;
+      const { userId, role } = req.body;
+
+      if (!userId || typeof userId !== 'string') {
+        return res.status(400).json({ error: 'userId is required.' });
+      }
+
+      // Check authorization: caller must be a member or admin
+      const hasAccess = await canUserAccessRoom(currentUser.id, currentUser.role, roomId);
+      if (!hasAccess) {
+        return res.status(403).json({ error: 'Forbidden: You are not authorized to add members to this chat room.' });
+      }
+
+      const now = new Date().toISOString();
+      const newMember = {
+        id: `crm_${roomId}_${userId}_${Date.now()}`,
+        roomId,
+        userId: userId.trim(),
+        role: role || 'member',
+        joinedAt: now,
+      };
+
+      memoryStore.addRoomMember(roomId, newMember.userId, newMember.role);
+
+      if (isDbConnected() && db) {
+        try {
+          await db.insert(chatRoomMembers).values(newMember);
+        } catch (dbErr: any) {
+          console.warn('[API] Notice adding room member in DB:', dbErr.message);
+        }
+      }
+
+      return res.status(201).json({ success: true, member: newMember });
+    } catch (err: any) {
+      return res.status(500).json({ error: err.message });
+    }
+  });
+
+  // DELETE /api/chat-rooms/:id/members/:userId - Remove a member from a chat room
+  app.delete('/api/chat-rooms/:id/members/:userId', requireAuth, async (req, res) => {
+    try {
+      const currentUser = (req as any).user;
+      const roomId = req.params.id;
+      const targetUserId = req.params.userId;
+
+      // Caller can remove self, or must be an admin
+      const isSelf = currentUser.id === targetUserId;
+      const isAdmin = currentUser.role === 'admin' || currentUser.role === 'subadmin';
+
+      if (!isSelf && !isAdmin) {
+        return res.status(403).json({ error: 'Forbidden: You cannot remove other members from this room.' });
+      }
+
+      memoryStore.removeRoomMember(roomId, targetUserId);
+
+      if (isDbConnected() && db) {
+        try {
+          await db.delete(chatRoomMembers).where(
+            and(eq(chatRoomMembers.roomId, roomId), eq(chatRoomMembers.userId, targetUserId))
+          );
+        } catch (dbErr: any) {
+          console.warn('[API] Notice removing room member from DB:', dbErr.message);
+        }
+      }
+
+      return res.status(200).json({ success: true, message: `Member ${targetUserId} removed from room.` });
+    } catch (err: any) {
+      return res.status(500).json({ error: err.message });
+    }
+  });
+
+  // GET /api/chat-rooms/:id/messages - Retrieve messages for a specific room
+  app.get('/api/chat-rooms/:id/messages', requireAuth, async (req, res) => {
+    try {
+      const currentUser = (req as any).user;
+      const roomId = req.params.id;
+
+      // Enforce room membership check (403 for unauthorized users)
+      const hasAccess = await canUserAccessRoom(currentUser.id, currentUser.role, roomId);
+      if (!hasAccess) {
+        return res.status(403).json({ error: 'Forbidden: You are not authorized to view messages in this chat room.' });
+      }
+
+      if (isDbConnected() && db) {
+        try {
+          const rows = await db.select().from(messages).where(
+            eq(messages.roomId, roomId)
+          ).orderBy(messages.createdAt);
+          return res.status(200).json({ messages: rows });
+        } catch (dbErr: any) {
+          console.warn('[API] Notice fetching room messages from DB:', dbErr.message);
+        }
+      }
+
+      const memMsgs = memoryStore.getRoomMessages(roomId);
+      return res.status(200).json({ messages: memMsgs });
+    } catch (err: any) {
+      return res.status(500).json({ error: err.message });
+    }
+  });
+
+  // POST /api/chat-rooms/:id/messages - Send a message to a specific room
+  app.post('/api/chat-rooms/:id/messages', requireAuth, async (req, res) => {
+    try {
+      const currentUser = (req as any).user;
+      const roomId = req.params.id;
+
+      // Enforce room membership check (403 for non-members)
+      const hasAccess = await canUserAccessRoom(currentUser.id, currentUser.role, roomId);
+      if (!hasAccess) {
+        return res.status(403).json({ error: 'Forbidden: You are not a member of this chat room.' });
+      }
+
+      const { content, fileUrl, fileName, isSystem } = req.body;
+
+      // Validation 1: Reject empty or whitespace-only messages
+      if (!content || typeof content !== 'string' || content.trim().length === 0) {
+        return res.status(400).json({ error: 'Message content cannot be empty.' });
+      }
+
+      // Validation 2: Enforce 5,000 character limit
+      if (content.length > 5000) {
+        return res.status(400).json({ error: 'Message length exceeds the 5,000 character limit.' });
+      }
+
+      // Security requirement: NEVER accept senderId from frontend; ALWAYS use authenticated session user
+      const senderId = currentUser.id;
+      const now = new Date().toISOString();
+      const msgId = req.body.id || 'msg_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6);
+
+      const newMsg = {
+        id: msgId,
+        chatId: roomId, // backward-compatibility
+        roomId,
+        orderId: req.body.orderId || null,
+        senderId,
+        receiverId: req.body.receiverId || null,
+        content: content.trim(),
+        fileUrl: fileUrl || null,
+        fileName: fileName || null,
+        isSystem: Boolean(isSystem),
+        read: false,
+        createdAt: now,
+        updatedAt: now,
+      };
+
+      memoryStore.addMessage(newMsg);
+
+      if (isDbConnected() && db) {
+        try {
+          await db.insert(messages).values(newMsg);
+          // Update room's updatedAt timestamp
+          await db.update(chatRooms).set({ updatedAt: now }).where(eq(chatRooms.id, roomId));
+        } catch (dbErr: any) {
+          console.warn('[API] Notice inserting room message into DB:', dbErr.message);
+        }
+      }
+
+      return res.status(201).json({ success: true, message: newMsg });
+    } catch (err: any) {
+      return res.status(500).json({ error: err.message });
+    }
+  });
+
+  // GET /api/messages - Secure backward-compatible message retrieval
+  app.get('/api/messages', requireAuth, async (req, res) => {
+    try {
+      const currentUser = (req as any).user;
       const { chatId, orderId } = req.query;
+
+      // If chatId is provided, enforce access check
+      if (chatId) {
+        const hasAccess = await canUserAccessRoom(currentUser.id, currentUser.role, String(chatId));
+        if (!hasAccess) {
+          return res.status(403).json({ error: 'Forbidden: You do not have access to this conversation.' });
+        }
+      }
 
       if (isDbConnected() && db) {
         try {
           if (chatId) {
-            const rows = await db.select().from(messages).where(eq(messages.chatId, String(chatId))).orderBy(messages.createdAt);
+            const rows = await db.select().from(messages).where(
+              eq(messages.chatId, String(chatId))
+            ).orderBy(messages.createdAt);
             return res.status(200).json({ messages: rows });
           }
           if (orderId) {
-            const rows = await db.select().from(messages).where(eq(messages.orderId, String(orderId))).orderBy(messages.createdAt);
+            const rows = await db.select().from(messages).where(
+              eq(messages.orderId, String(orderId))
+            ).orderBy(messages.createdAt);
             return res.status(200).json({ messages: rows });
           }
-          const rows = await db.select().from(messages).orderBy(desc(messages.createdAt)).limit(100);
-          return res.status(200).json({ messages: rows });
+          // If no specific chat/order, return only messages where the user is sender or receiver (or admin)
+          if (currentUser.role === 'admin' || currentUser.role === 'subadmin') {
+            const rows = await db.select().from(messages).orderBy(desc(messages.createdAt)).limit(100);
+            return res.status(200).json({ messages: rows });
+          } else {
+            const memberRooms = await db.select().from(chatRoomMembers).where(eq(chatRoomMembers.userId, currentUser.id));
+            const roomIds = memberRooms.map(m => m.roomId);
+            if (roomIds.length > 0) {
+              const rows = await db.select().from(messages).where(inArray(messages.chatId, roomIds)).orderBy(desc(messages.createdAt)).limit(100);
+              return res.status(200).json({ messages: rows });
+            }
+            return res.status(200).json({ messages: [] });
+          }
         } catch (dbErr: any) {
           console.warn('[API] Notice querying messages from DB:', dbErr.message);
         }
@@ -831,31 +1166,55 @@ async function startServer() {
         messages: memoryStore.getMessages(chatId as string | undefined, orderId as string | undefined)
       });
     } catch (err: any) {
-      return res.status(200).json({ messages: [] });
+      return res.status(500).json({ error: err.message });
     }
   });
 
-  // POST /api/messages
-  app.post('/api/messages', async (req, res) => {
+  // POST /api/messages - Secure backward-compatible message dispatch
+  app.post('/api/messages', requireAuth, async (req, res) => {
     try {
+      const currentUser = (req as any).user;
       const data = req.body;
-      if (!data.chatId || !data.senderId || !data.content) {
-        return res.status(400).json({ error: 'Missing required message parameters (chatId, senderId, content).' });
+      const targetRoomId = data.roomId || data.chatId;
+
+      if (!targetRoomId || !data.content) {
+        return res.status(400).json({ error: 'Missing required parameters (chatId/roomId, content).' });
       }
 
+      // Check room membership authorization
+      const hasAccess = await canUserAccessRoom(currentUser.id, currentUser.role, targetRoomId);
+      if (!hasAccess) {
+        return res.status(403).json({ error: 'Forbidden: You are not authorized to post to this conversation.' });
+      }
+
+      // Content length validations
+      const trimmedContent = String(data.content).trim();
+      if (trimmedContent.length === 0) {
+        return res.status(400).json({ error: 'Message content cannot be empty.' });
+      }
+      if (data.content.length > 5000) {
+        return res.status(400).json({ error: 'Message length exceeds the 5,000 character limit.' });
+      }
+
+      // Security: Sender ID is strictly enforced from authenticated session
+      const senderId = currentUser.id;
+      const now = new Date().toISOString();
       const msgId = data.id || 'msg_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6);
+
       const newMsg = {
         id: msgId,
-        chatId: data.chatId,
+        chatId: targetRoomId,
+        roomId: targetRoomId,
         orderId: data.orderId || null,
-        senderId: data.senderId,
+        senderId,
         receiverId: data.receiverId || null,
-        content: data.content,
+        content: trimmedContent,
         fileUrl: data.fileUrl || null,
         fileName: data.fileName || null,
         isSystem: Boolean(data.isSystem),
         read: Boolean(data.read),
-        createdAt: data.createdAt || new Date().toISOString(),
+        createdAt: data.createdAt || now,
+        updatedAt: now,
       };
 
       memoryStore.addMessage(newMsg);
@@ -1028,9 +1387,19 @@ async function startServer() {
     });
     app.use(vite.middlewares);
   } else {
-    const distPath = path.join(process.cwd(), 'dist');
+    const possibleDistPaths = [
+      path.join(process.cwd(), 'dist'),
+      path.resolve(__dirname, 'dist'),
+      path.resolve(__dirname),
+      process.cwd(),
+    ];
+    const distPath =
+      possibleDistPaths.find((p) => fs.existsSync(path.join(p, 'index.html'))) ||
+      path.join(process.cwd(), 'dist');
+
+    console.info(`[STATIC] Serving production assets from: ${distPath}`);
     app.use(express.static(distPath));
-    app.get('*', (req, res) => {
+    app.get('*', (_req, res) => {
       res.sendFile(path.join(distPath, 'index.html'));
     });
   }
