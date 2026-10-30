@@ -26,13 +26,15 @@ import {
   WifiOff,
   RefreshCw,
   Download,
-  Paperclip
+  Paperclip,
+  GraduationCap
 } from 'lucide-react';
 import { 
   User, Blog, FAQ, Assignment, Payment, SupportTicket, UserRole, Chat, Message,
   Invoice, ActivityLog, AppNotification, SOP, AssignmentReport, Agreement, AssignmentStatus, TriggeredEmail
 } from '../types';
 import TutorsListAdmin from './TutorsListAdmin';
+import StudentProfilesAdmin from './StudentProfilesAdmin';
 import { store } from '../lib/store';
 
 interface AdminDashboardProps {
@@ -228,10 +230,14 @@ export default function AdminDashboard({
   };
 
   const [activeTab, setActiveTab] = useState<
-    'tutors_list' | 'users' | 'chats' | 'disputes' | 'faqs' | 'blogs' | 'subjects' |
+    'student_profiles' | 'tutors_list' | 'users' | 'chats' | 'disputes' | 'faqs' | 'blogs' | 'subjects' |
     'assignments' | 'payments_ledger' | 'create_invoice' | 'activity_log' |
     'notifications' | 'feedback' | 'sops' | 'reports' | 'agreements' | 'trigger_emails'
   >('tutors_list');
+
+  // Student directory deep-link selection
+  const [adminStudentDirectorySearch, setAdminStudentDirectorySearch] = useState<string>('');
+  const [adminStudentDirectoryId, setAdminStudentDirectoryId] = useState<string>('');
 
   // FORM & FILTER STATES FOR SUB-SYSTEMS
   // 1. Assignments
@@ -845,6 +851,7 @@ export default function AdminDashboard({
           <div className="bg-white rounded-2xl border border-gray-150 p-4 space-y-1">
             <span className="text-[9px] font-bold text-gray-400 uppercase px-3 pb-1 block tracking-wider">Academics & Tutors</span>
             {[
+              { id: 'student_profiles', label: 'Student Profiles Directory', icon: <GraduationCap className="w-4 h-4 text-orange-400" /> },
               { id: 'tutors_list', label: 'Tutors List', icon: <UserCheck className="w-4 h-4" /> },
               { id: 'users', label: 'User Ledger List', icon: <UsersIcon className="w-4 h-4" /> },
               { id: 'assignments', label: 'New Assignment Ledger', icon: <BookOpen className="w-4 h-4" /> },
@@ -959,6 +966,38 @@ export default function AdminDashboard({
         {/* Content switch displays */}
         <div className="lg:col-span-3 space-y-6">
           
+          {/* STUDENT PROFILES DIRECTORY */}
+          {activeTab === 'student_profiles' && (
+            <StudentProfilesAdmin
+              users={users}
+              assignments={assignments}
+              chats={chats}
+              messages={messages}
+              invoices={invoices}
+              initialSearchQuery={adminStudentDirectorySearch}
+              initialStudentId={adminStudentDirectoryId}
+              onOpenChatWithStudent={(studentId, tutorId, subject) => {
+                let targetChat = chats.find(c => 
+                  c.studentId === studentId || 
+                  c.studentId.toLowerCase() === studentId.toLowerCase()
+                );
+                if (!targetChat && onGetOrCreateChat) {
+                  targetChat = onGetOrCreateChat(studentId, tutorId || 'tutor_clara', subject || 'Academic Mentorship');
+                }
+                if (targetChat) {
+                  onSelectChat(targetChat);
+                  setSelectedChatId(targetChat.id);
+                }
+                setActiveTab('chats');
+              }}
+              onAssignTutor={onAssignTutor}
+              onSetAssignmentPrice={onSetAssignmentPrice}
+              onUpdateUserProfile={onUpdateUserProfile}
+              onDeleteUser={onDeleteUser}
+              onSendNotification={onSendNotification}
+            />
+          )}
+
           {/* TUTORS LIST MANAGEMENT */}
           {activeTab === 'tutors_list' && (
             <TutorsListAdmin
@@ -1898,16 +1937,71 @@ export default function AdminDashboard({
                           return true;
                         })
                         .map(assign => {
-                          const student = users.find(u => u.id === assign.studentId);
+                          const student = users.find(u => 
+                            u.id.toLowerCase() === assign.studentId.toLowerCase() || 
+                            u.email.toLowerCase().trim() === assign.studentId.toLowerCase().trim() ||
+                            u.name.toLowerCase().trim() === assign.studentId.toLowerCase().trim()
+                          );
+                          const studentName = student?.name || (assign.studentId.includes('@') ? assign.studentId.split('@')[0] : assign.studentId);
+                          const studentEmail = student?.email || (assign.studentId.includes('@') ? assign.studentId : `${assign.studentId.replace(/\s+/g, '.').toLowerCase()}@universitytutors.com`);
                           const tutor = users.find(u => u.id === assign.tutorId);
                           const tutorsList = users.filter(u => u.role === UserRole.TUTOR);
 
                         return (
                           <tr key={assign.id} className="hover:bg-gray-50/70 transition-colors">
                             <td className="p-4">
-                              <span className="font-bold text-gray-900 block">{assign.title}</span>
-                              <span className="text-[10px] text-gray-400 block mt-0.5">By: {student?.name || 'Unknown Student'} ({student?.email})</span>
+                              <span className="font-bold text-gray-900 block text-xs">{assign.title}</span>
+                              <div className="flex items-center gap-1.5 mt-1">
+                                <span className="w-5 h-5 rounded-full bg-orange-100 text-orange-700 font-bold text-[9px] flex items-center justify-center border border-orange-200">
+                                  {studentName.charAt(0).toUpperCase()}
+                                </span>
+                                <span className="text-[10.5px] text-gray-700 font-semibold truncate max-w-[220px]" title={studentName}>
+                                  By: {studentName}
+                                </span>
+                              </div>
+                              <span className="text-[9.5px] text-gray-400 font-mono block mt-0.5">({studentEmail})</span>
                               <span className="inline-block text-[9px] bg-orange-100 text-orange-800 font-bold font-mono px-1.5 py-0.5 rounded-md mt-1">Ref: #{assign.id}</span>
+
+                              {/* Interactive Actions */}
+                              <div className="flex flex-wrap gap-1.5 mt-2">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setAdminStudentDirectorySearch(studentName || studentEmail || assign.studentId);
+                                    setAdminStudentDirectoryId(student?.id || assign.studentId);
+                                    setActiveTab('student_profiles');
+                                  }}
+                                  className="inline-flex items-center gap-1 text-[9.5px] font-bold bg-white hover:bg-orange-50 text-orange-700 border border-orange-200 px-2 py-0.5 rounded-md transition-colors shadow-2xs cursor-pointer"
+                                  title="View this student's full profile & academic brief history"
+                                >
+                                  <Eye className="w-2.5 h-2.5" />
+                                  <span>View Profile</span>
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const studentIdentifier = student?.id || assign.studentId;
+                                    const targetTutorId = assign.tutorId || 'tutor_clara';
+                                    let targetChat = chats.find(c => 
+                                      c.studentId === studentIdentifier || 
+                                      c.studentId.toLowerCase() === studentEmail.toLowerCase()
+                                    );
+                                    if (!targetChat && onGetOrCreateChat) {
+                                      targetChat = onGetOrCreateChat(studentIdentifier, targetTutorId, assign.title);
+                                    }
+                                    if (targetChat) {
+                                      onSelectChat(targetChat);
+                                      setSelectedChatId(targetChat.id);
+                                    }
+                                    setActiveTab('chats');
+                                  }}
+                                  className="inline-flex items-center gap-1 text-[9.5px] font-bold bg-orange-500 hover:bg-orange-600 text-white px-2 py-0.5 rounded-md transition-colors shadow-2xs cursor-pointer"
+                                  title="Open live chat room with this student"
+                                >
+                                  <MessageSquare className="w-2.5 h-2.5" />
+                                  <span>Chat with Student</span>
+                                </button>
+                              </div>
                             </td>
                             <td className="p-4">
                               <span className="font-bold text-gray-800 block text-[11px]">{assign.subject}</span>
@@ -1974,7 +2068,7 @@ export default function AdminDashboard({
                                 <span className="text-[11px] uppercase font-bold text-gray-500 mt-1 block">
                                   Assigned: <b>{tutor ? tutor.name : '🚨 None'}</b>
                                 </span>
-                                <div className="flex gap-1">
+                                <div className="flex gap-1 items-center flex-wrap justify-end">
                                   <select
                                     id={`tutor-select-${assign.id}`}
                                     value={assignTutorState[assign.id] || assign.tutorId || ''}
@@ -1992,13 +2086,48 @@ export default function AdminDashboard({
                                       if (tId) {
                                         await onAssignTutor(assign.id, tId);
                                         const tName = tutorsList.find(ts => ts.id === tId)?.name || tId;
-                                        alert(`Assignment #${assign.id} has been successfully dispatched to Tutor ${tName}!`);
+                                        
+                                        // Auto-create/sync chat room with student and tutor
+                                        const studentIdentifier = student?.id || assign.studentId;
+                                        if (onGetOrCreateChat) {
+                                          const chat = onGetOrCreateChat(studentIdentifier, tId, assign.title);
+                                          onSendMessage(
+                                            chat.id,
+                                            currentUser.id,
+                                            `🎉 Hello! Tutor ${tName} has been assigned to coordinate "${assign.title}". You can now discuss requirements and milestones directly in this room.`
+                                          );
+                                        }
+
+                                        alert(`Assignment #${assign.id} has been successfully dispatched to Tutor ${tName}! Chat room synchronized.`);
                                       }
                                     }}
                                     className="bg-orange-500 text-white font-bold text-[10px] px-2.5 py-1.5 rounded-lg hover:bg-orange-600 transition-all cursor-pointer shadow-xs"
                                   >
                                     Assign
                                   </button>
+
+                                  {assign.tutorId && (
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        const studentIdentifier = student?.id || assign.studentId;
+                                        let targetChat = chats.find(c => c.studentId === studentIdentifier || c.studentId.toLowerCase() === studentEmail.toLowerCase());
+                                        if (!targetChat && onGetOrCreateChat) {
+                                          targetChat = onGetOrCreateChat(studentIdentifier, assign.tutorId!, assign.title);
+                                        }
+                                        if (targetChat) {
+                                          onSelectChat(targetChat);
+                                          setSelectedChatId(targetChat.id);
+                                        }
+                                        setActiveTab('chats');
+                                      }}
+                                      className="bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-[10px] px-2 py-1.5 rounded-lg transition-colors flex items-center gap-1 cursor-pointer border border-slate-200"
+                                      title="Open active chat room for this task"
+                                    >
+                                      <MessageSquare className="w-3 h-3 text-orange-600" />
+                                      <span>Chat</span>
+                                    </button>
+                                  )}
                                 </div>
                               </div>
                             </td>

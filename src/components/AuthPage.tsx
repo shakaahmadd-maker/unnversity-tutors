@@ -1,5 +1,27 @@
 import React, { useState, useEffect } from 'react';
-import { Mail, Lock, User as UserIcon, LogIn, ChevronRight, CheckCircle2, ShieldCheck, Apple, CheckSquare, Inbox, AlertCircle, ArrowLeft, Send, KeyRound } from 'lucide-react';
+import {
+  Mail,
+  Lock,
+  User as UserIcon,
+  LogIn,
+  ChevronRight,
+  CheckCircle2,
+  ShieldCheck,
+  ShieldAlert,
+  MessageSquare,
+  TrendingUp,
+  Eye,
+  EyeOff,
+  UserPlus,
+  GraduationCap,
+  Key,
+  Check,
+  ArrowRight,
+  ArrowLeft,
+  Send,
+  KeyRound,
+  Info
+} from 'lucide-react';
 import { UserRole } from '../types';
 import { store } from '../lib/store';
 
@@ -20,13 +42,24 @@ interface SimEmail {
 }
 
 export default function AuthPage({ onLogin, onRegister, onNavigate }: AuthPageProps) {
-  const [isLoginView, setIsLoginView] = useState(true);
+  const [activeTab, setActiveTab] = useState<'signin' | 'signup'>('signin');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [name, setName] = useState('');
-  const [role, setRole] = useState<UserRole>(UserRole.STUDENT);
+  const [rememberSession, setRememberSession] = useState(true);
+  const [agreeTerms, setAgreeTerms] = useState(true);
+  
+  // Password visibility toggles
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+
+  // Status & error messages
   const [errorMsg, setErrorMsg] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
+  const [toastText, setToastText] = useState('');
+  const [toastVisible, setToastVisible] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Forgot password & reset password state
   const [isForgotPasswordView, setIsForgotPasswordView] = useState(false);
@@ -35,27 +68,23 @@ export default function AuthPage({ onLogin, onRegister, onNavigate }: AuthPagePr
   const [resetTokenInput, setResetTokenInput] = useState('');
   const [newPasswordInput, setNewPasswordInput] = useState('');
 
-  // Simulated email inbox sandbox
+  // Simulated email inbox sandbox for recovery tokens
   const [simEmails, setSimEmails] = useState<SimEmail[]>(() => {
     const cached = localStorage.getItem('ut_sim_emails');
     if (cached) {
-      try { return JSON.parse(cached); } catch (e) { return []; }
+      try {
+        return JSON.parse(cached);
+      } catch (e) {
+        return [];
+      }
     }
     return [
       {
-        id: 'verification_lunn_sim',
-        to: 'lunn@example.com',
-        subject: 'Verify your University Tutors student identity (Security Dispatch)',
-        type: 'verification',
-        body: 'Hello Lunn,\n\nWe received a registration log for your student identity on universitytutors.com. Please click the verified button link below to immediately synchronize your identity profile and activate your login:\n\n[Verify Student Account]',
-        timestamp: 'Just now'
-      },
-      {
-        id: 'welcome_sim',
+        id: 'welcome_student',
         to: 'alex@example.com',
-        subject: 'Welcome to your University Tutors sandbox',
+        subject: 'Welcome to University Tutors Portal',
         type: 'verification',
-        body: 'This simulated mailbox intercepts all local server-side notifications, activation links, and secure tokens. No real external SMTP mail is sent in developer preview mode.',
+        body: 'Welcome to your verified academic coaching portal. Connect directly with vetted university tutors.',
         timestamp: 'Just now'
       }
     ];
@@ -65,103 +94,27 @@ export default function AuthPage({ onLogin, onRegister, onNavigate }: AuthPagePr
     localStorage.setItem('ut_sim_emails', JSON.stringify(simEmails));
   }, [simEmails]);
 
-  // Student providers and email validation
-  const [signupMethod, setSignupMethod] = useState<'email' | 'apple'>('email');
-  const [verificationSentTo, setVerificationSentTo] = useState('');
-  const [verificationProvider, setVerificationProvider] = useState<'email' | 'apple' | null>(null);
-
-  // Apple verification simulation
-  const [isAppleModalOpen, setIsAppleModalOpen] = useState(false);
-  const [appleSimEmail, setAppleSimEmail] = useState('');
-  const [appleSimName, setAppleSimName] = useState('');
-
-  // Tutor registration state
-  const [rate, setRate] = useState(35);
-  const [subject, setSubject] = useState('English Literature');
-  const [bio, setBio] = useState('Qualified instructor with academic coaching credential.');
-  const [country, setCountry] = useState('US');
-  const [avatarUrl, setAvatarUrl] = useState('');
-
-  const presetAccounts = [
-    { name: 'Student (Lunn - Verify Demo)', email: 'lunn@example.com', role: 'Student' },
-    { name: 'Student (Alex Mercer)', email: 'alex@example.com', role: 'Student' },
-    { name: 'Tutor (Dr. Clara Stirling)', email: 'clara@example.com', role: 'Tutor' },
-    { name: 'Platform Admin (Emily Vance)', email: 'emily@example.com', role: 'Admin' },
-  ];
-
-  const handleConfirmVerification = () => {
-    setErrorMsg('');
-    setSuccessMsg('');
-    const targetEmail = verificationSentTo || email;
-    const targetName = name || 'Student User';
-    
-    const extra = {
-      verified: true,
-      signupMethod: verificationProvider || 'email',
-      verifiedAt: new Date().toISOString()
-    };
-
-    const isShaka = targetEmail.toLowerCase().trim() === 'shaka.ahmadd@gmail.com';
-    const assignedRole = isShaka ? UserRole.ADMIN : UserRole.STUDENT;
-
-    const success = onRegister(targetName, targetEmail, assignedRole, extra);
-    if (success) {
-      setSuccessMsg(`Welcome aboard, ${targetName}! Your account was authenticated successfully. Redirecting...`);
-      setVerificationSentTo('');
-      setTimeout(() => {
-        onNavigate('dashboard');
-      }, 1200);
-    } else {
-      setErrorMsg('This student email is already registered. Please sign in or use quick fills.');
-      setVerificationSentTo('');
-    }
+  const showToast = (text: string) => {
+    setToastText(text);
+    setToastVisible(true);
+    setTimeout(() => {
+      setToastVisible(false);
+    }, 4000);
   };
 
-  const handleVerifyEmailInInbox = async (targetEmail: string) => {
+  const handleTabSwitch = (mode: 'signin' | 'signup') => {
     setErrorMsg('');
     setSuccessMsg('');
-    const success = await store.verifyUserEmail(targetEmail);
-    if (success) {
-      setSuccessMsg(`Student account verified successfully for ${targetEmail}! Logging in...`);
-      setVerificationSentTo('');
-      const loggedIn = onLogin(targetEmail);
-      if (loggedIn) {
-        setTimeout(() => {
-          onNavigate('dashboard');
-        }, 1200);
-      } else {
-        setIsLoginView(true);
-        setEmail(targetEmail);
-      }
-    } else {
-      setErrorMsg('Failed to verify email address. Please make sure the account is created in our simulation first.');
-    }
+    setIsForgotPasswordView(false);
+    setIsResetPasswordView(false);
+    setActiveTab(mode);
   };
 
-  const handleResendVerification = (targetEmail: string) => {
-    if (!targetEmail) {
-      setErrorMsg('Please input your registered student email address.');
-      return;
-    }
-    setErrorMsg('');
-    setSuccessMsg('');
-
-    const trimmedEmail = targetEmail.toLowerCase().trim();
-    const matchedUser = store.users.find(u => u.email.toLowerCase().trim() === trimmedEmail);
-    const targetName = matchedUser ? matchedUser.name : 'Valued Student';
-
-    const newMail: SimEmail = {
-      id: 'mail_' + Math.random().toString(36).substr(2, 9),
-      to: trimmedEmail,
-      subject: 'Verify your University Tutors student identity (Security Dispatch)',
-      type: 'verification',
-      body: `Hello ${targetName},\n\nWe received an email re-dispatch request for your security activation on universitytutors.com. Please click the verified button link below to immediately synchronize your identity profile:\n\n[Verify Student Account]`,
-      timestamp: new Date().toLocaleTimeString()
-    };
-
-    setSimEmails(prev => [newMail, ...prev]);
-    setSuccessMsg(`Simulated verification email dispatched to ${trimmedEmail}! Open the Simulated Student Mail Client below to activate your account.`);
-    setVerificationSentTo(trimmedEmail);
+  const handleQuickFill = (presetEmail: string, presetName: string) => {
+    setEmail(presetEmail);
+    setPassword('student123');
+    setName(presetName);
+    showToast(`Pre-filled credentials for ${presetName}`);
   };
 
   const handleForgotPasswordSubmit = async (e: React.FormEvent) => {
@@ -176,7 +129,7 @@ export default function AuthPage({ onLogin, onRegister, onNavigate }: AuthPagePr
 
     const matchedUser = store.users.find(u => u.email.toLowerCase().trim() === resetEmail.toLowerCase().trim());
     if (!matchedUser) {
-      setErrorMsg('No account found under this email. Check spelling or preloaded fills.');
+      setErrorMsg('No registered student account was found with this email. Please check spelling or create an account.');
       return;
     }
 
@@ -195,10 +148,11 @@ export default function AuthPage({ onLogin, onRegister, onNavigate }: AuthPagePr
       };
       setSimEmails(prev => [newMail, ...prev]);
 
-      setSuccessMsg(`A secure recovery token has been dispatched to ${resetEmail}! Extract your token from the Simulated Mailbox folder below.`);
+      setSuccessMsg(`Secure recovery key dispatched for ${resetEmail}. Fill the code below to finalize.`);
       setIsResetPasswordView(true);
       setIsForgotPasswordView(false);
       setResetTokenInput(secureToken);
+      showToast('Reset Key Dispatched! Check code below');
     } else {
       setErrorMsg('Simulation gateway failed to assign reset token.');
     }
@@ -216,729 +170,736 @@ export default function AuthPage({ onLogin, onRegister, onNavigate }: AuthPagePr
 
     const success = await store.resetUserPassword(resetEmail, resetTokenInput, newPasswordInput);
     if (success) {
-      setSuccessMsg(`Your password credential was updated successfully to "${newPasswordInput}"! You may now log in.`);
+      setSuccessMsg(`Your password credential was updated successfully! You may now sign in.`);
       setIsResetPasswordView(false);
-      setIsLoginView(true);
+      setIsForgotPasswordView(false);
+      setActiveTab('signin');
       setEmail(resetEmail);
       setPassword(newPasswordInput);
+      showToast('Password updated! Signing in...');
     } else {
-      setErrorMsg('Reset code rejected. Verify correct token spelling in the inbox sandbox.');
+      setErrorMsg('Reset token invalid or expired. Please check code spelling.');
     }
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSignInSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg('');
     setSuccessMsg('');
 
+    if (!email.trim()) {
+      setErrorMsg('Please input your registered email address.');
+      return;
+    }
+
+    if (email.toLowerCase().trim() === 'shaka.ahmadd@gmail.com') {
+      setErrorMsg('Administrative login for Shaka Ahmad is restricted to the dedicated Admin Portal at /admin only.');
+      return;
+    }
+
+    setIsSubmitting(true);
     try {
-      if (isLoginView) {
-        if (!email) {
-          setErrorMsg('Please input your registered email address.');
-          return;
-        }
-
-        if (email.toLowerCase().trim() === 'shaka.ahmadd@gmail.com') {
-          setErrorMsg('Administrative login for Shaka Ahmad is restricted to the dedicated Admin Portal at /admin only.');
-          return;
-        }
-
-        const success = await onLogin(email, password);
-        if (success) {
-          setSuccessMsg('Authentication successful! Opening workspace session...');
-          setTimeout(() => {
-            onNavigate('dashboard');
-          }, 1000);
-        } else {
-          setErrorMsg('Authentication failed: Invalid credentials or account not registered.');
-        }
+      const success = await onLogin(email.trim(), password);
+      if (success) {
+        setSuccessMsg('Authenticated profile successfully! Opening student workspace...');
+        showToast('Sign In Successful! Redirecting...');
+        setTimeout(() => {
+          onNavigate('dashboard');
+        }, 800);
       } else {
-        if (role === UserRole.STUDENT) {
-          if (signupMethod === 'email') {
-            if (!name || !email || !password) {
-              setErrorMsg('Name, email, and security password are required fields.');
-              return;
-            }
-            const exists = store.users.find(u => u.email.toLowerCase().trim() === email.toLowerCase().trim());
-            if (exists) {
-              setErrorMsg('This email is already registered. Please login.');
-              return;
-            }
-
-            const isShaka = email.toLowerCase().trim() === 'shaka.ahmadd@gmail.com';
-            const assignedRole = isShaka ? UserRole.ADMIN : UserRole.STUDENT;
-
-            const success = await onRegister(isShaka ? 'Shaka Ahmad' : name, email, assignedRole, {
-              verified: true,
-              password: password,
-              signupMethod: 'email',
-              verifiedAt: new Date().toISOString()
-            });
-
-            if (success) {
-              setSuccessMsg(`${isShaka ? 'Admin' : 'Student'} account successfully registered! Redirecting to workspace...`);
-              setTimeout(() => {
-                onLogin(email, password);
-                onNavigate('dashboard');
-              }, 1100);
-            } else {
-              setErrorMsg('Something went wrong during student registration.');
-            }
-
-          } else if (signupMethod === 'apple') {
-            setAppleSimEmail(email || 'student.apple@icloud.com');
-            setAppleSimName(name || 'Apple Student');
-            setIsAppleModalOpen(true);
-            return;
-          }
-        }
-
-        if (!name || !email || !password) {
-          setErrorMsg('Name, email, and security password are required.');
-          return;
-        }
-        
-        const extra = {
-          password,
-          ...(role === UserRole.TUTOR ? {
-            hourlyRate: rate,
-            subjects: [subject],
-            bio: bio,
-            country: country,
-            ...(avatarUrl.trim() ? { avatarUrl: avatarUrl.trim() } : {})
-          } : {})
-        };
-
-        const success = await onRegister(name, email, role, extra);
-        if (success) {
-          setSuccessMsg(`Welcome aboard, ${name}! Your profile was registered successfully. Redirecting...`);
-          setTimeout(() => {
-            onLogin(email, password);
-            onNavigate('dashboard');
-          }, 1200);
-        } else {
-          setErrorMsg('Email address already registered.');
-        }
+        setErrorMsg('Authentication failed: Invalid credentials or account not registered.');
       }
     } catch (err: any) {
-      setErrorMsg(err.message || 'Authentication failed. Please verify credentials.');
+      setErrorMsg(err.message || 'Authentication error. Please check credentials.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleSignUpSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setErrorMsg('');
+    setSuccessMsg('');
+
+    if (!name.trim() || !email.trim() || !password) {
+      setErrorMsg('Full name, email, and security password are required.');
+      return;
+    }
+
+    if (password !== confirmPassword) {
+      setErrorMsg('Password confirmation does not match the entered password.');
+      return;
+    }
+
+    if (password.length < 6) {
+      setErrorMsg('Security password must contain at least 6 characters.');
+      return;
+    }
+
+    if (!agreeTerms) {
+      setErrorMsg('You must agree to the Terms of Service and Escrow payment terms to register.');
+      return;
+    }
+
+    const existingUser = store.users.find(u => u.email.toLowerCase().trim() === email.toLowerCase().trim());
+    if (existingUser) {
+      setErrorMsg('This student email is already registered. Please sign in instead.');
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      const isShaka = email.toLowerCase().trim() === 'shaka.ahmadd@gmail.com';
+      const assignedRole = isShaka ? UserRole.ADMIN : UserRole.STUDENT;
+
+      const success = await onRegister(
+        name.trim(),
+        email.trim(),
+        assignedRole,
+        {
+          verified: true,
+          password: password,
+          signupMethod: 'email',
+          verifiedAt: new Date().toISOString()
+        }
+      );
+
+      if (success) {
+        setSuccessMsg('Student account created successfully! Welcome to the portal.');
+        showToast('Account Created Successfully!');
+        setTimeout(async () => {
+          await onLogin(email.trim(), password);
+          onNavigate('dashboard');
+        }, 900);
+      } else {
+        setErrorMsg('Something went wrong establishing your student account.');
+      }
+    } catch (err: any) {
+      setErrorMsg(err.message || 'Registration failed. Please try again.');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
   return (
-    <main className="min-h-[85vh] bg-gray-50 flex flex-col items-center justify-center p-6 md:p-12 font-sans gap-6" id="auth-main-page">
-      <div className="bg-white rounded-3xl shadow-xl w-full max-w-5xl overflow-hidden border border-gray-100 flex flex-col lg:flex-row shadow-orange-500/5">
-        
-        {/* Left column: Professional Brand Identity */}
-        <div className="bg-orange-500 text-white p-8 lg:p-12 lg:w-[40%] flex flex-col justify-between relative overflow-hidden">
-          <div className="absolute -top-12 -left-12 w-48 h-48 bg-orange-650 rounded-full blur-2xl opacity-50 pointer-events-none"></div>
-          <div className="absolute -bottom-12 -right-12 w-48 h-48 bg-orange-400 rounded-full blur-2xl opacity-40 pointer-events-none"></div>
-          
+    <div className="bg-[#eef2f6] min-h-[90vh] flex flex-col items-center justify-center p-3 sm:p-6 md:p-10 font-sans text-slate-800 antialiased selection:bg-orange-500 selection:text-white relative">
+      
+      {/* Toast Notification */}
+      {toastVisible && (
+        <div 
+          id="toast-message" 
+          className="fixed bottom-6 right-6 max-w-sm bg-slate-900 text-white text-xs px-4 py-3 rounded-xl shadow-xl flex items-center gap-3 border border-slate-700 z-50 transition-all animate-bounce"
+        >
+          <Info className="w-4 h-4 text-orange-400 shrink-0" />
+          <span id="toast-text" className="font-medium">{toastText}</span>
+        </div>
+      )}
+
+      {/* Main Container Card */}
+      <div className="w-full max-w-5xl bg-white rounded-3xl shadow-2xl overflow-hidden flex flex-col lg:flex-row border border-slate-100">
+
+        {/* ============================================== */}
+        {/* LEFT PANEL: Hero & Value Proposition (Orange)  */}
+        {/* ============================================== */}
+        <div className="lg:w-5/12 bg-gradient-to-br from-[#ea580c] via-[#e05307] to-[#c2410c] text-white p-8 sm:p-10 flex flex-col justify-between relative overflow-hidden">
+          {/* Subtle background decoration circles */}
+          <div className="absolute -top-24 -left-24 w-72 h-72 bg-white/5 rounded-full pointer-events-none blur-2xl"></div>
+          <div className="absolute -bottom-24 -right-24 w-80 h-80 bg-black/10 rounded-full pointer-events-none blur-2xl"></div>
+
+          {/* Top Section: Header & Shield Logo */}
           <div className="relative z-10">
-            <div className="bg-white/10 backdrop-blur-xs p-3 rounded-2xl w-fit mb-6">
+            <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-white/20 border border-white/30 backdrop-blur-md mb-6 shadow-sm">
               <ShieldCheck className="w-6 h-6 text-white" />
             </div>
-            <h2 className="text-3xl font-bold tracking-tight text-white font-sans">
-              University Tutors Portal
-            </h2>
-            <p className="text-sm text-orange-50 leading-relaxed mt-3">
-              Log in with your verified email and password credentials or establish a new student profile. Connect directly with verified global academic coaches.
+
+            <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight leading-tight">
+              University Tutors<br />Portal
+            </h1>
+
+            <p className="mt-4 text-orange-100/90 text-sm leading-relaxed font-normal">
+              Log in with your verified credentials or establish a new student profile. Connect directly with verified global academic coaches.
             </p>
 
-            <div className="space-y-4 mt-8">
-              <div className="bg-white/10 backdrop-blur-xs border border-white/10 p-4 rounded-xl flex items-start gap-3">
-                <span className="text-lg">💬</span>
-                <div>
-                  <h4 className="text-xs font-bold text-white uppercase tracking-wider">Real-time Live Chat</h4>
-                  <p className="text-[11px] text-orange-100 mt-0.5 leading-normal">Instant consultation with certified tutors and supervisors on assignments and test preps.</p>
+            {/* Feature List */}
+            <div className="mt-8 space-y-3.5">
+              {/* Item 1: Real-Time Chat */}
+              <div className="bg-white/12 backdrop-blur-md border border-white/20 hover:bg-white/18 rounded-2xl p-4 transition-all duration-200">
+                <div className="flex items-start gap-3.5">
+                  <div className="p-2 bg-white/20 rounded-lg shrink-0 mt-0.5">
+                    <MessageSquare className="w-4 h-4 text-white" />
+                  </div>
+                  <div>
+                    <h4 className="font-bold text-xs uppercase tracking-wider text-white">Real-Time Live Chat</h4>
+                    <p className="text-xs text-orange-100/85 mt-0.5 leading-snug">Instant consultation with certified tutors and supervisors on assignments and test preps.</p>
+                  </div>
                 </div>
               </div>
-              <div className="bg-white/10 backdrop-blur-xs border border-white/10 p-4 rounded-xl flex items-start gap-3">
-                <span className="text-lg">🛡️</span>
-                <div>
-                  <h4 className="text-xs font-bold text-white uppercase tracking-wider">Escrow Secure Payments</h4>
-                  <p className="text-[11px] text-orange-100 mt-0.5 leading-normal">Authorize milestones and release funds securely in stages, backed by official administrative support.</p>
+
+              {/* Item 2: Escrow Secure Payments */}
+              <div className="bg-white/12 backdrop-blur-md border border-white/20 hover:bg-white/18 rounded-2xl p-4 transition-all duration-200">
+                <div className="flex items-start gap-3.5">
+                  <div className="p-2 bg-white/20 rounded-lg shrink-0 mt-0.5">
+                    <ShieldAlert className="w-4 h-4 text-white" />
+                  </div>
+                  <div>
+                    <h4 className="font-bold text-xs uppercase tracking-wider text-white">Escrow Secure Payments</h4>
+                    <p className="text-xs text-orange-100/85 mt-0.5 leading-snug">Authorize milestones and release funds securely in stages, backed by official administrative support.</p>
+                  </div>
                 </div>
               </div>
-              <div className="bg-white/10 backdrop-blur-xs border border-white/10 p-4 rounded-xl flex items-start gap-3">
-                <span className="text-lg">📈</span>
-                <div>
-                  <h4 className="text-xs font-bold text-white uppercase tracking-wider">Durable Progress Tracking</h4>
-                  <p className="text-[11px] text-orange-100 mt-0.5 leading-normal">Keep a full dashboard history of chat rooms, active task deliveries, revisions, and support logs.</p>
+
+              {/* Item 3: Progress Tracking */}
+              <div className="bg-white/12 backdrop-blur-md border border-white/20 hover:bg-white/18 rounded-2xl p-4 transition-all duration-200">
+                <div className="flex items-start gap-3.5">
+                  <div className="p-2 bg-white/20 rounded-lg shrink-0 mt-0.5">
+                    <TrendingUp className="w-4 h-4 text-white" />
+                  </div>
+                  <div>
+                    <h4 className="font-bold text-xs uppercase tracking-wider text-white">Durable Progress Tracking</h4>
+                    <p className="text-xs text-orange-100/85 mt-0.5 leading-snug">Keep a full dashboard history of chat rooms, active task deliveries, revisions, and support logs.</p>
+                  </div>
                 </div>
               </div>
             </div>
           </div>
 
-          <div className="mt-8 lg:mt-0 pt-6 border-t border-white/20 text-[11px] text-orange-100 leading-relaxed relative z-10">
-            Our platform establishes secure, authenticated connection entries. All database and payment records are fully encrypted and stored in PostgreSQL.
+          {/* Bottom Security Tag */}
+          <div className="mt-8 pt-6 border-t border-white/20 text-[11px] text-orange-100/75 leading-relaxed relative z-10 flex items-center gap-2">
+            <Lock className="w-4 h-4 shrink-0 text-white/80" />
+            <span>Our platform establishes secure, authenticated connection entries. All database and payment records are fully encrypted and stored in PostgreSQL.</span>
           </div>
         </div>
 
-        {/* Right column: Interactive form */}
-        <div className="p-8 lg:p-12 flex-1 flex flex-col justify-center">
-          <div className="mb-8">
-            <span className="text-xs font-bold uppercase tracking-widest text-orange-600 block">
+
+        {/* ============================================== */}
+        {/* RIGHT PANEL: Interactive Forms (Tabs)          */}
+        {/* ============================================== */}
+        <div className="lg:w-7/12 p-8 sm:p-12 md:p-14 flex flex-col justify-center bg-white relative">
+          
+          {/* Top Subtitle Brand Bar */}
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-[11px] font-bold tracking-widest text-orange-600 uppercase">
               University Tutors Platform
             </span>
-            <h3 className="text-2xl font-bold text-gray-900 mt-1">
-              {isLoginView ? 'Welcome Back!' : 'Create Your Academic Account'}
-            </h3>
-            <p className="text-sm text-gray-500 mt-2">
-              {isLoginView 
-                ? 'Sign in to access your dashboard, chats, and assignments.' 
-                : 'Complete the form below to register and choose your desired platform role.'}
-            </p>
+            <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+              256-bit SSL Protected
+            </span>
           </div>
 
+          {/* Segmented Switcher / Top Navigation Tabs */}
+          {!isForgotPasswordView && !isResetPasswordView && (
+            <div className="flex p-1 bg-slate-100 rounded-xl max-w-xs mb-8 mt-1 border border-slate-200">
+              <button 
+                id="tab-btn-signin"
+                onClick={() => handleTabSwitch('signin')} 
+                type="button" 
+                className={`flex-1 py-1.5 text-xs font-semibold rounded-lg transition-all duration-200 ${
+                  activeTab === 'signin'
+                    ? 'shadow-sm bg-white text-slate-900'
+                    : 'text-slate-500 hover:text-slate-800'
+                } focus:outline-none`}
+              >
+                Sign In
+              </button>
+              <button 
+                id="tab-btn-signup"
+                onClick={() => handleTabSwitch('signup')} 
+                type="button" 
+                className={`flex-1 py-1.5 text-xs font-semibold rounded-lg transition-all duration-200 ${
+                  activeTab === 'signup'
+                    ? 'shadow-sm bg-white text-slate-900'
+                    : 'text-slate-500 hover:text-slate-800'
+                } focus:outline-none`}
+              >
+                Create Account
+              </button>
+            </div>
+          )}
+
+          {/* Alerts: Error & Success */}
           {errorMsg && (
-            <div id="auth-error-msg" className="bg-red-50 border border-red-200/80 text-red-700 text-xs p-3.5 rounded-xl mb-6">
-              <div className="flex items-start gap-2.5">
-                <span className="shrink-0 text-amber-600 font-sans text-sm font-bold">⚠️</span>
-                <div className="space-y-1 flex-1 leading-normal font-sans">
-                  <p className="font-semibold">{errorMsg}</p>
-                </div>
-              </div>
+            <div id="auth-error-msg" className="bg-red-50 border border-red-200 text-red-700 text-xs p-3.5 rounded-xl mb-6 flex items-start gap-2.5">
+              <span className="shrink-0 text-amber-600 font-sans text-sm font-bold">⚠️</span>
+              <p className="font-semibold">{errorMsg}</p>
             </div>
           )}
 
           {successMsg && (
-            <div id="auth-success-msg" className="bg-emerald-50 border border-emerald-200/80 text-emerald-700 text-xs p-3.5 rounded-xl mb-6 flex items-center gap-2">
-              <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+            <div id="auth-success-msg" className="bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs p-3.5 rounded-xl mb-6 flex items-center gap-2">
+              <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
               <span>{successMsg}</span>
             </div>
           )}
 
+          {/* ============================================== */}
+          {/* VIEW: FORGOT PASSWORD FLOW                     */}
+          {/* ============================================== */}
           {isForgotPasswordView ? (
-            <form onSubmit={handleForgotPasswordSubmit} className="space-y-4 animate-fade-in" id="forgot-password-form">
-              <div className="space-y-2 mb-4">
-                <h4 className="font-bold text-lg text-gray-900 flex items-center gap-2">
-                  <KeyRound className="w-5 h-5 text-orange-500 font-display" />
-                  Forgot Academic Password Key
-                </h4>
-                <p className="text-sm text-gray-500 leading-relaxed">
-                  Enter your registered student email address. We will transmit a secure reset token to your simulated sandbox mailbox folders below to restore your credentials.
+            <div className="space-y-4">
+              <div className="mb-5">
+                <h2 className="text-2xl font-extrabold text-slate-900 tracking-tight flex items-center gap-2">
+                  <KeyRound className="w-5 h-5 text-orange-600" />
+                  Forgot Security Password
+                </h2>
+                <p className="text-slate-500 text-xs mt-1.5">
+                  Enter your registered student email address. We will transmit a secure recovery token to unlock your account.
                 </p>
               </div>
 
-              <div>
-                <label className="text-xs font-bold text-gray-700 block mb-1">Student Registered Email</label>
-                <div className="relative">
-                  <Mail className="w-4 h-4 text-gray-400 absolute left-3 top-3.5" />
-                  <input
-                    type="email"
-                    id="forgot-email-input"
-                    placeholder="student@example.com"
-                    value={resetEmail}
-                    onChange={(e) => setResetEmail(e.target.value)}
-                    className="w-full bg-gray-50 border border-gray-200 focus:border-orange-500 focus:bg-white focus:outline-hidden py-2.5 pl-10 pr-4 rounded-xl text-sm transition-colors"
-                    required
-                  />
+              <form onSubmit={handleForgotPasswordSubmit} className="space-y-4">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                    Registered Student Email
+                  </label>
+                  <div className="relative rounded-xl shadow-sm">
+                    <div className="pointer-events-none absolute inset-y-0 left-0 pl-3.5 flex items-center">
+                      <Mail className="w-4 h-4 text-slate-400" />
+                    </div>
+                    <input
+                      type="email"
+                      required
+                      placeholder="student@example.com"
+                      value={resetEmail}
+                      onChange={(e) => setResetEmail(e.target.value)}
+                      className="block w-full pl-10 pr-4 py-3 bg-slate-50/70 border border-slate-200 rounded-xl text-sm placeholder-slate-400 text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 transition-colors"
+                    />
+                  </div>
                 </div>
-              </div>
 
-              <div className="flex gap-3 pt-2">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setErrorMsg('');
-                    setSuccessMsg('');
-                    setIsForgotPasswordView(false);
-                  }}
-                  className="w-1/3 bg-gray-100 text-gray-700 font-bold text-xs py-3 rounded-xl hover:bg-gray-200 transition-all cursor-pointer flex items-center justify-center gap-1.5"
-                >
-                  <ArrowLeft className="w-4 h-4" />
-                  <span>Back</span>
-                </button>
-                <button
-                  type="submit"
-                  id="forgot-submit-btn"
-                  className="flex-1 bg-orange-500 text-white font-bold text-xs py-3 rounded-xl hover:bg-orange-650 hover:-translate-y-0.5 transition-all cursor-pointer flex items-center justify-center gap-1.5 shadow-md shadow-orange-500/10"
-                >
-                  <Send className="w-4 h-4 text-white" />
-                  <span>Dispatch Secure Token</span>
-                </button>
-              </div>
-            </form>
+                <div className="flex gap-3 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsForgotPasswordView(false);
+                      setActiveTab('signin');
+                    }}
+                    className="w-1/3 bg-slate-100 text-slate-700 font-bold text-xs py-3 rounded-xl hover:bg-slate-200 transition-all flex items-center justify-center gap-1.5"
+                  >
+                    <ArrowLeft className="w-4 h-4" />
+                    <span>Back</span>
+                  </button>
+                  <button
+                    type="submit"
+                    className="flex-1 bg-orange-600 hover:bg-orange-700 text-white font-bold text-xs py-3 rounded-xl transition-all flex items-center justify-center gap-1.5 shadow-md shadow-orange-500/20"
+                  >
+                    <Send className="w-4 h-4 text-white" />
+                    <span>Dispatch Recovery Key</span>
+                  </button>
+                </div>
+              </form>
+            </div>
           ) : isResetPasswordView ? (
-            <form onSubmit={handleResetPasswordSubmit} className="space-y-4 animate-fade-in" id="reset-password-form">
-              <div className="space-y-2 mb-4">
-                <h4 className="font-bold text-lg text-gray-900 flex items-center gap-2">
-                  <ShieldCheck className="w-5 h-5 text-emerald-500" />
+            /* ============================================== */
+            /* VIEW: RESET PASSWORD CODE VERIFICATION         */
+            /* ============================================== */
+            <div className="space-y-4">
+              <div className="mb-5">
+                <h2 className="text-2xl font-extrabold text-slate-900 tracking-tight flex items-center gap-2">
+                  <ShieldCheck className="w-5 h-5 text-emerald-600" />
                   Establish New Password
-                </h4>
-                <p className="text-sm text-gray-500 leading-relaxed">
-                  Please fetch the secure token sent to <span className="font-semibold text-emerald-600">{resetEmail}</span> from the simulated mailbox below to unlock security reset.
+                </h2>
+                <p className="text-slate-500 text-xs mt-1.5">
+                  Enter the recovery token dispatched to <strong className="text-orange-600">{resetEmail}</strong>.
                 </p>
               </div>
 
-              <div>
-                <label className="text-xs font-bold text-gray-700 block mb-1">Secure Reset Token</label>
-                <div className="relative border border-orange-200 rounded-xl bg-orange-50/20 p-0.5">
-                  <KeyRound className="w-4 h-4 text-orange-500 absolute left-3.5 top-3.5 animate-pulse" />
-                  <input
-                    type="text"
-                    id="reset-token-input"
-                    placeholder="RESET-123456"
-                    value={resetTokenInput}
-                    onChange={(e) => setResetTokenInput(e.target.value)}
-                    className="w-full bg-transparent focus:outline-hidden py-2.5 pl-10 pr-4 text-sm font-mono font-bold uppercase tracking-wider text-orange-950 placeholder:font-sans"
-                    required
-                  />
+              <form onSubmit={handleResetPasswordSubmit} className="space-y-4">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                    Recovery Token
+                  </label>
+                  <div className="relative rounded-xl shadow-sm">
+                    <div className="pointer-events-none absolute inset-y-0 left-0 pl-3.5 flex items-center">
+                      <KeyRound className="w-4 h-4 text-orange-500" />
+                    </div>
+                    <input
+                      type="text"
+                      required
+                      placeholder="RESET-123456"
+                      value={resetTokenInput}
+                      onChange={(e) => setResetTokenInput(e.target.value)}
+                      className="block w-full pl-10 pr-4 py-3 bg-orange-50/30 border border-orange-200 rounded-xl text-sm font-mono font-bold uppercase tracking-wider text-orange-950 focus:bg-white focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 transition-colors"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                    New Security Password
+                  </label>
+                  <div className="relative rounded-xl shadow-sm">
+                    <div className="pointer-events-none absolute inset-y-0 left-0 pl-3.5 flex items-center">
+                      <Lock className="w-4 h-4 text-slate-400" />
+                    </div>
+                    <input
+                      type="password"
+                      required
+                      minLength={6}
+                      placeholder="At least 6 characters"
+                      value={newPasswordInput}
+                      onChange={(e) => setNewPasswordInput(e.target.value)}
+                      className="block w-full pl-10 pr-4 py-3 bg-slate-50/70 border border-slate-200 rounded-xl text-sm placeholder-slate-400 text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 transition-colors"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex gap-3 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsResetPasswordView(false);
+                      setIsForgotPasswordView(true);
+                    }}
+                    className="w-1/3 bg-slate-100 text-slate-700 font-bold text-xs py-3 rounded-xl hover:bg-slate-200 transition-all flex items-center justify-center gap-1.5"
+                  >
+                    <ArrowLeft className="w-4 h-4" />
+                    <span>Back</span>
+                  </button>
+                  <button
+                    type="submit"
+                    className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs py-3 rounded-xl transition-all flex items-center justify-center gap-1.5 shadow-md shadow-emerald-500/20"
+                  >
+                    <Check className="w-4 h-4 text-white" />
+                    <span>Update Password</span>
+                  </button>
+                </div>
+              </form>
+            </div>
+          ) : activeTab === 'signin' ? (
+            /* ============================================== */
+            /* VIEW 1: SIGN IN VIEW                           */
+            /* ============================================== */
+            <div id="signin-view" className="view-card view-active">
+              <div className="mb-7">
+                <h2 className="text-3xl font-extrabold text-slate-900 tracking-tight">Welcome Back!</h2>
+                <p className="text-slate-500 text-sm mt-1.5">Sign in to access your dashboard, chats, and assignments.</p>
+              </div>
+
+              {/* Quick Demo Fills */}
+              <div className="mb-5 p-3 bg-slate-50 border border-slate-200/80 rounded-2xl flex items-center justify-between text-xs">
+                <span className="text-slate-500 font-medium">Quick Demo:</span>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => handleQuickFill('alex@example.com', 'Alex Mercer')}
+                    className="px-2.5 py-1 bg-white hover:bg-orange-50 text-slate-700 hover:text-orange-600 font-semibold rounded-lg border border-slate-200 transition-colors text-[11px]"
+                  >
+                    Alex Mercer
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleQuickFill('lunn@example.com', 'Lunn (Student)')}
+                    className="px-2.5 py-1 bg-white hover:bg-orange-50 text-slate-700 hover:text-orange-600 font-semibold rounded-lg border border-slate-200 transition-colors text-[11px]"
+                  >
+                    Lunn
+                  </button>
                 </div>
               </div>
 
-              <div>
-                <label className="text-xs font-bold text-gray-700 block mb-1">New Security Password</label>
-                <div className="relative">
-                  <Lock className="w-4 h-4 text-gray-400 absolute left-3 top-3.5" />
-                  <input
-                    type="password"
-                    id="reset-password-input"
-                    placeholder="Enter at least 6 characters"
-                    value={newPasswordInput}
-                    onChange={(e) => setNewPasswordInput(e.target.value)}
-                    className="w-full bg-gray-50 border border-gray-200 focus:border-orange-500 focus:bg-white focus:outline-hidden py-2.5 pl-10 pr-4 rounded-xl text-sm transition-colors"
-                    required
-                    minLength={6}
-                  />
+              <form onSubmit={handleSignInSubmit} className="space-y-4">
+                {/* Email Input */}
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5" htmlFor="login-email">
+                    Email Address
+                  </label>
+                  <div className="relative rounded-xl shadow-sm">
+                    <div className="pointer-events-none absolute inset-y-0 left-0 pl-3.5 flex items-center">
+                      <Mail className="w-4 h-4 text-slate-400" />
+                    </div>
+                    <input
+                      type="email"
+                      id="login-email"
+                      required
+                      placeholder="name@university.com"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      className="block w-full pl-10 pr-4 py-3 bg-slate-50/70 border border-slate-200 rounded-xl text-sm placeholder-slate-400 text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 transition-colors"
+                    />
+                  </div>
                 </div>
-              </div>
 
-              <div className="flex gap-3 pt-2">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setErrorMsg('');
-                    setSuccessMsg('');
-                    setIsResetPasswordView(false);
-                    setIsForgotPasswordView(true);
-                  }}
-                  className="w-1/3 bg-gray-100 text-gray-700 font-bold text-xs py-3 rounded-xl hover:bg-gray-200 transition-all cursor-pointer flex items-center justify-center gap-1.5"
-                >
-                  <ArrowLeft className="w-4 h-4" />
-                  <span>Resend</span>
-                </button>
+                {/* Password Input */}
+                <div>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider" htmlFor="login-password">
+                      Security Password
+                    </label>
+                    <button 
+                      type="button"
+                      onClick={() => {
+                        setResetEmail(email || 'alex@example.com');
+                        setIsForgotPasswordView(true);
+                      }} 
+                      className="text-xs font-semibold text-orange-600 hover:text-orange-700 transition-colors"
+                    >
+                      Forgot Key?
+                    </button>
+                  </div>
+                  <div className="relative rounded-xl shadow-sm">
+                    <div className="pointer-events-none absolute inset-y-0 left-0 pl-3.5 flex items-center">
+                      <Lock className="w-4 h-4 text-slate-400" />
+                    </div>
+                    <input
+                      type={showPassword ? 'text' : 'password'}
+                      id="login-password"
+                      required
+                      placeholder="••••••••••••"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      className="block w-full pl-10 pr-10 py-3 bg-slate-50/70 border border-slate-200 rounded-xl text-sm placeholder-slate-400 text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 transition-colors"
+                    />
+                    <button 
+                      type="button" 
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-400 hover:text-slate-600 focus:outline-none cursor-pointer"
+                      title={showPassword ? "Hide password" : "Show password"}
+                    >
+                      {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
+                </div>
+
+                {/* Remember me & Status */}
+                <div className="flex items-center justify-between text-xs pt-1">
+                  <label className="flex items-center gap-2 cursor-pointer select-none text-slate-600">
+                    <input 
+                      type="checkbox" 
+                      checked={rememberSession}
+                      onChange={(e) => setRememberSession(e.target.checked)}
+                      className="w-4 h-4 text-orange-600 border-slate-300 rounded focus:ring-orange-500" 
+                    />
+                    <span>Remember session on this device</span>
+                  </label>
+                </div>
+
+                {/* Submit Action Button */}
                 <button
                   type="submit"
-                  id="reset-submit-btn"
-                  className="flex-1 bg-emerald-600 text-white font-bold text-xs py-3 rounded-xl hover:bg-emerald-700 hover:-translate-y-0.5 transition-all cursor-pointer flex items-center justify-center gap-1.5 shadow-md shadow-emerald-500/10"
+                  disabled={isSubmitting}
+                  className="w-full mt-4 py-3.5 px-4 bg-orange-600 hover:bg-orange-700 text-white font-bold rounded-xl shadow-md hover:shadow-lg shadow-orange-500/20 transition-all flex items-center justify-center gap-2 active:scale-[0.99] group disabled:opacity-70 cursor-pointer"
                 >
-                  <CheckSquare className="w-4 h-4" />
-                  <span>Commit Password</span>
+                  <LogIn className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" />
+                  <span>{isSubmitting ? 'Authenticating...' : 'Authenticate Profile'}</span>
+                  <ChevronRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" />
                 </button>
-              </div>
-            </form>
-          ) : verificationSentTo ? (
-            /* VERIFICATION SENT FLOW */
-            <div className="space-y-6 text-center animate-fade-in p-6 bg-orange-50/50 rounded-3xl border border-[#fed7aa] mt-2">
-              <div className="w-16 h-16 bg-orange-100 rounded-3xl flex items-center justify-center mx-auto text-orange-605 shadow-xs animate-pulse">
-                <Inbox className="w-8 h-8 text-orange-600" />
-              </div>
-              <div className="space-y-2">
-                <h4 className="font-bold text-lg text-amber-955 font-display">Student Verification Pending!</h4>
-                <p className="text-xs text-amber-900/80 max-w-sm mx-auto leading-relaxed">
-                  We've dispatched a secure activation email to: <br/>
-                  <strong className="text-orange-650 break-all">{verificationSentTo}</strong>.
-                </p>
-                <div className="text-[10px] bg-amber-500/10 text-amber-805 border border-amber-200/50 px-3 py-1 rounded-full w-fit mx-auto font-mono font-bold">
-                  Method: {verificationProvider?.toUpperCase() || 'EMAIL'} AUTH
+              </form>
+
+              {/* Divider with prominent Create Account option */}
+              <div className="relative my-7 text-center">
+                <div className="absolute inset-0 flex items-center">
+                  <div className="w-full border-t border-slate-200"></div>
                 </div>
+                <span className="relative bg-white px-3 text-xs font-medium text-slate-400 uppercase tracking-wider">
+                  New to University Tutors?
+                </span>
               </div>
 
-              <div className="p-4 bg-white border border-[#fed7aa] rounded-2xl text-left space-y-3 shadow-xs">
-                <div className="flex items-center gap-2 text-xs font-bold text-amber-950">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
-                  Local Verification Inbox Simulator
-                </div>
-                <p className="text-[10px] text-amber-900/70 leading-normal">
-                  In production, the student clicks the validation token inside their actual email client. To bypass for local sandbox testing, click "Verify & Authenticate" below to immediately synchronize database authorization state.
-                </p>
-                <button
-                  type="button"
-                  id="confirm-verification-btn"
-                  onClick={handleConfirmVerification}
-                  className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs py-2.5 px-3 rounded-xl flex items-center justify-center gap-1.5 transition-all shadow-md cursor-pointer"
-                >
-                  <CheckSquare className="w-4 h-4" />
-                  <span>Verify & Authenticate Student Account</span>
-                </button>
-              </div>
-
+              {/* Secondary CTA: Create Account button */}
               <button
                 type="button"
-                onClick={() => setVerificationSentTo('')}
-                className="text-xs text-amber-900/60 font-semibold hover:text-orange-600 flex items-center gap-1 mx-auto transition-colors cursor-pointer"
+                onClick={() => handleTabSwitch('signup')}
+                className="w-full py-3 px-4 border-2 border-orange-500 text-orange-600 hover:bg-orange-50 font-bold rounded-xl transition-all flex items-center justify-center gap-2 text-sm cursor-pointer"
               >
-                <ArrowLeft className="w-3.5 h-3.5" />
-                <span>Change Registration Details</span>
+                <UserPlus className="w-4 h-4" />
+                <span>Create New Account</span>
               </button>
-            </div>
-          ) : (
-            /* STANDARD / SIGNUP FORM FLOW */
-            <form onSubmit={handleSubmit} className="space-y-4">
-              
-              {!isLoginView && (
-                <>
-                  <div>
-                    <label className="text-xs font-bold text-gray-700 block mb-1">Full Representative Student Name</label>
-                    <div className="relative">
-                      <UserIcon className="w-4 h-4 text-gray-400 absolute left-3 top-3.5" />
-                      <input
-                        type="text"
-                        id="register-input-name"
-                        placeholder="e.g. Liam Stirling"
-                        value={name}
-                        onChange={(e) => setName(e.target.value)}
-                        className="w-full bg-gray-55 border border-gray-200 focus:border-orange-500 focus:bg-white focus:outline-hidden py-2.5 pl-10 pr-4 rounded-xl text-sm transition-colors"
-                        required
-                      />
-                    </div>
-                  </div>
 
-                  <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 text-[11px] leading-relaxed font-sans text-left space-y-1 my-2">
-                    <p className="font-bold text-amber-950 flex items-center gap-1.5">
-                      🎓 Student Registration Only
-                    </p>
-                    <p className="text-gray-700">
-                      Public registration is reserved for active students seeking tutor services. <strong>Certified Tutors</strong> and <strong>Sub-Admins</strong> are generated exclusively by the Superior Admin (<span className="font-semibold text-orange-700">shaka.ahmadd@gmail.com</span>).
-                    </p>
-                  </div>
-
-                  {/* ONLY FOR STUDENTS: Render the specific enabled signup options from the picture */}
-                  {role === UserRole.STUDENT && (
-                    <div className="space-y-2.5 p-4 bg-orange-50/50 rounded-2xl border border-[#fed7aa] my-3" id="student-signup-providers">
-                      <div className="flex items-center justify-between">
-                        <span className="text-[10px] font-bold uppercase tracking-wider text-orange-600 block">
-                          Authorized Student Identity Providers
-                        </span>
-                        <span className="text-[8px] uppercase tracking-widest font-mono bg-emerald-50 text-emerald-700 border border-emerald-200 px-2 py-0.5 rounded-md font-bold">
-                          SECURE ESCROW PINNED
-                        </span>
-                      </div>
-                      
-                      <div className="space-y-1.5 mt-2">
-                        {/* Option 1: Email / Password */}
-                        <button
-                          type="button"
-                          id="signup-choice-email"
-                          onClick={() => setSignupMethod('email')}
-                          className={`w-full p-2.5 rounded-xl border flex items-center justify-between text-left transition-all cursor-pointer ${
-                            signupMethod === 'email'
-                              ? 'bg-orange-100/70 border-orange-400 text-amber-955 font-bold animate-pulse'
-                              : 'bg-white border-gray-150 hover:bg-gray-50 text-gray-700'
-                          }`}
-                        >
-                          <div className="flex items-center gap-2.5">
-                            <Mail className="w-4 h-4 text-orange-500 shrink-0" />
-                            <div className="leading-tight">
-                              <span className="text-xs block">Email / Security Password</span>
-                              <span className="text-[9px] text-amber-800/60 font-mono">Status: Enabled</span>
-                            </div>
-                          </div>
-                          <span className="text-[10px] bg-emerald-50 text-emerald-700 border border-emerald-200 px-2 py-0.5 rounded-full font-bold flex items-center gap-1">
-                            <CheckCircle2 className="w-3 h-3 text-emerald-600 shrink-0" />
-                            Enabled
-                          </span>
-                        </button>
-
-
-
-                        {/* Option 3: Apple */}
-                        <button
-                          type="button"
-                          id="signup-choice-apple"
-                          onClick={() => setSignupMethod('apple')}
-                          className={`w-full p-2.5 rounded-xl border flex items-center justify-between text-left transition-all cursor-pointer ${
-                            signupMethod === 'apple'
-                              ? 'bg-orange-100/70 border-orange-400 text-amber-955 font-bold animate-pulse'
-                              : 'bg-white border-gray-150 hover:bg-gray-50 text-gray-700'
-                          }`}
-                        >
-                          <div className="flex items-center gap-2.5">
-                            <Apple className="w-4 h-4 text-gray-900 shrink-0" />
-                            <div className="leading-tight">
-                              <span className="text-xs block font-sans">Apple Account</span>
-                              <span className="text-[9px] text-amber-805/65 font-mono">Status: Enabled</span>
-                            </div>
-                          </div>
-                          <span className="text-[10px] bg-emerald-50 text-emerald-700 border border-emerald-200 px-2 py-0.5 rounded-full font-bold flex items-center gap-1">
-                            <CheckCircle2 className="w-3 h-3 text-emerald-600 shrink-0" />
-                            Enabled
-                          </span>
-                        </button>
-                      </div>
-                    </div>
-                  )}
-
-                  {role === UserRole.TUTOR && (
-                    <div className="p-4 bg-gray-50 rounded-2xl border border-gray-150 space-y-3">
-                      <span className="text-[10px] font-bold uppercase tracking-wider text-orange-600 block">Tutor Settings</span>
-                      
-                      <div className="grid grid-cols-2 gap-3">
-                        <div>
-                          <label className="text-[10px] font-bold text-gray-600 block">Hourly Rate ($)</label>
-                          <input 
-                            type="number" 
-                            id="register-tutor-rate"
-                            min="10" 
-                            max="150" 
-                            value={rate}
-                            onChange={(e) => setRate(isNaN(parseInt(e.target.value)) ? 0 : parseInt(e.target.value))}
-                            className="w-full bg-white border border-gray-200 py-1.5 px-3 rounded-lg text-xs" 
-                          />
-                        </div>
-                        <div>
-                          <label className="text-[10px] font-bold text-gray-600 block">Default Country Flag</label>
-                          <select 
-                            id="register-tutor-country"
-                            value={country} 
-                            onChange={(e) => setCountry(e.target.value)}
-                            className="w-full bg-white border border-gray-200 py-1.5 px-3 rounded-lg text-xs"
-                          >
-                            <option value="GB">🇬🇧 United Kingdom</option>
-                            <option value="US">🇺🇸 United States</option>
-                            <option value="CA">🇨🇦 Canada</option>
-                            <option value="AU">🇦🇺 Australia</option>
-                            <option value="NZ">🇳🇿 New Zealand</option>
-                            <option value="IE">🇮🇪 Ireland</option>
-                          </select>
-                        </div>
-                      </div>
-
-                      <div>
-                        <label className="text-[10px] font-bold text-gray-600 block">Specialty Subjects</label>
-                        <input 
-                          type="text" 
-                          id="register-tutor-subject"
-                          value={subject} 
-                          onChange={(e) => setSubject(e.target.value)}
-                          placeholder="e.g. Computer Science" 
-                          className="w-full bg-white border border-gray-200 py-1.5 px-3 rounded-lg text-xs mt-0.5" 
-                        />
-                      </div>
-
-                      <div>
-                        <label className="text-[10px] font-bold text-gray-650 block mb-0.5">Profile Image URL (Avatar)</label>
-                        <input 
-                          type="url" 
-                          id="register-tutor-avatar"
-                          value={avatarUrl} 
-                          onChange={(e) => setAvatarUrl(e.target.value)}
-                          placeholder="e.g. https://images.unsplash.com/photo-..." 
-                          className="w-full bg-white border border-gray-205 py-1.5 px-3 rounded-lg text-xs" 
-                        />
-                      </div>
-
-                      <div>
-                        <label className="text-[10px] font-bold text-gray-600 block">Biography Overview</label>
-                        <textarea 
-                          id="register-tutor-bio"
-                          rows={2} 
-                          value={bio} 
-                          onChange={(e) => setBio(e.target.value)}
-                          className="w-full bg-white border border-gray-200 py-1.5 px-3 rounded-lg text-xs mt-0.5" 
-                        />
-                      </div>
-                    </div>
-                  )}
-                </>
-              )}
-
-              {/* Render credential inputs dynamically based on selection */}
-              {(isLoginView || role === UserRole.TUTOR || (role === UserRole.STUDENT && signupMethod === 'email')) ? (
-                <>
-                  <div>
-                    <label className="text-xs font-bold text-gray-700 block mb-1">Email Address</label>
-                    <div className="relative">
-                      <Mail className="w-4 h-4 text-gray-400 absolute left-3 top-3.5" />
-                      <input
-                        type="email"
-                        id="auth-input-email"
-                        placeholder="name@university.com"
-                        value={email}
-                        onChange={(e) => setEmail(e.target.value)}
-                        className="w-full bg-gray-50 border border-gray-200 focus:border-orange-500 focus:bg-white focus:outline-hidden py-2.5 pl-10 pr-4 rounded-xl text-sm transition-colors"
-                        required
-                      />
-                    </div>
-                  </div>
-
-                  <div>
-                    <div className="flex justify-between items-center mb-1">
-                      <label className="text-xs font-bold text-gray-700">Security Password</label>
-                      {isLoginView && (
-                        <button type="button" className="text-[11px] text-orange-600 hover:underline">
-                          Forgot Key?
-                        </button>
-                      )}
-                    </div>
-                    <div className="relative">
-                      <Lock className="w-4 h-4 text-gray-400 absolute left-3 top-3.5" />
-                      <input
-                        type="password"
-                        id="auth-input-password"
-                        placeholder="••••••••"
-                        value={password}
-                        onChange={(e) => setPassword(e.target.value)}
-                        className="w-full bg-gray-50 border border-gray-200 focus:border-orange-500 focus:bg-white focus:outline-hidden py-2.5 pl-10 pr-4 rounded-xl text-sm transition-colors"
-                        required={!isLoginView}
-                      />
-                    </div>
-                  </div>
-                </>
-              ) : null}
-
-              {/* standard submission button for email/login/tutors */}
-              <div className="space-y-4 pt-2">
-                <button
-                  type="submit"
-                  id="auth-submit-btn"
-                  className="w-full bg-orange-500 text-white font-bold text-sm py-3 rounded-xl hover:bg-orange-600 hover:-translate-y-0.5 transition-all focus:outline-hidden flex items-center justify-center gap-1.5 cursor-pointer shadow-lg shadow-orange-500/10"
+              <p className="text-center text-xs text-slate-500 mt-5">
+                Don't have an account? 
+                <button 
+                  type="button"
+                  onClick={() => handleTabSwitch('signup')} 
+                  className="font-bold text-orange-600 hover:text-orange-700 underline underline-offset-2 ml-1 cursor-pointer"
                 >
-                  <LogIn className="w-4 h-4" />
-                  <span>{isLoginView ? 'Authenticate Profile' : 'Complete Registration & Access Workspace'}</span>
-                  <ChevronRight className="w-4 h-4" />
+                  Establish Registration Here
                 </button>
-              </div>
-            </form>
-          )}
-
-          <div className="mt-6 text-center border-t border-gray-100 pt-5 font-sans">
-            <button
-              id="auth-toggle-view-btn"
-              onClick={() => {
-                setErrorMsg('');
-                setSuccessMsg('');
-                if (isForgotPasswordView || isResetPasswordView) {
-                  setIsForgotPasswordView(false);
-                  setIsResetPasswordView(false);
-                  setIsLoginView(true);
-                } else {
-                  setIsLoginView(!isLoginView);
-                }
-              }}
-              className="text-xs text-orange-600 hover:text-orange-705 font-bold transition-colors cursor-pointer"
-            >
-              {isForgotPasswordView || isResetPasswordView
-                ? "Return to Platform Authenticate Credentials Screen"
-                : isLoginView 
-                  ? "Don't have an account? Establish Registration Here" 
-                  : 'Already configured? Click here to Log In'}
-            </button>
-          </div>
-
-        </div>
-
-      </div>
-
-
-
-      {/* simulated apple login modal */}
-      {isAppleModalOpen && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fade-in" id="apple-auth-modal">
-          <div className="bg-white rounded-3xl shadow-2xl max-w-md w-full border border-gray-150 p-8 space-y-6 relative">
-            <button 
-              type="button"
-              onClick={() => setIsAppleModalOpen(false)}
-              className="absolute top-4 right-4 text-gray-400 hover:text-gray-650 text-lg cursor-pointer"
-            >
-              ✕
-            </button>
-            <div className="text-center space-y-3">
-              <div className="w-14 h-14 bg-black rounded-2xl flex items-center justify-center mx-auto text-white shadow-xs">
-                <Apple className="w-8 h-8 fill-white text-white" />
-              </div>
-              <h4 className="text-lg font-bold text-gray-950 font-display">Sign Up with Apple ID</h4>
-              <p className="text-xs text-gray-500 max-w-xs mx-auto leading-relaxed">
-                Connect your iCloud Keychain credentials securely with our student environment.
               </p>
             </div>
-
-            <div className="space-y-3 pt-2">
-              <div>
-                <label className="text-[10px] font-bold text-gray-700 uppercase tracking-wider block mb-1">Apple Profile Name</label>
-                <input
-                  type="text"
-                  placeholder="e.g. Liam Sterling"
-                  value={appleSimName}
-                  onChange={(e) => setAppleSimName(e.target.value)}
-                  className="w-full bg-gray-50 border border-gray-200 py-2.5 px-3.5 rounded-xl text-sm"
-                  required
-                />
+          ) : (
+            /* ============================================== */
+            /* VIEW 2: CREATE ACCOUNT (REGISTRATION) VIEW     */
+            /* ============================================== */
+            <div id="signup-view" className="view-card view-active">
+              <div className="mb-5">
+                <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-orange-50 text-orange-700 text-xs font-semibold mb-2 border border-orange-200">
+                  <GraduationCap className="w-3.5 h-3.5" />
+                  <span>Student Registration</span>
+                </div>
+                <h2 className="text-3xl font-extrabold text-slate-900 tracking-tight">Create Student Account</h2>
+                <p className="text-slate-500 text-sm mt-1">Join as a student to book verified tutors and submit assignments.</p>
               </div>
-              <div>
-                <label className="text-[10px] font-bold text-gray-700 uppercase tracking-wider block mb-1">Apple ID (Email)</label>
-                <input
-                  type="email"
-                  placeholder="liam@icloud.com"
-                  value={appleSimEmail}
-                  onChange={(e) => setAppleSimEmail(e.target.value)}
-                  className="w-full bg-gray-50 border border-gray-200 py-2.5 px-3.5 rounded-xl text-sm"
-                  required
-                />
-              </div>
-            </div>
 
-            <div className="space-y-2 pt-4">
-              <button
-                type="button"
-                onClick={() => {
-                  if (!appleSimName || !appleSimEmail) {
-                    setErrorMsg('Please prefill Apple ID credential info.');
-                    setIsAppleModalOpen(false);
-                    return;
-                  }
-                  setIsAppleModalOpen(false);
-                  // Setup verification
-                  setVerificationProvider('apple');
-                  setVerificationSentTo(appleSimEmail.toLowerCase().trim());
-                  setName(appleSimName);
-                  setEmail(appleSimEmail.toLowerCase().trim());
-                  setSuccessMsg(`Apple Keychain secure handshake successful. Click below to proceed.`);
-                }}
-                className="w-full bg-black hover:bg-zinc-900 text-white font-bold text-xs py-3 rounded-xl flex items-center justify-center gap-2 transition-all cursor-pointer shadow-md"
-              >
-                <span>Authorize with Apple Keychain</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => setIsAppleModalOpen(false)}
-                className="w-full bg-gray-50 hover:bg-gray-100 text-gray-700 font-bold text-xs py-2.5 rounded-xl transition-all cursor-pointer text-center"
-              >
-                Cancel
-              </button>
+              <form onSubmit={handleSignUpSubmit} className="space-y-3.5">
+                {/* Full Name */}
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1" htmlFor="reg-name">
+                    Full Legal Name
+                  </label>
+                  <div className="relative rounded-xl shadow-sm">
+                    <div className="pointer-events-none absolute inset-y-0 left-0 pl-3.5 flex items-center">
+                      <UserIcon className="w-4 h-4 text-slate-400" />
+                    </div>
+                    <input
+                      type="text"
+                      id="reg-name"
+                      required
+                      placeholder="e.g. Alexander Hamilton"
+                      value={name}
+                      onChange={(e) => setName(e.target.value)}
+                      className="block w-full pl-10 pr-4 py-2.5 bg-slate-50/70 border border-slate-200 rounded-xl text-sm placeholder-slate-400 text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 transition-colors"
+                    />
+                  </div>
+                </div>
+
+                {/* Email Address */}
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1" htmlFor="reg-email">
+                    University / Student Email
+                  </label>
+                  <div className="relative rounded-xl shadow-sm">
+                    <div className="pointer-events-none absolute inset-y-0 left-0 pl-3.5 flex items-center">
+                      <Mail className="w-4 h-4 text-slate-400" />
+                    </div>
+                    <input
+                      type="email"
+                      id="reg-email"
+                      required
+                      placeholder="student.name@university.edu"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      className="block w-full pl-10 pr-4 py-2.5 bg-slate-50/70 border border-slate-200 rounded-xl text-sm placeholder-slate-400 text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 transition-colors"
+                    />
+                  </div>
+                </div>
+
+                {/* Password & Confirmation Grid */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1" htmlFor="reg-pass">
+                      Password
+                    </label>
+                    <div className="relative rounded-xl shadow-sm">
+                      <div className="pointer-events-none absolute inset-y-0 left-0 pl-3.5 flex items-center">
+                        <Key className="w-4 h-4 text-slate-400" />
+                      </div>
+                      <input
+                        type={showPassword ? 'text' : 'password'}
+                        id="reg-pass"
+                        required
+                        placeholder="Min 6 chars"
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        className="block w-full pl-10 pr-8 py-2.5 bg-slate-50/70 border border-slate-200 rounded-xl text-sm placeholder-slate-400 text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 transition-colors"
+                      />
+                      <button 
+                        type="button" 
+                        onClick={() => setShowPassword(!showPassword)}
+                        className="absolute inset-y-0 right-0 pr-2.5 flex items-center text-slate-400 hover:text-slate-600 focus:outline-none cursor-pointer"
+                      >
+                        {showPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                      </button>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1" htmlFor="reg-pass-confirm">
+                      Confirm
+                    </label>
+                    <div className="relative rounded-xl shadow-sm">
+                      <div className="pointer-events-none absolute inset-y-0 left-0 pl-3.5 flex items-center">
+                        <Check className="w-4 h-4 text-slate-400" />
+                      </div>
+                      <input
+                        type={showConfirmPassword ? 'text' : 'password'}
+                        id="reg-pass-confirm"
+                        required
+                        placeholder="Re-enter"
+                        value={confirmPassword}
+                        onChange={(e) => setConfirmPassword(e.target.value)}
+                        className="block w-full pl-10 pr-8 py-2.5 bg-slate-50/70 border border-slate-200 rounded-xl text-sm placeholder-slate-400 text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 transition-colors"
+                      />
+                      <button 
+                        type="button" 
+                        onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                        className="absolute inset-y-0 right-0 pr-2.5 flex items-center text-slate-400 hover:text-slate-600 focus:outline-none cursor-pointer"
+                      >
+                        {showConfirmPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Terms Checkbox */}
+                <div className="pt-1">
+                  <label className="flex items-start gap-2.5 cursor-pointer text-xs text-slate-600 leading-snug">
+                    <input 
+                      type="checkbox" 
+                      required 
+                      checked={agreeTerms}
+                      onChange={(e) => setAgreeTerms(e.target.checked)}
+                      className="w-4 h-4 mt-0.5 text-orange-600 border-slate-300 rounded focus:ring-orange-500" 
+                    />
+                    <span>
+                      I agree to the <button type="button" onClick={() => onNavigate('terms')} className="text-orange-600 underline font-medium">Terms of Service</button>, student honor code, and Escrow payment terms.
+                    </span>
+                  </label>
+                </div>
+
+                {/* Create Account Button */}
+                <button
+                  type="submit"
+                  disabled={isSubmitting}
+                  className="w-full mt-3 py-3.5 px-4 bg-orange-600 hover:bg-orange-700 text-white font-bold rounded-xl shadow-md hover:shadow-lg shadow-orange-500/20 transition-all flex items-center justify-center gap-2 active:scale-[0.99] group disabled:opacity-70 cursor-pointer"
+                >
+                  <GraduationCap className="w-4 h-4" />
+                  <span>{isSubmitting ? 'Registering...' : 'Register Student Account'}</span>
+                  <ArrowRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" />
+                </button>
+              </form>
+
+              <p className="text-center text-xs text-slate-500 mt-5">
+                Already have an existing student profile? 
+                <button 
+                  type="button"
+                  onClick={() => handleTabSwitch('signin')} 
+                  className="font-bold text-orange-600 hover:text-orange-700 underline underline-offset-2 ml-1 cursor-pointer"
+                >
+                  Sign In Here
+                </button>
+              </p>
             </div>
-          </div>
+          )}
+
         </div>
-      )}
+      </div>
 
       {/* Google OAuth human reviewer disclosure block */}
-      <div className="w-full max-w-5xl bg-white rounded-3xl border border-gray-200 p-6 md:p-8 mt-2 space-y-6 shadow-xs text-left">
+      <div className="w-full max-w-5xl bg-white rounded-3xl border border-slate-200/80 p-6 md:p-8 mt-6 space-y-4 shadow-sm text-left">
         <div>
-          <h4 className="text-xs font-bold text-gray-900 uppercase tracking-widest mb-3 border-b border-gray-100 pb-2">
+          <h4 className="text-xs font-bold text-slate-900 uppercase tracking-widest mb-3 border-b border-slate-100 pb-2">
             Application Overview &amp; Google OAuth Disclosure
           </h4>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-xs text-gray-650 leading-relaxed">
-            <div className="space-y-2 bg-orange-50/40 p-5 rounded-2xl border border-orange-100/50">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs text-slate-600 leading-relaxed">
+            <div className="space-y-1.5 bg-orange-50/50 p-4 rounded-2xl border border-orange-100/60">
               <span className="font-bold text-orange-950 block text-[11px] uppercase tracking-wider">Section A: The App Purpose</span>
-              <p className="font-medium text-gray-700">
+              <p className="font-normal text-slate-700">
                 <strong>University-tutors</strong> is an integrated academic support platform designed to connect students with expert educational consultants and tutors. This application facilitates secure, real-time consultation chats, document sharing for assignment briefs, and streamlined project tracking between students and administrative teams to enhance the overall learning experience.
               </p>
             </div>
-            <div className="space-y-2 bg-amber-50/40 p-5 rounded-2xl border border-amber-100/50">
-              <span className="font-bold text-amber-950 block text-[11px] uppercase tracking-wider">Section B: Google Data Usage</span>
-              <p className="font-medium text-gray-700">
+            <div className="space-y-1.5 bg-slate-50 p-4 rounded-2xl border border-slate-200/60">
+              <span className="font-bold text-slate-900 block text-[11px] uppercase tracking-wider">Section B: Google Data Usage</span>
+              <p className="font-normal text-slate-700">
                 When you sign in using your Google Account, <strong>University-tutors</strong> requests access to your basic profile information (such as your name and email address). We use this data exclusively to securely authenticate your account, personalize your dashboard, and verify your identity within our internal chat and support systems. We do not share, sell, or utilize your personal information for any secondary purposes.
               </p>
             </div>
           </div>
-          <div className="mt-4 text-[10px] text-gray-400 text-center font-mono">
+          <div className="mt-3 text-[10px] text-slate-400 text-center">
             For more details, view our dedicated <button onClick={() => onNavigate('google-disclosure')} className="text-orange-600 hover:underline font-bold">Google Disclosure page</button> or read our full <button onClick={() => onNavigate('privacy')} className="text-orange-600 hover:underline font-bold">Privacy Policy</button>.
           </div>
         </div>
       </div>
 
-    </main>
+    </div>
   );
 }

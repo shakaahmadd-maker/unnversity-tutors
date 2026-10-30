@@ -75,9 +75,40 @@ export default function ChatWindow({
   // Find current pending quote for this chat
   const pendingQuote = quotes.find(q => q.chatId === chat.id && q.status === 'pending');
 
-  const otherUser = currentUser.role === UserRole.STUDENT
-    ? tutors.find(t => t.id === chat.tutorId)
-    : students.find(s => s.id === chat.studentId);
+  // Resolve student and tutor entities with deep fallback (id, email, name)
+  const resolvedStudent = students.find(s => 
+    s.id === chat.studentId || 
+    (s.email && s.email.toLowerCase() === chat.studentId.toLowerCase()) ||
+    (s.name && s.name.toLowerCase() === chat.studentId.toLowerCase())
+  ) || {
+    id: chat.studentId,
+    name: chat.studentId.includes('@') ? chat.studentId.split('@')[0] : (chat.studentId || 'Student Member'),
+    email: chat.studentId.includes('@') ? chat.studentId : `${chat.studentId.toLowerCase().replace(/\s+/g, '.')}@student.uni.edu`,
+    avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150',
+    role: UserRole.STUDENT
+  } as User;
+
+  const resolvedTutor = tutors.find(t => 
+    t.id === chat.tutorId || 
+    (t.email && t.email.toLowerCase() === chat.tutorId.toLowerCase()) ||
+    (t.name && t.name.toLowerCase() === chat.tutorId.toLowerCase())
+  ) || (chat.tutorId?.startsWith('admin_') || chat.tutorId === 'admin_emily' ? {
+    id: chat.tutorId,
+    name: chat.tutorId === 'admin_shaka' ? 'Shaka Ahmad (Head Admin)' : 'Platform Support Desk',
+    email: 'support@university-tutors.com',
+    avatarUrl: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150',
+    role: UserRole.ADMIN
+  } as User : {
+    id: chat.tutorId,
+    name: chat.tutorId || 'Assigned Tutor',
+    email: 'tutor@university-tutors.com',
+    avatarUrl: 'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=150',
+    role: UserRole.TUTOR
+  } as User);
+
+  const otherUser = currentUser.role === UserRole.STUDENT 
+    ? resolvedTutor 
+    : (currentUser.role === UserRole.TUTOR ? resolvedStudent : (resolvedStudent.id !== currentUser.id ? resolvedStudent : resolvedTutor));
 
   const isOtherUserTyping = currentUser.role === UserRole.STUDENT
     ? chat.tutorIsTyping
@@ -198,15 +229,31 @@ export default function ChatWindow({
       {/* Chat header */}
       <div className="bg-gray-50 border-b border-gray-150 p-5 flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <img 
-            src={otherUser?.avatarUrl || 'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6'} 
-            className="w-10 h-10 rounded-full object-cover border" 
-            alt="Avatar" 
-          />
+          <div className="relative">
+            <img 
+              src={otherUser?.avatarUrl || 'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6'} 
+              className="w-10 h-10 rounded-full object-cover border" 
+              alt="Avatar" 
+            />
+            <span className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-emerald-500 border-2 border-white rounded-full"></span>
+          </div>
           <div className="text-left">
-            <span className="font-bold text-sm text-gray-900 block leading-tight">{otherUser?.name}</span>
-            <span className="text-[10px] text-gray-500 block leading-tight mt-0.5 font-mono">
-              Discussion topic: <strong>{chat.subject}</strong>
+            <div className="flex items-center gap-1.5">
+              <span className="font-bold text-sm text-gray-900 block leading-tight">{otherUser?.name}</span>
+              <span className={`text-[9px] font-bold uppercase px-1.5 py-0.2 rounded ${
+                otherUser?.role === UserRole.ADMIN ? 'bg-purple-100 text-purple-700' :
+                otherUser?.role === UserRole.TUTOR ? 'bg-blue-100 text-blue-700' : 'bg-emerald-100 text-emerald-700'
+              }`}>
+                {otherUser?.role || 'Member'}
+              </span>
+            </div>
+            <span className="text-[10.5px] text-gray-500 block leading-tight mt-0.5 font-sans">
+              Topic: <strong className="text-gray-800">{chat.subject}</strong>
+              {currentUser.role === UserRole.ADMIN && (
+                <span className="text-gray-400 font-mono text-[9.5px] ml-2">
+                  (Student: {resolvedStudent.name} • Tutor: {resolvedTutor.name})
+                </span>
+              )}
             </span>
           </div>
         </div>
@@ -259,6 +306,11 @@ export default function ChatWindow({
           }
 
           const isSelf = msg.senderId === currentUser.id;
+          const allKnownUsers = tutors.concat(students);
+          const msgSender = isSelf 
+            ? currentUser 
+            : (allKnownUsers.find(u => u.id === msg.senderId || (u.email && u.email.toLowerCase() === msg.senderId.toLowerCase())) || otherUser);
+
           return (
             <div 
               key={msg.id} 
@@ -266,11 +318,13 @@ export default function ChatWindow({
               className={`flex gap-3 max-w-xl ${isSelf ? 'ml-auto flex-row-reverse' : 'mr-auto text-left'}`}
             >
               {!isSelf && (
-                <img 
-                  src={otherUser?.avatarUrl || 'https://images.unsplash.com/photo-1544005313-94ddf0286df2'} 
-                  className="w-7 h-7 rounded-full object-cover border self-end shrink-0" 
-                  alt="" 
-                />
+                <div className="flex flex-col items-center self-end shrink-0">
+                  <img 
+                    src={msgSender?.avatarUrl || otherUser?.avatarUrl || 'https://images.unsplash.com/photo-1544005313-94ddf0286df2'} 
+                    className="w-7 h-7 rounded-full object-cover border" 
+                    alt="" 
+                  />
+                </div>
               )}
               
               <div className="space-y-1">
@@ -281,6 +335,18 @@ export default function ChatWindow({
                       : 'bg-white border border-gray-150 text-gray-800 rounded-bl-none shadow-xs'
                   }`}
                 >
+                  {!isSelf && (
+                    <div className="flex items-center gap-1.5 mb-1">
+                      <span className="text-[10px] font-bold text-orange-600">
+                        {msgSender?.name || 'Member'}
+                      </span>
+                      {msgSender?.role && (
+                        <span className="text-[8px] uppercase font-bold text-gray-400 font-mono">
+                          • {msgSender.role}
+                        </span>
+                      )}
+                    </div>
+                  )}
                   <p className="whitespace-pre-wrap">{msg.content}</p>
                   
                   {/* Embedded PDF/Doc briefs */}

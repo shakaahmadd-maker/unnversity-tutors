@@ -55,27 +55,45 @@ export default function TutorDashboard({
   const [newSyllabusDate, setNewSyllabusDate] = useState('');
   const [slotsList, setSlotsList] = useState<string[]>(currentUser.availableSlots || []);
 
-  // Filter values for current tutor
-  const tutorAssignments = assignments.filter(a => a.tutorId === currentUser.id);
-  const tutorChats = chats.filter(c => c.tutorId === currentUser.id);
+  // Filter values for current tutor (supports both ID and name assignments)
+  const tutorAssignments = assignments.filter(a => 
+    a.tutorId === currentUser.id || 
+    (currentUser.name && a.tutorId === currentUser.name)
+  );
+  const tutorChats = chats.filter(c => 
+    c.tutorId === currentUser.id || 
+    (currentUser.name && c.tutorId === currentUser.name)
+  );
   const tutorReviews = reviews.filter(r => r.tutorId === currentUser.id);
 
   // Earnings calculations
   const totalEarned = payments
     .filter(p => {
       const a = assignments.find(assign => assign.id === p.assignmentId);
-      return a && a.tutorId === currentUser.id && p.status === 'released';
+      return a && (a.tutorId === currentUser.id || a.tutorId === currentUser.name) && p.status === 'released';
     })
     .reduce((sum, p) => sum + p.amount, 0);
 
   const pendingEscrow = payments
     .filter(p => {
       const a = assignments.find(assign => assign.id === p.assignmentId);
-      return a && a.tutorId === currentUser.id && p.status === 'escrow';
+      return a && (a.tutorId === currentUser.id || a.tutorId === currentUser.name) && p.status === 'escrow';
     })
     .reduce((sum, p) => sum + p.amount, 0);
 
-  const getStudent = (studentId: string) => students.find(s => s.id === studentId);
+  const getStudent = (studentId: string) => {
+    return students.find(s => 
+      s.id === studentId || 
+      (s.email && s.email.toLowerCase() === studentId.toLowerCase()) || 
+      (s.name && s.name.toLowerCase() === studentId.toLowerCase())
+    ) || {
+      id: studentId,
+      name: studentId.includes('@') ? studentId.split('@')[0] : (studentId || 'Student Member'),
+      email: studentId.includes('@') ? studentId : `${studentId.toLowerCase().replace(/\s+/g, '.')}@student.uni.edu`,
+      avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150',
+      role: UserRole.STUDENT
+    } as User;
+  };
 
   const handleDeliverSubmit = (e: React.FormEvent, assignId: string) => {
     e.preventDefault();

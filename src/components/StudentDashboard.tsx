@@ -353,27 +353,52 @@ export default function StudentDashboard({
   const [alertMessage, setAlertMessage] = useState<string>('');
 
 
-  // Filter lists for current student
-  const studentAssignments = assignments.filter(a => a.studentId === currentUser.id);
+  // Filter lists for current student (matching across user ID, email, and display name for funnel submissions)
+  const studentAssignments = assignments.filter(a => {
+    if (a.studentId === currentUser.id) return true;
+    if (currentUser.email && a.studentId.toLowerCase() === currentUser.email.toLowerCase()) return true;
+    if (currentUser.name && a.studentId.toLowerCase() === currentUser.name.toLowerCase()) return true;
+    return false;
+  });
+
   const studentPayments = payments.filter(p => {
     const a = assignments.find(assign => assign.id === p.assignmentId);
-    return a && a.studentId === currentUser.id;
+    if (!a) return false;
+    if (a.studentId === currentUser.id) return true;
+    if (currentUser.email && a.studentId.toLowerCase() === currentUser.email.toLowerCase()) return true;
+    if (currentUser.name && a.studentId.toLowerCase() === currentUser.name.toLowerCase()) return true;
+    return false;
   });
-  const studentTickets = supportTickets.filter(t => t.studentId === currentUser.id);
-  const studentChats = chats.filter(c => c.studentId === currentUser.id);
+
+  const studentTickets = supportTickets.filter(t => {
+    if (t.studentId === currentUser.id) return true;
+    if (currentUser.email && t.studentId.toLowerCase() === currentUser.email.toLowerCase()) return true;
+    return false;
+  });
+
+  const studentChats = chats.filter(c => {
+    if (c.studentId === currentUser.id) return true;
+    if (currentUser.email && c.studentId.toLowerCase() === currentUser.email.toLowerCase()) return true;
+    if (currentUser.name && c.studentId.toLowerCase() === currentUser.name.toLowerCase()) return true;
+    return false;
+  });
 
   // Helper to find tutor details
   const getTutor = (tutorId: string) => {
-    if (tutorId === 'admin_emily' || tutorId.startsWith('admin_')) {
+    if (tutorId === 'admin_emily' || tutorId.startsWith('admin_') || tutorId === 'admin_shaka') {
       return {
         id: tutorId,
-        name: 'Platform Support / Admin',
+        name: tutorId === 'admin_shaka' ? 'Shaka Ahmad (Head Admin)' : 'Platform Support Desk',
         avatarUrl: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150&auto=format&fit=crop&q=80',
         role: UserRole.ADMIN,
         bio: '24/7 Platform Support & Customer Service Representative Desk.'
       } as User;
     }
-    return tutors.find(t => t.id === tutorId);
+    return tutors.find(t => 
+      t.id === tutorId || 
+      t.name.toLowerCase() === tutorId.toLowerCase() || 
+      t.email.toLowerCase() === tutorId.toLowerCase()
+    );
   };
 
   const handleApproveSubmit = (assignId: string) => {
