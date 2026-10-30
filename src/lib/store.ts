@@ -723,6 +723,8 @@ export class AppStore {
           fileUrl,
           fileName,
           isSystem: Boolean(isSystem),
+          senderId,
+          sendAsTutorId: (senderId !== this.currentUser?.id) ? senderId : undefined,
         }),
       });
 
@@ -736,6 +738,8 @@ export class AppStore {
             chatId,
             roomId: chatId,
             orderId,
+            senderId,
+            sendAsTutorId: (senderId !== this.currentUser?.id) ? senderId : undefined,
             content: content.trim(),
             fileUrl,
             fileName,
@@ -757,6 +761,18 @@ export class AppStore {
       this.notify();
       throw err;
     }
+  }
+
+  sendMessage(
+    chatId: string,
+    senderId: string,
+    content: string,
+    fileUrl?: string,
+    fileName?: string,
+    isSystem?: boolean,
+    orderId?: string
+  ) {
+    return this.addMessage(chatId, senderId, content, fileUrl, fileName, isSystem, orderId);
   }
 
   markMessagesAsRead(chatId: string, currentUserId: string) {
@@ -1249,10 +1265,6 @@ export class AppStore {
   // ==========================================
   // ACTION ALIASES FOR COMPONENT COMPATIBILITY
   // ==========================================
-
-  sendMessage(chatId: string, senderId: string, content: string, fileUrl?: string, fileName?: string, isSystem?: boolean, orderId?: string) {
-    return this.addMessage(chatId, senderId, content, fileUrl, fileName, isSystem, orderId);
-  }
 
   offerQuote(
     chatId: string, 

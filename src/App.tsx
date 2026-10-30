@@ -7,7 +7,7 @@ import CookieBanner from './components/CookieBanner';
 const SopModal = lazy(() => import('./components/SopModal'));
 const AuthPage = lazy(() => import('./components/AuthPage'));
 const AdminLoginPage = lazy(() => import('./components/AdminLoginPage'));
-import MarketingPages from './components/MarketingPages';
+const MarketingPages = lazy(() => import('./components/MarketingPages'));
 const StudentDashboard = lazy(() => import('./components/StudentDashboard'));
 const TutorDashboard = lazy(() => import('./components/TutorDashboard'));
 const AdminDashboard = lazy(() => import('./components/AdminDashboard'));
@@ -21,6 +21,8 @@ const WhatsAppChatModal = lazy(() => import('./components/WhatsAppChatModal'));
 const CountryOnlineTutoringPage = lazy(() => import('./components/CountryOnlineTutoringPage'));
 const SpecializedServicePage = lazy(() => import('./components/SpecializedServicePage'));
 const WhatsAppPage = lazy(() => import('./components/WhatsAppPage'));
+import ChatNotificationToast from './components/ChatNotificationToast';
+import { audioNotifier, ToastNotification } from './utils/audioNotification';
 import { COUNTRY_ONLINE_TUTORING_PAGES } from './data/countryOnlineTutoringData';
 import { SPECIALIZED_SERVICE_PAGES_MAP } from './data/specializedTutoringServicesData';
 
@@ -68,6 +70,58 @@ export default function App() {
   const [isBecomeTutorOpen, setIsBecomeTutorOpen] = useState<boolean>(false);
   const [isWhatsAppModalOpen, setIsWhatsAppModalOpen] = useState<boolean>(false);
   const [prefilledTutorForAssign, setPrefilledTutorForAssign] = useState<string>('');
+
+  // Floating notifications and audio music chime for incoming texts
+  const [activeToasts, setActiveToasts] = useState<ToastNotification[]>([]);
+  const seenMessageIdsRef = React.useRef<Set<string>>(new Set(store.messages.map(m => m.id)));
+  const isInitialMountRef = React.useRef<boolean>(true);
+
+  // Incoming text listener: plays melodic chime ("music") and shows in-app floating banner
+  useEffect(() => {
+    if (isInitialMountRef.current) {
+      isInitialMountRef.current = false;
+      seenMessageIdsRef.current = new Set(storeState.messages.map(m => m.id));
+      return;
+    }
+
+    const currentMessages = storeState.messages;
+    const newArrivals = currentMessages.filter(m => !seenMessageIdsRef.current.has(m.id));
+
+    if (newArrivals.length > 0) {
+      newArrivals.forEach(m => {
+        seenMessageIdsRef.current.add(m.id);
+
+        if (m.senderId !== storeState.currentUser?.id && !m.isSystem) {
+          const senderUser = storeState.users.find(u => u.id === m.senderId);
+          const senderName = senderUser?.name || 'Academic Advisor';
+          const senderAvatar = senderUser?.avatarUrl;
+          const senderRole = senderUser?.role || 'tutor';
+
+          // 1. Play musical chime ("music")
+          audioNotifier.playReceivedSound();
+
+          // 2. Display live floating notification toast
+          const toastId = `notif_${m.id}_${Date.now()}`;
+          const newToast: ToastNotification = {
+            id: toastId,
+            senderName,
+            senderAvatar,
+            senderRole,
+            chatId: m.chatId || m.roomId || '',
+            content: m.content,
+            timestamp: new Date(m.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          };
+
+          setActiveToasts(prev => [newToast, ...prev.slice(0, 2)]);
+
+          // Auto-dismiss after 7 seconds
+          setTimeout(() => {
+            setActiveToasts(prev => prev.filter(t => t.id !== toastId));
+          }, 7000);
+        }
+      });
+    }
+  }, [storeState.messages, storeState.currentUser, storeState.users]);
 
   // Open WhatsApp modal 10 seconds after user moves to a new page; keep it shut on page transition
   useEffect(() => {
@@ -562,6 +616,7 @@ export default function App() {
   };
 
   const handleSendMessage = (chatId: string, senderId: string, content: string, fileUrl?: string, fileName?: string) => {
+    audioNotifier.playSentSound();
     return store.sendMessage(chatId, senderId, content, fileUrl, fileName);
   };
 
@@ -1149,6 +1204,18 @@ export default function App() {
           </div>
         )}
       </Suspense>
+
+      {/* Floating incoming chat message notification toasts with chime music */}
+      <ChatNotificationToast 
+        notifications={activeToasts}
+        onDismiss={(id) => setActiveToasts(prev => prev.filter(t => t.id !== id))}
+        onOpenChat={(chatId) => {
+          const targetChat = storeState.chats.find(c => c.id === chatId);
+          if (targetChat) {
+            setActiveChat(targetChat);
+          }
+        }}
+      />
 
     </div>
   );

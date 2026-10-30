@@ -15,7 +15,7 @@ import {
   Inbox,
   User as UserIcon
 } from 'lucide-react';
-import { User, Assignment, AssignmentStatus, Chat, Message, Payment, Review, AssignmentReport } from '../types';
+import { User, Assignment, AssignmentStatus, Chat, Message, Payment, Review, AssignmentReport, UserRole } from '../types';
 
 interface TutorDashboardProps {
   currentUser: User;

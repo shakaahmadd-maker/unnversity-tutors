@@ -10,9 +10,14 @@ import {
   AlertCircle,
   HelpCircle,
   FileCheck2,
-  DollarSign
+  DollarSign,
+  Volume2,
+  VolumeX,
+  ShieldCheck,
+  GraduationCap
 } from 'lucide-react';
 import { Chat, Message, User, UserRole, Quote } from '../types';
+import { audioNotifier } from '../utils/audioNotification';
 
 interface ChatWindowProps {
   chat: Chat;
@@ -157,6 +162,13 @@ export default function ChatWindow({
     }
   };
 
+  const [adminPersona, setAdminPersona] = useState<'admin' | 'tutor'>('admin');
+  const [soundActive, setSoundActive] = useState(audioNotifier.isEnabled());
+
+  const effectiveSenderId = (currentUser.role === UserRole.ADMIN && adminPersona === 'tutor')
+    ? resolvedTutor.id
+    : currentUser.id;
+
   const handleSend = async (e: React.FormEvent) => {
     e.preventDefault();
     const trimmed = inputMsg.trim();
@@ -181,11 +193,12 @@ export default function ChatWindow({
     try {
       await onSendMessage(
         chat.id,
-        currentUser.id,
+        effectiveSenderId,
         trimmed,
         attachedFile ? `https://example.com/uploads/${attachedFile}` : undefined,
         attachedFile ? attachedFile : undefined
       );
+      audioNotifier.playSentSound();
       setInputMsg('');
       setAttachedFile('');
     } catch (err: any) {
@@ -259,16 +272,39 @@ export default function ChatWindow({
         </div>
 
         {/* Action button options */}
-        {(currentUser.role === UserRole.TUTOR || currentUser.role === UserRole.ADMIN) && onOfferQuote && (
+        <div className="flex items-center gap-2">
           <button
-            id="tutor-toggle-quote-panel"
-            onClick={() => setShowQuoteForm(!showQuoteForm)}
-            className="bg-orange-500 font-bold hover:bg-orange-600 text-white text-[11px] px-3.5 py-2.5 rounded-xl transition-all cursor-pointer flex items-center gap-1 shadow-sm"
+            type="button"
+            onClick={() => {
+              const next = !audioNotifier.isEnabled();
+              audioNotifier.setEnabled(next);
+              setSoundActive(next);
+              if (next) {
+                audioNotifier.playReceivedSound();
+              }
+            }}
+            className={`p-2 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all border cursor-pointer ${
+              soundActive 
+                ? 'bg-orange-50 text-orange-700 border-orange-200 hover:bg-orange-100' 
+                : 'bg-gray-100 text-gray-500 border-gray-200 hover:bg-gray-200'
+            }`}
+            title={soundActive ? 'Sound notifications are ON (Click to test chime or mute)' : 'Sound notifications are MUTED (Click to enable)'}
           >
-            <DollarSign className="w-3.5 h-3.5" />
-            <span>Offer Custom Quote</span>
+            {soundActive ? <Volume2 className="w-3.5 h-3.5 text-orange-600" /> : <VolumeX className="w-3.5 h-3.5" />}
+            <span className="text-[10px] font-mono font-bold hidden sm:inline">{soundActive ? 'Chime Active' : 'Muted'}</span>
           </button>
-        )}
+
+          {(currentUser.role === UserRole.TUTOR || currentUser.role === UserRole.ADMIN) && onOfferQuote && (
+            <button
+              id="tutor-toggle-quote-panel"
+              onClick={() => setShowQuoteForm(!showQuoteForm)}
+              className="bg-orange-500 font-bold hover:bg-orange-600 text-white text-[11px] px-3.5 py-2 rounded-xl transition-all cursor-pointer flex items-center gap-1 shadow-sm"
+            >
+              <DollarSign className="w-3.5 h-3.5" />
+              <span>Offer Custom Quote</span>
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Main Messages Body */}
@@ -672,6 +708,48 @@ export default function ChatWindow({
           >
             ✕
           </button>
+        </div>
+      )}
+
+      {/* Admin Sending Persona Switcher */}
+      {currentUser.role === UserRole.ADMIN && (
+        <div className="bg-amber-50/90 border-t border-amber-200/80 px-4 py-2 flex flex-wrap items-center justify-between gap-2 text-xs font-sans animate-fade-in" id="admin-send-persona-bar">
+          <div className="flex items-center gap-2">
+            <span className="font-extrabold text-amber-950 flex items-center gap-1 text-[11px]">
+              <span>🎭 Reply Persona:</span>
+            </span>
+            <div className="inline-flex rounded-xl border border-amber-300 bg-white p-0.5 shadow-2xs">
+              <button
+                type="button"
+                id="persona-send-as-admin"
+                onClick={() => setAdminPersona('admin')}
+                className={`px-3 py-1 rounded-lg text-[10.5px] font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                  adminPersona === 'admin'
+                    ? 'bg-purple-600 text-white shadow-xs'
+                    : 'text-gray-600 hover:bg-gray-100'
+                }`}
+              >
+                <ShieldCheck className="w-3 h-3" />
+                <span>👑 Platform Admin ({currentUser.name})</span>
+              </button>
+              <button
+                type="button"
+                id="persona-send-as-tutor"
+                onClick={() => setAdminPersona('tutor')}
+                className={`px-3 py-1 rounded-lg text-[10.5px] font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                  adminPersona === 'tutor'
+                    ? 'bg-orange-500 text-white shadow-xs'
+                    : 'text-gray-600 hover:bg-gray-100'
+                }`}
+              >
+                <GraduationCap className="w-3 h-3" />
+                <span>🎓 Tutor ({resolvedTutor.name})</span>
+              </button>
+            </div>
+          </div>
+          <span className="text-[9.5px] text-amber-900 font-mono font-bold bg-amber-100/70 px-2 py-0.5 rounded-md border border-amber-200">
+            Sending to {resolvedStudent.name} as: <b>{adminPersona === 'tutor' ? resolvedTutor.name : currentUser.name}</b>
+          </span>
         </div>
       )}
 

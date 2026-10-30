@@ -194,6 +194,43 @@ async function runTests() {
   });
   assert(validLongRes.status === 201, 'Message within 5,000 characters is accepted with 201 Created');
 
+  // -------------------------------------------------------------
+  // TEST 7: Admin sending as Admin and sending as Tutor to student
+  // -------------------------------------------------------------
+  console.log('\n[Scenario 7]: Admin sending text as Admin and as Tutor');
+  // Admin sends as Admin
+  const adminMsgRes = await fetch(`${BASE_URL}/api/chat-rooms/${roomId}/messages`, {
+    method: 'POST',
+    headers: getHeaders(subadminToken),
+    body: JSON.stringify({ content: 'Hello Student, this is Platform Administration assistance.' }),
+  });
+  assert(adminMsgRes.status === 201, 'Admin can send message as Platform Admin (201 Created)');
+
+  // Admin sends as Assigned Tutor
+  const adminAsTutorRes = await fetch(`${BASE_URL}/api/chat-rooms/${roomId}/messages`, {
+    method: 'POST',
+    headers: getHeaders(subadminToken),
+    body: JSON.stringify({ 
+      content: 'Hello Student, this is Dr. Clara Stirling with feedback on your chapter draft.',
+      sendAsTutorId: tutorMember.user.id
+    }),
+  });
+  assert(adminAsTutorRes.status === 201, 'Admin can send message as assigned Tutor (201 Created)');
+  const adminAsTutorData = await adminAsTutorRes.json();
+  assert(adminAsTutorData.message.senderId === tutorMember.user.id, 'Message sent by Admin as Tutor records tutor ID as senderId');
+
+  // Non-admin attempting to send as tutor should NOT change senderId
+  const studentSpoofTutorRes = await fetch(`${BASE_URL}/api/chat-rooms/${roomId}/messages`, {
+    method: 'POST',
+    headers: getHeaders(studentA.token),
+    body: JSON.stringify({
+      content: 'I am pretending to be tutor',
+      sendAsTutorId: tutorMember.user.id
+    }),
+  });
+  const spoofData = await studentSpoofTutorRes.json();
+  assert(spoofData.message.senderId === studentA.user.id, 'Non-admin cannot use sendAsTutorId (forced to student ID)');
+
   console.log(`\n--- TEST SUMMARY: ${passed}/${total} PASSED ---`);
   if (passed === total) {
     console.log('🎉 ALL SECURITY & INTEGRITY AUDIT TESTS PASSED CLEANLY!\n');

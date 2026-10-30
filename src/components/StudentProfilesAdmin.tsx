@@ -35,6 +35,7 @@ interface StudentProfilesAdminProps {
   onSetAssignmentPrice: (assignmentId: string, price: number) => Promise<boolean>;
   onUpdateUserProfile: (userId: string, updatedData: Partial<User>) => void;
   onDeleteUser: (userId: string) => void;
+  onSendNotification?: (title: string, message: string, targetUserId: string, type: 'email' | 'webapp' | 'both') => Promise<boolean>;
   initialSearchQuery?: string;
   initialStudentId?: string;
 }

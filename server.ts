@@ -1079,8 +1079,13 @@ async function startServer() {
         return res.status(400).json({ error: 'Message length exceeds the 5,000 character limit.' });
       }
 
-      // Security requirement: NEVER accept senderId from frontend; ALWAYS use authenticated session user
-      const senderId = currentUser.id;
+      // Security requirement: Regular users (students, tutors) can NEVER spoof senderId; session user ID is strictly enforced.
+      // Platform administrators have supervisory authority to send messages as Admin or as Assigned Tutor to assist students.
+      const isAdmin = currentUser.role === 'admin' || currentUser.role === 'subadmin';
+      let senderId = currentUser.id;
+      if (isAdmin && (req.body.sendAsTutorId || req.body.senderId)) {
+        senderId = req.body.sendAsTutorId || req.body.senderId;
+      }
       const now = new Date().toISOString();
       const msgId = req.body.id || 'msg_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6);
 
@@ -1198,8 +1203,13 @@ async function startServer() {
         return res.status(400).json({ error: 'Message length exceeds the 5,000 character limit.' });
       }
 
-      // Security: Sender ID is strictly enforced from authenticated session
-      const senderId = currentUser.id;
+      // Security: Non-admins cannot impersonate another user (forced session user ID).
+      // Platform administrators have supervisory authority to send as Admin or on behalf of Tutor.
+      const isAdmin = currentUser.role === 'admin' || currentUser.role === 'subadmin';
+      let senderId = currentUser.id;
+      if (isAdmin && (data.sendAsTutorId || data.senderId)) {
+        senderId = data.sendAsTutorId || data.senderId;
+      }
       const now = new Date().toISOString();
       const msgId = data.id || 'msg_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6);
 

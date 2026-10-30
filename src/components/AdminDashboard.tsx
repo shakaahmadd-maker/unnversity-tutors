@@ -33,6 +33,7 @@ import {
   User, Blog, FAQ, Assignment, Payment, SupportTicket, UserRole, Chat, Message,
   Invoice, ActivityLog, AppNotification, SOP, AssignmentReport, Agreement, AssignmentStatus, TriggeredEmail
 } from '../types';
+import { audioNotifier } from '../utils/audioNotification';
 import TutorsListAdmin from './TutorsListAdmin';
 import StudentProfilesAdmin from './StudentProfilesAdmin';
 import { store } from '../lib/store';
@@ -245,6 +246,13 @@ export default function AdminDashboard({
   const [assignTutorState, setAssignTutorState] = useState<{[key: string]: string}>({});
   const [assignmentFilter, setAssignmentFilter] = useState<'all' | 'pending' | 'in_progress' | 'completed' | 'revision'>('all');
 
+  // Quick text dispatch state from assignment table row (send as Admin OR send as Tutor)
+  const [quickTextAssignId, setQuickTextAssignId] = useState<string | null>(null);
+  const [quickTextMessage, setQuickTextMessage] = useState<string>('');
+  const [quickTextPersona, setQuickTextPersona] = useState<'admin' | 'tutor'>('tutor');
+  const [quickTextSending, setQuickTextSending] = useState<boolean>(false);
+  const [quickTextSuccess, setQuickTextSuccess] = useState<string | null>(null);
+
   // Advanced User detail state
   const [selectedUserForDetail, setSelectedUserForDetail] = useState<User | null>(null);
 
@@ -364,6 +372,7 @@ export default function AdminDashboard({
       adminAttachedFileUrl || undefined,
       adminAttachedFileName || undefined
     );
+    audioNotifier.playSentSound();
     setAdminReply('');
     setAdminAttachedFileName('');
     setAdminAttachedFileUrl('');
@@ -1948,7 +1957,8 @@ export default function AdminDashboard({
                           const tutorsList = users.filter(u => u.role === UserRole.TUTOR);
 
                         return (
-                          <tr key={assign.id} className="hover:bg-gray-50/70 transition-colors">
+                          <React.Fragment key={assign.id}>
+                            <tr className="hover:bg-gray-50/70 transition-colors">
                             <td className="p-4">
                               <span className="font-bold text-gray-900 block text-xs">{assign.title}</span>
                               <div className="flex items-center gap-1.5 mt-1">
@@ -1962,7 +1972,7 @@ export default function AdminDashboard({
                               <span className="text-[9.5px] text-gray-400 font-mono block mt-0.5">({studentEmail})</span>
                               <span className="inline-block text-[9px] bg-orange-100 text-orange-800 font-bold font-mono px-1.5 py-0.5 rounded-md mt-1">Ref: #{assign.id}</span>
 
-                              {/* Interactive Actions */}
+                              {/* Interactive Actions for Admin and Tutor Persona Messaging */}
                               <div className="flex flex-wrap gap-1.5 mt-2">
                                 <button
                                   type="button"
@@ -1992,14 +2002,56 @@ export default function AdminDashboard({
                                     if (targetChat) {
                                       onSelectChat(targetChat);
                                       setSelectedChatId(targetChat.id);
+                                      setReplyAsTutor(false);
+                                    }
+                                    setActiveTab('chats');
+                                  }}
+                                  className="inline-flex items-center gap-1 text-[9.5px] font-bold bg-gray-900 hover:bg-black text-white px-2 py-0.5 rounded-md transition-colors shadow-2xs cursor-pointer"
+                                  title="Open live chat and send messages as Platform Admin"
+                                >
+                                  <span>👑 Chat as Admin</span>
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const studentIdentifier = student?.id || assign.studentId;
+                                    const targetTutorId = assign.tutorId || 'tutor_clara';
+                                    let targetChat = chats.find(c => 
+                                      c.studentId === studentIdentifier || 
+                                      c.studentId.toLowerCase() === studentEmail.toLowerCase()
+                                    );
+                                    if (!targetChat && onGetOrCreateChat) {
+                                      targetChat = onGetOrCreateChat(studentIdentifier, targetTutorId, assign.title);
+                                    }
+                                    if (targetChat) {
+                                      onSelectChat(targetChat);
+                                      setSelectedChatId(targetChat.id);
+                                      setReplyAsTutor(true);
                                     }
                                     setActiveTab('chats');
                                   }}
                                   className="inline-flex items-center gap-1 text-[9.5px] font-bold bg-orange-500 hover:bg-orange-600 text-white px-2 py-0.5 rounded-md transition-colors shadow-2xs cursor-pointer"
-                                  title="Open live chat room with this student"
+                                  title={`Open live chat and send messages as assigned tutor (${tutor?.name || 'Tutor'})`}
                                 >
                                   <MessageSquare className="w-2.5 h-2.5" />
-                                  <span>Chat with Student</span>
+                                  <span>🎓 Chat as Tutor</span>
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setQuickTextAssignId(quickTextAssignId === assign.id ? null : assign.id);
+                                    setQuickTextSuccess(null);
+                                    setQuickTextPersona(assign.tutorId ? 'tutor' : 'admin');
+                                  }}
+                                  className={`inline-flex items-center gap-1 text-[9.5px] font-bold px-2 py-0.5 rounded-md transition-colors shadow-2xs cursor-pointer border ${
+                                    quickTextAssignId === assign.id
+                                      ? 'bg-amber-600 text-white border-amber-600'
+                                      : 'bg-amber-50 hover:bg-amber-100 text-amber-800 border-amber-300'
+                                  }`}
+                                  title="Quick inline text sender: send text directly to student as Admin or Tutor with audio chime"
+                                >
+                                  <Send className="w-2.5 h-2.5" />
+                                  <span>⚡ Quick Text</span>
                                 </button>
                               </div>
                             </td>
@@ -2132,7 +2184,183 @@ export default function AdminDashboard({
                               </div>
                             </td>
                           </tr>
-                        );
+
+                          {/* Quick Inline Direct Text Dispatch Row */}
+                          {quickTextAssignId === assign.id && (
+                            <tr key={`quick-text-row-${assign.id}`} className="bg-amber-50/75 border-y-2 border-amber-300 animate-fade-in">
+                              <td colSpan={5} className="p-4">
+                                <div className="bg-white rounded-2xl border border-amber-200 p-4 shadow-sm space-y-3">
+                                  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 border-b pb-2.5">
+                                    <div>
+                                      <div className="flex items-center gap-2">
+                                        <span className="text-[10px] bg-amber-100 text-amber-800 font-bold px-2 py-0.5 rounded-full uppercase tracking-wider font-mono">
+                                          Direct Text Dispatcher
+                                        </span>
+                                        <span className="text-xs font-bold text-gray-900 font-sans">
+                                          Send message to: {studentName} ({studentEmail})
+                                        </span>
+                                      </div>
+                                      <p className="text-[10.5px] text-gray-500 mt-0.5">
+                                        Regarding brief: <span className="font-semibold text-gray-700">"{assign.title}"</span>
+                                      </p>
+                                    </div>
+
+                                    <div className="flex items-center gap-2">
+                                      <button
+                                        type="button"
+                                        onClick={() => audioNotifier.playReceivedSound()}
+                                        className="text-[10px] font-bold text-gray-600 hover:text-orange-600 bg-gray-50 hover:bg-orange-50 border border-gray-200 px-2 py-1 rounded-lg transition-colors cursor-pointer flex items-center gap-1"
+                                        title="Test melodic chime music"
+                                      >
+                                        <span>🎵 Test Chime Music</span>
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          setQuickTextAssignId(null);
+                                          setQuickTextMessage('');
+                                          setQuickTextSuccess(null);
+                                        }}
+                                        className="text-gray-400 hover:text-gray-600 font-bold p-1 rounded-full hover:bg-gray-100 cursor-pointer"
+                                        title="Close quick text box"
+                                      >
+                                        ✕
+                                      </button>
+                                    </div>
+                                  </div>
+
+                                  {/* Persona Selection */}
+                                  <div className="flex flex-wrap items-center gap-4 bg-gray-50 p-2.5 rounded-xl border border-gray-100 text-xs">
+                                    <span className="text-[10px] font-bold uppercase tracking-wide text-gray-500 font-mono">Choose Identity Persona:</span>
+                                    
+                                    <label className="inline-flex items-center gap-1.5 cursor-pointer font-bold select-none text-[11px]">
+                                      <input
+                                        type="radio"
+                                        name={`persona-${assign.id}`}
+                                        checked={quickTextPersona === 'admin'}
+                                        onChange={() => setQuickTextPersona('admin')}
+                                        className="accent-gray-900"
+                                      />
+                                      <span className={quickTextPersona === 'admin' ? 'text-gray-950 underline underline-offset-2 font-extrabold' : 'text-gray-500'}>
+                                        👑 Send as Platform Admin ({currentUser.name})
+                                      </span>
+                                    </label>
+
+                                    <label className="inline-flex items-center gap-1.5 cursor-pointer font-bold select-none text-[11px]">
+                                      <input
+                                        type="radio"
+                                        name={`persona-${assign.id}`}
+                                        checked={quickTextPersona === 'tutor'}
+                                        onChange={() => setQuickTextPersona('tutor')}
+                                        className="accent-orange-600"
+                                      />
+                                      <span className={quickTextPersona === 'tutor' ? 'text-orange-700 underline underline-offset-2 font-extrabold' : 'text-gray-500'}>
+                                        🎓 Send as Assigned Tutor ({tutor?.name || 'Dr. Clara Stirling'})
+                                      </span>
+                                    </label>
+                                  </div>
+
+                                  {/* Message Input & Dispatch */}
+                                  <div className="space-y-2">
+                                    <div className="flex gap-2">
+                                      <input
+                                        type="text"
+                                        value={quickTextMessage}
+                                        onChange={(e) => setQuickTextMessage(e.target.value)}
+                                        onKeyDown={async (e) => {
+                                          if (e.key === 'Enter' && !e.shiftKey) {
+                                            e.preventDefault();
+                                            if (!quickTextMessage.trim()) return;
+                                            const studentIdentifier = student?.id || assign.studentId;
+                                            const targetTutorId = assign.tutorId || 'tutor_clara';
+                                            let targetChat = chats.find(c => 
+                                              c.studentId === studentIdentifier || 
+                                              c.studentId.toLowerCase() === studentEmail.toLowerCase()
+                                            );
+                                            if (!targetChat && onGetOrCreateChat) {
+                                              targetChat = onGetOrCreateChat(studentIdentifier, targetTutorId, assign.title);
+                                            }
+                                            if (targetChat) {
+                                              const senderId = quickTextPersona === 'tutor' ? targetTutorId : currentUser.id;
+                                              await onSendMessage(targetChat.id, senderId, quickTextMessage.trim());
+                                              audioNotifier.playSentSound();
+                                              setQuickTextSuccess(`Text sent as ${quickTextPersona === 'tutor' ? (tutor?.name || 'Tutor') : 'Platform Admin'} to ${studentName}!`);
+                                              setQuickTextMessage('');
+                                            }
+                                          }
+                                        }}
+                                        placeholder={`Type text to student as ${quickTextPersona === 'tutor' ? (tutor?.name || 'Assigned Tutor') : 'Platform Admin'}... (press Enter to send)`}
+                                        className="flex-1 bg-white border border-gray-300 p-2.5 rounded-xl text-xs font-semibold focus:outline-none focus:border-orange-500 shadow-2xs"
+                                      />
+                                      <button
+                                        type="button"
+                                        disabled={!quickTextMessage.trim() || quickTextSending}
+                                        onClick={async () => {
+                                          if (!quickTextMessage.trim()) return;
+                                          setQuickTextSending(true);
+                                          try {
+                                            const studentIdentifier = student?.id || assign.studentId;
+                                            const targetTutorId = assign.tutorId || 'tutor_clara';
+                                            let targetChat = chats.find(c => 
+                                              c.studentId === studentIdentifier || 
+                                              c.studentId.toLowerCase() === studentEmail.toLowerCase()
+                                            );
+                                            if (!targetChat && onGetOrCreateChat) {
+                                              targetChat = onGetOrCreateChat(studentIdentifier, targetTutorId, assign.title);
+                                            }
+                                            if (targetChat) {
+                                              const senderId = quickTextPersona === 'tutor' ? targetTutorId : currentUser.id;
+                                              await onSendMessage(targetChat.id, senderId, quickTextMessage.trim());
+                                              audioNotifier.playSentSound();
+                                              setQuickTextSuccess(`Text sent as ${quickTextPersona === 'tutor' ? (tutor?.name || 'Tutor') : 'Platform Admin'} to ${studentName}!`);
+                                              setQuickTextMessage('');
+                                            }
+                                          } catch (err: any) {
+                                            alert(`Failed to send message: ${err.message || 'Error'}`);
+                                          } finally {
+                                            setQuickTextSending(false);
+                                          }
+                                        }}
+                                        className="bg-orange-500 hover:bg-orange-600 disabled:opacity-50 text-white font-bold text-xs px-4 py-2.5 rounded-xl transition-all shadow-sm flex items-center gap-1.5 cursor-pointer shrink-0"
+                                      >
+                                        <Send className="w-3.5 h-3.5" />
+                                        <span>{quickTextSending ? 'Sending...' : 'Send Text Now 🚀'}</span>
+                                      </button>
+                                    </div>
+
+                                    {/* Quick Presets */}
+                                    <div className="flex flex-wrap items-center gap-1.5 pt-1 text-[10px]">
+                                      <span className="text-gray-400 font-semibold">Templates:</span>
+                                      {[
+                                        "Hello! Your assignment brief has been reviewed and accepted. We are proceeding now.",
+                                        "Hi, please check your uploaded reference materials to verify page count.",
+                                        "Good news! Your tutor has submitted the first draft milestone for your review."
+                                      ].map((preset, pIdx) => (
+                                        <button
+                                          key={pIdx}
+                                          type="button"
+                                          onClick={() => setQuickTextMessage(preset)}
+                                          className="bg-gray-100 hover:bg-orange-50 hover:text-orange-700 text-gray-600 px-2 py-0.5 rounded-md border border-gray-200 transition-colors truncate max-w-[260px] cursor-pointer"
+                                          title={preset}
+                                        >
+                                          {preset}
+                                        </button>
+                                      ))}
+                                    </div>
+
+                                    {quickTextSuccess && (
+                                      <div className="p-2 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-lg text-xs font-bold flex items-center justify-between animate-fade-in">
+                                        <span>✅ {quickTextSuccess}</span>
+                                        <span className="text-[10px] text-emerald-600 font-mono">Chime music played</span>
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                              </td>
+                            </tr>
+                          )}
+                        </React.Fragment>
+                      );
                       })}
                     </tbody>
                   </table>
