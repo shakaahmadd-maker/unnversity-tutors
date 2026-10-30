@@ -7,10 +7,10 @@ export default function CookieBanner() {
   useEffect(() => {
     const consent = localStorage.getItem('ut_cookie_consent_approved');
     if (!consent) {
-      // Small timeout to look organic
+      // Defer cookie banner so it never interferes with critical initial mobile paint or LCP
       const timer = setTimeout(() => {
         setIsVisible(true);
-      }, 1500);
+      }, 3500);
       return () => clearTimeout(timer);
     }
   }, []);
@@ -27,47 +27,49 @@ export default function CookieBanner() {
   if (!isVisible) return null;
 
   return (
-    <div 
-      className="fixed bottom-6 left-6 right-6 md:left-auto md:max-w-md bg-white border border-gray-200/80 shadow-2xl rounded-2xl p-5 z-55 flex flex-col gap-3 transition-opacity duration-300 transform animate-fade-in-up"
+    <aside 
+      className="fixed bottom-3 left-3 right-3 sm:bottom-6 sm:left-auto sm:right-6 sm:max-w-md bg-white border border-gray-200 shadow-2xl rounded-2xl p-4 sm:p-5 z-55 flex flex-col gap-2.5 sm:gap-3 transition-opacity duration-300 transform animate-fade-in-up"
       id="cookie-consent-container"
+      aria-label="Cookie consent banner"
     >
-      <div className="flex items-start gap-3.5 relative">
-        <div className="p-2 bg-orange-100 rounded-lg shrink-0">
-          <ShieldCheck className="w-5 h-5 text-orange-600" />
+      <div className="flex items-start gap-3 relative">
+        <div className="p-1.5 sm:p-2 bg-orange-100 rounded-lg shrink-0 mt-0.5">
+          <ShieldCheck className="w-4 h-4 sm:w-5 sm:h-5 text-orange-600" />
         </div>
-        <div className="flex-1">
-          <h4 className="font-semibold text-sm text-gray-900 tracking-tight flex items-center gap-1.5">
-            GDPR & Privacy Consent
+        <div className="flex-1 pr-6 sm:pr-0">
+          <h4 className="font-semibold text-xs sm:text-sm text-gray-900 tracking-tight">
+            GDPR &amp; Privacy Consent
           </h4>
-          <p className="text-xs text-gray-650 leading-relaxed mt-1">
-            We use secure cookies and local cache storage to track interactive chat sequences, active lesson dashboards, current tutor assignments, and Stripe Escrow validations under CCPA/GDPR compliance frameworks.
+          <p className="text-[11px] sm:text-xs text-gray-600 leading-relaxed mt-0.5 sm:mt-1 line-clamp-3 sm:line-clamp-none">
+            We use secure cookies and local storage to track interactive chat sequences, active lesson dashboards, current tutor assignments, and Stripe Escrow validations.
           </p>
         </div>
         <button 
           id="close-cookie-banner"
           onClick={closeBanner} 
-          className="text-gray-400 hover:text-gray-600 self-start p-1 hover:bg-gray-100 rounded-full"
+          className="text-gray-400 hover:text-gray-600 absolute top-0 right-0 p-1 hover:bg-gray-100 rounded-full cursor-pointer"
+          aria-label="Dismiss cookie banner"
         >
           <X className="w-4 h-4" />
         </button>
       </div>
 
-      <div className="flex items-center gap-2.5 mt-2 ml-10">
+      <div className="flex items-center gap-2 mt-1 sm:mt-2 sm:ml-9">
         <button
           id="cookie-accept-all"
           onClick={approve}
-          className="bg-orange-500 font-medium hover:bg-orange-600 text-xs text-white px-5 py-2 rounded-xl shadow-lg shadow-orange-500/10 transition-colors cursor-pointer"
+          className="flex-1 sm:flex-initial bg-orange-500 font-medium hover:bg-orange-600 text-[11px] sm:text-xs text-white px-4 py-2 rounded-xl shadow-md shadow-orange-500/10 transition-colors cursor-pointer text-center"
         >
-          Accept Optional All
+          Accept All
         </button>
         <button
           id="cookie-necessary"
           onClick={approve}
-          className="bg-white hover:bg-gray-100 border border-gray-200 text-gray-700 font-medium text-xs px-4 py-2 rounded-xl transition-colors cursor-pointer"
+          className="flex-1 sm:flex-initial bg-white hover:bg-gray-100 border border-gray-200 text-gray-700 font-medium text-[11px] sm:text-xs px-3.5 py-2 rounded-xl transition-colors cursor-pointer text-center"
         >
-          Just Necessary
+          Necessary Only
         </button>
       </div>
-    </div>
+    </aside>
   );
 }

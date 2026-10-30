@@ -7,7 +7,7 @@ import CookieBanner from './components/CookieBanner';
 const SopModal = lazy(() => import('./components/SopModal'));
 const AuthPage = lazy(() => import('./components/AuthPage'));
 const AdminLoginPage = lazy(() => import('./components/AdminLoginPage'));
-const MarketingPages = lazy(() => import('./components/MarketingPages'));
+import MarketingPages from './components/MarketingPages';
 const StudentDashboard = lazy(() => import('./components/StudentDashboard'));
 const TutorDashboard = lazy(() => import('./components/TutorDashboard'));
 const AdminDashboard = lazy(() => import('./components/AdminDashboard'));

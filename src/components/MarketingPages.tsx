@@ -34,9 +34,8 @@ import {
   X
 } from 'lucide-react';
 import { User, Blog, FAQ, UserRole } from '../types';
-import DedicatedServicePages from './DedicatedServicePages';
 import HowItWorksSection from './HowItWorksSection';
-import SEOKeywordLinksBlock from './SEOKeywordLinksBlock';
+const DedicatedServicePages = React.lazy(() => import('./DedicatedServicePages'));
 import hero1on1Img from '../assets/images/hero_1on1_tutoring_1787387369345.jpg';
 import heroAssignmentImg from '../assets/images/hero_assignment_guidance_1787387387028.jpg';
 import heroCourseworkImg from '../assets/images/hero_coursework_tracks_1787387403661.jpg';
@@ -917,62 +916,75 @@ export default function MarketingPages({
         <div id="home-section" className="animate-fade-in">
           
           {/* Hero Section */}
-          <section className="relative overflow-hidden bg-white py-16 md:py-24 border-b border-gray-100">
-            <div className="container mx-auto px-4 md:px-8 max-w-7xl flex flex-col lg:flex-row items-center gap-12 relative z-10">
+          <section className="relative overflow-hidden bg-white py-8 sm:py-14 md:py-20 border-b border-gray-100">
+            <div className="container mx-auto px-4 sm:px-6 md:px-8 max-w-7xl flex flex-col lg:flex-row items-center gap-8 lg:gap-12 relative z-10">
               
-              <div className="flex-1 text-left space-y-6">
-                <span className="inline-flex items-center gap-1.5 bg-orange-100 text-orange-650 px-3.5 py-1.5 rounded-full text-xs font-bold tracking-wider uppercase">
-                  <Sparkles className="w-4 h-4 text-orange-600 animate-spin" />
+              <div className="flex-1 text-left space-y-4 sm:space-y-6">
+                <span className="inline-flex items-center gap-1.5 bg-orange-100 text-orange-650 px-3 py-1 rounded-full text-[11px] sm:text-xs font-bold tracking-wider uppercase">
+                  <Sparkles className="w-3.5 h-3.5 text-orange-600 animate-spin" />
                   Your Global Partner for Academic Success
                 </span>
                 
-                <h1 className="text-4xl md:text-5xl lg:text-6.5xl font-bold tracking-tight text-gray-950 font-sans leading-tight">
+                <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold tracking-tight text-gray-950 font-sans leading-tight">
                   Expert Tutors for Every <span className="text-orange-500 relative inline-block">University Subject</span> <br className="hidden md:inline" />
                   Online, On‑Demand
                 </h1>
                 
-                <p className="text-sm md:text-base text-gray-650 max-w-2xl leading-relaxed text-justify">
-                  Get 1-on-1 academic tutoring, subject coaching, coursework guidance, and essay structure review from qualified UK, US, CA, AU, NZ & IE academic mentors. Held in PCI protected escrow payment vaults.
+                <p className="text-xs sm:text-sm md:text-base text-gray-650 max-w-2xl leading-relaxed text-left">
+                  Get 1-on-1 academic tutoring, subject coaching, coursework guidance, and essay structure review from qualified UK, US, CA, AU, NZ &amp; IE academic mentors. Held in PCI protected escrow payment vaults.
                 </p>
 
-                <div className="flex flex-wrap items-center gap-4 pt-2">
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 sm:gap-4 pt-1 sm:pt-2">
                   <button 
                     id="hero-find-tutor-btn"
                     onClick={() => onNavigate('services')}
-                    className="bg-orange-500 hover:bg-orange-650 text-white font-bold text-xs tracking-wider uppercase px-8 py-4 rounded-xl shadow-lg shadow-orange-500/15 cursor-pointer hover:-translate-y-0.5 transition-all duration-200"
+                    className="bg-orange-500 hover:bg-orange-650 text-white font-bold text-xs tracking-wider uppercase px-7 py-3.5 sm:px-8 sm:py-4 rounded-xl shadow-lg shadow-orange-500/15 cursor-pointer hover:-translate-y-0.5 transition-all duration-200 text-center"
                   >
                     Find a Tutor
                   </button>
                   <button 
                     id="hero-get-quote-btn"
                     onClick={() => onNavigate('contact')}
-                    className="bg-white hover:bg-gray-100 text-gray-800 border-2 border-gray-250 font-bold text-xs tracking-wider uppercase px-8 py-4 rounded-xl cursor-pointer hover:-translate-y-0.5 transition-all duration-200"
+                    className="bg-white hover:bg-gray-100 text-gray-800 border-2 border-gray-250 font-bold text-xs tracking-wider uppercase px-7 py-3.5 sm:px-8 sm:py-4 rounded-xl cursor-pointer hover:-translate-y-0.5 transition-all duration-200 text-center"
                   >
                     Get a Free Quote
                   </button>
                 </div>
 
-                <div className="pt-6 border-t border-gray-100 flex items-center gap-4 text-xs font-semibold text-gray-500">
-                  <div className="flex -space-x-1.5">
+                <div className="pt-4 sm:pt-6 border-t border-gray-100 flex items-center gap-3 sm:gap-4 text-xs font-semibold text-gray-500">
+                  <div className="flex -space-x-1.5 shrink-0">
                     {tutors.slice(0,4).map((t, idx) => (
-                      <img key={idx} src={t.avatarUrl} className="w-7 h-7 rounded-full border-2 border-white" alt="Avatar" />
+                      <img 
+                        key={idx} 
+                        src={t.avatarUrl} 
+                        width={28}
+                        height={28}
+                        loading="lazy"
+                        decoding="async"
+                        className="w-7 h-7 rounded-full border-2 border-white object-cover" 
+                        alt="Tutor Avatar" 
+                      />
                     ))}
                   </div>
                   <div>
-                    <span className="text-gray-900 font-bold block">Trusted by 10,000+ university students</span>
-                    <span className="text-[10px] text-gray-400 block -mt-1 font-mono">98% satisfaction score across 500+ tutors</span>
+                    <span className="text-gray-900 font-bold block text-xs">Trusted by 10,000+ university students</span>
+                    <span className="text-[10px] text-gray-400 block -mt-0.5 font-mono">98% satisfaction score across 500+ tutors</span>
                   </div>
                 </div>
 
               </div>
 
               {/* Right Hero: Modern Image/Layout overlapping details */}
-              <div className="flex-1 relative w-full h-[400px] mt-10 lg:mt-0 min-h-[380px]">
+              <div className="flex-1 relative w-full h-[320px] sm:h-[380px] lg:h-[400px] mt-6 lg:mt-0 max-w-[340px] sm:max-w-none mx-auto">
                 {/* Under/Overlapping rotative shapes */}
-                <div className="absolute top-10 right-4 w-72 h-80 bg-orange-600 rounded-3xl transform rotate-3 shadow-2xl overflow-hidden group">
+                <div className="absolute top-6 sm:top-10 right-2 sm:right-4 w-64 sm:w-72 h-72 sm:h-80 bg-orange-600 rounded-3xl transform rotate-2 sm:rotate-3 shadow-2xl overflow-hidden group">
                   <img 
-                    src="https://images.unsplash.com/photo-1522202176988-66273c2fd55f?w=600&auto=format&fit=crop&q=80" 
+                    src={hero1on1Img} 
                     alt="University students on tutoring simulation call"
+                    width={400}
+                    height={320}
+                    fetchPriority="high"
+                    decoding="async"
                     className="w-full h-full object-cover brightness-95 group-hover:scale-105 transition-transform duration-500"
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-gray-950/80 via-transparent to-transparent"></div>
@@ -982,23 +994,23 @@ export default function MarketingPages({
                   </div>
                 </div>
                 
-                <div className="absolute top-0 left-4 w-64 h-72 bg-white p-4 rounded-3xl transform -rotate-6 shadow-2xl border border-orange-100/70 flex flex-col justify-between">
+                <div className="absolute top-0 left-2 sm:left-4 w-56 sm:w-64 h-64 sm:h-72 bg-white p-3 sm:p-4 rounded-3xl transform -rotate-4 sm:-rotate-6 shadow-xl border border-orange-100/70 flex flex-col justify-between">
                    <div className="w-full h-full bg-orange-50 rounded-2xl flex flex-col p-4 items-center justify-center text-center">
-                      <div className="w-12 h-12 bg-white rounded-full flex items-center justify-center mb-2 shadow-sm font-serif text-orange-600 font-bold text-sm">5.0 ★</div>
+                      <div className="w-10 h-10 sm:w-12 sm:h-12 bg-white rounded-full flex items-center justify-center mb-2 shadow-sm font-serif text-orange-600 font-bold text-xs sm:text-sm">5.0 ★</div>
                       <p className="text-xs font-bold text-gray-900">Expert Guidance</p>
                       <p className="text-[10px] text-gray-500 font-sans">Available 24/7</p>
                    </div>
                 </div>
                 
-                <div className="absolute bottom-4 left-16 bg-white py-3.5 px-4 rounded-2xl shadow-xl border border-gray-100 flex items-center gap-3 z-20">
+                <div className="absolute bottom-2 sm:bottom-4 left-6 sm:left-16 bg-white py-2.5 sm:py-3.5 px-3.5 sm:px-4 rounded-2xl shadow-xl border border-gray-100 flex items-center gap-2.5 sm:gap-3 z-20">
                    <div className="flex -space-x-2">
-                     <p className="w-7 h-7 rounded-full bg-orange-200 border-2 border-white flex items-center justify-center text-[10px] font-bold text-orange-850 m-0">💬</p>
-                     <p className="w-7 h-7 rounded-full bg-slate-300 border-2 border-white flex items-center justify-center text-[10px] font-bold text-slate-800 m-0">10k</p>
-                     <p className="w-7 h-7 rounded-full bg-orange-100 border-2 border-white flex items-center justify-center text-[10px] font-bold text-orange-600 m-0 font-sans">✓</p>
+                     <p className="w-6 h-6 sm:w-7 sm:h-7 rounded-full bg-orange-200 border-2 border-white flex items-center justify-center text-[9px] sm:text-[10px] font-bold text-orange-850 m-0">💬</p>
+                     <p className="w-6 h-6 sm:w-7 sm:h-7 rounded-full bg-slate-300 border-2 border-white flex items-center justify-center text-[9px] sm:text-[10px] font-bold text-slate-800 m-0">10k</p>
+                     <p className="w-6 h-6 sm:w-7 sm:h-7 rounded-full bg-orange-100 border-2 border-white flex items-center justify-center text-[9px] sm:text-[10px] font-bold text-orange-600 m-0 font-sans">✓</p>
                    </div>
                    <div className="text-left">
-                     <span className="text-[10px] font-bold text-gray-900 block leading-tight">10,000+ Online</span>
-                     <span className="text-[9px] text-gray-500 block font-sans">SOP Compliant Advisors</span>
+                     <span className="text-[9px] sm:text-[10px] font-bold text-gray-900 block leading-tight">10,000+ Online</span>
+                     <span className="text-[8px] sm:text-[9px] text-gray-500 block font-sans">SOP Compliant Advisors</span>
                    </div>
                 </div>
               </div>
@@ -2152,16 +2164,22 @@ export default function MarketingPages({
             </div>
           ) : (
             /* ==================== MODULAR SHIELD OF DEDICATED CHILD SERVICES ==================== */
-            <DedicatedServicePages
-              selectedServiceId={selectedServiceId}
-              tutors={tutors}
-              onTutorSelect={onTutorSelect}
-              onNavigate={onNavigate}
-              onBackToHub={() => {
-                setSelectedServiceId(null);
-                window.scrollTo({ top: 300, behavior: 'smooth' });
-              }}
-            />
+            <React.Suspense fallback={
+              <div className="py-20 flex justify-center items-center text-orange-500">
+                <span className="w-8 h-8 border-2 border-orange-500 border-t-transparent rounded-full animate-spin"></span>
+              </div>
+            }>
+              <DedicatedServicePages
+                selectedServiceId={selectedServiceId}
+                tutors={tutors}
+                onTutorSelect={onTutorSelect}
+                onNavigate={onNavigate}
+                onBackToHub={() => {
+                  setSelectedServiceId(null);
+                  window.scrollTo({ top: 300, behavior: 'smooth' });
+                }}
+              />
+            </React.Suspense>
           )}
 
           {/* DUMMY HOOK TO DEPLOY AND BLOCK THE RETROGRADE TABS SECTION CODE */}
