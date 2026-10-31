@@ -150,3 +150,21 @@ export const auditLogs = pgTable('audit_logs', {
   ipAddress: text('ip_address'),
   createdAt: text('created_at').notNull(),
 });
+
+// 7. Blogs Table (Educational Blog Articles & Academic Guides)
+export const blogs = pgTable('blogs', {
+  id: text('id').primaryKey(),
+  adminId: text('admin_id').notNull(),
+  title: text('title').notNull(),
+  content: text('content').notNull(),
+  image: text('image').notNull(),
+  category: text('category').notNull(),
+  tags: text('tags').notNull(), // JSON stringified array of tags
+  publishedAt: text('published_at').notNull(),
+  createdAt: text('created_at').notNull(),
+  updatedAt: text('updated_at'),
+}, (table) => [
+  index('idx_blogs_published_at').on(table.publishedAt),
+  index('idx_blogs_category').on(table.category),
+]);
+

@@ -3153,7 +3153,7 @@ export default function MarketingPages({
 
               {/* Category Filter Tabs */}
               <div className="flex flex-wrap gap-2.5 mb-10 border-b border-gray-100 pb-6">
-                {['All', 'University Survival', 'APA Guidelines', 'Mathematics Tricks', 'Legal Disclaimers'].map((cat) => (
+                {Array.from(new Set(['All', 'University Survival', 'APA Guidelines', 'Mathematics Tricks', 'Legal Disclaimers', ...blogs.map(b => b.category).filter(Boolean)])).map((cat) => (
                   <button
                     key={cat}
                     onClick={() => setBlogActiveCategory(cat)}
@@ -3205,7 +3205,7 @@ export default function MarketingPages({
                         onClick={() => { setSelectedBlog(b); window.scrollTo({ top: 0, behavior: 'instant' }); }}
                       >
                         <div>
-                          <img src={b.image} alt={b.title} className="w-full h-56 object-cover" />
+                          <img src={b.imageUrl || b.image} alt={b.title} className="w-full h-56 object-cover" />
                           <div className="p-6 space-y-3">
                             <div className="flex items-center gap-2.5">
                               <span className="text-[10px] font-semibold tracking-wider text-orange-600 bg-orange-100 px-2.5 py-1 rounded-full uppercase">
@@ -3296,15 +3296,15 @@ export default function MarketingPages({
                         className="w-10 h-10 rounded-full border border-orange-200 object-cover"
                       />
                       <div>
-                        <p className="text-xs font-bold text-gray-900">Emily Thornton</p>
-                        <p className="text-[10px] text-gray-500 font-medium">Head of Administrative Board & Peer Screening</p>
+                        <p className="text-xs font-bold text-gray-900">{selectedBlog.author || 'Editorial Team'}</p>
+                        <p className="text-[10px] text-gray-500 font-medium">Academic Research Advisor & Peer Reviewer</p>
                       </div>
                     </div>
                   </div>
 
                   {/* Wide Display Banner Image */}
                   <div className="relative group overflow-hidden rounded-3xl border border-gray-200 shadow-lg">
-                    <img src={selectedBlog.image} alt={selectedBlog.title} className="w-full h-[320px] md:h-[400px] object-cover transition-transform duration-500 group-hover:scale-102" />
+                    <img src={selectedBlog.imageUrl || selectedBlog.image} alt={selectedBlog.title} className="w-full h-[320px] md:h-[400px] object-cover transition-transform duration-500 group-hover:scale-102" />
                     <div className="absolute inset-0 bg-gradient-to-t from-black/25 to-transparent pointer-events-none" />
                   </div>
 

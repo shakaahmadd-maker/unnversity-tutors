@@ -1,4 +1,24 @@
 import crypto from 'crypto';
+import { DEFAULT_20_BLOGS } from '../data/defaultBlogsData';
+
+export interface BlogRecord {
+  id: string;
+  adminId: string;
+  title: string;
+  content: string;
+  image: string;
+  imageUrl?: string;
+  slug?: string;
+  excerpt?: string;
+  author?: string;
+  category: string;
+  tags: string[];
+  readTime?: string;
+  featured?: boolean;
+  publishedAt: string;
+  createdAt: string;
+  updatedAt?: string | null;
+}
 
 export interface UserRecord {
   id: string;
@@ -150,6 +170,7 @@ export class MemoryStore {
   private messages: MessageRecord[] = [];
   private quotes: Map<string, QuoteRecord> = new Map();
   private auditLogs: AuditLogRecord[] = [];
+  private blogs: Map<string, BlogRecord> = new Map();
 
   constructor() {
     this.seedDefaults();
@@ -281,6 +302,15 @@ export class MemoryStore {
       { userId: 'admin_shaka', role: 'admin' },
       { userId: 'tutor_clara', role: 'tutor' },
     ]);
+
+    // Seed 20 Default Educational Blogs
+    for (const b of DEFAULT_20_BLOGS) {
+      this.blogs.set(b.id, {
+        ...b,
+        createdAt: b.publishedAt,
+        updatedAt: b.publishedAt,
+      });
+    }
   }
 
   // --- Users ---
@@ -484,6 +514,51 @@ export class MemoryStore {
     if (this.auditLogs.length > 500) {
       this.auditLogs.pop();
     }
+  }
+
+  // --- Blogs ---
+  public getBlogs(category?: string): BlogRecord[] {
+    let list = Array.from(this.blogs.values());
+    if (category && category !== 'All') {
+      list = list.filter(b => b.category.toLowerCase() === category.toLowerCase());
+    }
+    return list.sort((a, b) => new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime());
+  }
+
+  public getBlogById(id: string): BlogRecord | undefined {
+    return this.blogs.get(id);
+  }
+
+  public setBlog(blog: BlogRecord): void {
+    this.blogs.set(blog.id, blog);
+  }
+
+  public updateBlog(id: string, updates: Partial<BlogRecord>): BlogRecord | undefined {
+    const existing = this.blogs.get(id);
+    if (!existing) return undefined;
+    const updated: BlogRecord = {
+      ...existing,
+      ...updates,
+      updatedAt: new Date().toISOString(),
+    };
+    this.blogs.set(id, updated);
+    return updated;
+  }
+
+  public deleteBlog(id: string): boolean {
+    return this.blogs.delete(id);
+  }
+
+  public resetDefaultBlogs(): BlogRecord[] {
+    this.blogs.clear();
+    for (const b of DEFAULT_20_BLOGS) {
+      this.blogs.set(b.id, {
+        ...b,
+        createdAt: b.publishedAt,
+        updatedAt: b.publishedAt,
+      });
+    }
+    return this.getBlogs();
   }
 }
 

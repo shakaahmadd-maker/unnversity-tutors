@@ -19,6 +19,7 @@ import {
   Agreement,
   TriggeredEmail
 } from '../types';
+import { DEFAULT_20_BLOGS } from '../data/defaultBlogsData';
 
 // Standard Initial Mock Data
 const INITIAL_TUTORS: User[] = [
@@ -117,28 +118,22 @@ const INITIAL_TUTORS: User[] = [
   }
 ];
 
-const INITIAL_BLOGS: Blog[] = [
-  {
-    id: 'blog_1',
-    adminId: 'admin_emily',
-    title: 'Mastering the Undergraduate Dissertation: 5 Critical Roadmap Milestones',
-    content: `Writing your final undergraduate dissertation or project is arguably the most intellectually grueling milestone of your academic degree. However, establishing a systemic chronological plan avoids late-semester panic.`,
-    image: 'https://images.unsplash.com/photo-1506880018603-83d5b814b5a6?w=400&auto=format&fit=crop&q=80',
-    category: 'University Survival',
-    tags: ['Dissertation', 'Undergraduate', 'Methodology', 'Research Paper'],
-    publishedAt: new Date(Date.now() - 2 * 24 * 3600 * 1000).toISOString()
-  },
-  {
-    id: 'blog_2',
-    adminId: 'admin_emily',
-    title: 'The Harvard and APA 7th Edition Style Manual: Navigating Tricky In-Text Rules',
-    content: `Maintaining absolute formatting consistency is key to securing top-tier academic marks. Many students get tripped up when transitioning between Harvard and APA 7th structures.`,
-    image: 'https://images.unsplash.com/photo-1456513080510-7bf3a84b82f8?w=400&auto=format&fit=crop&q=80',
-    category: 'APA Guidelines',
-    tags: ['Referencing', 'Academic Writing', 'APA Style', 'Harvard Style'],
-    publishedAt: new Date(Date.now() - 4 * 24 * 3600 * 1000).toISOString()
-  }
-];
+const INITIAL_BLOGS: Blog[] = DEFAULT_20_BLOGS.map(b => ({
+  id: b.id,
+  adminId: b.adminId || 'admin_shaka',
+  title: b.title,
+  slug: b.id,
+  excerpt: b.title,
+  content: b.content,
+  author: 'Editorial Team',
+  image: b.image,
+  imageUrl: b.image,
+  category: b.category,
+  tags: b.tags,
+  readTime: '5 min read',
+  featured: false,
+  publishedAt: b.publishedAt,
+}));
 
 const INITIAL_FAQS: FAQ[] = [
   {
@@ -274,7 +269,7 @@ export class AppStore {
 
   public async fetchData() {
     try {
-      // 1. Fetch public users/tutors list (needed for public landing page)
+      // 1. Fetch public users/tutors list and educational blogs (needed for public landing and blog pages)
       const usersPromise = fetch('/api/users').then(async (res) => {
         if (res.ok) {
           const uData = await res.json();
@@ -288,9 +283,23 @@ export class AppStore {
         }
       }).catch(() => {});
 
+      const blogsPromise = fetch('/api/blogs').then(async (res) => {
+        if (res.ok) {
+          const bData = await res.json();
+          if (Array.isArray(bData.blogs) && bData.blogs.length > 0) {
+            this.blogs = bData.blogs.map((b: any) => ({
+              ...b,
+              image: b.imageUrl || b.image,
+              imageUrl: b.imageUrl || b.image,
+              tags: typeof b.tags === 'string' ? JSON.parse(b.tags || '[]') : (b.tags || []),
+            }));
+          }
+        }
+      }).catch(() => {});
+
       // For public visitors who are not logged in, DO NOT make private dashboard requests
       if (!this.currentUser) {
-        await usersPromise;
+        await Promise.all([usersPromise, blogsPromise]);
         this.connectionStatus = 'connected';
         this.lastSyncTime = new Date().toLocaleTimeString();
         this.syncError = null;
@@ -375,7 +384,7 @@ export class AppStore {
         }
       }).catch(() => {}) : Promise.resolve();
 
-      await Promise.all([usersPromise, ordersPromise, roomsPromise, msgsPromise, quotesPromise, auditPromise]);
+      await Promise.all([usersPromise, blogsPromise, ordersPromise, roomsPromise, msgsPromise, quotesPromise, auditPromise]);
 
       this.connectionStatus = 'connected';
       this.lastSyncTime = new Date().toLocaleTimeString();
@@ -1196,48 +1205,159 @@ export class AppStore {
 
   async addBlog(titleOrBlog: any, content?: string, image?: string, category?: string, tags?: string[], adminId?: string) {
     const id = `blog_${Date.now()}`;
-    let newBlog: Blog;
+    let blogPayload: any;
     if (typeof titleOrBlog === 'object') {
-      newBlog = { ...titleOrBlog, id, publishedAt: new Date().toISOString() };
+      blogPayload = {
+        ...titleOrBlog,
+        id: titleOrBlog.id || id,
+        imageUrl: titleOrBlog.imageUrl || titleOrBlog.image,
+        image: titleOrBlog.image || titleOrBlog.imageUrl,
+        publishedAt: titleOrBlog.publishedAt || new Date().toISOString(),
+      };
     } else {
-      newBlog = {
+      blogPayload = {
         id,
-        adminId: adminId || 'admin_emily',
+        adminId: adminId || this.currentUser?.id || 'admin_shaka',
         title: titleOrBlog,
         content: content || '',
+        imageUrl: image || '',
         image: image || '',
         category: category || 'University Survival',
         tags: tags || [],
         publishedAt: new Date().toISOString()
       };
     }
-    this.blogs.unshift(newBlog);
+    this.blogs.unshift(blogPayload);
     this.notify();
-    return newBlog;
+
+    try {
+      const res = await fetch('/api/blogs', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(localStorage.getItem('auth_token') ? { 'Authorization': `Bearer ${localStorage.getItem('auth_token')}` } : {})
+        },
+        body: JSON.stringify(blogPayload)
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.blog) {
+          const index = this.blogs.findIndex(b => b.id === blogPayload.id);
+          if (index !== -1) {
+            this.blogs[index] = {
+              ...data.blog,
+              image: data.blog.imageUrl || data.blog.image,
+              imageUrl: data.blog.imageUrl || data.blog.image,
+              tags: typeof data.blog.tags === 'string' ? JSON.parse(data.blog.tags) : data.blog.tags,
+            };
+            this.notify();
+          }
+        }
+      }
+    } catch (e) {
+      console.warn('[STORE] Network notice saving blog to server:', e);
+    }
+
+    return blogPayload;
   }
 
   async deleteBlog(blogId: string) {
     this.blogs = this.blogs.filter(b => b.id !== blogId);
     this.notify();
+
+    try {
+      await fetch(`/api/blogs/${encodeURIComponent(blogId)}`, {
+        method: 'DELETE',
+        headers: {
+          ...(localStorage.getItem('auth_token') ? { 'Authorization': `Bearer ${localStorage.getItem('auth_token')}` } : {})
+        }
+      });
+    } catch (e) {
+      console.warn('[STORE] Network notice deleting blog from server:', e);
+    }
   }
 
   async updateBlog(blogId: string, titleOrData: any, content?: string, image?: string, category?: string, tags?: string[]) {
     const blog = this.blogs.find(b => b.id === blogId);
-    if (blog) {
-      if (typeof titleOrData === 'object') {
-        Object.assign(blog, titleOrData);
-      } else {
-        if (titleOrData) blog.title = titleOrData;
-        if (content) blog.content = content;
-        if (image) blog.image = image;
-        if (category) blog.category = category;
-        if (tags) blog.tags = tags;
+    let updates: any = {};
+    if (typeof titleOrData === 'object') {
+      updates = { ...titleOrData };
+    } else {
+      if (titleOrData) updates.title = titleOrData;
+      if (content) updates.content = content;
+      if (image) {
+        updates.image = image;
+        updates.imageUrl = image;
       }
+      if (category) updates.category = category;
+      if (tags) updates.tags = tags;
+    }
+
+    if (blog) {
+      Object.assign(blog, updates);
+      if (updates.imageUrl && !blog.image) blog.image = updates.imageUrl;
+      if (updates.image && !blog.imageUrl) blog.imageUrl = updates.image;
       this.notify();
+    }
+
+    try {
+      await fetch(`/api/blogs/${encodeURIComponent(blogId)}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(localStorage.getItem('auth_token') ? { 'Authorization': `Bearer ${localStorage.getItem('auth_token')}` } : {})
+        },
+        body: JSON.stringify(updates)
+      });
+    } catch (e) {
+      console.warn('[STORE] Network notice updating blog on server:', e);
     }
   }
 
   async syncDefaultBlogs(): Promise<boolean> {
+    try {
+      const res = await fetch('/api/blogs/sync-defaults', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(localStorage.getItem('auth_token') ? { 'Authorization': `Bearer ${localStorage.getItem('auth_token')}` } : {})
+        }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data.blogs)) {
+          this.blogs = data.blogs.map((b: any) => ({
+            ...b,
+            image: b.imageUrl || b.image,
+            imageUrl: b.imageUrl || b.image,
+            tags: typeof b.tags === 'string' ? JSON.parse(b.tags || '[]') : (b.tags || []),
+          }));
+          this.notify();
+          return true;
+        }
+      }
+    } catch (e) {
+      console.warn('[STORE] Error calling /api/blogs/sync-defaults:', e);
+    }
+
+    // Local fallback: reload from DEFAULT_20_BLOGS
+    this.blogs = DEFAULT_20_BLOGS.map(b => ({
+      id: b.id,
+      adminId: b.adminId || 'admin_shaka',
+      title: b.title,
+      slug: b.id,
+      excerpt: b.title,
+      content: b.content,
+      author: 'Editorial Team',
+      image: b.image,
+      imageUrl: b.image,
+      category: b.category,
+      tags: b.tags,
+      readTime: '5 min read',
+      featured: false,
+      publishedAt: b.publishedAt,
+    }));
+    this.notify();
     return true;
   }
 

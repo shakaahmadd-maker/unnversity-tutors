@@ -155,12 +155,18 @@ export interface Payment {
 
 export interface Blog {
   id: string;
-  adminId: string;
+  adminId?: string;
   title: string;
+  slug?: string;
+  excerpt?: string;
   content: string;
+  author?: string;
   image: string;
+  imageUrl?: string;
   category: string;
   tags: string[];
+  readTime?: string;
+  featured?: boolean;
   publishedAt: string;
 }
 

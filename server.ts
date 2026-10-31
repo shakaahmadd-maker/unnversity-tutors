@@ -9,10 +9,11 @@ import crypto from 'crypto';
 import cookieParser from 'cookie-parser';
 import { createServer as createViteServer } from 'vite';
 import { db, isDbConnected, checkDbConnection } from './src/db/index';
-import { users, orders, inquiries, messages, quotes, auditLogs, chatRooms, chatRoomMembers } from './src/db/schema';
+import { users, orders, inquiries, messages, quotes, auditLogs, chatRooms, chatRoomMembers, blogs } from './src/db/schema';
 import { eq, desc, and, inArray } from 'drizzle-orm';
 import { runMigrations } from './src/db/migrate';
 import { memoryStore } from './src/db/memoryStore';
+import { DEFAULT_20_BLOGS } from './src/data/defaultBlogsData';
 
 // Configurable Environment Variables read from process.env
 const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
@@ -187,6 +188,30 @@ async function seedInitialDatabase() {
         }).onConflictDoNothing();
       }
       console.log('[SEED] Seeded initial certified tutors into PostgreSQL.');
+    }
+
+    // Check if blogs exist in DB
+    try {
+      const existingBlogs = await db.select().from(blogs).limit(1);
+      if (existingBlogs.length === 0) {
+        for (const b of DEFAULT_20_BLOGS) {
+          await db.insert(blogs).values({
+            id: b.id,
+            adminId: b.adminId,
+            title: b.title,
+            content: b.content,
+            image: b.image,
+            category: b.category,
+            tags: JSON.stringify(b.tags),
+            publishedAt: b.publishedAt,
+            createdAt: b.publishedAt,
+            updatedAt: b.publishedAt,
+          }).onConflictDoNothing();
+        }
+        console.log('[SEED] Seeded 20 default educational guides into PostgreSQL blogs table.');
+      }
+    } catch (blogErr: any) {
+      console.warn('[SEED] Notice during blog table verification:', blogErr.message);
     }
   } catch (err: any) {
     console.warn('[SEED] Notice during initial database seeding check:', err.message);
@@ -1376,6 +1401,284 @@ async function startServer() {
       const { action, details, userId, userName, userRole } = req.body;
       await logAudit(action, details, userId, userName, userRole, req);
       return res.status(201).json({ success: true });
+    } catch (err: any) {
+      return res.status(500).json({ error: err.message });
+    }
+  });
+
+  // ==========================================
+  // BLOGS (Educational Guides & Academic Articles)
+  // ==========================================
+
+  // GET /api/blogs (Public)
+  app.get('/api/blogs', async (req, res) => {
+    try {
+      const { category } = req.query;
+
+      if (isDbConnected() && db) {
+        try {
+          let rows: any[] = [];
+          if (category && category !== 'All') {
+            rows = await db.select().from(blogs).where(eq(blogs.category, String(category))).orderBy(desc(blogs.publishedAt));
+          } else {
+            rows = await db.select().from(blogs).orderBy(desc(blogs.publishedAt));
+          }
+
+          // If DB table is empty, auto-seed default blogs into DB
+          if (rows.length === 0 && (!category || category === 'All')) {
+            for (const b of DEFAULT_20_BLOGS) {
+              await db.insert(blogs).values({
+                id: b.id,
+                adminId: b.adminId,
+                title: b.title,
+                content: b.content,
+                image: b.image,
+                category: b.category,
+                tags: JSON.stringify(b.tags),
+                publishedAt: b.publishedAt,
+                createdAt: b.publishedAt,
+                updatedAt: b.publishedAt,
+              }).onConflictDoNothing();
+            }
+            rows = await db.select().from(blogs).orderBy(desc(blogs.publishedAt));
+          }
+
+          if (rows.length > 0) {
+            // Also sync to memoryStore cache
+            for (const r of rows) {
+              memoryStore.setBlog({
+                ...r,
+                image: r.image,
+                imageUrl: r.image,
+                tags: typeof r.tags === 'string' ? JSON.parse(r.tags) : (r.tags || []),
+              });
+            }
+            return res.status(200).json({ blogs: rows });
+          }
+        } catch (dbErr: any) {
+          console.warn('[API] Notice querying blogs from DB:', dbErr.message);
+        }
+      }
+
+      // Memory Store fallback
+      let memBlogs = memoryStore.getBlogs(category as string | undefined);
+      if (memBlogs.length === 0) {
+        memBlogs = memoryStore.resetDefaultBlogs();
+      }
+
+      return res.status(200).json({ blogs: memBlogs });
+    } catch (err: any) {
+      console.error('[API] Error in GET /api/blogs:', err);
+      return res.status(200).json({ blogs: memoryStore.getBlogs() });
+    }
+  });
+
+  // GET /api/blogs/:id (Public)
+  app.get('/api/blogs/:id', async (req, res) => {
+    try {
+      const { id } = req.params;
+
+      if (isDbConnected() && db) {
+        try {
+          const rows = await db.select().from(blogs).where(eq(blogs.id, id)).limit(1);
+          if (rows.length > 0) {
+            return res.status(200).json({ blog: rows[0] });
+          }
+        } catch (dbErr: any) {
+          console.warn('[API] DB error finding blog:', dbErr.message);
+        }
+      }
+
+      const memBlog = memoryStore.getBlogById(id);
+      if (memBlog) {
+        return res.status(200).json({ blog: memBlog });
+      }
+
+      return res.status(404).json({ error: 'Blog post not found' });
+    } catch (err: any) {
+      return res.status(500).json({ error: err.message });
+    }
+  });
+
+  // POST /api/blogs (Admin create)
+  app.post('/api/blogs', async (req, res) => {
+    try {
+      const user = (req as any).user;
+      if (!user || user.role !== 'admin') {
+        return res.status(403).json({ error: 'Unauthorized: Only platform administrators can publish blogs.' });
+      }
+
+      const { title, excerpt, content, category, readTime, imageUrl, image, tags, featured } = req.body;
+      if (!title || !content || !category) {
+        return res.status(400).json({ error: 'Missing required fields: title, content, category' });
+      }
+
+      const now = new Date().toISOString();
+      const slug = (title as string).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || `post-${Date.now()}`;
+      const imgUrl = (imageUrl || image || 'https://images.unsplash.com/photo-1434030216411-0b793f4b4173?w=800&auto=format&fit=crop&q=80').trim();
+      const tagsArray: string[] = Array.isArray(tags) ? tags : (typeof tags === 'string' ? tags.split(',').map((t: string) => t.trim()).filter(Boolean) : [category]);
+
+      const newBlog = {
+        id: 'blog_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6),
+        adminId: user.id || 'admin_shaka',
+        title: title.trim(),
+        slug,
+        excerpt: excerpt?.trim() || title.trim(),
+        content: content.trim(),
+        author: user.name || 'Editorial Team',
+        image: imgUrl,
+        imageUrl: imgUrl,
+        category: category.trim(),
+        publishedAt: now,
+        readTime: readTime?.trim() || '5 min read',
+        tags: tagsArray,
+        featured: !!featured,
+        createdAt: now,
+        updatedAt: now,
+      };
+
+      memoryStore.setBlog(newBlog);
+
+      if (isDbConnected() && db) {
+        try {
+          await db.insert(blogs).values({
+            id: newBlog.id,
+            adminId: newBlog.adminId,
+            title: newBlog.title,
+            content: newBlog.content,
+            image: newBlog.image,
+            category: newBlog.category,
+            tags: JSON.stringify(newBlog.tags),
+            publishedAt: newBlog.publishedAt,
+            createdAt: newBlog.createdAt,
+            updatedAt: newBlog.updatedAt,
+          });
+        } catch (dbErr: any) {
+          console.warn('[API] Notice inserting blog to DB:', dbErr.message);
+        }
+      }
+
+      await logAudit('BLOG_CREATE', `Published new blog: "${newBlog.title}" (${newBlog.category})`, user.id, user.name, user.role, req);
+
+      return res.status(201).json({ success: true, blog: newBlog });
+    } catch (err: any) {
+      return res.status(500).json({ error: err.message });
+    }
+  });
+
+  // PUT /api/blogs/:id (Admin update)
+  app.put('/api/blogs/:id', async (req, res) => {
+    try {
+      const user = (req as any).user;
+      if (!user || user.role !== 'admin') {
+        return res.status(403).json({ error: 'Unauthorized: Only platform administrators can update blogs.' });
+      }
+
+      const { id } = req.params;
+      const updates = { ...req.body };
+      delete updates.id;
+      updates.updatedAt = new Date().toISOString();
+
+      if (updates.tags && Array.isArray(updates.tags)) {
+        updates.tags = JSON.stringify(updates.tags);
+      }
+
+      const updated = memoryStore.updateBlog(id, updates);
+
+      if (isDbConnected() && db) {
+        try {
+          await db.update(blogs).set(updates).where(eq(blogs.id, id));
+        } catch (dbErr: any) {
+          console.warn('[API] Notice updating blog in DB:', dbErr.message);
+        }
+      }
+
+      await logAudit('BLOG_UPDATE', `Updated blog ${id}: "${updates.title || 'updated'}"`, user.id, user.name, user.role, req);
+
+      return res.status(200).json({ success: true, blog: updated });
+    } catch (err: any) {
+      return res.status(500).json({ error: err.message });
+    }
+  });
+
+  // DELETE /api/blogs/:id (Admin delete)
+  app.delete('/api/blogs/:id', async (req, res) => {
+    try {
+      const user = (req as any).user;
+      if (!user || user.role !== 'admin') {
+        return res.status(403).json({ error: 'Unauthorized: Only platform administrators can delete blogs.' });
+      }
+
+      const { id } = req.params;
+      memoryStore.deleteBlog(id);
+
+      if (isDbConnected() && db) {
+        try {
+          await db.delete(blogs).where(eq(blogs.id, id));
+        } catch (dbErr: any) {
+          console.warn('[API] Notice deleting blog from DB:', dbErr.message);
+        }
+      }
+
+      await logAudit('BLOG_DELETE', `Deleted blog ${id}`, user.id, user.name, user.role, req);
+
+      return res.status(200).json({ success: true });
+    } catch (err: any) {
+      return res.status(500).json({ error: err.message });
+    }
+  });
+
+  // POST /api/blogs/sync-defaults (Admin reset/sync all 20 default educational blogs)
+  app.post('/api/blogs/sync-defaults', async (req, res) => {
+    try {
+      const user = (req as any).user;
+      if (!user || user.role !== 'admin') {
+        return res.status(403).json({ error: 'Unauthorized: Only platform administrators can sync default blogs.' });
+      }
+
+      // 1. Reset memoryStore
+      const syncedBlogs = memoryStore.resetDefaultBlogs();
+
+      // 2. Sync to DB if connected
+      if (isDbConnected() && db) {
+        try {
+          for (const b of DEFAULT_20_BLOGS) {
+            await db.insert(blogs).values({
+              id: b.id,
+              adminId: b.adminId,
+              title: b.title,
+              content: b.content,
+              image: b.image,
+              category: b.category,
+              tags: JSON.stringify(b.tags),
+              publishedAt: b.publishedAt,
+              createdAt: b.publishedAt,
+              updatedAt: b.publishedAt,
+            }).onConflictDoUpdate({
+              target: blogs.id,
+              set: {
+                title: b.title,
+                content: b.content,
+                image: b.image,
+                category: b.category,
+                tags: JSON.stringify(b.tags),
+                publishedAt: b.publishedAt,
+                updatedAt: new Date().toISOString(),
+              }
+            });
+          }
+        } catch (dbErr: any) {
+          console.warn('[API] Notice syncing default blogs to DB:', dbErr.message);
+        }
+      }
+
+      await logAudit('BLOG_SYNC_DEFAULTS', `Synchronized and seeded ${syncedBlogs.length} standard educational blogs`, user.id, user.name, user.role, req);
+
+      return res.status(200).json({
+        success: true,
+        message: `Successfully synchronized and deployed ${syncedBlogs.length} educational guides across the live website.`,
+        blogs: syncedBlogs,
+      });
     } catch (err: any) {
       return res.status(500).json({ error: err.message });
     }
