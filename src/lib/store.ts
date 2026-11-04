@@ -263,7 +263,7 @@ export class AppStore {
         if (this.currentUser && !document.hidden) {
           this.fetchData();
         }
-      }, 15000);
+      }, 8000);
     }
   }
 
@@ -384,7 +384,34 @@ export class AppStore {
         }
       }).catch(() => {}) : Promise.resolve();
 
-      await Promise.all([usersPromise, blogsPromise, ordersPromise, roomsPromise, msgsPromise, quotesPromise, auditPromise]);
+      const paymentsPromise = fetch('/api/payments').then(async (res) => {
+        if (res.ok) {
+          const pData = await res.json();
+          if (Array.isArray(pData.payments)) {
+            this.payments = pData.payments;
+          }
+        }
+      }).catch(() => {});
+
+      const invoicesPromise = fetch('/api/invoices').then(async (res) => {
+        if (res.ok) {
+          const iData = await res.json();
+          if (Array.isArray(iData.invoices)) {
+            this.invoices = iData.invoices;
+          }
+        }
+      }).catch(() => {});
+
+      const notifsPromise = fetch(`/api/notifications?userId=${encodeURIComponent(this.currentUser?.id || '')}`).then(async (res) => {
+        if (res.ok) {
+          const nData = await res.json();
+          if (Array.isArray(nData.notifications) && nData.notifications.length > 0) {
+            this.appNotifications = nData.notifications;
+          }
+        }
+      }).catch(() => {});
+
+      await Promise.all([usersPromise, blogsPromise, ordersPromise, roomsPromise, msgsPromise, quotesPromise, auditPromise, notifsPromise, paymentsPromise, invoicesPromise]);
 
       this.connectionStatus = 'connected';
       this.lastSyncTime = new Date().toLocaleTimeString();
@@ -998,6 +1025,10 @@ export class AppStore {
     }
   }
 
+  async assignTutor(assignmentId: string, tutorId: string) {
+    return this.assignTutorToAssignment(assignmentId, tutorId);
+  }
+
   async updateAssignmentProgress(assignmentId: string, progressPercent: number) {
     const assign = this.assignments.find(a => a.id === assignmentId);
     if (assign) {
@@ -1105,7 +1136,68 @@ export class AppStore {
     };
     this.invoices.push(newInvoice);
     this.notify();
+
+    fetch('/api/invoices', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(newInvoice)
+    }).catch(() => {});
+
     return newInvoice;
+  }
+
+  async recordPayment(paymentData: {
+    assignmentId: string;
+    studentId?: string;
+    amount: number;
+    status?: 'escrow' | 'released' | 'refunded';
+    type?: 'advance' | 'balance' | 'full';
+    notes?: string;
+  }): Promise<Payment | null> {
+    try {
+      const res = await fetch('/api/payments', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(paymentData)
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.payment) {
+          this.payments.unshift(data.payment);
+          const assign = this.assignments.find(a => a.id === paymentData.assignmentId);
+          if (assign) {
+            assign.status = AssignmentStatus.IN_PROGRESS;
+          }
+          this.notify();
+          return data.payment;
+        }
+      }
+    } catch (e) {
+      console.warn('Error recording payment:', e);
+    }
+    return null;
+  }
+
+  async processAdvancePayment(assignmentId: string, amount: number) {
+    return this.recordPayment({
+      assignmentId,
+      studentId: this.currentUser?.id,
+      amount,
+      status: 'escrow',
+      type: 'advance',
+      notes: 'Initial 50% Advance Escrow Payment'
+    });
+  }
+
+  async processBalancePayment(assignmentId: string, amount: number) {
+    return this.recordPayment({
+      assignmentId,
+      studentId: this.currentUser?.id,
+      amount,
+      status: 'escrow',
+      type: 'balance',
+      notes: 'Milestone Balance Escrow Settlement'
+    });
   }
 
   // ==========================================
@@ -1113,7 +1205,7 @@ export class AppStore {
   // ==========================================
 
   async addNotification(notif: Omit<AppNotification, 'id' | 'createdAt' | 'read'>) {
-    const id = `notif_${Date.now()}`;
+    const id = `notif_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
     const newNotif: AppNotification = {
       ...notif,
       id,
@@ -1122,6 +1214,13 @@ export class AppStore {
     };
     this.appNotifications.unshift(newNotif);
     this.notify();
+
+    fetch('/api/notifications', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(newNotif)
+    }).catch(() => {});
+
     return newNotif;
   }
 
@@ -1130,7 +1229,24 @@ export class AppStore {
     if (notif) {
       notif.read = true;
       this.notify();
+
+      fetch(`/api/notifications/${notifId}/read`, {
+        method: 'PUT'
+      }).catch(() => {});
     }
+  }
+
+  async markAllNotificationsRead(userId: string) {
+    this.appNotifications = this.appNotifications.map(n => 
+      (n.userId === userId || n.userId === 'all') ? { ...n, read: true } : n
+    );
+    this.notify();
+
+    fetch('/api/notifications/mark-all-read', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId })
+    }).catch(() => {});
   }
 
   async addActivityLog(log: Omit<ActivityLog, 'id' | 'timestamp'>) {

@@ -222,7 +222,8 @@ async function startServer() {
   const app = express();
 
   app.use(compression());
-  app.use(express.json());
+  app.use(express.json({ limit: '15mb' }));
+  app.use(express.urlencoded({ extended: true, limit: '15mb' }));
   app.use(cookieParser());
 
   // Check database connectivity
@@ -1401,6 +1402,196 @@ async function startServer() {
       const { action, details, userId, userName, userRole } = req.body;
       await logAudit(action, details, userId, userName, userRole, req);
       return res.status(201).json({ success: true });
+    } catch (err: any) {
+      return res.status(500).json({ error: err.message });
+    }
+  });
+
+  // ==========================================
+  // NOTIFICATIONS
+  // ==========================================
+
+  // GET /api/notifications
+  app.get('/api/notifications', async (req, res) => {
+    try {
+      const { userId } = req.query;
+      const notifs = memoryStore.getNotifications(userId ? String(userId) : undefined);
+      return res.status(200).json({ notifications: notifs });
+    } catch (err: any) {
+      return res.status(200).json({ notifications: [] });
+    }
+  });
+
+  // POST /api/notifications
+  app.post('/api/notifications', async (req, res) => {
+    try {
+      const { userId, title, message, type, sentBy } = req.body;
+      if (!userId || !title || !message) {
+        return res.status(400).json({ error: 'Missing required notification fields' });
+      }
+      const newNotif = {
+        id: 'notif_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6),
+        userId,
+        title,
+        message,
+        type: type || 'webapp',
+        sentBy: sentBy || 'System',
+        createdAt: new Date().toISOString(),
+        read: false
+      };
+      memoryStore.addNotification(newNotif);
+      return res.status(201).json({ success: true, notification: newNotif });
+    } catch (err: any) {
+      return res.status(500).json({ error: err.message });
+    }
+  });
+
+  // PUT /api/notifications/:id/read
+  app.put('/api/notifications/:id/read', async (req, res) => {
+    try {
+      const { id } = req.params;
+      memoryStore.markNotificationRead(id);
+      return res.status(200).json({ success: true });
+    } catch (err: any) {
+      return res.status(500).json({ error: err.message });
+    }
+  });
+
+  // POST /api/notifications/mark-all-read
+  app.post('/api/notifications/mark-all-read', async (req, res) => {
+    try {
+      const { userId } = req.body;
+      if (userId) {
+        memoryStore.markAllNotificationsRead(String(userId));
+      }
+      return res.status(200).json({ success: true });
+    } catch (err: any) {
+      return res.status(500).json({ error: err.message });
+    }
+  });
+
+  // ==========================================
+  // PAYMENTS & ESCROW LEDGER
+  // ==========================================
+
+  // GET /api/payments
+  app.get('/api/payments', async (req, res) => {
+    try {
+      const { studentId, assignmentId } = req.query;
+      const paymentRecords = memoryStore.getPayments(
+        studentId ? String(studentId) : undefined,
+        assignmentId ? String(assignmentId) : undefined
+      );
+      return res.status(200).json({ payments: paymentRecords });
+    } catch (err: any) {
+      return res.status(200).json({ payments: [] });
+    }
+  });
+
+  // POST /api/payments
+  app.post('/api/payments', async (req, res) => {
+    try {
+      const { assignmentId, studentId, amount, status, type, notes } = req.body;
+      if (!assignmentId || amount === undefined) {
+        return res.status(400).json({ error: 'Missing required assignmentId or amount.' });
+      }
+      const paymentId = 'pay_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6);
+      const newPayment = {
+        id: paymentId,
+        assignmentId,
+        studentId: studentId || null,
+        amount: Number(amount),
+        status: status || 'escrow',
+        stripePaymentIntent: req.body.stripePaymentIntent || `pi_3Pqz_${Date.now()}_ut_escrow`,
+        type: type || 'advance',
+        notes: notes || 'Student Escrow Deposit',
+        createdAt: new Date().toISOString()
+      };
+      memoryStore.setPayment(newPayment as any);
+
+      // If advance payment was made, update assignment status
+      const existingOrder = memoryStore.getOrders().find(o => o.id === assignmentId);
+      if (existingOrder) {
+        const orderUpdates: any = { escrowStatus: newPayment.status };
+        if (existingOrder.status === 'Pending Tutor Assignment' || existingOrder.status === 'pending') {
+          orderUpdates.status = 'In Progress';
+        }
+        memoryStore.updateOrder(assignmentId, orderUpdates);
+      }
+
+      await logAudit('PAYMENT_DEPOSIT', `Payment recorded: $${amount} for assignment #${assignmentId}`, studentId, undefined, 'student', req);
+
+      return res.status(201).json({ success: true, payment: newPayment });
+    } catch (err: any) {
+      return res.status(500).json({ error: err.message });
+    }
+  });
+
+  // PUT /api/payments/:id
+  app.put('/api/payments/:id', async (req, res) => {
+    try {
+      const { id } = req.params;
+      const updates = { ...req.body };
+      delete updates.id;
+      const updated = memoryStore.updatePayment(id, updates);
+      return res.status(200).json({ success: true, payment: updated });
+    } catch (err: any) {
+      return res.status(500).json({ error: err.message });
+    }
+  });
+
+  // ==========================================
+  // INVOICES & STATEMENTS
+  // ==========================================
+
+  // GET /api/invoices
+  app.get('/api/invoices', async (req, res) => {
+    try {
+      const { studentId } = req.query;
+      const invList = memoryStore.getInvoices(studentId ? String(studentId) : undefined);
+      return res.status(200).json({ invoices: invList });
+    } catch (err: any) {
+      return res.status(200).json({ invoices: [] });
+    }
+  });
+
+  // POST /api/invoices
+  app.post('/api/invoices', async (req, res) => {
+    try {
+      const data = req.body;
+      const invoiceId = data.id || 'inv_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6);
+      const newInvoice = {
+        id: invoiceId,
+        assignmentId: data.assignmentId || null,
+        studentId: data.studentId || '',
+        studentName: data.studentName || 'Student',
+        studentEmail: data.studentEmail || '',
+        serviceSubject: data.serviceSubject || 'Academic Mentorship',
+        description: data.description || 'Academic Service Invoice',
+        details: data.details || '',
+        totalAmount: Number(data.totalAmount) || 0,
+        advanceAmount: Number(data.advanceAmount) || 0,
+        balanceAmount: Number(data.balanceAmount) || 0,
+        dueDate: data.dueDate || new Date(Date.now() + 7 * 86400000).toISOString().split('T')[0],
+        status: data.status || 'due',
+        createdAt: new Date().toISOString()
+      };
+      memoryStore.setInvoice(newInvoice as any);
+      await logAudit('INVOICE_CREATE', `Invoice created: $${newInvoice.totalAmount} (${invoiceId})`, data.studentId, data.studentName, 'admin', req);
+      return res.status(201).json({ success: true, invoice: newInvoice });
+    } catch (err: any) {
+      return res.status(500).json({ error: err.message });
+    }
+  });
+
+  // PUT /api/invoices/:id
+  app.put('/api/invoices/:id', async (req, res) => {
+    try {
+      const { id } = req.params;
+      const updates = { ...req.body };
+      delete updates.id;
+      const updated = memoryStore.updateInvoice(id, updates);
+      return res.status(200).json({ success: true, invoice: updated });
     } catch (err: any) {
       return res.status(500).json({ error: err.message });
     }

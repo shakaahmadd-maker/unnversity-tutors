@@ -199,6 +199,7 @@ export interface Review {
 
 export interface Invoice {
   id: string;
+  assignmentId?: string;
   studentId: string;
   studentName: string;
   studentEmail: string;

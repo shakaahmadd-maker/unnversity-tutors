@@ -161,6 +161,46 @@ function internalHashPassword(password: string): string {
   return `${salt}:${derivedKey.toString('hex')}`;
 }
 
+export interface NotificationRecord {
+  id: string;
+  userId: string;
+  title: string;
+  message: string;
+  type: string;
+  sentBy: string;
+  createdAt: string;
+  read?: boolean;
+}
+
+export interface PaymentRecord {
+  id: string;
+  assignmentId: string;
+  studentId?: string;
+  amount: number;
+  status: 'escrow' | 'released' | 'refunded';
+  stripePaymentIntent: string;
+  type?: 'advance' | 'balance' | 'full';
+  notes?: string;
+  createdAt: string;
+}
+
+export interface InvoiceRecord {
+  id: string;
+  assignmentId?: string;
+  studentId: string;
+  studentName: string;
+  studentEmail: string;
+  serviceSubject: string;
+  description: string;
+  details?: string;
+  totalAmount: number;
+  advanceAmount: number;
+  balanceAmount: number;
+  dueDate: string;
+  status: 'due' | 'paid' | 'pending' | 'uninvoiced';
+  createdAt: string;
+}
+
 export class MemoryStore {
   private users: Map<string, UserRecord> = new Map();
   private orders: Map<string, OrderRecord> = new Map();
@@ -171,6 +211,9 @@ export class MemoryStore {
   private quotes: Map<string, QuoteRecord> = new Map();
   private auditLogs: AuditLogRecord[] = [];
   private blogs: Map<string, BlogRecord> = new Map();
+  private notifications: Map<string, NotificationRecord> = new Map();
+  private payments: Map<string, PaymentRecord> = new Map();
+  private invoices: Map<string, InvoiceRecord> = new Map();
 
   constructor() {
     this.seedDefaults();
@@ -311,6 +354,59 @@ export class MemoryStore {
         updatedAt: b.publishedAt,
       });
     }
+
+    // Seed Sample Academic Order matching Admin Desk
+    const sampleOrder: OrderRecord = {
+      id: 'assign_1793361628984_pl5rwv',
+      studentId: 'student_alex',
+      tutorId: 'tutor_clara',
+      title: 'Science (Biochemistry) 1-on-1 Lesson Tutoring',
+      subject: 'Science',
+      academicLevel: 'Undergraduate',
+      deadline: '2026-10-31',
+      instructions: 'University-Tutors Matching Funnel Request: TUTORING SERVICE PATTERN: 1-on-1 Lesson Tutoring. Biochemical pathway kinetics and metabolic regulation review.',
+      fileNames: JSON.stringify(['Fsc DMC.pdf']),
+      fileUrls: JSON.stringify(['https://universitytutors.com/uploads/Fsc_DMC.pdf']),
+      quoteAmount: 320,
+      status: 'In Progress',
+      escrowStatus: 'escrow',
+      progressPercent: 50,
+      createdAt: new Date(Date.now() - 4 * 24 * 3600 * 1000).toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+    this.orders.set(sampleOrder.id, sampleOrder);
+
+    // Seed Initial Advance Escrow Payment for the sample order
+    const samplePayment: PaymentRecord = {
+      id: 'pay_1793361628984_adv',
+      assignmentId: sampleOrder.id,
+      studentId: 'student_alex',
+      amount: 160,
+      status: 'escrow',
+      stripePaymentIntent: 'pi_3Pqz9xUT2026_adv_escrow',
+      type: 'advance',
+      notes: '50% Initial Advance Payment (Secured in Escrow)',
+      createdAt: new Date(Date.now() - 4 * 24 * 3600 * 1000).toISOString(),
+    };
+    this.payments.set(samplePayment.id, samplePayment);
+
+    // Seed Initial Milestone Invoice
+    const sampleInvoice: InvoiceRecord = {
+      id: 'inv_1793361628984_01',
+      assignmentId: sampleOrder.id,
+      studentId: 'student_alex',
+      studentName: 'Alex Student',
+      studentEmail: 'student@example.com',
+      serviceSubject: 'Science (Biochemistry)',
+      description: 'Science (Biochemistry) 1-on-1 Lesson Tutoring Milestone Agreement',
+      totalAmount: 320,
+      advanceAmount: 160,
+      balanceAmount: 160,
+      dueDate: '2026-10-31',
+      status: 'paid',
+      createdAt: new Date(Date.now() - 4 * 24 * 3600 * 1000).toISOString(),
+    };
+    this.invoices.set(sampleInvoice.id, sampleInvoice);
   }
 
   // --- Users ---
@@ -559,6 +655,89 @@ export class MemoryStore {
       });
     }
     return this.getBlogs();
+  }
+
+  // --- Notifications ---
+  public getNotifications(userId?: string): NotificationRecord[] {
+    let list = Array.from(this.notifications.values());
+    if (userId) {
+      list = list.filter(n => n.userId === userId || n.userId === 'all');
+    }
+    return list.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  }
+
+  public addNotification(notif: NotificationRecord): void {
+    this.notifications.set(notif.id, notif);
+  }
+
+  public markNotificationRead(id: string): boolean {
+    const n = this.notifications.get(id);
+    if (n) {
+      n.read = true;
+      return true;
+    }
+    return false;
+  }
+
+  public markAllNotificationsRead(userId: string): void {
+    for (const n of this.notifications.values()) {
+      if (n.userId === userId || n.userId === 'all') {
+        n.read = true;
+      }
+    }
+  }
+
+  // --- Payments ---
+  public getPayments(studentId?: string, assignmentId?: string): PaymentRecord[] {
+    let list = Array.from(this.payments.values());
+    if (studentId) {
+      list = list.filter(p => p.studentId === studentId);
+    }
+    if (assignmentId) {
+      list = list.filter(p => p.assignmentId === assignmentId);
+    }
+    return list.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  }
+
+  public getPayment(id: string): PaymentRecord | undefined {
+    return this.payments.get(id);
+  }
+
+  public setPayment(payment: PaymentRecord): void {
+    this.payments.set(payment.id, payment);
+  }
+
+  public updatePayment(id: string, updates: Partial<PaymentRecord>): PaymentRecord | undefined {
+    const existing = this.payments.get(id);
+    if (!existing) return undefined;
+    const updated = { ...existing, ...updates };
+    this.payments.set(id, updated);
+    return updated;
+  }
+
+  // --- Invoices ---
+  public getInvoices(studentId?: string): InvoiceRecord[] {
+    let list = Array.from(this.invoices.values());
+    if (studentId) {
+      list = list.filter(i => i.studentId === studentId);
+    }
+    return list.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  }
+
+  public getInvoice(id: string): InvoiceRecord | undefined {
+    return this.invoices.get(id);
+  }
+
+  public setInvoice(invoice: InvoiceRecord): void {
+    this.invoices.set(invoice.id, invoice);
+  }
+
+  public updateInvoice(id: string, updates: Partial<InvoiceRecord>): InvoiceRecord | undefined {
+    const existing = this.invoices.get(id);
+    if (!existing) return undefined;
+    const updated = { ...existing, ...updates };
+    this.invoices.set(id, updated);
+    return updated;
   }
 }
 

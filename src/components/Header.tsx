@@ -45,6 +45,7 @@ export default function Header({
     { name: 'Get a Quote', view: 'get-a-quote' },
     { name: 'About Us', view: 'about' },
     { name: 'FAQs', view: 'faqs' },
+    { name: 'SOP Guide', view: 'sop' },
     { name: 'Contact', view: 'contact' },
     { name: 'Our Blog', view: 'blog' },
   ];

@@ -237,10 +237,10 @@ export default function ChatWindow({
   };
 
   return (
-    <div className="flex flex-col h-[650px] bg-white border border-gray-150 rounded-3xl overflow-hidden shadow-xl" id={`chat-window-${chat.id}`}>
+    <div className="flex flex-col h-[88vh] max-h-[650px] sm:h-[650px] w-full bg-white border border-gray-150 rounded-2xl sm:rounded-3xl overflow-hidden shadow-xl" id={`chat-window-${chat.id}`}>
       
       {/* Chat header */}
-      <div className="bg-gray-50 border-b border-gray-150 p-5 flex items-center justify-between">
+      <div className="bg-gray-50 border-b border-gray-150 p-3.5 sm:p-5 flex items-center justify-between pr-10 sm:pr-12">
         <div className="flex items-center gap-3">
           <div className="relative">
             <img 

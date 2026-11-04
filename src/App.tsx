@@ -674,9 +674,29 @@ export default function App() {
     const assignId = await store.submitAssignment(data);
     setIsAssignModalOpen(false);
     
-    // Lead student to admin chat support immediately
-    const targetTutorId = 'admin_shaka';
-    handleOpenChat(targetTutorId, `Hi, I just submitted an assignment brief titled "${data.title}" (Ref: #${assignId}). let's discuss details.`);
+    // Auto-match tutor based on subject criteria or prefilled tutor
+    let targetTutorId = data.tutorId;
+    if (!targetTutorId) {
+      const match = mentorsList.find(u => u.subjects?.some(s => s.toLowerCase().includes(data.subject?.toLowerCase())));
+      targetTutorId = match ? match.id : (mentorsList[0]?.id || 'tutor_clara');
+    }
+    // Update assignment with matched tutor if needed
+    if (!data.tutorId && targetTutorId) {
+      store.assignTutorToAssignment(assignId, targetTutorId);
+    }
+
+    const matchedTutor = storeState.users.find(u => u.id === targetTutorId);
+    // Add real notification for assignment created and tutor matched
+    store.addNotification({
+      userId: storeState.currentUser?.id || 'all',
+      title: 'Tutor Matched Successfully',
+      message: `Your assignment "${data.title}" was paired with ${matchedTutor?.name || 'an expert tutor'}. You can now communicate directly via Tutor Chat!`,
+      type: 'webapp',
+      sentBy: 'System'
+    });
+
+    // Lead student to matched tutor chat immediately
+    handleOpenChat(targetTutorId, `Hi ${matchedTutor?.name || 'Tutor'}, I just submitted an assignment brief titled "${data.title}" (Ref: #${assignId}). Looking forward to collaborating!`);
   };
 
   // Student Actions
@@ -882,6 +902,15 @@ export default function App() {
                 assignmentReports={storeState.assignmentReports}
                 quotes={storeState.quotes}
                 onAcceptQuote={handleAcceptQuote}
+                appNotifications={storeState.appNotifications}
+                onMarkNotificationRead={(id) => store.markNotificationRead(id)}
+                onMarkAllNotificationsRead={(userId) => store.markAllNotificationsRead(userId)}
+                onUpdateProfile={(data) => store.updateUserProfile(storeState.currentUser!.id, data)}
+                invoices={storeState.invoices}
+                onRefreshData={() => store.fetchData()}
+                lastSyncTime={storeState.lastSyncTime}
+                onPayAdvance={(assignmentId, amount) => store.processAdvancePayment(assignmentId, amount)}
+                onPayBalance={(assignmentId, amount) => store.processBalancePayment(assignmentId, amount)}
               />
             ) : storeState.currentUser.role === UserRole.TUTOR ? (
               <TutorDashboard 
@@ -1089,22 +1118,6 @@ export default function App() {
         </Suspense>
       </main>
 
-      {/* Floating Tutorial Help Trigger (Bottom Right) */}
-      <div 
-        className="fixed bottom-4 sm:bottom-6 right-4 sm:right-6 z-40 flex flex-col items-end gap-2" 
-        id="floating-support-container"
-      >
-        <button
-          id="trigger-sop-academy-tutorial"
-          onClick={() => setIsSopModalOpen(true)}
-          className="bg-gray-900 border border-gray-800 hover:bg-black text-white hover:text-orange-400 p-3 sm:px-4 sm:py-3 rounded-full shadow-2xl transition-all cursor-pointer flex items-center justify-center font-bold"
-          title="Open interactive SOP tutorial walkthrough"
-        >
-          <HelpCircle className="w-5 h-5 text-orange-400 animate-bounce shrink-0" />
-          <span className="text-xs ml-2 font-sans tracking-wide hidden sm:inline">Interactive Guide</span>
-        </button>
-      </div>
-
       {/* Floating WhatsApp Instant Chat Trigger (Bottom Left) */}
       {!isWhatsAppModalOpen && (
         <div 
@@ -1178,12 +1191,13 @@ export default function App() {
 
         {/* 6. Live Chat room overlay slideover dialog drawer */}
         {liveChat && storeState.currentUser && (
-          <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 z-50">
-            <div className="bg-white rounded-3xl max-w-lg w-full relative border shadow-2xl overflow-hidden animate-fade-in" id="active-chat-drawer-backdrop">
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center p-2 sm:p-4 z-50 overflow-y-auto">
+            <div className="bg-white rounded-2xl sm:rounded-3xl max-w-lg w-full relative border border-gray-200 shadow-2xl overflow-hidden animate-fade-in my-auto max-h-[94vh] flex flex-col" id="active-chat-drawer-backdrop">
               <button
                 id="close-chat-drawer-btn"
                 onClick={() => setActiveChat(null)}
-                className="absolute top-5 right-5 bg-white border hover:bg-gray-100 p-1.5 rounded-full text-gray-505 shadow-sm z-50"
+                className="absolute top-3 right-3 sm:top-5 sm:right-5 bg-white border border-gray-200 hover:bg-gray-100 p-1.5 rounded-full text-gray-600 shadow-sm z-50 cursor-pointer"
+                aria-label="Close chat"
               >
                 ✕
               </button>

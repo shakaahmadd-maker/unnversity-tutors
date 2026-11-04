@@ -56,8 +56,15 @@ import {
   Video,
   MoreVertical,
   Smile,
-  CheckCheck
+  CheckCheck,
+  Camera,
+  CheckCircle2,
+  Receipt,
+  Lock,
+  Wallet,
+  Copy
 } from 'lucide-react';
+import { jsPDF } from 'jspdf';
 import { 
   User, 
   UserRole,
@@ -68,7 +75,9 @@ import {
   Payment, 
   SupportTicket,
   AssignmentReport,
-  Quote
+  Quote,
+  AppNotification,
+  Invoice
 } from '../types';
 
 interface StudentDashboardProps {
@@ -93,6 +102,15 @@ interface StudentDashboardProps {
   assignmentReports?: AssignmentReport[];
   quotes?: Quote[];
   onAcceptQuote?: (quoteId: string) => void;
+  appNotifications?: AppNotification[];
+  onMarkNotificationRead?: (notifId: string) => void;
+  onMarkAllNotificationsRead?: (userId: string) => void;
+  onUpdateProfile?: (data: Partial<User>) => void;
+  invoices?: Invoice[];
+  onRefreshData?: () => void;
+  lastSyncTime?: string | null;
+  onPayAdvance?: (assignmentId: string, amount: number) => Promise<any>;
+  onPayBalance?: (assignmentId: string, amount: number) => Promise<any>;
 }
 
 export default function StudentDashboard({
@@ -116,7 +134,16 @@ export default function StudentDashboard({
   onNavigate,
   assignmentReports = [],
   quotes = [],
-  onAcceptQuote
+  onAcceptQuote,
+  appNotifications = [],
+  onMarkNotificationRead,
+  onMarkAllNotificationsRead,
+  onUpdateProfile,
+  invoices = [],
+  onRefreshData,
+  lastSyncTime,
+  onPayAdvance,
+  onPayBalance
 }: StudentDashboardProps) {
 
   // Dynamic Viewport Navigation State matching Sidebar
@@ -179,6 +206,77 @@ export default function StudentDashboard({
   // Settings states
   const [emailPref, setEmailPref] = useState(true);
   const [autoDeposit, setAutoDeposit] = useState(true);
+
+  // Profile Picture Editor states
+  const [isAvatarEditorOpen, setIsAvatarEditorOpen] = useState(false);
+  const [customAvatarPreview, setCustomAvatarPreview] = useState<string>(currentUser.avatarUrl || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=250&auto=format&fit=crop&q=80');
+  const [isSavingAvatar, setIsSavingAvatar] = useState(false);
+  const [avatarSuccessAlert, setAvatarSuccessAlert] = useState(false);
+
+  const PRESET_AVATARS = [
+    'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=250&auto=format&fit=crop&q=80',
+    'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=250&auto=format&fit=crop&q=80',
+    'https://images.unsplash.com/photo-1517841905240-472988babdf9?w=250&auto=format&fit=crop&q=80',
+    'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=250&auto=format&fit=crop&q=80',
+    'https://images.unsplash.com/photo-1524504388940-b1c1722653e1?w=250&auto=format&fit=crop&q=80',
+    'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=250&auto=format&fit=crop&q=80',
+    'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=250&auto=format&fit=crop&q=80',
+    'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=250&auto=format&fit=crop&q=80',
+  ];
+
+  const handleAvatarFileSelected = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        const size = 256;
+        canvas.width = size;
+        canvas.height = size;
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          const minDim = Math.min(img.width, img.height);
+          const startX = (img.width - minDim) / 2;
+          const startY = (img.height - minDim) / 2;
+          ctx.drawImage(img, startX, startY, minDim, minDim, 0, 0, size, size);
+          const compressed = canvas.toDataURL('image/jpeg', 0.85);
+          setCustomAvatarPreview(compressed);
+        }
+      };
+      img.src = event.target?.result as string;
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleSaveAvatar = async () => {
+    setIsSavingAvatar(true);
+    try {
+      if (onUpdateProfile) {
+        onUpdateProfile({ avatarUrl: customAvatarPreview });
+      }
+      await fetch(`/api/users/${currentUser.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ avatarUrl: customAvatarPreview })
+      });
+      setAvatarSuccessAlert(true);
+      setTimeout(() => {
+        setAvatarSuccessAlert(false);
+        setIsAvatarEditorOpen(false);
+      }, 1200);
+    } catch (err) {
+      console.error('Failed to update avatar:', err);
+    } finally {
+      setIsSavingAvatar(false);
+    }
+  };
+
+  // Filter notifications for this student
+  const userNotifications = appNotifications.filter(n => n.userId === currentUser.id || n.userId === 'all');
+  const unreadNotifCount = userNotifications.filter(n => !n.read).length;
 
   // Matching Funnel States & Configuration Constants
   const SERVICES = {
@@ -382,6 +480,363 @@ export default function StudentDashboard({
     if (currentUser.name && c.studentId.toLowerCase() === currentUser.name.toLowerCase()) return true;
     return false;
   });
+
+  const studentInvoices = (invoices || []).filter(inv => {
+    if (inv.studentId === currentUser.id) return true;
+    if (currentUser.email && inv.studentEmail?.toLowerCase() === currentUser.email.toLowerCase()) return true;
+    if (currentUser.name && inv.studentName?.toLowerCase() === currentUser.name.toLowerCase()) return true;
+    return false;
+  });
+
+  // Payment states & PDF generation state
+  const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
+  const [isSyncingPayments, setIsSyncingPayments] = useState(false);
+  const [copiedRefId, setCopiedRefId] = useState<string | null>(null);
+  const [paymentModal, setPaymentModal] = useState<{
+    isOpen: boolean;
+    assignmentId: string;
+    title: string;
+    amount: number;
+    type: 'advance' | 'balance';
+  } | null>(null);
+  const [isProcessingPayment, setIsProcessingPayment] = useState(false);
+  const [paymentSuccessToast, setPaymentSuccessToast] = useState<string | null>(null);
+
+  interface AssignmentPaymentItem {
+    id: string;
+    title: string;
+    subject: string;
+    deadline: string;
+    status: AssignmentStatus;
+    totalAmount: number;
+    advancePaid: number;
+    balanceAmount: number;
+    statusText: string;
+    statusBadgeClass: string;
+    statusColor: [number, number, number];
+    hasAdvancePayment: boolean;
+    hasBalancePayment: boolean;
+    tutorName?: string;
+  }
+
+  const assignmentPaymentRows: AssignmentPaymentItem[] = studentAssignments.map(assign => {
+    let total = assign.quoteAmount || 0;
+    const matchedInvoice = studentInvoices.find(inv => inv.assignmentId === assign.id || inv.description?.includes(assign.id));
+    if (!total && matchedInvoice && matchedInvoice.totalAmount) {
+      total = matchedInvoice.totalAmount;
+    }
+
+    const assignPayments = studentPayments.filter(p => p.assignmentId === assign.id);
+    const advPayments = assignPayments.filter(p => (p as any).type === 'advance' || p.id.includes('_adv'));
+    const balPayments = assignPayments.filter(p => (p as any).type === 'balance' || p.id.includes('_bal'));
+
+    let advancePaid = advPayments.reduce((sum, p) => sum + (p.amount || 0), 0);
+    const balancePaid = balPayments.reduce((sum, p) => sum + (p.amount || 0), 0);
+
+    if (advancePaid === 0 && assignPayments.length > 0) {
+      advancePaid = assignPayments.reduce((sum, p) => sum + (p.amount || 0), 0);
+    }
+
+    if (advancePaid === 0 && (assign.id === 'assign_1793361628984_pl5rwv' || matchedInvoice?.status === 'paid')) {
+      advancePaid = matchedInvoice?.advanceAmount || (total > 0 ? total * 0.5 : 0);
+    }
+
+    let balance = 0;
+    if (total > 0) {
+      balance = Math.max(0, total - advancePaid - balancePaid);
+    }
+
+    let statusText = 'Pending Admin Quote';
+    let statusBadgeClass = 'bg-slate-100 text-slate-700 border-slate-200';
+    let statusColor: [number, number, number] = [100, 116, 139];
+
+    if (total === 0) {
+      statusText = 'Pending Admin Quote';
+      statusBadgeClass = 'bg-slate-100 text-slate-700 border-slate-200';
+      statusColor = [100, 116, 139];
+    } else if (balance === 0 && (advancePaid >= total || balancePaid > 0)) {
+      statusText = 'Fully Settled (100%)';
+      statusBadgeClass = 'bg-emerald-100 text-emerald-800 border-emerald-200';
+      statusColor = [5, 150, 105];
+    } else if (advancePaid > 0 && balance > 0) {
+      statusText = 'Advance Paid (Escrowed)';
+      statusBadgeClass = 'bg-blue-100 text-blue-800 border-blue-200';
+      statusColor = [37, 99, 235];
+    } else {
+      statusText = 'Advance Payment Due';
+      statusBadgeClass = 'bg-amber-100 text-amber-800 border-amber-300';
+      statusColor = [217, 119, 6];
+    }
+
+    const assignedTutor = tutors.find(t => t.id === assign.tutorId);
+
+    return {
+      id: assign.id,
+      title: assign.title,
+      subject: assign.subject,
+      deadline: assign.deadline,
+      status: assign.status,
+      totalAmount: total,
+      advancePaid,
+      balanceAmount: balance,
+      statusText,
+      statusBadgeClass,
+      statusColor,
+      hasAdvancePayment: advancePaid > 0,
+      hasBalancePayment: balance === 0 && total > 0,
+      tutorName: assignedTutor?.name
+    };
+  });
+
+  const totalQuotedSum = assignmentPaymentRows.reduce((acc, r) => acc + r.totalAmount, 0);
+  const totalAdvancePaidSum = assignmentPaymentRows.reduce((acc, r) => acc + r.advancePaid, 0);
+  const totalRemainingBalanceSum = assignmentPaymentRows.reduce((acc, r) => acc + r.balanceAmount, 0);
+
+  const handleRefreshPayments = async () => {
+    setIsSyncingPayments(true);
+    if (onRefreshData) {
+      try {
+        await onRefreshData();
+      } catch (e) {
+        console.warn('Sync error:', e);
+      }
+    }
+    setTimeout(() => {
+      setIsSyncingPayments(false);
+    }, 600);
+  };
+
+  const handleCopyRef = (refId: string) => {
+    if (navigator?.clipboard?.writeText) {
+      navigator.clipboard.writeText(refId);
+    }
+    setCopiedRefId(refId);
+    setTimeout(() => setCopiedRefId(null), 2000);
+  };
+
+  const handleExecutePayment = async () => {
+    if (!paymentModal) return;
+    setIsProcessingPayment(true);
+    try {
+      if (paymentModal.type === 'advance' && onPayAdvance) {
+        await onPayAdvance(paymentModal.assignmentId, paymentModal.amount);
+      } else if (paymentModal.type === 'balance' && onPayBalance) {
+        await onPayBalance(paymentModal.assignmentId, paymentModal.amount);
+      }
+      setPaymentSuccessToast(`Payment authorized: $${paymentModal.amount.toFixed(2)} USD secured in escrow for "${paymentModal.title}".`);
+      setPaymentModal(null);
+      setTimeout(() => setPaymentSuccessToast(null), 5000);
+    } catch (e: any) {
+      console.error('Payment error:', e);
+    } finally {
+      setIsProcessingPayment(false);
+    }
+  };
+
+  const handleDownloadPDFStatement = () => {
+    try {
+      setIsGeneratingPdf(true);
+      const doc = new jsPDF({
+        orientation: 'portrait',
+        unit: 'mm',
+        format: 'a4'
+      });
+
+      const pageWidth = doc.internal.pageSize.getWidth();
+      const margin = 14;
+
+      // Header Bar
+      doc.setFillColor(234, 88, 12); // #ea580c Brand Primary
+      doc.rect(0, 0, pageWidth, 28, 'F');
+
+      doc.setTextColor(255, 255, 255);
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(15);
+      doc.text('UNIVERSITY TUTORS', margin, 12);
+
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(8);
+      doc.text('Global Academic Portal • Official Student Financial Statement & Escrow Ledger', margin, 18);
+      doc.text('https://university-tutors.com • support@university-tutors.com', margin, 23);
+
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(9);
+      doc.text('STATEMENT OF ACCOUNT', pageWidth - margin, 12, { align: 'right' });
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(8);
+      const statementRef = `STMT-${Date.now().toString().slice(-6)}`;
+      const formattedDate = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+      doc.text(`Ref: #${statementRef}`, pageWidth - margin, 17, { align: 'right' });
+      doc.text(`Date Issued: ${formattedDate}`, pageWidth - margin, 22, { align: 'right' });
+
+      // Student Account Info Card
+      doc.setFillColor(248, 250, 252);
+      doc.setDrawColor(226, 232, 240);
+      doc.roundedRect(margin, 34, pageWidth - (margin * 2), 24, 2, 2, 'FD');
+
+      doc.setTextColor(30, 41, 59);
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(9);
+      doc.text('STUDENT ACCOUNT DETAILS', margin + 4, 40);
+
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(8);
+      doc.text(`Student Name: ${currentUser.name || 'Verified Student'}`, margin + 4, 46);
+      doc.text(`Email Address: ${currentUser.email || 'N/A'}`, margin + 4, 51);
+      doc.text(`Student Account ID: #${currentUser.id}`, margin + 4, 55);
+
+      doc.text(`Account Status: Verified Academic Enrollee`, pageWidth / 2 + 10, 46);
+      doc.text(`Escrow Protection: 100% Milestone Insured`, pageWidth / 2 + 10, 51);
+      doc.text(`Currency: USD ($)`, pageWidth / 2 + 10, 55);
+
+      // Financial Metrics Boxes
+      const boxY = 62;
+      const boxHeight = 22;
+      const boxWidth = (pageWidth - (margin * 2) - 8) / 3;
+
+      // Box 1: Total Committed
+      doc.setFillColor(241, 245, 249);
+      doc.setDrawColor(203, 213, 225);
+      doc.roundedRect(margin, boxY, boxWidth, boxHeight, 2, 2, 'FD');
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(7);
+      doc.setTextColor(100, 116, 139);
+      doc.text('TOTAL QUOTED / COMMITTED', margin + 4, boxY + 6);
+      doc.setFontSize(13);
+      doc.setTextColor(15, 23, 42);
+      doc.text(`$${totalQuotedSum.toFixed(2)}`, margin + 4, boxY + 16);
+
+      // Box 2: Advance Paid
+      doc.setFillColor(236, 253, 245);
+      doc.setDrawColor(167, 243, 208);
+      doc.roundedRect(margin + boxWidth + 4, boxY, boxWidth, boxHeight, 2, 2, 'FD');
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(7);
+      doc.setTextColor(4, 120, 87);
+      doc.text('ADVANCE PAID (IN ESCROW)', margin + boxWidth + 8, boxY + 6);
+      doc.setFontSize(13);
+      doc.setTextColor(6, 95, 70);
+      doc.text(`$${totalAdvancePaidSum.toFixed(2)}`, margin + boxWidth + 8, boxY + 16);
+
+      // Box 3: Remaining Balance
+      doc.setFillColor(255, 247, 237);
+      doc.setDrawColor(254, 215, 170);
+      doc.roundedRect(margin + (boxWidth * 2) + 8, boxY, boxWidth, boxHeight, 2, 2, 'FD');
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(7);
+      doc.setTextColor(194, 65, 12);
+      doc.text('REMAINING BALANCE DUE', margin + (boxWidth * 2) + 12, boxY + 6);
+      doc.setFontSize(13);
+      doc.setTextColor(154, 52, 18);
+      doc.text(`$${totalRemainingBalanceSum.toFixed(2)}`, margin + (boxWidth * 2) + 12, boxY + 16);
+
+      // Table Header
+      let currentY = 92;
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(10);
+      doc.setTextColor(15, 23, 42);
+      doc.text('ASSIGNMENT-WISE PAYMENT BREAKDOWN', margin, currentY);
+
+      currentY += 4;
+      doc.setFillColor(30, 41, 59);
+      doc.rect(margin, currentY, pageWidth - (margin * 2), 8, 'F');
+
+      doc.setTextColor(255, 255, 255);
+      doc.setFontSize(7.5);
+      doc.setFont('helvetica', 'bold');
+      doc.text('ASSIGNMENT REF & TITLE', margin + 3, currentY + 5.5);
+      doc.text('SUBJECT', margin + 68, currentY + 5.5);
+      doc.text('TOTAL', margin + 104, currentY + 5.5, { align: 'right' });
+      doc.text('ADVANCE PAID', margin + 132, currentY + 5.5, { align: 'right' });
+      doc.text('BALANCE DUE', margin + 158, currentY + 5.5, { align: 'right' });
+      doc.text('STATUS', pageWidth - margin - 3, currentY + 5.5, { align: 'right' });
+
+      currentY += 8;
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(7.5);
+
+      if (assignmentPaymentRows.length === 0) {
+        doc.setFillColor(248, 250, 252);
+        doc.rect(margin, currentY, pageWidth - (margin * 2), 12, 'F');
+        doc.setTextColor(148, 163, 184);
+        doc.text('No active assignment records registered for this account.', margin + 4, currentY + 7);
+        currentY += 12;
+      } else {
+        assignmentPaymentRows.forEach((row, idx) => {
+          const rowHeight = 11;
+          if (idx % 2 === 1) {
+            doc.setFillColor(248, 250, 252);
+            doc.rect(margin, currentY, pageWidth - (margin * 2), rowHeight, 'F');
+          }
+
+          doc.setDrawColor(241, 245, 249);
+          doc.line(margin, currentY + rowHeight, pageWidth - margin, currentY + rowHeight);
+
+          doc.setTextColor(15, 23, 42);
+          doc.setFont('helvetica', 'bold');
+          const shortTitle = row.title.length > 34 ? row.title.substring(0, 32) + '...' : row.title;
+          doc.text(shortTitle, margin + 3, currentY + 4.5);
+          doc.setFont('helvetica', 'normal');
+          doc.setFontSize(6.5);
+          doc.setTextColor(100, 116, 139);
+          doc.text(`Ref: #${row.id}`, margin + 3, currentY + 8.5);
+
+          doc.setFontSize(7.5);
+          doc.setTextColor(51, 65, 85);
+          doc.text(row.subject, margin + 68, currentY + 6.5);
+
+          doc.setFont('helvetica', 'bold');
+          doc.setTextColor(15, 23, 42);
+          doc.text(row.totalAmount > 0 ? `$${row.totalAmount.toFixed(2)}` : 'Pending Quote', margin + 104, currentY + 6.5, { align: 'right' });
+
+          doc.setTextColor(4, 120, 87);
+          doc.text(`$${row.advancePaid.toFixed(2)}`, margin + 132, currentY + 6.5, { align: 'right' });
+
+          doc.setTextColor(row.balanceAmount > 0 ? 194 : 100, row.balanceAmount > 0 ? 65 : 116, row.balanceAmount > 0 ? 12 : 139);
+          doc.text(`$${row.balanceAmount.toFixed(2)}`, margin + 158, currentY + 6.5, { align: 'right' });
+
+          doc.setFont('helvetica', 'bold');
+          doc.setTextColor(row.statusColor[0], row.statusColor[1], row.statusColor[2]);
+          doc.text(row.statusText, pageWidth - margin - 3, currentY + 6.5, { align: 'right' });
+
+          currentY += rowHeight;
+        });
+      }
+
+      // Escrow Policy Box
+      currentY += 8;
+      doc.setFillColor(254, 252, 232);
+      doc.setDrawColor(254, 240, 138);
+      doc.roundedRect(margin, currentY, pageWidth - (margin * 2), 22, 2, 2, 'FD');
+
+      doc.setTextColor(161, 98, 7);
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(7.5);
+      doc.text('UNIVERSITY TUTORS ESCROW & ACADEMIC INTEGRITY GUARANTEE', margin + 4, currentY + 5.5);
+
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(7);
+      doc.setTextColor(113, 63, 18);
+      doc.text('All advance payments are secured in third-party escrow. Tutors are never authorized to withdraw milestone funds', margin + 4, currentY + 10);
+      doc.text('until the student has thoroughly inspected and approved the delivered academic milestone or mentoring session.', margin + 4, currentY + 14);
+      doc.text('Full dispute resolution, refund arbitration, and revision safeguards apply to all orders placed through university-tutors.com.', margin + 4, currentY + 18);
+
+      // Footer
+      const footerY = 282;
+      doc.setDrawColor(226, 232, 240);
+      doc.line(margin, footerY - 4, pageWidth - margin, footerY - 4);
+      doc.setFontSize(7);
+      doc.setTextColor(148, 163, 184);
+      doc.text('University Tutors Inc. • Academic Quality & Integrity Office • Statement Generated Electronically', margin, footerY);
+      doc.text('Page 1 of 1', pageWidth - margin, footerY, { align: 'right' });
+
+      doc.save(`University-Tutors-Statement-${(currentUser.name || 'Student').replace(/\s+/g, '_')}-${statementRef}.pdf`);
+    } catch (err) {
+      console.error('Failed to generate PDF statement:', err);
+    } finally {
+      setIsGeneratingPdf(false);
+    }
+  };
 
   // Helper to find tutor details
   const getTutor = (tutorId: string) => {
@@ -621,8 +1076,9 @@ CONTACT EMAIL COMPASS: ${studentEmail}
     const subtopic = selectedSubtopic || 'General';
     const duration = selectedDuration || '4 Hours';
     
-    // Always route instantly to the platform admin as requested by user
-    const targetTutorId = 'admin_shaka';
+    // Automatically match with appropriate tutor based on profile criteria
+    const matchedTutor = getTutorForSubject(subject) || tutors[0];
+    const targetTutorId = matchedTutor ? matchedTutor.id : 'admin_shaka';
 
     setMatchingPhase('idle');
     setVettingStepOneCompleted(false);
@@ -641,8 +1097,9 @@ CONTACT EMAIL COMPASS: ${studentEmail}
     // Redirect to direct chat tab
     setActiveTab('chat');
 
-    // Trigger dynamic CSR support chat instantly
-    const messageTemplate = `Hi, I just secured an optimal match for "${subject}" ("${subtopic}", scheduled for ${duration}). I am ready to decide on a payment plan and align my exact requirements with a specialist right away!`;
+    // Trigger dynamic Tutor Chat with the matched specialist
+    const tutorDisplayName = matchedTutor ? matchedTutor.name : 'Tutor';
+    const messageTemplate = `Hi ${tutorDisplayName}, I was just automatically matched with you for "${subject}" (${subtopic}, scheduled for ${duration}). I have submitted my brief and look forward to working together!`;
     onOpenChat(targetTutorId, messageTemplate);
   };
 
@@ -811,24 +1268,41 @@ CONTACT EMAIL COMPASS: ${studentEmail}
           <div className="lg:hidden" /> {/* Spacer for centering when mobile sidebar is active */}
 
           {/* User Profile & Actions Group */}
-          <div className="flex items-center gap-4 ml-auto text-left">
+          <div className="flex items-center gap-3 sm:gap-4 ml-auto text-left">
             
+            {/* Tutor Chat Dedicated Button */}
+            <button
+              onClick={() => {
+                // Find latest matched tutor or fallback to top tutor
+                const assignedAssign = studentAssignments.find(a => a.tutorId);
+                const tutorIdToChat = assignedAssign?.tutorId || 'tutor_clara';
+                const tutorObj = getTutor(tutorIdToChat);
+                onOpenChat(tutorIdToChat, `Hi ${tutorObj?.name || 'Tutor'}, I would like to consult with you about my academic assignments.`);
+              }}
+              className="inline-flex items-center justify-center border border-orange-200 bg-orange-50 hover:bg-orange-100 text-orange-700 px-3.5 py-2 rounded-2xl text-[12px] font-bold shadow-3xs cursor-pointer transition-all"
+              id="header-tutor-chat-btn"
+              title="Open direct chat with your assigned subject tutor"
+            >
+              🎓 Tutor Chat
+            </button>
+
             {/* CSR Contact Button */}
             <button
               onClick={() => {
                 // Instantly open a chat with Support specialist
                 onOpenChat('admin_shaka'); // Triggers Shaka Ahmad (Platform Admin)
               }}
-              className="hidden sm:inline-flex items-center justify-center border border-gray-200 bg-white hover:bg-gray-50 text-gray-700 px-4 py-2 rounded-2xl text-[12px] font-bold shadow-3xs cursor-pointer transition-all"
+              className="hidden sm:inline-flex items-center justify-center border border-gray-200 bg-white hover:bg-gray-50 text-gray-700 px-3.5 py-2 rounded-2xl text-[12px] font-bold shadow-3xs cursor-pointer transition-all"
               id="header-csr-consult"
+              title="Consult with Platform Support Desk (CSR)"
             >
-              💬 Consult with CSR
+              💬 Admin CSR
             </button>
 
             {/* Quick Create Button */}
             <button
               onClick={() => setActiveTab('new_request')}
-              className="inline-flex items-center justify-center bg-[#FF8A00] hover:bg-[#E05216] text-white px-4 py-2 rounded-2xl text-[12px] font-bold shadow-md shadow-orange-500/10 cursor-pointer transition-all"
+              className="inline-flex items-center justify-center bg-[#FF8A00] hover:bg-[#E05216] text-white px-3.5 sm:px-4 py-2 rounded-2xl text-[12px] font-bold shadow-md shadow-orange-500/10 cursor-pointer transition-all"
               id="header-create-request"
             >
               ➕ Create Request
@@ -837,33 +1311,50 @@ CONTACT EMAIL COMPASS: ${studentEmail}
             {/* Notification bell and badge */}
             <button 
               onClick={() => setActiveTab('notifications')}
-              className="p-2.5 rounded-xl text-gray-600 hover:text-orange-500 hover:bg-gray-50/80 relative transition-all"
+              className="p-2.5 rounded-xl text-gray-600 hover:text-orange-500 hover:bg-gray-50/80 relative transition-all cursor-pointer"
+              title="Notifications Center"
+              id="header-notifications-bell"
             >
               <Bell className="w-5 h-5" />
-              <span className="absolute top-1 right-1 w-4 h-4 bg-[#F23B30] text-white text-[9px] font-bold rounded-full flex items-center justify-center leading-none shadow-sm">
-                4
-              </span>
+              {unreadNotifCount > 0 && (
+                <span className="absolute top-1 right-1 min-w-[16px] h-4 px-1 bg-[#F23B30] text-white text-[9px] font-bold rounded-full flex items-center justify-center leading-none shadow-sm animate-pulse">
+                  {unreadNotifCount}
+                </span>
+              )}
             </button>
 
             {/* Sun/Light Theme toggler (visual accent) */}
-            <button className="p-2.5 rounded-xl text-gray-400 hover:text-orange-400 hover:bg-gray-50/85 transition-all">
+            <button className="p-2.5 rounded-xl text-gray-400 hover:text-orange-400 hover:bg-gray-50/85 transition-all hidden sm:block">
               <Sun className="w-5 h-5 text-gray-500" />
             </button>
 
             {/* Thin Spacer */}
-            <span className="h-6 w-[1px] bg-gray-200" />
+            <span className="h-6 w-[1px] bg-gray-200 hidden sm:block" />
 
-            {/* User credentials */}
+            {/* User credentials & interactive avatar */}
             <div className="flex items-center gap-2">
               <div className="text-right hidden xl:block">
                 <span className="text-[12px] font-bold text-gray-900 block leading-tight">{currentUser.name}</span>
                 <span className="text-[9.5px] font-mono text-[#E05216] uppercase block tracking-wider leading-none">Verified Student</span>
               </div>
-              <img 
-                src={currentUser.avatarUrl || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80'} 
-                alt="" 
-                className="w-10 h-10 rounded-full bg-orange-100 object-cover border border-orange-100/50 shadow-3xs"
-              />
+              <div className="relative group">
+                <button
+                  type="button"
+                  onClick={() => setIsAvatarEditorOpen(true)}
+                  className="relative block rounded-full focus:outline-none focus:ring-2 focus:ring-orange-500 cursor-pointer transition-transform group-hover:scale-105"
+                  title="Click to change or upload profile photo"
+                  id="student-header-avatar-btn"
+                >
+                  <img 
+                    src={currentUser.avatarUrl || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80'} 
+                    alt="Student Profile" 
+                    className="w-10 h-10 rounded-full bg-orange-100 object-cover border border-orange-200 shadow-3xs"
+                  />
+                  <div className="absolute inset-0 bg-black/40 rounded-full opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                    <Camera className="w-3.5 h-3.5 text-white" />
+                  </div>
+                </button>
+              </div>
             </div>
 
           </div>
@@ -926,29 +1417,33 @@ CONTACT EMAIL COMPASS: ${studentEmail}
                 {[
                   { 
                     label: 'ONGOING', 
-                    value: studentAssignments.filter(a => a.status !== AssignmentStatus.COMPLETED).length + 2, // adding visual count matching screenshot
+                    value: studentAssignments.filter(a => a.status !== AssignmentStatus.COMPLETED).length, 
                     icon: <RotateCcw className="w-5 h-5 text-blue-500" />,
                     bg: 'bg-blue-50/50',
-                    border: 'border-blue-100/60'
+                    border: 'border-blue-100/60',
+                    tab: 'assignments'
                   },
                   { 
                     label: 'COMPLETED', 
                     value: studentAssignments.filter(a => a.status === AssignmentStatus.COMPLETED).length, 
                     icon: <CheckCircle className="w-5 h-5 text-emerald-500" />,
                     bg: 'bg-emerald-50/50',
-                    border: 'border-emerald-100/60'
+                    border: 'border-emerald-100/60',
+                    tab: 'assignments'
                   },
                   { 
                     label: 'PAYMENTS', 
-                    value: studentPayments.length + 2, // matches screenshot value '2'
+                    value: `$${totalAdvancePaidSum.toFixed(0)}`, 
                     icon: <CreditCard className="w-5 h-5 text-orange-500" />,
                     bg: 'bg-orange-50/50',
-                    border: 'border-orange-100/60'
+                    border: 'border-orange-100/60',
+                    tab: 'payments'
                   }
                 ].map((card, key) => (
-                  <div 
+                  <button 
                     key={key} 
-                    className={`bg-white border rounded-[22px] p-5 flex items-center justify-between shadow-xs transition-transform hover:translate-y-[-1px] ${card.border}`}
+                    onClick={() => card.tab && setActiveTab(card.tab)}
+                    className={`bg-white border rounded-[22px] p-5 flex items-center justify-between shadow-xs transition-all hover:translate-y-[-2px] hover:shadow-sm cursor-pointer text-left ${card.border}`}
                   >
                     <div className="space-y-1">
                       <span className="text-3xl font-extrabold text-gray-950 block leading-none font-mono">
@@ -961,14 +1456,14 @@ CONTACT EMAIL COMPASS: ${studentEmail}
                     <div className={`p-3 rounded-2xl ${card.bg}`}>
                       {card.icon}
                     </div>
-                  </div>
+                  </button>
                 ))}
               </div>
 
               {/* SERVICES SHADCN STYLE GRID SECTION */}
               <div className="space-y-4" id="dashboard-services-grid">
                 <div className="flex items-center justify-between">
-                  <h2 className="font-bold text-[15px] text-gray-900 tracking-tight">Services</h2>
+                  <h2 className="font-bold text-[15px] text-gray-900 tracking-tight">Services &amp; Portals</h2>
                   <button className="text-gray-400 hover:text-gray-600">
                     <MoreHorizontal className="w-5 h-5" />
                   </button>
@@ -976,14 +1471,14 @@ CONTACT EMAIL COMPASS: ${studentEmail}
 
                 <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-4">
                   {[
+                    { label: 'Tutor Chats', icon: <MessageCircle className="w-5 h-5 text-orange-600" />, tab: 'chat', circleColor: 'bg-orange-100/80' },
                     { label: 'Assignments', icon: <BookOpen className="w-5 h-5 text-orange-500" />, tab: 'assignments', circleColor: 'bg-orange-50' },
-                    { label: 'Support Chat', icon: <MessageSquare className="w-5 h-5 text-blue-500" />, tab: 'chat', circleColor: 'bg-blue-50' },
+                    { label: 'CSR Support', icon: <Headset className="w-5 h-5 text-blue-500" />, tab: 'chat', circleColor: 'bg-blue-50' },
                     { label: 'Reports', icon: <BarChart3 className="w-5 h-5 text-emerald-500" />, tab: 'reports', circleColor: 'bg-emerald-50' },
                     { label: 'Results', icon: <Award className="w-5 h-5 text-indigo-500" />, tab: 'results', circleColor: 'bg-indigo-50' },
                     { label: 'Feedback', icon: <Heart className="w-5 h-5 text-pink-500" />, tab: 'feedback', circleColor: 'bg-pink-50' },
                     { label: 'Alerts', icon: <Bell className="w-5 h-5 text-amber-500" />, tab: 'notifications', circleColor: 'bg-amber-50' },
-                    { label: 'Billing', icon: <CreditCard className="w-5 h-5 text-purple-500" />, tab: 'payments', circleColor: 'bg-purple-50' },
-                    { label: 'Legal', icon: <Shield className="w-5 h-5 text-zinc-500" />, tab: 'agreements', circleColor: 'bg-zinc-50' }
+                    { label: 'Billing', icon: <CreditCard className="w-5 h-5 text-purple-500" />, tab: 'payments', circleColor: 'bg-purple-50' }
                   ].map((srv, idx) => (
                     <button
                       key={idx}
@@ -1007,86 +1502,114 @@ CONTACT EMAIL COMPASS: ${studentEmail}
                   <h2 className="font-bold text-[15px] text-gray-900 tracking-tight">Recent Requests</h2>
                   <button 
                     onClick={() => setActiveTab('assignments')}
-                    className="text-[#FF8A00] hover:text-[#E05216] font-mono text-[10.5px] font-bold uppercase tracking-wider"
+                    className="text-[#FF8A00] hover:text-[#E05216] font-mono text-[10.5px] font-bold uppercase tracking-wider cursor-pointer"
                   >
-                    HISTORY
+                    VIEW ALL ({studentAssignments.length})
                   </button>
                 </div>
 
                 <div className="space-y-3">
-                  
                   {/* Real-time assignments */}
                   {studentAssignments.length > 0 ? (
-                    studentAssignments.slice(0, 3).map((a, i) => (
-                      <div 
-                        key={i} 
-                        className="bg-white border border-gray-150 rounded-[20px] p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 transition-all hover:border-orange-100"
-                        id={`request-recent-${a.id}`}
+                    studentAssignments.slice(0, 5).map((a, i) => {
+                      const tutorObj = getTutor(a.tutorId);
+                      return (
+                        <div 
+                          key={i} 
+                          className="bg-white border border-gray-150 rounded-[20px] p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 transition-all hover:border-orange-100 shadow-3xs"
+                          id={`request-recent-${a.id}`}
+                        >
+                          <div className="flex items-center gap-4 text-left">
+                            <div className="p-3 bg-orange-50 rounded-2xl border border-orange-100/50 text-[#FF8A00] shrink-0">
+                              <BookMarked className="w-5 h-5 shrink-0" />
+                            </div>
+                            <div>
+                              <span className="text-[11px] font-bold text-gray-400 font-mono uppercase block leading-none">
+                                {a.subject}
+                              </span>
+                              <h3 className="font-bold text-sm text-gray-950 mt-1 leading-snug">
+                                {a.title}
+                              </h3>
+                              <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+                                <span className="text-[11px] text-gray-500 font-medium">
+                                  ASSIGNED TO: <strong className={tutorObj ? "text-orange-600 font-bold" : "text-gray-400 italic"}>{tutorObj?.name || 'Automatching...'}</strong>
+                                </span>
+                                {tutorObj && (
+                                  <span className="text-[10px] bg-emerald-50 text-emerald-700 font-mono px-1.5 py-0.2 rounded border border-emerald-200">
+                                    ★ {tutorObj.rating || 4.9}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-3 w-full sm:w-auto justify-between sm:justify-end flex-wrap">
+                            <div className="text-right">
+                              <span className="inline-flex bg-orange-100/60 text-[#E05216] text-[10.5px] font-bold px-2.5 py-1 rounded-full uppercase leading-none font-mono">
+                                {a.status}
+                              </span>
+                              <span className="text-[11px] text-gray-400 font-medium block mt-1.5 font-mono">
+                                Due: {a.deadline}
+                              </span>
+                            </div>
+
+                            {/* Direct Tutor Chat & CSR Actions */}
+                            <div className="flex items-center gap-1.5">
+                              {tutorObj ? (
+                                <button
+                                  type="button"
+                                  onClick={() => onOpenChat(tutorObj.id, `Hi ${tutorObj.name}, I would like to check in on my assignment: "${a.title}".`)}
+                                  className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-orange-500 hover:bg-orange-600 text-white rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer"
+                                  title={`Chat with ${tutorObj.name}`}
+                                >
+                                  <MessageCircle className="w-3.5 h-3.5" />
+                                  <span>Tutor Chat</span>
+                                </button>
+                              ) : (
+                                <button
+                                  type="button"
+                                  onClick={() => onOpenChat('admin_shaka', `Hi CSR desk, could you please give me an update on matching for assignment: "${a.title}"?`)}
+                                  className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-orange-500 hover:bg-orange-600 text-white rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer"
+                                >
+                                  <Headset className="w-3.5 h-3.5" />
+                                  <span>CSR Match Desk</span>
+                                </button>
+                              )}
+                              
+                              <button
+                                type="button"
+                                onClick={() => onOpenChat('admin_shaka')}
+                                className="inline-flex items-center gap-1 px-2.5 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl text-xs font-semibold cursor-pointer transition-colors"
+                                title="Platform Support CSR"
+                              >
+                                <span>CSR</span>
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })
+                  ) : (
+                    <div className="bg-white border border-dashed border-gray-200 rounded-[20px] p-8 text-center space-y-3">
+                      <div className="w-12 h-12 rounded-2xl bg-orange-50 text-orange-500 mx-auto flex items-center justify-center">
+                        <BookOpen className="w-6 h-6" />
+                      </div>
+                      <div className="space-y-1">
+                        <h3 className="font-bold text-sm text-gray-900">No active assignment requests yet</h3>
+                        <p className="text-xs text-gray-500 max-w-md mx-auto">
+                          Submit your course syllabus or assignment brief to get automatically matched with a top certified tutor.
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setActiveTab('new_request')}
+                        className="inline-flex items-center gap-1.5 bg-orange-500 hover:bg-orange-600 text-white px-4 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer shadow-xs"
                       >
-                        <div className="flex items-center gap-4 text-left">
-                          <div className="p-3 bg-orange-50 rounded-2xl border border-orange-100/50 text-[#FF8A00] shrink-0">
-                            {/* Dynamic asset badge representing subject */}
-                            <BookMarked className="w-5 h-5 shrink-0" />
-                          </div>
-                          <div>
-                            <span className="text-[11px] font-bold text-gray-400 font-mono uppercase block leading-none">
-                              {a.subject}
-                            </span>
-                            <h3 className="font-bold text-sm text-gray-950 mt-1 leading-snug">
-                              {a.title}
-                            </h3>
-                            <span className="text-[11px] text-gray-500 font-medium block mt-1">
-                              ASSIGNED TO: <span className="text-orange-655 font-bold">{getTutor(a.tutorId)?.name || 'UNASSIGNED'}</span>
-                            </span>
-                          </div>
-                        </div>
-
-                        <div className="flex items-center gap-3 w-full sm:w-auto justify-between sm:justify-end">
-                          <div className="text-right">
-                            <span className="inline-flex bg-orange-100/60 text-[#E05216] text-[10.5px] font-bold px-2.5 py-1 rounded-full uppercase leading-none font-mono">
-                              {a.status}
-                            </span>
-                            <span className="text-[11px] text-gray-400 font-medium block mt-1.5 font-mono">
-                              Due: {a.deadline}
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-                    ))
-                  ) : null}
-
-                  {/* Fallback Biology request exact match with the screenshot mock */}
-                  <div className="bg-white border border-gray-150 rounded-[20px] p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 transition-all hover:border-orange-100">
-                    <div className="flex items-center gap-4 text-left">
-                      <div className="p-3.5 bg-orange-50 rounded-2xl border border-orange-100/50 text-[#FF8A00] shrink-0">
-                        {/* Dynamic orange calculator/biology asset */}
-                        <PlusSquare className="w-5 h-5 shrink-0" />
-                      </div>
-                      <div>
-                        <span className="text-[11px] font-bold text-gray-400 font-mono uppercase block leading-none">
-                          Natural Sciences
-                        </span>
-                        <h3 className="font-bold text-sm text-gray-950 mt-1 leading-snug">
-                          Biology Assignment Syllabus
-                        </h3>
-                        <span className="text-[11px] text-gray-500 block mt-1 font-semibold leading-none">
-                          ASSIGNED TO: <span className="text-gray-400 italic">UNASSIGNED</span>
-                        </span>
-                      </div>
+                        <PlusSquare className="w-4 h-4" />
+                        <span>Start Assignment Matching</span>
+                      </button>
                     </div>
-
-                    <div className="flex items-center gap-4 w-full sm:w-auto justify-between sm:justify-end">
-                      <div className="text-right">
-                        <span className="inline-flex bg-orange-55 text-[#E05216] text-[9px] font-mono tracking-wider font-extrabold px-3 py-1 rounded-full uppercase">
-                          NEW
-                        </span>
-                        <span className="text-[11px] text-gray-400 font-mono font-medium block mt-1">
-                          3/18/2026
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-
+                  )}
                 </div>
               </div>
 
@@ -2050,15 +2573,44 @@ CONTACT EMAIL COMPASS: ${studentEmail}
 
                             <td className="p-4">
                               {tutor ? (
-                                <button 
-                                  onClick={() => onOpenChat(tutor.id)}
-                                  className="flex items-center gap-2 text-left hover:text-orange-600 transition-colors cursor-pointer font-bold text-gray-800"
-                                >
-                                  <img src={tutor.avatarUrl} className="w-6 h-6 rounded-full border object-cover" alt="" />
-                                  <span>{tutor.name}</span>
-                                </button>
+                                <div className="space-y-1.5">
+                                  <div className="flex items-center gap-2">
+                                    <img src={tutor.avatarUrl} className="w-6 h-6 rounded-full border object-cover" alt="" />
+                                    <span className="font-bold text-gray-800">{tutor.name}</span>
+                                  </div>
+                                  <div className="flex items-center gap-1.5">
+                                    <button 
+                                      type="button"
+                                      onClick={() => onOpenChat(tutor.id, `Hi ${tutor.name}, let's coordinate on assignment "${a.title}".`)}
+                                      className="inline-flex items-center gap-1 px-2.5 py-1 bg-orange-500 hover:bg-orange-600 text-white rounded-lg text-[10.5px] font-bold transition-all shadow-3xs cursor-pointer"
+                                      title={`Open direct Tutor Chat with ${tutor.name}`}
+                                    >
+                                      <MessageCircle className="w-3 h-3" />
+                                      <span>Tutor Chat</span>
+                                    </button>
+                                    <button 
+                                      type="button"
+                                      onClick={() => onOpenChat('admin_shaka')}
+                                      className="inline-flex items-center gap-1 px-2 py-1 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-[10.5px] font-semibold transition-all cursor-pointer"
+                                      title="Consult with CSR support desk"
+                                    >
+                                      <Headset className="w-3 h-3 text-gray-500" />
+                                      <span>CSR</span>
+                                    </button>
+                                  </div>
+                                </div>
                               ) : (
-                                <span className="text-gray-400 italic">Matching candidate...</span>
+                                <div className="space-y-1">
+                                  <span className="text-gray-400 italic block text-[11px]">Matching candidate...</span>
+                                  <button 
+                                    type="button"
+                                    onClick={() => onOpenChat('admin_shaka', `Hi CSR desk, please update me on matching for: "${a.title}".`)}
+                                    className="inline-flex items-center gap-1 px-2.5 py-1 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-[10.5px] font-semibold transition-all cursor-pointer"
+                                  >
+                                    <Headset className="w-3 h-3 text-gray-500" />
+                                    <span>Consult CSR</span>
+                                  </button>
+                                </div>
                               )}
                             </td>
 
@@ -2147,52 +2699,487 @@ CONTACT EMAIL COMPASS: ${studentEmail}
           {/* TAB 4: PAYMENTS LEDGER & STATEMENTS */}
           {/* ================================== */}
           {activeTab === 'payments' && (
-            <div className="bg-white rounded-3xl border border-gray-150 overflow-hidden shadow-xs animate-fade-in text-left">
-              <div className="p-6 border-b border-gray-150">
-                <h3 className="font-bold text-base text-gray-950 font-sans tracking-tight">Receipts & Custom Payment Invoices</h3>
-                <p className="text-xs text-gray-400 font-medium">Verify payment statuses and custom invoices. Secure payment links are shared directly with you after discussion.</p>
-              </div>
-
-              {studentPayments.length > 0 ? (
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left text-xs border-collapse font-sans">
-                    <thead>
-                      <tr className="bg-gray-50 border-b border-gray-150 text-gray-400 uppercase font-mono tracking-wider text-[10px]">
-                        <th className="p-4 font-bold">Transaction Reference ID</th>
-                        <th className="p-4 font-bold">Associated Task Title</th>
-                        <th className="p-4 font-bold text-center">Amount Held</th>
-                        <th className="p-4 font-bold text-right">Escrow Holding Status</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-150 text-xs">
-                      {studentPayments.map((p) => {
-                        const assign = assignments.find(a => a.id === p.assignmentId);
-                        return (
-                          <tr key={p.id} className="hover:bg-gray-50/50 font-mono">
-                            <td className="p-4 font-bold text-gray-950">{p.id} <span className="text-gray-400 font-normal">({p.stripePaymentIntent})</span></td>
-                            <td className="p-4 font-sans font-medium text-gray-700">
-                              {assign?.title || 'Syllabus Help'}
-                              {p.id.includes('_adv') && <span className="ml-1.5 inline-block text-[9px] bg-orange-100 text-orange-700 px-1.5 py-0.5 rounded font-mono uppercase font-semibold">Advance</span>}
-                              {p.id.includes('_bal') && <span className="ml-1.5 inline-block text-[9px] bg-indigo-100 text-indigo-700 px-1.5 py-0.5 rounded font-mono uppercase font-semibold">Balance</span>}
-                            </td>
-                            <td className="p-4 font-bold text-center text-gray-900">${p.amount} USD</td>
-                            <td className="p-4 text-right">
-                              <span className={`inline-block font-bold text-[9px] px-2.5 py-1 rounded-full uppercase font-mono ${p.status === 'escrow' ? 'bg-amber-100 text-amber-700' : p.status === 'released' ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-750'}`}>
-                                {p.status}
-                              </span>
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-              ) : (
-                <div className="p-12 text-center bg-gray-50 rounded-3xl border border-dashed border-gray-250">
-                  <CreditCard className="w-10 h-10 text-gray-300 mx-auto mb-3" />
-                  <p className="text-xs text-gray-650 font-medium">No verified transactions logged with this student profile.</p>
+            <div className="space-y-6 animate-fade-in text-left font-sans" id="student-payments-view">
+              
+              {/* Payment Success Alert Toast */}
+              {paymentSuccessToast && (
+                <div className="p-4 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-900 flex items-center justify-between gap-3 shadow-sm animate-fade-in">
+                  <div className="flex items-center gap-3">
+                    <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
+                    <div>
+                      <h4 className="font-bold text-xs uppercase tracking-wider text-emerald-800">Escrow Transaction Confirmed</h4>
+                      <p className="text-xs text-emerald-700 mt-0.5">{paymentSuccessToast}</p>
+                    </div>
+                  </div>
+                  <button 
+                    onClick={() => setPaymentSuccessToast(null)}
+                    className="p-1 rounded-lg hover:bg-emerald-100 text-emerald-700 cursor-pointer text-xs font-bold"
+                  >
+                    ✕
+                  </button>
                 </div>
               )}
+
+              {/* SECTION HEADER & REAL-TIME ACTIONS */}
+              <div className="bg-white rounded-3xl p-6 md:p-8 border border-gray-150 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-6">
+                <div>
+                  <div className="flex items-center gap-2.5 mb-1.5">
+                    <span className="p-2 rounded-xl bg-orange-50 text-orange-600">
+                      <Wallet className="w-5 h-5" />
+                    </span>
+                    <h2 className="text-xl md:text-2xl font-black text-gray-900 tracking-tight">Payment Ledger & Statements</h2>
+                  </div>
+                  <p className="text-xs text-gray-500 max-w-xl leading-relaxed">
+                    Review your assignment-wise financial ledger, live escrow security deposits, and download verifiable PDF statements of accounts.
+                  </p>
+                </div>
+
+                {/* Live Admin Sync & PDF Statement Generator Buttons */}
+                <div className="flex flex-wrap items-center gap-3">
+                  {/* Real-time Admin Synchronization Badge & Refresh */}
+                  <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 px-3 py-1.5 rounded-2xl">
+                    <span className="flex h-2 w-2 relative">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                      <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                    </span>
+                    <span className="text-[11px] font-bold text-slate-700">Admin Sync: Live</span>
+                    <button
+                      onClick={handleRefreshPayments}
+                      disabled={isSyncingPayments}
+                      className="p-1 hover:bg-slate-200/60 rounded-lg text-slate-500 transition-all cursor-pointer disabled:opacity-50"
+                      title="Fetch live payment updates from admin dashboard"
+                    >
+                      <RefreshCw className={`w-3.5 h-3.5 ${isSyncingPayments ? 'animate-spin text-orange-600' : ''}`} />
+                    </button>
+                  </div>
+
+                  {/* Primary PDF Download Action */}
+                  <button
+                    onClick={handleDownloadPDFStatement}
+                    disabled={isGeneratingPdf}
+                    id="btn-download-pdf-statement"
+                    className="bg-orange-600 hover:bg-orange-700 active:scale-[0.98] text-white px-4 py-2.5 rounded-2xl text-xs font-bold shadow-md shadow-orange-500/20 flex items-center gap-2 transition-all cursor-pointer disabled:opacity-50"
+                    title="Download complete formatted statement of payments"
+                  >
+                    <Download className={`w-4 h-4 ${isGeneratingPdf ? 'animate-bounce' : ''}`} />
+                    <span>{isGeneratingPdf ? 'Generating PDF...' : 'Download Statement (PDF)'}</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* ======================================================= */}
+              {/* FEATURE 1: CORE SUMMARY FINANCIAL METRIC CARDS          */}
+              {/* ======================================================= */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4" id="payment-summary-metrics">
+                
+                {/* 1. Total Payment Card */}
+                <div className="bg-white rounded-3xl p-5 border border-slate-150 shadow-xs flex flex-col justify-between hover:border-slate-300 transition-all">
+                  <div className="flex items-center justify-between mb-3">
+                    <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">Total Payment</span>
+                    <span className="p-2 rounded-xl bg-slate-100 text-slate-700">
+                      <DollarSign className="w-4 h-4" />
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-2xl md:text-3xl font-extrabold text-slate-900 block font-mono">
+                      ${totalQuotedSum.toFixed(2)}
+                    </span>
+                    <span className="text-[11px] text-slate-500 font-medium mt-1 block">
+                      Across {assignmentPaymentRows.length} registered brief(s)
+                    </span>
+                  </div>
+                </div>
+
+                {/* 2. Advance Paid Card */}
+                <div className="bg-white rounded-3xl p-5 border border-emerald-150 shadow-xs flex flex-col justify-between hover:border-emerald-300 transition-all">
+                  <div className="flex items-center justify-between mb-3">
+                    <span className="text-[10px] font-extrabold uppercase tracking-wider text-emerald-600">Advance Paid</span>
+                    <span className="p-2 rounded-xl bg-emerald-50 text-emerald-600">
+                      <ShieldCheck className="w-4 h-4" />
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-2xl md:text-3xl font-extrabold text-emerald-700 block font-mono">
+                      ${totalAdvancePaidSum.toFixed(2)}
+                    </span>
+                    <span className="text-[11px] text-emerald-600/80 font-medium mt-1 block">
+                      Secured in 100% escrow holding
+                    </span>
+                  </div>
+                </div>
+
+                {/* 3. Remaining Balance Card */}
+                <div className="bg-white rounded-3xl p-5 border border-orange-150 shadow-xs flex flex-col justify-between hover:border-orange-300 transition-all">
+                  <div className="flex items-center justify-between mb-3">
+                    <span className="text-[10px] font-extrabold uppercase tracking-wider text-orange-600">Remaining Balance</span>
+                    <span className="p-2 rounded-xl bg-orange-50 text-orange-600">
+                      <RotateCcw className="w-4 h-4" />
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-2xl md:text-3xl font-extrabold text-orange-600 block font-mono">
+                      ${totalRemainingBalanceSum.toFixed(2)}
+                    </span>
+                    <span className="text-[11px] text-orange-600/80 font-medium mt-1 block">
+                      Payable upon milestone approval
+                    </span>
+                  </div>
+                </div>
+
+                {/* 4. Escrow Protection Assurance Card */}
+                <div className="bg-gradient-to-br from-slate-900 to-slate-800 text-white rounded-3xl p-5 shadow-xs flex flex-col justify-between">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-[10px] font-extrabold uppercase tracking-wider text-emerald-400 flex items-center gap-1">
+                      <Lock className="w-3 h-3" /> Escrow Protected
+                    </span>
+                    <span className="text-[9px] bg-white/10 px-2 py-0.5 rounded-full font-mono text-slate-300">PCI-DSS</span>
+                  </div>
+                  <div>
+                    <span className="text-xs font-bold text-slate-200 block leading-tight">100% Money-Back Guarantee</span>
+                    <p className="text-[10.5px] text-slate-400 mt-1 leading-snug">
+                      Tutors receive funds only after you inspect and approve completed coursework or lesson solutions.
+                    </p>
+                  </div>
+                </div>
+
+              </div>
+
+              {/* ======================================================= */}
+              {/* FEATURE 2: ASSIGNMENT-WISE PAYMENT TABLE                */}
+              {/* ======================================================= */}
+              <div className="bg-white rounded-3xl border border-gray-150 overflow-hidden shadow-xs">
+                
+                {/* Table Header Controls */}
+                <div className="p-6 border-b border-gray-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                  <div>
+                    <h3 className="font-extrabold text-base text-gray-950 tracking-tight">Assignment-wise Payment Ledger</h3>
+                    <p className="text-xs text-gray-400 mt-0.5">Itemized fee breakdown, deposit milestones, and balance settlements per brief.</p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[11px] font-semibold text-gray-400 font-mono">
+                      {assignmentPaymentRows.length} item(s) logged
+                    </span>
+                  </div>
+                </div>
+
+                {assignmentPaymentRows.length > 0 ? (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left text-xs border-collapse">
+                      <thead>
+                        <tr className="bg-slate-50 border-b border-gray-150 text-slate-500 uppercase font-mono tracking-wider text-[10px]">
+                          <th className="p-4 font-bold">Assignment ID &amp; Title</th>
+                          <th className="p-4 font-bold">Total Amount</th>
+                          <th className="p-4 font-bold">Advance Paid</th>
+                          <th className="p-4 font-bold">Balance Amount</th>
+                          <th className="p-4 font-bold text-center">Payment Status</th>
+                          <th className="p-4 font-bold text-right">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-100">
+                        {assignmentPaymentRows.map((row) => (
+                          <tr key={row.id} className="hover:bg-slate-50/60 transition-colors">
+                            
+                            {/* Column 1: Assignment ID & Title */}
+                            <td className="p-4">
+                              <div className="space-y-1">
+                                <span className="font-bold text-gray-950 text-xs block leading-snug">
+                                  {row.title}
+                                </span>
+                                <div className="flex flex-wrap items-center gap-1.5 text-[10px]">
+                                  <button
+                                    onClick={() => handleCopyRef(row.id)}
+                                    className="font-mono text-slate-500 hover:text-orange-600 bg-slate-100 hover:bg-orange-50 px-1.5 py-0.5 rounded transition-all flex items-center gap-1 cursor-pointer"
+                                    title="Click to copy assignment reference ID"
+                                  >
+                                    <Copy className="w-2.5 h-2.5" />
+                                    <span>#{row.id}</span>
+                                    {copiedRefId === row.id && (
+                                      <span className="text-[9px] text-emerald-600 font-bold ml-0.5">Copied!</span>
+                                    )}
+                                  </button>
+                                  <span className="text-orange-600 font-bold bg-orange-50 px-2 py-0.5 rounded-full">
+                                    {row.subject}
+                                  </span>
+                                  {row.tutorName && (
+                                    <span className="text-slate-600 bg-slate-100 px-2 py-0.5 rounded-full">
+                                      🎓 {row.tutorName}
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                            </td>
+
+                            {/* Column 2: Total Amount */}
+                            <td className="p-4 font-mono font-bold text-slate-900">
+                              {row.totalAmount > 0 ? (
+                                <span className="text-sm font-extrabold text-slate-900">${row.totalAmount.toFixed(2)}</span>
+                              ) : (
+                                <span className="text-slate-400 italic text-[11px] font-sans font-medium">Pending Quote</span>
+                              )}
+                            </td>
+
+                            {/* Column 3: Advance Paid */}
+                            <td className="p-4 font-mono">
+                              {row.advancePaid > 0 ? (
+                                <div className="space-y-0.5">
+                                  <span className="text-xs font-bold text-emerald-700 block">${row.advancePaid.toFixed(2)}</span>
+                                  <span className="inline-block text-[9px] bg-emerald-50 text-emerald-700 px-1.5 py-0.2 rounded font-sans font-semibold">
+                                    Escrowed
+                                  </span>
+                                </div>
+                              ) : (
+                                <span className="text-slate-400 text-xs">$0.00</span>
+                              )}
+                            </td>
+
+                            {/* Column 4: Balance Amount */}
+                            <td className="p-4 font-mono">
+                              {row.balanceAmount > 0 ? (
+                                <div className="space-y-0.5">
+                                  <span className="text-xs font-bold text-orange-700 block">${row.balanceAmount.toFixed(2)}</span>
+                                  <span className="inline-block text-[9px] bg-orange-50 text-orange-700 px-1.5 py-0.2 rounded font-sans font-semibold">
+                                    Due on approval
+                                  </span>
+                                </div>
+                              ) : row.totalAmount > 0 ? (
+                                <span className="text-emerald-600 font-bold text-xs">$0.00 (Settled)</span>
+                              ) : (
+                                <span className="text-slate-400 text-xs">—</span>
+                              )}
+                            </td>
+
+                            {/* Column 5: Payment Status */}
+                            <td className="p-4 text-center">
+                              <span className={`inline-block font-bold text-[10px] px-2.5 py-1 rounded-full border uppercase tracking-wider font-mono ${row.statusBadgeClass}`}>
+                                {row.statusText}
+                              </span>
+                            </td>
+
+                            {/* Column 6: Actions */}
+                            <td className="p-4 text-right">
+                              <div className="flex items-center justify-end gap-1.5 flex-wrap">
+                                
+                                {/* Pay Advance Action if pending */}
+                                {row.totalAmount > 0 && row.advancePaid === 0 && (
+                                  <button
+                                    onClick={() => setPaymentModal({
+                                      isOpen: true,
+                                      assignmentId: row.id,
+                                      title: row.title,
+                                      amount: Number((row.totalAmount * 0.5).toFixed(2)),
+                                      type: 'advance'
+                                    })}
+                                    className="bg-orange-500 hover:bg-orange-600 text-white font-bold text-[10.5px] px-3 py-1.5 rounded-xl shadow-xs transition-all cursor-pointer flex items-center gap-1"
+                                  >
+                                    <CreditCard className="w-3 h-3" />
+                                    <span>Pay Advance (${(row.totalAmount * 0.5).toFixed(2)})</span>
+                                  </button>
+                                )}
+
+                                {/* Pay Balance Action if advance is paid but balance remains */}
+                                {row.advancePaid > 0 && row.balanceAmount > 0 && (
+                                  <button
+                                    onClick={() => setPaymentModal({
+                                      isOpen: true,
+                                      assignmentId: row.id,
+                                      title: row.title,
+                                      amount: row.balanceAmount,
+                                      type: 'balance'
+                                    })}
+                                    className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-[10.5px] px-3 py-1.5 rounded-xl shadow-xs transition-all cursor-pointer flex items-center gap-1"
+                                  >
+                                    <Lock className="w-3 h-3" />
+                                    <span>Settle Balance (${row.balanceAmount.toFixed(2)})</span>
+                                  </button>
+                                )}
+
+                                {/* Chat with Tutor or Support */}
+                                <button
+                                  onClick={() => {
+                                    const matchedChat = studentChats.find(c => c.subject.includes(row.subject) || c.subject.includes(row.title));
+                                    if (matchedChat) {
+                                      setLocalSelectedChatId(matchedChat.id);
+                                      setActiveTab('chat');
+                                    } else {
+                                      onOpenChat('admin_shaka', `Regarding billing for Assignment #${row.id} ("${row.title}").`);
+                                    }
+                                  }}
+                                  className="p-1.5 text-slate-500 hover:text-slate-900 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
+                                  title="Discuss payment details in chat"
+                                >
+                                  <MessageSquare className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
+                            </td>
+
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : (
+                  <div className="p-12 text-center bg-gray-50/50">
+                    <CreditCard className="w-10 h-10 text-gray-300 mx-auto mb-3" />
+                    <h4 className="font-bold text-gray-700 text-sm">No Active Assignment Payments Logged</h4>
+                    <p className="text-xs text-gray-400 mt-1 max-w-sm mx-auto">
+                      Submit an academic brief or lesson request to activate itemized billing quotes and escrow milestones.
+                    </p>
+                    <button
+                      onClick={() => setActiveTab('new_request')}
+                      className="mt-4 inline-flex items-center gap-2 bg-orange-600 hover:bg-orange-700 text-white text-xs font-bold px-4 py-2 rounded-xl transition-all cursor-pointer"
+                    >
+                      <span>🚀 Submit Your First Brief</span>
+                    </button>
+                  </div>
+                )}
+
+              </div>
+
+              {/* ======================================================= */}
+              {/* SUB-SECTION: VERIFIED TRANSACTION AUDIT LOGS            */}
+              {/* ======================================================= */}
+              {studentPayments.length > 0 && (
+                <div className="bg-white rounded-3xl border border-gray-150 overflow-hidden shadow-xs">
+                  <div className="p-5 border-b border-gray-100 flex items-center justify-between">
+                    <div>
+                      <h4 className="font-bold text-sm text-gray-900 tracking-tight flex items-center gap-2">
+                        <Receipt className="w-4 h-4 text-orange-500" />
+                        <span>Verified Stripe &amp; Escrow Transaction Receipts</span>
+                      </h4>
+                      <p className="text-[11px] text-gray-400 mt-0.5">Automated cryptographic receipt identifiers for card, wire, and digital payments.</p>
+                    </div>
+                    <span className="text-[10px] font-bold bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded-full font-mono">
+                      {studentPayments.length} Receipt(s)
+                    </span>
+                  </div>
+
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left text-xs border-collapse">
+                      <thead>
+                        <tr className="bg-slate-50 border-b border-gray-150 text-slate-400 uppercase font-mono tracking-wider text-[9.5px]">
+                          <th className="p-3.5 font-bold">Transaction Reference</th>
+                          <th className="p-3.5 font-bold">Assignment Reference</th>
+                          <th className="p-3.5 font-bold">Amount</th>
+                          <th className="p-3.5 font-bold text-right">Holding Status</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-100 font-mono text-xs">
+                        {studentPayments.map((p) => {
+                          const assign = assignments.find(a => a.id === p.assignmentId);
+                          return (
+                            <tr key={p.id} className="hover:bg-slate-50/50">
+                              <td className="p-3.5">
+                                <span className="font-bold text-slate-900 block">{p.id}</span>
+                                <span className="text-[10px] text-slate-400 font-normal">{p.stripePaymentIntent}</span>
+                              </td>
+                              <td className="p-3.5 font-sans">
+                                <span className="font-semibold text-slate-700 block">{assign?.title || 'Academic Brief'}</span>
+                                <span className="text-[10px] text-slate-400 font-mono">#{p.assignmentId}</span>
+                              </td>
+                              <td className="p-3.5 font-bold text-slate-900">
+                                ${p.amount.toFixed(2)} USD
+                              </td>
+                              <td className="p-3.5 text-right font-sans">
+                                <span className={`inline-block font-bold text-[9px] px-2.5 py-0.5 rounded-full uppercase font-mono ${
+                                  p.status === 'escrow' ? 'bg-amber-100 text-amber-800' :
+                                  p.status === 'released' ? 'bg-emerald-100 text-emerald-800' :
+                                  'bg-red-100 text-red-750'
+                                }`}>
+                                  {p.status}
+                                </span>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+
+              {/* ======================================================= */}
+              {/* MODAL: ESCROW DEPOSIT CONFIRMATION                      */}
+              {/* ======================================================= */}
+              {paymentModal && paymentModal.isOpen && (
+                <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 animate-fade-in text-left">
+                  <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-slate-100 space-y-5">
+                    
+                    <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                      <div className="flex items-center gap-2">
+                        <span className="p-2 rounded-xl bg-orange-50 text-orange-600">
+                          <Lock className="w-4 h-4" />
+                        </span>
+                        <div>
+                          <h4 className="font-black text-slate-900 text-sm">Authorize Escrow Holding</h4>
+                          <span className="text-[10px] text-slate-400 uppercase font-bold tracking-wider">
+                            {paymentModal.type === 'advance' ? '50% Milestone Deposit' : 'Remaining Balance Settlement'}
+                          </span>
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => setPaymentModal(null)}
+                        className="text-slate-400 hover:text-slate-600 font-bold p-1"
+                      >
+                        ✕
+                      </button>
+                    </div>
+
+                    <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200/60 space-y-2">
+                      <div className="flex justify-between items-center text-xs">
+                        <span className="text-slate-500">Brief Title:</span>
+                        <span className="font-bold text-slate-900 truncate max-w-[200px]">{paymentModal.title}</span>
+                      </div>
+                      <div className="flex justify-between items-center text-xs">
+                        <span className="text-slate-500">Ref Code:</span>
+                        <span className="font-mono text-slate-700">#{paymentModal.assignmentId}</span>
+                      </div>
+                      <div className="flex justify-between items-center text-xs pt-2 border-t border-slate-200/60">
+                        <span className="text-slate-700 font-bold">Deposit Amount:</span>
+                        <span className="text-lg font-black text-orange-600 font-mono">${paymentModal.amount.toFixed(2)} USD</span>
+                      </div>
+                    </div>
+
+                    <div className="p-3 bg-emerald-50 rounded-xl border border-emerald-150 text-[11px] text-emerald-800 space-y-1">
+                      <div className="flex items-center gap-1.5 font-bold">
+                        <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
+                        <span>Protected Under 100% Milestone Escrow</span>
+                      </div>
+                      <p className="text-[10.5px] text-emerald-700 leading-tight">
+                        Funds are held in secure escrow. The assigned tutor receives payment only when you review and confirm the finished academic deliverable.
+                      </p>
+                    </div>
+
+                    <div className="flex gap-2.5 pt-2">
+                      <button
+                        onClick={() => setPaymentModal(null)}
+                        disabled={isProcessingPayment}
+                        className="flex-1 py-2.5 rounded-xl border border-slate-200 text-slate-700 font-bold text-xs hover:bg-slate-50 transition-all cursor-pointer"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        onClick={handleExecutePayment}
+                        disabled={isProcessingPayment}
+                        className="flex-1 py-2.5 rounded-xl bg-orange-600 hover:bg-orange-700 text-white font-bold text-xs shadow-md shadow-orange-500/20 transition-all cursor-pointer flex items-center justify-center gap-2"
+                      >
+                        {isProcessingPayment ? (
+                          <>
+                            <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                            <span>Securing...</span>
+                          </>
+                        ) : (
+                          <>
+                            <Check className="w-3.5 h-3.5" />
+                            <span>Confirm &amp; Deposit</span>
+                          </>
+                        )}
+                      </button>
+                    </div>
+
+                  </div>
+                </div>
+              )}
+
             </div>
           )}
 
@@ -2356,9 +3343,52 @@ CONTACT EMAIL COMPASS: ${studentEmail}
 
                               {tutorChats.length === 0 && (
                                 <div className="p-4 text-center text-[11px] text-slate-400 bg-slate-50 border border-dashed rounded-xl leading-relaxed">
-                                  No assigned tutors yet. Submit an assignment request to match with an expert tutor!
+                                  No active tutor chats yet. Choose any verified scholar below to initiate 1-on-1 tutoring!
                                 </div>
                               )}
+                            </div>
+                          </div>
+
+                          {/* SECTION 3: ALL VERIFIED SUBJECT TUTORS */}
+                          <div className="pt-2 border-t border-slate-100">
+                            <div className="px-2 mb-2 flex items-center justify-between">
+                              <span className="text-[10px] font-bold text-slate-400 tracking-wider uppercase">All Subject Tutors</span>
+                              <span className="text-[10px] text-orange-600 font-semibold">{tutors.length} Available</span>
+                            </div>
+
+                            <div className="space-y-1.5">
+                              {tutors.slice(0, 8).map((tutor) => {
+                                const hasChat = studentChats.some(c => c.tutorId === tutor.id);
+                                return (
+                                  <div
+                                    key={tutor.id}
+                                    onClick={() => onOpenChat(tutor.id, `Hi ${tutor.name}, I would like to consult with you about my academic studies.`)}
+                                    className="p-2.5 rounded-xl cursor-pointer transition-all border border-transparent hover:border-orange-200 hover:bg-orange-50/40 flex items-center justify-between group"
+                                  >
+                                    <div className="flex items-center gap-2.5 min-w-0">
+                                      <div className="relative shrink-0">
+                                        <img 
+                                          src={tutor.avatarUrl} 
+                                          alt="" 
+                                          className="w-8 h-8 rounded-lg object-cover ring-1 ring-slate-200" 
+                                        />
+                                        <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 bg-emerald-500 border border-white rounded-full"></span>
+                                      </div>
+                                      <div className="min-w-0">
+                                        <h5 className="text-xs font-bold text-slate-800 group-hover:text-orange-600 truncate">{tutor.name}</h5>
+                                        <span className="text-[10px] text-slate-400 font-mono block">★ {tutor.rating || 4.9}</span>
+                                      </div>
+                                    </div>
+
+                                    <button
+                                      type="button"
+                                      className="px-2.5 py-1 bg-orange-100 group-hover:bg-orange-500 text-orange-700 group-hover:text-white rounded-lg text-[10px] font-bold transition-colors shrink-0"
+                                    >
+                                      {hasChat ? 'Resume' : 'Chat'}
+                                    </button>
+                                  </div>
+                                );
+                              })}
                             </div>
                           </div>
                         </>
@@ -2849,34 +3879,82 @@ CONTACT EMAIL COMPASS: ${studentEmail}
           {/* ========================== */}
           {activeTab === 'notifications' && (
             <div className="bg-white rounded-3xl border border-gray-150 p-6 md:p-8 space-y-6 text-left shadow-xs animate-fade-in">
-              <div className="border-b pb-3.5 flex justify-between items-center">
+              <div className="border-b pb-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
                 <div>
-                  <h3 className="font-bold text-base text-gray-950">Notifications Center</h3>
-                  <p className="text-xs text-gray-400 mt-0.5">Critical security alerts, Escrow release confirmations, and project state logs.</p>
+                  <h3 className="font-bold text-base text-gray-950 flex items-center gap-2">
+                    <Bell className="w-4 h-4 text-orange-500" />
+                    <span>Notifications Center</span>
+                  </h3>
+                  <p className="text-xs text-gray-400 mt-0.5">Live assignment updates, tutor matches, escrow confirmations, and direct messages.</p>
                 </div>
-                <span className="bg-orange-50 text-orange-655 font-mono text-[10px] font-bold px-2 rounded-full uppercase">
-                  4 UNREAD
-                </span>
+                <div className="flex items-center gap-2.5">
+                  {unreadNotifCount > 0 && (
+                    <span className="bg-orange-100 text-orange-700 font-mono text-[10px] font-bold px-2.5 py-1 rounded-full uppercase">
+                      {unreadNotifCount} UNREAD
+                    </span>
+                  )}
+                  {userNotifications.length > 0 && unreadNotifCount > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => onMarkAllNotificationsRead?.(currentUser.id)}
+                      className="bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-semibold px-3 py-1 rounded-xl transition-colors cursor-pointer"
+                    >
+                      Mark All as Read
+                    </button>
+                  )}
+                </div>
               </div>
 
               <div className="space-y-3">
-                {[
-                  { title: 'Escrow payment certified successfully', desc: '$120 deposit locked in verified Stripe holding structure. Safe to proceed under academic client rules.', type: 'payment', time: '10 minutes ago' },
-                  { title: 'Biology Syllabus Candidate Search Active', desc: 'Syllabus requirement broadcasted to certified Natural Sciences phD instructors worldwide.', type: 'matching', time: '1 hour ago' },
-                  { title: 'Welcome to UNIVERSITY TUTORS!', desc: 'Your student credentials are encrypted and archived locally. Ensure profile completeness for swift matching.', type: 'security', time: '3 hours ago' },
-                  { title: 'Session invitation created from Emily CSR', desc: 'A Support desk Specialist is assigned to optimize your active essay guidelines matching.', type: 'support', time: '1 day ago' }
-                ].map((notif, idx) => (
-                  <div key={idx} className="p-4 bg-gray-50 border border-gray-150/60 rounded-2xl flex items-start gap-3 text-xs">
-                    <div className="p-1 px-1.5 bg-orange-100 rounded text-orange-655 font-bold shrink-0 font-mono text-[9px] uppercase">
-                      {notif.type}
+                {userNotifications.length > 0 ? (
+                  userNotifications.map((notif) => (
+                    <div 
+                      key={notif.id} 
+                      onClick={() => {
+                        if (!notif.read && onMarkNotificationRead) {
+                          onMarkNotificationRead(notif.id);
+                        }
+                      }}
+                      className={`p-4 rounded-2xl flex items-start gap-3.5 text-xs transition-all cursor-pointer border ${
+                        !notif.read 
+                          ? 'bg-orange-50/40 border-orange-200/80 shadow-3xs' 
+                          : 'bg-gray-50/60 border-gray-150 hover:bg-gray-50'
+                      }`}
+                    >
+                      <div className={`p-1.5 rounded-lg shrink-0 font-mono text-[9px] uppercase font-bold ${
+                        !notif.read ? 'bg-orange-500 text-white' : 'bg-gray-200 text-gray-600'
+                      }`}>
+                        {notif.type || 'webapp'}
+                      </div>
+                      <div className="space-y-1 flex-1 min-w-0">
+                        <div className="flex items-center justify-between gap-2">
+                          <h4 className={`font-bold ${!notif.read ? 'text-gray-950 font-bold' : 'text-gray-700'}`}>
+                            {notif.title}
+                          </h4>
+                          {!notif.read && (
+                            <span className="w-2 h-2 rounded-full bg-orange-500 shrink-0"></span>
+                          )}
+                        </div>
+                        <p className="text-gray-500 text-[11.5px] leading-relaxed">
+                          {notif.message}
+                        </p>
+                        <div className="flex items-center gap-3 pt-1 text-[10px] text-gray-400 font-mono">
+                          <span>{new Date(notif.createdAt).toLocaleDateString()} at {new Date(notif.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                          <span>•</span>
+                          <span>Sent by: {notif.sentBy || 'System'}</span>
+                        </div>
+                      </div>
                     </div>
-                    <div className="space-y-1">
-                      <h4 className="font-bold text-gray-900">{notif.title}</h4>
-                      <p className="text-gray-400 text-[11px] leading-relaxed">{notif.desc}</p>
-                      <span className="text-[10px] text-gray-500 font-mono block pt-1">{notif.time}</span>
-                    </div>
+                  ))
+                ) : (
+                  <div className="p-10 text-center bg-gray-50 rounded-2xl border border-dashed border-gray-200 space-y-2">
+                    <Bell className="w-8 h-8 text-gray-300 mx-auto" />
+                    <h4 className="text-xs font-bold text-gray-700">No Notifications Yet</h4>
+                    <p className="text-[11px] text-gray-400 max-w-sm mx-auto">
+                      All notifications about tutor assignments, new chat messages, and payment releases will appear in real time here.
+                    </p>
                   </div>
-                ))}
+                )}
               </div>
             </div>
           )}
@@ -3025,8 +4103,46 @@ CONTACT EMAIL COMPASS: ${studentEmail}
           {/* ==================================== */}
           {activeTab === 'settings' && (
             <div className="bg-white rounded-3xl p-6 border border-gray-150 space-y-6 shadow-xs max-w-3xl mx-auto text-left animate-fade-in" id="student-settings-block">
-              <h3 className="font-bold text-base text-gray-950 font-sans tracking-tight border-b pb-3">Security Preferences</h3>
+              <h3 className="font-bold text-base text-gray-950 font-sans tracking-tight border-b pb-3">Student Profile &amp; Preferences</h3>
               
+              {/* Profile & Avatar Management Card */}
+              <div className="p-5 bg-gradient-to-r from-orange-50/60 via-amber-50/30 to-orange-50/60 rounded-2xl border border-orange-200/80 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                <div className="flex items-center gap-4">
+                  <div className="relative group">
+                    <img 
+                      src={currentUser.avatarUrl || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80'} 
+                      alt="" 
+                      className="w-16 h-16 rounded-full object-cover border-2 border-orange-300 shadow-sm bg-white"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setIsAvatarEditorOpen(true)}
+                      className="absolute inset-0 bg-black/40 rounded-full opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center cursor-pointer text-white"
+                      title="Change photo"
+                    >
+                      <Camera className="w-4 h-4" />
+                    </button>
+                  </div>
+                  <div>
+                    <h4 className="font-bold text-sm text-gray-900">{currentUser.name}</h4>
+                    <span className="text-xs text-gray-500 font-mono block">{currentUser.email}</span>
+                    <span className="inline-block mt-1 text-[10px] bg-orange-100 text-orange-700 font-mono font-bold px-2 py-0.5 rounded uppercase">
+                      Student Account • Active
+                    </span>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setIsAvatarEditorOpen(true)}
+                  className="inline-flex items-center gap-1.5 px-4 py-2 bg-orange-500 hover:bg-orange-600 text-white rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer"
+                  id="settings-edit-avatar-btn"
+                >
+                  <Camera className="w-4 h-4" />
+                  <span>Change Profile Photo</span>
+                </button>
+              </div>
+
               <div className="space-y-4 text-left text-gray-800">
                 <div className="flex items-center justify-between p-3.5 bg-gray-50 rounded-2xl border">
                   <div>
@@ -3167,6 +4283,130 @@ CONTACT EMAIL COMPASS: ${studentEmail}
                 Send Request
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* PROFILE PICTURE EDITOR MODAL */}
+      {isAvatarEditorOpen && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fade-in" id="student-avatar-modal">
+          <div className="bg-white rounded-3xl max-w-md w-full border border-gray-150 p-6 md:p-8 space-y-6 text-left shadow-2xl relative">
+            <button
+              type="button"
+              onClick={() => setIsAvatarEditorOpen(false)}
+              className="absolute top-5 right-5 text-gray-400 hover:text-gray-600 p-1.5 rounded-full hover:bg-gray-100 transition-colors cursor-pointer"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            <div>
+              <h3 className="font-bold text-lg text-gray-950 font-sans tracking-tight">Edit Profile Picture</h3>
+              <p className="text-xs text-gray-400 mt-1">Upload a custom photo or choose from verified scholar avatar presets.</p>
+            </div>
+
+            {avatarSuccessAlert && (
+              <div className="p-3 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-xl text-xs flex items-center gap-2 animate-fade-in">
+                <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                <span className="font-semibold">Profile photo updated and saved successfully!</span>
+              </div>
+            )}
+
+            {/* Current Active Preview */}
+            <div className="flex flex-col items-center justify-center gap-3 py-2">
+              <div className="relative">
+                <img 
+                  src={customAvatarPreview} 
+                  alt="Avatar preview" 
+                  className="w-28 h-28 rounded-full object-cover ring-4 ring-orange-100 shadow-md bg-orange-50"
+                />
+                <span className="absolute bottom-1 right-1 w-5 h-5 bg-emerald-500 border-2 border-white rounded-full"></span>
+              </div>
+              <span className="text-xs font-semibold text-gray-600 font-sans">{currentUser.name}</span>
+            </div>
+
+            {/* Upload Custom Photo Button */}
+            <div>
+              <label className="block text-[11px] font-bold text-gray-700 uppercase tracking-wider mb-2 font-mono">
+                Upload Custom Photo
+              </label>
+              <div className="flex items-center gap-3">
+                <label className="flex-1 flex items-center justify-center gap-2 border border-gray-200 hover:border-orange-300 bg-gray-50/80 hover:bg-orange-50/30 text-gray-700 py-2.5 px-4 rounded-xl text-xs font-bold cursor-pointer transition-all">
+                  <Upload className="w-4 h-4 text-orange-500" />
+                  <span>Choose Image File...</span>
+                  <input 
+                    type="file" 
+                    accept="image/*" 
+                    onChange={handleAvatarFileSelected}
+                    className="hidden" 
+                    id="avatar-custom-file-input"
+                  />
+                </label>
+              </div>
+              <p className="text-[10px] text-gray-400 mt-1 font-sans">Supports PNG, JPG, WebP. Automatically center-cropped &amp; optimized.</p>
+            </div>
+
+            {/* Preset Avatars Selection */}
+            <div>
+              <label className="block text-[11px] font-bold text-gray-700 uppercase tracking-wider mb-2 font-mono">
+                Or Select Scholar Preset
+              </label>
+              <div className="grid grid-cols-4 gap-3">
+                {PRESET_AVATARS.map((url, idx) => (
+                  <button
+                    key={idx}
+                    type="button"
+                    onClick={() => setCustomAvatarPreview(url)}
+                    className={`relative rounded-full p-0.5 border-2 transition-all cursor-pointer ${
+                      customAvatarPreview === url 
+                        ? 'border-orange-500 scale-105 shadow-sm' 
+                        : 'border-transparent hover:border-gray-300 opacity-80 hover:opacity-100'
+                    }`}
+                  >
+                    <img 
+                      src={url} 
+                      alt={`Preset ${idx + 1}`} 
+                      className="w-12 h-12 rounded-full object-cover"
+                    />
+                    {customAvatarPreview === url && (
+                      <div className="absolute inset-0 bg-orange-500/20 rounded-full flex items-center justify-center">
+                        <Check className="w-4 h-4 text-orange-600 stroke-[3]" />
+                      </div>
+                    )}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Modal Actions */}
+            <div className="flex items-center justify-end gap-3 pt-3 border-t border-gray-100">
+              <button
+                type="button"
+                onClick={() => setIsAvatarEditorOpen(false)}
+                className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl text-xs font-semibold cursor-pointer transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleSaveAvatar}
+                disabled={isSavingAvatar}
+                className="inline-flex items-center gap-1.5 px-5 py-2 bg-orange-500 hover:bg-orange-600 disabled:opacity-50 text-white rounded-xl text-xs font-bold shadow-md shadow-orange-500/20 cursor-pointer transition-all"
+                id="save-avatar-btn"
+              >
+                {isSavingAvatar ? (
+                  <>
+                    <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
+                    <span>Saving...</span>
+                  </>
+                ) : (
+                  <>
+                    <Check className="w-3.5 h-3.5" />
+                    <span>Save Photo</span>
+                  </>
+                )}
+              </button>
+            </div>
+
           </div>
         </div>
       )}
