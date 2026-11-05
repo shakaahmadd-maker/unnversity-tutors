@@ -85,10 +85,14 @@ export interface Chat {
   studentId: string;
   tutorId: string;
   subject: string;
+  orderId?: string;
   createdAt: string;
   updatedAt: string;
   studentIsTyping?: boolean;
   tutorIsTyping?: boolean;
+  pairedTutor?: any;
+  pairedStudent?: any;
+  order?: any;
 }
 
 export interface Message {

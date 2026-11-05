@@ -59,8 +59,12 @@ export default function TutorsListAdmin({
   onDeleteUser,
   onAddNewTutor
 }: TutorsListAdminProps) {
-  // Filter for tutors only
-  const allTutors = users.filter(u => u.role === UserRole.TUTOR);
+  // Filter for tutors only - matches enum UserRole.TUTOR, string 'tutor', or tutor ID prefixes
+  const allTutors = users.filter(u => {
+    if (!u) return false;
+    const r = (u.role || '').toLowerCase();
+    return r === 'tutor' || u.role === UserRole.TUTOR || u.id.startsWith('tutor_') || u.id.startsWith('tutor-') || !!u.hourlyRate;
+  });
 
   const [statusFilter, setStatusFilter] = useState<'all' | 'pending' | 'approved' | 'rejected'>('all');
   const [searchQuery, setSearchQuery] = useState('');
@@ -166,15 +170,19 @@ export default function TutorsListAdmin({
 
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase().trim();
-      const matchName = tutor.name.toLowerCase().includes(q);
-      const matchEmail = tutor.email.toLowerCase().includes(q);
+      const matchName = (tutor.name || '').toLowerCase().includes(q);
+      const matchEmail = (tutor.email || '').toLowerCase().includes(q);
       const matchBio = (tutor.bio || '').toLowerCase().includes(q);
       const matchEdu = (tutor.education || '').toLowerCase().includes(q);
       const matchExp = (tutor.experiences || tutor.experience || '').toLowerCase().includes(q);
-      const subStr = Array.isArray(tutor.subjectExpertise) ? tutor.subjectExpertise.join(' ') : (tutor.subjectExpertise || tutor.subjects?.join(' ') || '');
+      const subStr = Array.isArray(tutor.subjectExpertise) 
+        ? tutor.subjectExpertise.join(' ') 
+        : (tutor.subjectExpertise || (Array.isArray(tutor.subjects) ? tutor.subjects.join(' ') : (tutor.subjects || '')));
       const matchSub = subStr.toLowerCase().includes(q);
       const matchHob = (tutor.hobbies || '').toLowerCase().includes(q);
-      return matchName || matchEmail || matchBio || matchEdu || matchExp || matchSub || matchHob;
+      const matchCountry = (tutor.country || '').toLowerCase().includes(q);
+      const matchLoc = (tutor.location || tutor.city || '').toLowerCase().includes(q);
+      return matchName || matchEmail || matchBio || matchEdu || matchExp || matchSub || matchHob || matchCountry || matchLoc;
     }
 
     return true;
@@ -477,6 +485,24 @@ export default function TutorsListAdmin({
                           {tutor.country && (
                             <span className="text-xs bg-slate-100 text-slate-700 px-2 py-0.5 rounded-full font-mono font-semibold">
                               {tutor.country}
+                            </span>
+                          )}
+
+                          {/* Profile Origin / Type Badge */}
+                          {['tutor_clara', 'tutor_liam', 'tutor_chloe', 'tutor_james', 'tutor-dr-marcus-vance'].includes(tutor.id) ? (
+                            <span className="bg-sky-50 text-sky-700 border border-sky-200 text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full flex items-center gap-1" title="Pre-existing system dummy profile">
+                              <Sparkles className="w-3 h-3 text-sky-600" />
+                              Dummy Seed Profile
+                            </span>
+                          ) : (tutor.specializedKeywords || tutor.primaryDomain || tutor.id.startsWith('tutor-dr-') || tutor.id.startsWith('tutor-alex-') || tutor.id.startsWith('tutor-sarah-')) ? (
+                            <span className="bg-indigo-50 text-indigo-700 border border-indigo-200 text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full flex items-center gap-1" title="Curated academic faculty profile">
+                              <Sparkles className="w-3 h-3 text-indigo-600" />
+                              Curated Faculty
+                            </span>
+                          ) : (
+                            <span className="bg-purple-50 text-purple-700 border border-purple-200 text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full flex items-center gap-1" title="Newly created or uploaded tutor profile">
+                              <UserCheck className="w-3 h-3 text-purple-600" />
+                              New Profile Creation
                             </span>
                           )}
 

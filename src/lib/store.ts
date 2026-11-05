@@ -20,6 +20,7 @@ import {
   TriggeredEmail
 } from '../types';
 import { DEFAULT_20_BLOGS } from '../data/defaultBlogsData';
+import { CURATED_SPECIALIZED_TUTORS } from '../data/tutorsDirectoryData';
 
 // Standard Initial Mock Data
 const INITIAL_TUTORS: User[] = [
@@ -168,6 +169,7 @@ export function isShakaEmail(email: string | undefined | null): boolean {
 export class AppStore {
   users: User[] = [
     ...INITIAL_TUTORS,
+    ...CURATED_SPECIALIZED_TUTORS,
     {
       id: 'student_alex',
       role: UserRole.STUDENT,
@@ -273,12 +275,33 @@ export class AppStore {
       const usersPromise = fetch('/api/users').then(async (res) => {
         if (res.ok) {
           const uData = await res.json();
-          if (Array.isArray(uData.users) && uData.users.length > 0) {
-            this.users = uData.users.map((u: any) => ({
+          if (Array.isArray(uData.users)) {
+            const serverUsers = uData.users.map((u: any) => ({
               ...u,
-              subjects: typeof u.subjects === 'string' ? JSON.parse(u.subjects || '[]') : u.subjects,
-              subjectExpertise: typeof u.subjectExpertise === 'string' ? JSON.parse(u.subjectExpertise || '[]') : u.subjectExpertise,
+              role: u.role || UserRole.TUTOR,
+              subjects: typeof u.subjects === 'string' ? JSON.parse(u.subjects || '[]') : (u.subjects || []),
+              subjectExpertise: typeof u.subjectExpertise === 'string' ? JSON.parse(u.subjectExpertise || '[]') : (u.subjectExpertise || []),
             }));
+
+            // Merge serverUsers with INITIAL_TUTORS and CURATED_SPECIALIZED_TUTORS so all dummy profiles AND all new profiles are present
+            const mergedMap = new Map<string, User>();
+            for (const initial of INITIAL_TUTORS) {
+              mergedMap.set(initial.id, initial);
+            }
+            for (const curated of CURATED_SPECIALIZED_TUTORS) {
+              mergedMap.set(curated.id, curated);
+            }
+            for (const su of serverUsers) {
+              const existing = mergedMap.get(su.id);
+              mergedMap.set(su.id, existing ? { ...existing, ...su } : su);
+            }
+            // Preserve any newly created users already in local memory
+            for (const u of this.users) {
+              if (!mergedMap.has(u.id)) {
+                mergedMap.set(u.id, u);
+              }
+            }
+            this.users = Array.from(mergedMap.values());
           }
         }
       }).catch(() => {});
@@ -330,15 +353,23 @@ export class AppStore {
             this.chats = rData.rooms.map((r: any) => {
               const members = r.members || [];
               const memberIds = members.map((m: any) => m.userId);
-              const studentId = memberIds[0] || r.createdBy;
-              const tutorId = memberIds.find((id: string) => id !== studentId) || 'tutor_clara';
+              const studentMember = members.find((m: any) => m.role === 'student' || m.user?.role === 'student');
+              const tutorMember = members.find((m: any) => m.role === 'tutor' || m.user?.role === 'tutor' || (!m.userId.startsWith('admin_') && m.userId !== (studentMember?.userId || r.createdBy)));
+              
+              const studentId = r.studentId || r.student?.id || studentMember?.userId || memberIds[0] || r.createdBy;
+              const tutorId = r.tutorId || r.tutor?.id || tutorMember?.userId || memberIds.find((id: string) => id !== studentId) || r.order?.tutorId || 'tutor_clara';
+              
               return {
                 id: r.id,
                 studentId,
                 tutorId,
-                subject: r.title || 'Academic Mentorship',
+                orderId: r.orderId,
+                subject: r.title || (r.order?.title ? `${r.order.subject} - ${r.order.title}` : 'Academic Mentorship'),
                 createdAt: r.createdAt,
                 updatedAt: r.updatedAt,
+                pairedTutor: r.tutor || null,
+                pairedStudent: r.student || null,
+                order: r.order || null,
               };
             });
           }
@@ -562,19 +593,72 @@ export class AppStore {
     this.notify();
   }
 
-  async registerTutorFromModal(tutorData: any): Promise<boolean> {
-    return this.register(
-      tutorData.name,
-      tutorData.email,
-      UserRole.TUTOR,
-      {
-        hourlyRate: tutorData.hourlyRate,
-        subjects: tutorData.subjects,
-        country: tutorData.country,
-        bio: tutorData.bio,
-        avatarUrl: tutorData.avatarUrl
+  async createTutorProfile(tutorData: any): Promise<boolean> {
+    try {
+      const res = await fetch('/api/tutors', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(tutorData)
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || 'Failed to create tutor profile');
       }
-    );
+
+      const created = data.tutor || data.user;
+      if (created) {
+        const normalized: User = {
+          ...created,
+          role: UserRole.TUTOR,
+          subjects: typeof created.subjects === 'string' ? JSON.parse(created.subjects || '[]') : (created.subjects || []),
+          subjectExpertise: typeof created.subjectExpertise === 'string' ? JSON.parse(created.subjectExpertise || '[]') : (created.subjectExpertise || []),
+        };
+        const idx = this.users.findIndex(u => u.id === normalized.id || u.email.toLowerCase().trim() === normalized.email.toLowerCase().trim());
+        if (idx !== -1) {
+          this.users[idx] = { ...this.users[idx], ...normalized };
+        } else {
+          this.users.unshift(normalized);
+        }
+        this.notify();
+      }
+      return true;
+    } catch (err: any) {
+      console.error('[STORE] createTutorProfile error:', err);
+      // Fallback: create locally so UI is immediately responsive even if network is offline
+      const fallbackId = 'tutor_' + Date.now();
+      const fallbackTutor: User = {
+        id: fallbackId,
+        role: UserRole.TUTOR,
+        name: tutorData.name,
+        email: tutorData.email,
+        avatarUrl: tutorData.avatarUrl || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=300&auto=format&fit=crop&q=80',
+        createdAt: new Date().toISOString(),
+        verified: true,
+        isApproved: tutorData.isApproved !== undefined ? tutorData.isApproved : true,
+        status: tutorData.status || (tutorData.isApproved !== false ? 'approved' : 'pending'),
+        bio: tutorData.bio || 'Dedicated academic tutor and subject mentor.',
+        education: tutorData.education,
+        experience: tutorData.experiences || tutorData.experience,
+        experiences: tutorData.experiences,
+        subjectExpertise: tutorData.subjectExpertise,
+        subjects: Array.isArray(tutorData.subjectExpertise) ? tutorData.subjectExpertise : (typeof tutorData.subjectExpertise === 'string' ? tutorData.subjectExpertise.split(',').map((s: string) => s.trim()) : ['General Academics']),
+        availabilities: tutorData.availabilities,
+        availability: tutorData.availabilities,
+        canMeet: tutorData.canMeet,
+        hobbies: tutorData.hobbies,
+        hourlyRate: tutorData.hourlyRate || 45,
+        country: tutorData.country || 'US',
+        phoneNumber: tutorData.phoneNumber,
+        location: tutorData.location,
+      };
+      this.users.unshift(fallbackTutor);
+      this.notify();
+      return true;
+    }
+  }
+
+  async registerTutorFromModal(tutorData: any): Promise<boolean> {
+    return this.createTutorProfile(tutorData);
   }
 
   // ==========================================

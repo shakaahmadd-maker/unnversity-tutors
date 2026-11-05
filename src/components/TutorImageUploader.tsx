@@ -37,16 +37,42 @@ export default function TutorImageUploader({
       alert('Please select an image file (PNG, JPG, WEBP, etc.)');
       return;
     }
-    if (file.size > 5 * 1024 * 1024) {
-      alert('Image file size must be under 5MB.');
+    if (file.size > 10 * 1024 * 1024) {
+      alert('Image file size must be under 10MB.');
       return;
     }
 
     const reader = new FileReader();
     reader.onload = (event) => {
-      if (event.target?.result) {
-        onImageChange(event.target.result as string);
-      }
+      const rawDataUrl = event.target?.result as string;
+      if (!rawDataUrl) return;
+
+      const img = new Image();
+      img.onload = () => {
+        try {
+          const canvas = document.createElement('canvas');
+          const size = 300;
+          canvas.width = size;
+          canvas.height = size;
+          const ctx = canvas.getContext('2d');
+          if (ctx) {
+            const minDim = Math.min(img.width, img.height);
+            const startX = (img.width - minDim) / 2;
+            const startY = (img.height - minDim) / 2;
+            ctx.drawImage(img, startX, startY, minDim, minDim, 0, 0, size, size);
+            const compressed = canvas.toDataURL('image/jpeg', 0.88);
+            onImageChange(compressed);
+          } else {
+            onImageChange(rawDataUrl);
+          }
+        } catch {
+          onImageChange(rawDataUrl);
+        }
+      };
+      img.onerror = () => {
+        onImageChange(rawDataUrl);
+      };
+      img.src = rawDataUrl;
     };
     reader.readAsDataURL(file);
   };

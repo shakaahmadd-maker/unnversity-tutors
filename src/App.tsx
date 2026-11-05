@@ -597,16 +597,17 @@ export default function App() {
   };
 
   // Chat initiation
-  const handleOpenChat = (tutorId: string, initialMessage?: string) => {
+  const handleOpenChat = (tutorId: string, initialMessage?: string): Chat | undefined => {
     if (!storeState.currentUser) {
       setActiveView('auth');
-      return;
+      return undefined;
     }
     const chat = store.getOrCreateChat(storeState.currentUser.id, tutorId, 'Direct Consultation');
     if (initialMessage) {
       store.sendMessage(chat.id, storeState.currentUser.id, initialMessage);
     }
     setActiveChat(chat);
+    return chat;
   };
 
   const liveChat = activeChat ? storeState.chats.find(c => c.id === activeChat.id) || activeChat : null;
@@ -762,6 +763,9 @@ export default function App() {
       }
 
       const data = await response.json();
+      if (data.user) {
+        store.fetchData();
+      }
       return !!data.success;
     } catch (err: any) {
       console.error("Error creating privileged user via secure backend:", err);
@@ -956,6 +960,7 @@ export default function App() {
                 onGenerateProfile={handleGenerateProfile}
                 onDeleteUser={handleDeleteUser}
                 onUpdateUserProfile={handleUpdateUserProfile}
+                onAddNewTutor={store.createTutorProfile.bind(store)}
                 onDeleteChat={handleDeleteChat}
                 onSelectChat={handleSelectChat}
                 onSendMessage={handleSendMessage}
@@ -1159,7 +1164,11 @@ export default function App() {
           isOpen={isBecomeTutorOpen}
           onClose={() => setIsBecomeTutorOpen(false)}
           onSubmit={async (data) => {
-            return await store.submitTutorApplication(data);
+            return await store.submitTutorApplication({
+              ...data,
+              isApproved: false,
+              status: 'pending'
+            });
           }}
         />
 

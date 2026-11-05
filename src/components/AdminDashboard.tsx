@@ -349,11 +349,19 @@ export default function AdminDashboard({
   const [adminAttachedFileName, setAdminAttachedFileName] = useState('');
   const [adminAttachedFileUrl, setAdminAttachedFileUrl] = useState('');
   const [replyAsTutor, setReplyAsTutor] = useState(true);
+  const [adminChatsSearch, setAdminChatsSearch] = useState<string>('');
+  const [showSubmissionHistoriesDrawer, setShowSubmissionHistoriesDrawer] = useState<boolean>(true);
 
   const selectedChat = chats.find(c => c.id === selectedChatId);
   const activeChatMessages = messages.filter(m => m.chatId === selectedChatId).sort(
     (a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
   );
+
+  useEffect(() => {
+    if (activeTab === 'chats' && chats.length > 0 && (!selectedChatId || !chats.some(c => c.id === selectedChatId))) {
+      setSelectedChatId(chats[0].id);
+    }
+  }, [activeTab, chats, selectedChatId]);
 
   useEffect(() => {
     if (selectedChatId && onSubscribeToChatDetails) {
@@ -420,6 +428,8 @@ export default function AdminDashboard({
           setGenBio('Highly dedicated academic advisor with master credentials.');
           setGenSubject('Chemistry & Organic Synthesis');
           setGenRate(45);
+          store.fetchData();
+          runUsersSyncAudit();
           setTimeout(() => {
             setSelectedActionSuccess(null);
           }, 5000);
@@ -1017,7 +1027,7 @@ export default function AdminDashboard({
                 if (onAddNewTutor) {
                   return await onAddNewTutor(data);
                 } else {
-                  return await store.submitTutorApplication(data);
+                  return await store.createTutorProfile(data);
                 }
               }}
             />
@@ -1416,16 +1426,16 @@ export default function AdminDashboard({
                     </thead>
                     <tbody className="divide-y divide-gray-100 text-xs font-sans">
                       {(() => {
-                        const baseUsers = forceMerged ? [...users, ...unsyncedUsers.filter(u => !users.some(pu => pu.id === u.id))] : users;
+                        const baseUsers = [...users, ...unsyncedUsers.filter(u => !users.some(pu => pu.id === u.id || pu.email.toLowerCase().trim() === u.email.toLowerCase().trim()))];
                         const filteredUsers = baseUsers.filter(u => {
                           const matchesQuery = 
                             u.name.toLowerCase().includes(userSearchQuery.toLowerCase()) || 
                             u.email.toLowerCase().includes(userSearchQuery.toLowerCase()) || 
                             u.id.toLowerCase().includes(userSearchQuery.toLowerCase());
                           
-                          if (userFilterRole === 'student') return u.role === UserRole.STUDENT && matchesQuery;
-                          if (userFilterRole === 'tutor') return u.role === UserRole.TUTOR && matchesQuery;
-                          if (userFilterRole === 'admin') return u.role === UserRole.ADMIN && matchesQuery;
+                          if (userFilterRole === 'student') return (u.role === UserRole.STUDENT || (u.role as string)?.toLowerCase() === 'student') && matchesQuery;
+                          if (userFilterRole === 'tutor') return (u.role === UserRole.TUTOR || (u.role as string)?.toLowerCase() === 'tutor' || u.id.startsWith('tutor_') || u.id.startsWith('tutor-') || !!u.hourlyRate) && matchesQuery;
+                          if (userFilterRole === 'admin') return (u.role === UserRole.ADMIN || (u.role as string)?.toLowerCase() === 'admin') && matchesQuery;
                           return matchesQuery;
                         });
 
@@ -1717,7 +1727,7 @@ export default function AdminDashboard({
 
                 {(() => {
                   const pendingIncomingRequests = assignments.filter(a => !a.tutorId || a.status === AssignmentStatus.PENDING);
-                  const tutorsList = users.filter(u => u.role === UserRole.TUTOR);
+                  const tutorsList = users.filter(u => u.role === UserRole.TUTOR || (u.role as string)?.toLowerCase() === 'tutor' || u.id.startsWith('tutor_') || u.id.startsWith('tutor-') || !!u.hourlyRate);
 
                   if (pendingIncomingRequests.length === 0) {
                     return (
@@ -1954,7 +1964,7 @@ export default function AdminDashboard({
                           const studentName = student?.name || (assign.studentId.includes('@') ? assign.studentId.split('@')[0] : assign.studentId);
                           const studentEmail = student?.email || (assign.studentId.includes('@') ? assign.studentId : `${assign.studentId.replace(/\s+/g, '.').toLowerCase()}@universitytutors.com`);
                           const tutor = users.find(u => u.id === assign.tutorId);
-                          const tutorsList = users.filter(u => u.role === UserRole.TUTOR);
+                          const tutorsList = users.filter(u => u.role === UserRole.TUTOR || (u.role as string)?.toLowerCase() === 'tutor' || u.id.startsWith('tutor_') || u.id.startsWith('tutor-') || !!u.hourlyRate);
 
                         return (
                           <React.Fragment key={assign.id}>
@@ -3399,74 +3409,163 @@ export default function AdminDashboard({
                   {/* LEFT COLUMN: CHAT ROOMS DIRECTORY */}
                   <div className="lg:col-span-4 border border-gray-150 rounded-2xl overflow-hidden bg-gray-50/40 flex flex-col">
                     <div className="bg-gray-100/80 p-3.5 border-b border-gray-150 text-left">
-                      <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-gray-500">Chats Directory ({chats.length})</span>
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-gray-700 flex items-center gap-1.5">
+                          <MessageSquare className="w-3.5 h-3.5 text-orange-600" />
+                          <span>Paired Chats Directory ({chats.length})</span>
+                        </span>
+                        <span className="text-[9.5px] font-bold bg-orange-100 text-orange-800 px-2 py-0.5 rounded-full border border-orange-200">
+                          Live Moderation
+                        </span>
+                      </div>
+                      
+                      {/* Search chats */}
+                      <div className="relative">
+                        <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                        <input
+                          type="text"
+                          value={adminChatsSearch}
+                          onChange={(e) => setAdminChatsSearch(e.target.value)}
+                          placeholder="Filter student, tutor or subject..."
+                          className="w-full pl-8 pr-3 py-1.5 bg-white border border-gray-200 rounded-xl text-xs focus:border-orange-500 focus:ring-1 focus:ring-orange-500 outline-none transition-all placeholder:text-gray-400"
+                        />
+                      </div>
                     </div>
 
-                    <div className="divide-y divide-gray-150 overflow-y-auto max-h-[500px] flex-1">
-                      {chats.map((c) => {
-                        const student = users.find(u => u.id === c.studentId);
-                        const tutor = users.find(u => u.id === c.tutorId);
-                        const lastMsg = messages.filter(m => m.chatId === c.id).sort(
-                          (a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
-                        )[0];
+                    <div className="divide-y divide-gray-150 overflow-y-auto max-h-[520px] flex-1">
+                      {chats
+                        .filter((c) => {
+                          if (!adminChatsSearch.trim()) return true;
+                          const q = adminChatsSearch.toLowerCase();
+                          const s = users.find(u => u.id === c.studentId) || (c as any).pairedStudent;
+                          const t = users.find(u => u.id === c.tutorId) || (c as any).pairedTutor;
+                          return (
+                            c.subject?.toLowerCase().includes(q) ||
+                            s?.name?.toLowerCase().includes(q) ||
+                            s?.email?.toLowerCase().includes(q) ||
+                            t?.name?.toLowerCase().includes(q) ||
+                            c.id.toLowerCase().includes(q)
+                          );
+                        })
+                        .map((c) => {
+                          const student = users.find(u => u.id === c.studentId) || (c as any).pairedStudent;
+                          
+                          // Comprehensive paired tutor resolution
+                          const linkedAssignment = assignments.find(a => 
+                            (c.orderId && a.id === c.orderId) ||
+                            (a.studentId === c.studentId && a.tutorId === c.tutorId) ||
+                            (a.studentId === c.studentId && a.tutorId)
+                          );
+                          const isSupportChat = c.tutorId.startsWith('admin_') || c.tutorId === 'admin_emily' || c.tutorId === 'admin_shaka';
+                          const tutor = users.find(u => u.id === c.tutorId) || 
+                            (c as any).pairedTutor || 
+                            (linkedAssignment?.tutorId ? users.find(u => u.id === linkedAssignment.tutorId) : null);
 
-                        const isSelected = selectedChatId === c.id;
+                          const lastMsg = messages.filter(m => m.chatId === c.id).sort(
+                            (a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+                          )[0];
 
-                        return (
-                          <div 
-                            key={c.id}
-                            onClick={() => setSelectedChatId(c.id)}
-                            className={`p-3.5 text-left transition-all cursor-pointer select-none space-y-2 relative border-l-4 ${
-                              isSelected 
-                                ? 'bg-white border-l-orange-500 shadow-xs' 
-                                : 'border-l-transparent hover:bg-gray-100'
-                            }`}
-                          >
-                            <div className="flex justify-between items-start gap-2">
-                              <div>
-                                <h4 className="font-bold text-xs text-gray-900 leading-tight truncate max-w-[140px]" title={c.subject || 'Direct Consultation'}>
-                                  {c.subject || 'Direct Consultation'}
-                                </h4>
-                                <p className="text-[10px] text-gray-450 font-semibold mt-0.5">
-                                  ID: <span className="font-mono">{c.id.split('_')[1] || c.id}</span>
-                                </p>
+                          const isSelected = selectedChatId === c.id;
+
+                          return (
+                            <div 
+                              key={c.id}
+                              onClick={() => setSelectedChatId(c.id)}
+                              className={`p-3.5 text-left transition-all cursor-pointer select-none space-y-2 relative border-l-4 ${
+                                isSelected 
+                                  ? 'bg-white border-l-orange-500 shadow-xs' 
+                                  : 'border-l-transparent hover:bg-gray-100/70'
+                              }`}
+                            >
+                              <div className="flex justify-between items-start gap-2">
+                                <div>
+                                  <h4 className="font-bold text-xs text-gray-900 leading-tight truncate max-w-[150px]" title={c.subject || 'Academic Consultation'}>
+                                    {c.subject || 'Academic Consultation'}
+                                  </h4>
+                                  <p className="text-[10px] text-gray-400 font-mono mt-0.5">
+                                    ID: #{c.id.split('_')[1] || c.id}
+                                  </p>
+                                </div>
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    if (confirm("Are you absolutely sure you want to permanently delete this entire chat history? All message receipts will be purged.")) {
+                                      onDeleteChat(c.id);
+                                      if (selectedChatId === c.id) setSelectedChatId(null);
+                                    }
+                                  }}
+                                  className="text-gray-400 hover:text-red-550 p-1 hover:bg-red-50 rounded transition-colors shrink-0"
+                                  title="Permanently Purge Chat logs"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
                               </div>
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  if (confirm("Are you absolutely sure you want to permanently delete this entire chat history? All message receipts will be purged.")) {
-                                    onDeleteChat(c.id);
-                                    if (selectedChatId === c.id) setSelectedChatId(null);
-                                  }
-                                }}
-                                className="text-gray-400 hover:text-red-550 p-1 hover:bg-red-50 rounded transition-colors shrink-0"
-                                title="Permanently Purge Chat logs"
-                              >
-                                <Trash2 className="w-3.5 h-3.5" />
-                              </button>
-                            </div>
 
-                            <div className="space-y-1 block text-[10.5px]">
-                              <p className="text-gray-650">
-                                <span className="text-gray-450">👨‍🎓 Student:</span> <span className="font-bold text-gray-850">{student?.name || 'Unknown Student'}</span>
-                              </p>
-                              <p className="text-gray-655">
-                                <span className="text-gray-450">🎓 Tutor:</span> <span className="font-bold text-gray-855">{tutor?.name || 'Unassigned Tutor'}</span>
-                              </p>
-                            </div>
+                              {/* PAIRED STUDENT AND TUTOR BADGES */}
+                              <div className="space-y-1.5 block text-[11px] bg-slate-50/70 p-2 rounded-xl border border-slate-200/60">
+                                {/* Student */}
+                                <div className="flex items-center gap-2">
+                                  <img 
+                                    src={student?.avatarUrl || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=80&q=80'} 
+                                    alt="" 
+                                    className="w-5 h-5 rounded-full object-cover ring-1 ring-slate-200 shrink-0" 
+                                  />
+                                  <div className="truncate flex-1 min-w-0">
+                                    <span className="font-bold text-gray-900 truncate block leading-tight">{student?.name || 'Enrolled Student'}</span>
+                                    <span className="text-[9.5px] text-gray-400 truncate block leading-none">{student?.email || 'N/A'}</span>
+                                  </div>
+                                  <span className="text-[8.5px] font-bold bg-blue-50 text-blue-700 px-1.5 py-0.2 rounded border border-blue-200 shrink-0">
+                                    Student
+                                  </span>
+                                </div>
 
-                            {lastMsg ? (
-                              <p className="text-[10px] text-gray-400 truncate italic font-medium leading-none">
-                                "{lastMsg.content.replace(/\*\*|__/g, '')}"
-                              </p>
-                            ) : (
-                              <p className="text-[10px] text-gray-350 italic font-medium leading-none">
-                                No messages exchanged yet.
-                              </p>
-                            )}
-                          </div>
-                        );
-                      })}
+                                {/* Assigned Tutor / CSR Desk */}
+                                <div className="flex items-center gap-2 pt-1 border-t border-slate-200/50">
+                                  <img 
+                                    src={isSupportChat 
+                                      ? 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=80&auto=format&fit=crop&q=80'
+                                      : (tutor?.avatarUrl || 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=80&auto=format&fit=crop&q=80')} 
+                                    alt="" 
+                                    className="w-5 h-5 rounded-full object-cover ring-1 ring-orange-200 shrink-0" 
+                                  />
+                                  <div className="truncate flex-1 min-w-0">
+                                    <span className="font-bold text-gray-900 truncate block leading-tight">
+                                      {isSupportChat ? 'Emily Vance (CSR Desk)' : (tutor?.name || 'Assigned Specialist')}
+                                    </span>
+                                    <span className="text-[9.5px] text-emerald-700 font-semibold truncate block leading-none">
+                                      {isSupportChat ? '24/7 Support Desk' : `★ ${tutor?.rating || 4.9} • Verified Tutor`}
+                                    </span>
+                                  </div>
+                                  <span className={`text-[8.5px] font-bold px-1.5 py-0.2 rounded border shrink-0 ${
+                                    isSupportChat ? 'bg-purple-50 text-purple-700 border-purple-200' : 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                                  }`}>
+                                    {isSupportChat ? 'CSR' : 'Tutor'}
+                                  </span>
+                                </div>
+
+                                {/* Paired Assignment Reference */}
+                                {linkedAssignment && (
+                                  <div className="pt-1 text-[10px] text-orange-900 font-medium flex items-center justify-between border-t border-slate-200/50">
+                                    <span className="truncate max-w-[150px]">📋 {linkedAssignment.title}</span>
+                                    <span className="font-bold uppercase text-[8.5px] bg-orange-100 text-orange-800 px-1 rounded">
+                                      {linkedAssignment.status}
+                                    </span>
+                                  </div>
+                                )}
+                              </div>
+
+                              {lastMsg ? (
+                                <p className="text-[10px] text-gray-400 truncate italic font-medium leading-none">
+                                  "{lastMsg.content.replace(/\*\*|__/g, '')}"
+                                </p>
+                              ) : (
+                                <p className="text-[10px] text-gray-350 italic font-medium leading-none">
+                                  No messages exchanged yet.
+                                </p>
+                              )}
+                            </div>
+                          );
+                        })}
                     </div>
                   </div>
 
@@ -3474,40 +3573,170 @@ export default function AdminDashboard({
                   <div className="lg:col-span-8 border border-gray-150 rounded-2xl overflow-hidden flex flex-col justify-between bg-white">
                     {selectedChat && selectedChatId ? (
                       <div className="flex flex-col h-full justify-between">
-                        {/* Selected Chat info heading */}
-                        <div className="p-4 bg-gray-50 border-b border-gray-150 flex justify-between items-center text-left shrink-0">
-                          <div>
-                            <span className="text-[9px] font-mono bg-orange-50 text-orange-700 px-2.5 py-0.5 rounded-full border border-orange-100 font-bold uppercase tracking-wider">
-                              Monitoring Console Active
-                            </span>
-                            <h4 className="font-bold text-sm text-[#0B1528] mt-1">
-                              Topic: {selectedChat.subject}
-                            </h4>
-                            <p className="text-[10px] text-gray-500 font-medium mt-0.5">
-                              Student ID: <span className="font-bold text-gray-750">{users.find(u => u.id === selectedChat.studentId)?.name}</span> • 
-                              Tutor ID: <span className="font-bold text-gray-750">{users.find(u => u.id === selectedChat.tutorId)?.name}</span>
-                            </p>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <button
-                              onClick={() => handleTestChatConnection(selectedChatId)}
-                              disabled={testingChatConnectionId === selectedChatId}
-                              className="text-xs bg-white hover:bg-gray-55 border border-gray-200 text-gray-700 px-3 py-1.5 rounded-xl font-bold transition-all shadow-sm flex items-center gap-1 cursor-pointer disabled:opacity-50"
-                              title="Verify if onSnapshot subscription is active and query last 5 messages"
-                            >
-                              <RefreshCw className={`w-3.5 h-3.5 text-gray-500 ${testingChatConnectionId === selectedChatId ? 'animate-spin' : ''}`} />
-                              <span>{testingChatConnectionId === selectedChatId ? 'Testing...' : 'Test Connection'}</span>
-                            </button>
-                            <button
-                              onClick={() => onSelectChat(selectedChat)}
-                              className="text-xs bg-gray-950 hover:bg-black text-white px-3 py-1.5 rounded-xl font-bold transition-all shadow-sm flex items-center gap-1 cursor-pointer"
-                              title="Join communication session in normal UI view overlay"
-                            >
-                              <span>Open In Drawer Workspace</span>
-                              <ArrowUpRight className="w-3.5 h-3.5 text-orange-400" />
-                            </button>
-                          </div>
-                        </div>
+                        {(() => {
+                          const selStudent = users.find(u => u.id === selectedChat.studentId) || (selectedChat as any).pairedStudent;
+                          const selLinkedAssignment = assignments.find(a => 
+                            (selectedChat.orderId && a.id === selectedChat.orderId) ||
+                            (a.studentId === selectedChat.studentId && a.tutorId === selectedChat.tutorId) ||
+                            (a.studentId === selectedChat.studentId && a.tutorId)
+                          );
+                          const selIsSupport = selectedChat.tutorId.startsWith('admin_') || selectedChat.tutorId === 'admin_emily' || selectedChat.tutorId === 'admin_shaka';
+                          const selTutor = users.find(u => u.id === selectedChat.tutorId) || 
+                            (selectedChat as any).pairedTutor || 
+                            (selLinkedAssignment?.tutorId ? users.find(u => u.id === selLinkedAssignment.tutorId) : null);
+
+                          return (
+                            <>
+                              {/* Selected Chat info heading with Paired Tutor & Student Details */}
+                              <div className="p-4 bg-gradient-to-r from-gray-50 to-orange-50/30 border-b border-gray-150 flex flex-col md:flex-row justify-between items-start md:items-center gap-3 text-left shrink-0">
+                                <div className="space-y-1">
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-[9px] font-mono bg-orange-100 text-orange-800 px-2.5 py-0.5 rounded-full border border-orange-200 font-bold uppercase tracking-wider">
+                                      Live Room: #{selectedChat.id.split('_')[1] || selectedChat.id}
+                                    </span>
+                                    <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+                                      Paired Active Thread
+                                    </span>
+                                  </div>
+                                  <h4 className="font-bold text-sm text-[#0B1528]">
+                                    {selectedChat.subject}
+                                  </h4>
+                                  
+                                  {/* PAIRED CHAT MEMBERS SUMMARY */}
+                                  <div className="flex flex-wrap items-center gap-2 pt-1 text-xs">
+                                    {/* Student badge */}
+                                    <div className="flex items-center gap-1.5 bg-white border border-gray-200 px-2.5 py-1 rounded-xl shadow-2xs">
+                                      <span className="text-[10px] font-bold text-blue-700 uppercase">Student:</span>
+                                      <span className="font-bold text-gray-900">{selStudent?.name || 'Student'}</span>
+                                      <span className="text-[10px] text-gray-400">({selStudent?.email || 'N/A'})</span>
+                                    </div>
+
+                                    <span className="text-gray-400 font-bold">↔</span>
+
+                                    {/* Tutor badge */}
+                                    <div className="flex items-center gap-1.5 bg-white border border-gray-200 px-2.5 py-1 rounded-xl shadow-2xs">
+                                      <span className="text-[10px] font-bold text-orange-700 uppercase">
+                                        {selIsSupport ? 'Admin Support:' : 'Assigned Tutor:'}
+                                      </span>
+                                      <span className="font-bold text-gray-900">
+                                        {selIsSupport ? 'Emily Vance (CSR)' : (selTutor?.name || 'Matched Specialist')}
+                                      </span>
+                                      {!selIsSupport && (
+                                        <span className="text-[10px] text-emerald-600 font-bold">★ {selTutor?.rating || 4.9}</span>
+                                      )}
+                                    </div>
+                                  </div>
+                                </div>
+
+                                <div className="flex items-center gap-2 shrink-0">
+                                  <button
+                                    onClick={() => setShowSubmissionHistoriesDrawer(!showSubmissionHistoriesDrawer)}
+                                    className={`text-xs px-3 py-1.5 rounded-xl font-bold transition-all shadow-xs flex items-center gap-1.5 cursor-pointer border ${
+                                      showSubmissionHistoriesDrawer
+                                        ? 'bg-orange-500 text-white border-orange-600'
+                                        : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-50'
+                                    }`}
+                                    title="Toggle Student Submissions & Academic History"
+                                  >
+                                    <BookOpen className="w-3.5 h-3.5" />
+                                    <span>{showSubmissionHistoriesDrawer ? 'Hide Submissions' : 'View Submissions'}</span>
+                                  </button>
+                                  <button
+                                    onClick={() => handleTestChatConnection(selectedChatId)}
+                                    disabled={testingChatConnectionId === selectedChatId}
+                                    className="text-xs bg-white hover:bg-gray-55 border border-gray-200 text-gray-700 px-3 py-1.5 rounded-xl font-bold transition-all shadow-sm flex items-center gap-1 cursor-pointer disabled:opacity-50"
+                                    title="Verify if onSnapshot subscription is active and query last 5 messages"
+                                  >
+                                    <RefreshCw className={`w-3.5 h-3.5 text-gray-500 ${testingChatConnectionId === selectedChatId ? 'animate-spin' : ''}`} />
+                                    <span>{testingChatConnectionId === selectedChatId ? 'Testing...' : 'Test Sync'}</span>
+                                  </button>
+                                  <button
+                                    onClick={() => onSelectChat(selectedChat)}
+                                    className="text-xs bg-gray-950 hover:bg-black text-white px-3 py-1.5 rounded-xl font-bold transition-all shadow-sm flex items-center gap-1 cursor-pointer"
+                                    title="Join communication session in normal UI view overlay"
+                                  >
+                                    <span>Open In Drawer</span>
+                                    <ArrowUpRight className="w-3.5 h-3.5 text-orange-400" />
+                                  </button>
+                                </div>
+                              </div>
+
+                              {/* STUDENT SUBMISSION HISTORIES PANEL */}
+                              {showSubmissionHistoriesDrawer && (
+                                <div className="p-3.5 bg-slate-50 border-b border-gray-200 text-left shrink-0 space-y-2">
+                                  <div className="flex items-center justify-between">
+                                    <span className="text-[10px] font-bold uppercase tracking-wider text-gray-700 flex items-center gap-1.5 font-mono">
+                                      <GraduationCap className="w-3.5 h-3.5 text-orange-600" />
+                                      <span>Student Submission Histories &amp; Assigned Tutor Records</span>
+                                    </span>
+                                    <span className="text-[9.5px] font-bold bg-white border border-gray-200 px-2 py-0.5 rounded-full text-gray-600">
+                                      {assignments.filter(a => a.studentId === selectedChat.studentId).length} Submissions Total
+                                    </span>
+                                  </div>
+
+                                  {(() => {
+                                    const studentAssignments = assignments.filter(a => a.studentId === selectedChat.studentId);
+                                    if (studentAssignments.length === 0) {
+                                      return (
+                                        <p className="text-[11px] text-gray-400 italic">No formal coursework submissions recorded for this student yet.</p>
+                                      );
+                                    }
+                                    return (
+                                      <div className="space-y-2 max-h-[140px] overflow-y-auto pr-1">
+                                        {studentAssignments.map(a => {
+                                          const aTutor = users.find(u => u.id === a.tutorId);
+                                          return (
+                                            <div key={a.id} className="bg-white border border-gray-200 p-2.5 rounded-xl flex items-center justify-between gap-3 text-xs shadow-2xs">
+                                              <div className="min-w-0 flex-1">
+                                                <div className="flex items-center gap-2">
+                                                  <h5 className="font-bold text-gray-900 truncate leading-none">{a.title}</h5>
+                                                  <span className={`text-[9px] font-bold uppercase px-1.5 py-0.2 rounded border ${
+                                                    a.status === AssignmentStatus.COMPLETED ? 'bg-emerald-50 text-emerald-700 border-emerald-200' :
+                                                    a.status === AssignmentStatus.IN_PROGRESS ? 'bg-blue-50 text-blue-700 border-blue-200' :
+                                                    'bg-amber-50 text-amber-700 border-amber-200'
+                                                  }`}>
+                                                    {a.status}
+                                                  </span>
+                                                </div>
+                                                <div className="flex items-center gap-3 text-[10px] text-gray-500 mt-1">
+                                                  <span>Subject: <strong className="text-gray-700">{a.subject}</strong></span>
+                                                  <span>•</span>
+                                                  <span>Deadline: <strong className="text-gray-700">{a.deadline}</strong></span>
+                                                  <span>•</span>
+                                                  <span>Assigned Tutor: <strong className="text-orange-600">{aTutor?.name || a.tutorId || 'Unassigned'}</strong></span>
+                                                </div>
+                                              </div>
+
+                                              <div className="flex items-center gap-2 shrink-0">
+                                                {a.quoteAmount && (
+                                                  <span className="text-[11px] font-mono font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+                                                    ${a.quoteAmount}
+                                                  </span>
+                                                )}
+                                                {a.fileUrls && a.fileUrls.length > 0 && (
+                                                  <a 
+                                                    href={a.fileUrls[0]} 
+                                                    target="_blank" 
+                                                    rel="noreferrer" 
+                                                    download
+                                                    className="p-1.5 bg-orange-50 hover:bg-orange-500 text-orange-600 hover:text-white rounded-lg transition-colors"
+                                                    title="Download attached coursework brief"
+                                                  >
+                                                    <Download className="w-3.5 h-3.5" />
+                                                  </a>
+                                                )}
+                                              </div>
+                                            </div>
+                                          );
+                                        })}
+                                      </div>
+                                    );
+                                  })()}
+                                </div>
+                              )}
+                            </>
+                          );
+                        })()}
 
                         {/* SHARED STUDENT DOCUMENTS VAULT BAR */}
                         {selectedChat && (
@@ -3753,9 +3982,21 @@ export default function AdminDashboard({
                                 onChange={() => setReplyAsTutor(true)}
                                 className="accent-orange-550 scale-95"
                               />
-                              <span className={replyAsTutor ? "text-orange-700" : "text-gray-400"}>
-                                🎭 Reply as Tutor ({users.find(u => u.id === selectedChat.tutorId)?.name || 'Imaginary Tutor'})
-                              </span>
+                              {(() => {
+                                const linkedAssign = assignments.find(a => 
+                                  (selectedChat.orderId && a.id === selectedChat.orderId) ||
+                                  (a.studentId === selectedChat.studentId && a.tutorId === selectedChat.tutorId) ||
+                                  (a.studentId === selectedChat.studentId && a.tutorId)
+                                );
+                                const pairedTutorObj = users.find(u => u.id === selectedChat.tutorId) || 
+                                  (selectedChat as any).pairedTutor || 
+                                  (linkedAssign?.tutorId ? users.find(u => u.id === linkedAssign.tutorId) : null);
+                                return (
+                                  <span className={replyAsTutor ? "text-orange-700 font-bold" : "text-gray-400"}>
+                                    🎭 Reply as Tutor ({pairedTutorObj?.name || 'Assigned Tutor'})
+                                  </span>
+                                );
+                              })()}
                             </label>
                             <label className="inline-flex items-center gap-1.5 cursor-pointer text-[9.5px] uppercase tracking-wider font-extrabold select-none">
                               <input 
@@ -3796,7 +4037,7 @@ export default function AdminDashboard({
                               type="text"
                               value={adminReply}
                               onChange={(e) => setAdminReply(e.target.value)}
-                              placeholder={`Type message to send as ${replyAsTutor ? (users.find(u => u.id === selectedChat.tutorId)?.name || 'Tutor') : 'Platform Admin'}...`}
+                              placeholder={`Type message to send as ${replyAsTutor ? (users.find(u => u.id === selectedChat.tutorId)?.name || (selectedChat as any).pairedTutor?.name || 'Assigned Tutor') : 'Platform Admin'}...`}
                               className="flex-1 bg-gray-50 border border-gray-250 px-4 py-2.5 rounded-xl text-xs font-semibold focus:outline-hidden focus:border-orange-500 focus:bg-white"
                             />
                             <button

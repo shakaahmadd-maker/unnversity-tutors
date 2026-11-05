@@ -148,6 +148,25 @@ const SEED_TUTORS = [
     subjects: JSON.stringify(['Organic Chemistry', 'MCAT', 'Biochemistry', 'Chemistry']),
     isApproved: true,
     status: 'approved',
+  },
+  {
+    id: 'tutor_james',
+    role: 'tutor',
+    name: 'James Cook',
+    email: 'james@example.com',
+    avatarUrl: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150&auto=format&fit=crop&q=80',
+    createdAt: new Date(Date.now() - 150 * 24 * 3600 * 1000).toISOString(),
+    bio: 'Fullstack Developer and Algorithms Engineer. Academic advisor for Computer Science students across AU and NZ. Specialized in Python, Java, C++, and database architecture.',
+    hourlyRate: 48,
+    rating: 5.0,
+    reviewCount: 215,
+    subjects: JSON.stringify(['Computer Science', 'Data Structures', 'Coding & Python', 'Database Systems']),
+    country: 'AU',
+    location: 'Sydney, AU',
+    education: 'University of Sydney - B.Sc, Computer Science & Software Systems',
+    experience: '6+ years coaching students in algorithmic problem solving, Python, C++, and systems programming.',
+    isApproved: true,
+    status: 'approved',
   }
 ];
 
@@ -171,24 +190,30 @@ async function seedInitialDatabase() {
         suspended: false,
         bio: 'Platform Owner and Superior Administrator.',
         country: 'US',
-      });
+        isApproved: true,
+        status: 'approved',
+      }).onConflictDoNothing();
       console.log(`[SEED] Created default Superior Admin account: ${adminEmail}`);
     }
 
-    // Check if tutors exist
-    const existingTutors = await db.select().from(users).where(eq(users.role, 'tutor')).limit(1);
-    if (existingTutors.length === 0) {
-      const defaultTutorHash = hashPassword('Tutor@123456');
-      for (const t of SEED_TUTORS) {
-        await db.insert(users).values({
-          ...t,
-          passwordHash: defaultTutorHash,
-          verified: true,
-          suspended: false,
-        }).onConflictDoNothing();
+    // Seed each certified initial tutor individually if not yet in DB
+    const defaultTutorHash = hashPassword('Tutor@123456');
+    for (const t of SEED_TUTORS) {
+      try {
+        const existing = await db.select().from(users).where(eq(users.id, t.id)).limit(1);
+        if (existing.length === 0) {
+          await db.insert(users).values({
+            ...t,
+            passwordHash: defaultTutorHash,
+            verified: true,
+            suspended: false,
+          }).onConflictDoNothing();
+        }
+      } catch (err: any) {
+        console.warn(`[SEED] Notice seeding tutor ${t.id}:`, err.message);
       }
-      console.log('[SEED] Seeded initial certified tutors into PostgreSQL.');
     }
+    console.log('[SEED] Verified initial certified tutors in PostgreSQL.');
 
     // Check if blogs exist in DB
     try {
@@ -499,12 +524,13 @@ async function startServer() {
   // USERS & PRIVILEGED ACCOUNTS ENDPOINTS
   // ==========================================
 
-  // GET /api/users
+  // GET /api/users - returns all platform users including seed tutors, memory store, and PostgreSQL
   app.get('/api/users', async (req, res) => {
     try {
+      let dbUsers: any[] = [];
       if (isDbConnected() && db) {
         try {
-          const allUsers = await db.select({
+          dbUsers = await db.select({
             id: users.id,
             role: users.role,
             name: users.name,
@@ -530,19 +556,247 @@ async function startServer() {
             isApproved: users.isApproved,
             status: users.status,
           }).from(users);
-
-          if (allUsers.length > 0) {
-            return res.status(200).json({ users: allUsers });
-          }
         } catch (dbErr: any) {
-          console.warn('[API] DB select failed for users, serving memory store:', dbErr.message);
+          console.warn('[API] DB select failed for users:', dbErr.message);
         }
       }
 
       // Memory store response
-      return res.status(200).json({ users: memoryStore.getAllUsers() });
+      const memUsers = memoryStore.getAllUsers();
+
+      // Combine map: seed tutors + memory store + dbUsers
+      const userMap = new Map<string, any>();
+
+      // 1. Initial seed tutors
+      for (const t of SEED_TUTORS) {
+        const { passwordHash: _, ...safeT } = t as any;
+        userMap.set(t.id, safeT);
+      }
+
+      // 2. Memory store users
+      for (const u of memUsers) {
+        const { passwordHash: _, ...safeU } = u as any;
+        userMap.set(u.id, safeU);
+      }
+
+      // 3. PostgreSQL database (authoritative for persisted records)
+      for (const u of dbUsers) {
+        const { passwordHash: _, ...safeU } = u as any;
+        userMap.set(u.id, safeU);
+      }
+
+      return res.status(200).json({ users: Array.from(userMap.values()) });
     } catch (err: any) {
       return res.status(200).json({ users: memoryStore.getAllUsers() });
+    }
+  });
+
+  // POST /api/tutors
+  // Handles new tutor profile creations (Admin Dashboard) and public tutor applications (Become a Tutor modal)
+  app.post('/api/tutors', async (req, res) => {
+    try {
+      const {
+        name,
+        email,
+        phoneNumber,
+        location,
+        city,
+        bio,
+        education,
+        experiences,
+        experience,
+        subjectExpertise,
+        subjects,
+        availabilities,
+        availability,
+        canMeet,
+        hobbies,
+        hourlyRate,
+        country,
+        avatarUrl,
+        isApproved,
+        status,
+        password
+      } = req.body;
+
+      if (!name || !name.trim() || !email || !email.trim()) {
+        return res.status(400).json({ error: 'Full name and email address are required.' });
+      }
+
+      const cleanEmail = email.toLowerCase().trim();
+      const expText = (experiences || experience || '').trim();
+      const availText = (availabilities || availability || '').trim();
+      const locText = location || (city ? `${city}` : 'Miami, FL');
+
+      // Normalize subjects array
+      let subjectsArray: string[] = [];
+      if (Array.isArray(subjects) && subjects.length > 0) {
+        subjectsArray = subjects;
+      } else if (typeof subjects === 'string' && subjects.trim()) {
+        subjectsArray = subjects.split(',').map((s: string) => s.trim()).filter(Boolean);
+      } else if (Array.isArray(subjectExpertise) && subjectExpertise.length > 0) {
+        subjectsArray = subjectExpertise;
+      } else if (typeof subjectExpertise === 'string' && subjectExpertise.trim()) {
+        subjectsArray = subjectExpertise.split(',').map((s: string) => s.trim()).filter(Boolean);
+      } else {
+        subjectsArray = ['General Academics'];
+      }
+
+      // Normalize subjectExpertise array
+      let subjectExpertiseArray: string[] = [];
+      if (Array.isArray(subjectExpertise) && subjectExpertise.length > 0) {
+        subjectExpertiseArray = subjectExpertise;
+      } else if (typeof subjectExpertise === 'string' && subjectExpertise.trim()) {
+        subjectExpertiseArray = subjectExpertise.split(',').map((s: string) => s.trim()).filter(Boolean);
+      } else {
+        subjectExpertiseArray = subjectsArray;
+      }
+
+      const avatar = (avatarUrl && typeof avatarUrl === 'string' && avatarUrl.trim())
+        ? avatarUrl.trim()
+        : 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=300&auto=format&fit=crop&q=80';
+
+      const isApp = isApproved !== undefined ? Boolean(isApproved) : true;
+      const stat = status || (isApp ? 'approved' : 'pending');
+      const rate = hourlyRate ? Math.round(Number(hourlyRate)) : 45;
+
+      // Check if user with this email already exists in PostgreSQL
+      if (isDbConnected() && db) {
+        try {
+          const existing = await db.select().from(users).where(eq(users.email, cleanEmail)).limit(1);
+          if (existing.length > 0) {
+            const existingUser = existing[0];
+            const updates = {
+              name: name.trim(),
+              role: 'tutor',
+              avatarUrl: avatar,
+              bio: bio || existingUser.bio || 'Dedicated academic tutor and subject mentor.',
+              hourlyRate: rate,
+              subjects: JSON.stringify(subjectsArray),
+              country: country || existingUser.country || 'US',
+              location: locText,
+              phoneNumber: phoneNumber || existingUser.phoneNumber,
+              education: education || existingUser.education,
+              experience: expText || existingUser.experience,
+              subjectExpertise: JSON.stringify(subjectExpertiseArray),
+              availability: availText || existingUser.availability,
+              canMeet: canMeet || existingUser.canMeet || 'Online',
+              hobbies: hobbies || existingUser.hobbies,
+              isApproved: isApp,
+              status: stat,
+            };
+
+            await db.update(users).set(updates).where(eq(users.id, existingUser.id));
+            const fullUpdated = { ...existingUser, ...updates };
+            memoryStore.setUser(fullUpdated);
+
+            await logAudit('TUTOR_PROFILE_UPDATED', `Updated existing tutor profile: ${cleanEmail}`, existingUser.id, name.trim(), 'tutor', req);
+
+            const { passwordHash: _, ...safeTutor } = fullUpdated;
+            return res.status(200).json({
+              success: true,
+              tutor: { ...safeTutor, subjects: subjectsArray, subjectExpertise: subjectExpertiseArray },
+              user: { ...safeTutor, subjects: subjectsArray, subjectExpertise: subjectExpertiseArray },
+              updated: true
+            });
+          }
+        } catch (dbErr: any) {
+          console.warn('[API] DB check/update for tutor failed:', dbErr.message);
+        }
+      }
+
+      // Check memory store for existing user by email
+      const memExisting = memoryStore.findUserByEmail(cleanEmail);
+      if (memExisting) {
+        const updates = {
+          name: name.trim(),
+          role: 'tutor' as any,
+          avatarUrl: avatar,
+          bio: bio || memExisting.bio,
+          hourlyRate: rate,
+          subjects: JSON.stringify(subjectsArray),
+          country: country || memExisting.country || 'US',
+          location: locText,
+          phoneNumber: phoneNumber || memExisting.phoneNumber,
+          education: education || memExisting.education,
+          experience: expText || memExisting.experience,
+          subjectExpertise: JSON.stringify(subjectExpertiseArray),
+          availability: availText || memExisting.availability,
+          canMeet: canMeet || memExisting.canMeet || 'Online',
+          hobbies: hobbies || memExisting.hobbies,
+          isApproved: isApp,
+          status: stat,
+        };
+        const updated = memoryStore.updateUser(memExisting.id, updates) || { ...memExisting, ...updates };
+        const { passwordHash: _, ...safeTutor } = updated;
+        return res.status(200).json({
+          success: true,
+          tutor: { ...safeTutor, subjects: subjectsArray, subjectExpertise: subjectExpertiseArray },
+          user: { ...safeTutor, subjects: subjectsArray, subjectExpertise: subjectExpertiseArray },
+          updated: true
+        });
+      }
+
+      // Create new tutor profile
+      const newTutorId = 'tutor_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7);
+      const now = new Date().toISOString();
+      const pHash = hashPassword(password || 'TutorPass@2026');
+
+      const newTutorRecord = {
+        id: newTutorId,
+        role: 'tutor',
+        name: name.trim(),
+        email: cleanEmail,
+        passwordHash: pHash,
+        avatarUrl: avatar,
+        createdAt: now,
+        suspended: false,
+        verified: true,
+        bio: bio || 'Dedicated academic tutor and subject mentor.',
+        hourlyRate: rate,
+        rating: 5.0,
+        reviewCount: 0,
+        subjects: JSON.stringify(subjectsArray),
+        country: country || 'US',
+        location: locText,
+        phoneNumber: phoneNumber || null,
+        education: education || null,
+        experience: expText || null,
+        subjectExpertise: JSON.stringify(subjectExpertiseArray),
+        availability: availText || null,
+        canMeet: canMeet || 'Online',
+        hobbies: hobbies || null,
+        isApproved: isApp,
+        status: stat,
+        availableSlots: JSON.stringify([
+          new Date(Date.now() + 86400000).toISOString().split('T')[0] + 'T10:00:00.000Z',
+          new Date(Date.now() + 86400000 * 2).toISOString().split('T')[0] + 'T14:00:00.000Z',
+        ]),
+      };
+
+      // Always save to memory store
+      memoryStore.setUser(newTutorRecord);
+
+      // Save to PostgreSQL if connected
+      if (isDbConnected() && db) {
+        try {
+          await db.insert(users).values(newTutorRecord);
+        } catch (dbErr: any) {
+          console.warn('[API] Notice inserting new tutor into PostgreSQL:', dbErr.message);
+        }
+      }
+
+      await logAudit('CREATE_TUTOR_PROFILE', `New tutor profile created: ${cleanEmail} (${name.trim()})`, newTutorId, name.trim(), 'tutor', req);
+
+      const { passwordHash: _, ...safeTutor } = newTutorRecord;
+      return res.status(201).json({
+        success: true,
+        tutor: { ...safeTutor, subjects: subjectsArray, subjectExpertise: subjectExpertiseArray },
+        user: { ...safeTutor, subjects: subjectsArray, subjectExpertise: subjectExpertiseArray }
+      });
+    } catch (err: any) {
+      console.error('[API] Error in POST /api/tutors:', err);
+      return res.status(500).json({ error: err.message || 'Internal server error while saving tutor profile' });
     }
   });
 
@@ -564,13 +818,17 @@ async function startServer() {
       const pHash = hashPassword(password || 'TutorPass@2026');
       const userId = (role === 'admin' ? 'admin_' : 'tutor_') + Date.now() + '_' + Math.random().toString(36).slice(2, 6);
 
+      const avatar = (extra?.avatarUrl && typeof extra.avatarUrl === 'string' && extra.avatarUrl.trim())
+        ? extra.avatarUrl.trim()
+        : `https://images.unsplash.com/photo-${role === 'tutor' ? '1534528741775-53994a69daeb' : '1494790108377-be9c29b29330'}?w=150&auto=format&fit=crop&q=80`;
+
       const newUser = {
         id: userId,
         role,
         name: name.trim(),
         email: cleanEmail,
         passwordHash: pHash,
-        avatarUrl: `https://images.unsplash.com/photo-${role === 'tutor' ? '1534528741775-53994a69daeb' : '1494790108377-be9c29b29330'}?w=150&auto=format&fit=crop&q=80`,
+        avatarUrl: avatar,
         createdAt: new Date().toISOString(),
         verified: true,
         suspended: false,
@@ -578,10 +836,16 @@ async function startServer() {
         hourlyRate: extra?.hourlyRate ? Math.round(Number(extra.hourlyRate)) : (role === 'tutor' ? 45 : null),
         rating: role === 'tutor' ? 5.0 : null,
         reviewCount: role === 'tutor' ? 0 : null,
-        subjects: extra?.subjects ? JSON.stringify(extra.subjects) : (role === 'tutor' ? JSON.stringify(['English Literature']) : null),
+        subjects: extra?.subjects ? (typeof extra.subjects === 'string' ? extra.subjects : JSON.stringify(extra.subjects)) : (role === 'tutor' ? JSON.stringify(['English Literature']) : null),
         country: extra?.country || 'US',
         location: extra?.location || null,
+        phoneNumber: extra?.phoneNumber || null,
         education: extra?.education || null,
+        experience: extra?.experience || extra?.experiences || null,
+        subjectExpertise: extra?.subjectExpertise ? (typeof extra.subjectExpertise === 'string' ? extra.subjectExpertise : JSON.stringify(extra.subjectExpertise)) : null,
+        availability: extra?.availability || extra?.availabilities || null,
+        canMeet: extra?.canMeet || 'Online',
+        hobbies: extra?.hobbies || null,
         isApproved: true,
         status: 'approved',
       };
@@ -596,10 +860,21 @@ async function startServer() {
             set: {
               role: newUser.role,
               name: newUser.name,
+              avatarUrl: newUser.avatarUrl,
               bio: newUser.bio,
               hourlyRate: newUser.hourlyRate,
               subjects: newUser.subjects,
               country: newUser.country,
+              location: newUser.location,
+              phoneNumber: newUser.phoneNumber,
+              education: newUser.education,
+              experience: newUser.experience,
+              subjectExpertise: newUser.subjectExpertise,
+              availability: newUser.availability,
+              canMeet: newUser.canMeet,
+              hobbies: newUser.hobbies,
+              isApproved: newUser.isApproved,
+              status: newUser.status,
             }
           });
         } catch (dbErr: any) {
@@ -632,11 +907,40 @@ async function startServer() {
         updates.subjectExpertise = JSON.stringify(updates.subjectExpertise);
       }
 
+      // Handle aliases
+      if (updates.experiences && !updates.experience) {
+        updates.experience = updates.experiences;
+      }
+      if (updates.availabilities && !updates.availability) {
+        updates.availability = updates.availabilities;
+      }
+      if (updates.city && !updates.location) {
+        updates.location = updates.city;
+      }
+
       memoryStore.updateUser(id, updates);
 
       if (isDbConnected() && db) {
         try {
-          await db.update(users).set(updates).where(eq(users.id, id));
+          // Whitelist valid columns from users schema
+          const validColumns = new Set([
+            'role', 'name', 'email', 'avatarUrl', 'bio', 'hourlyRate',
+            'rating', 'reviewCount', 'subjects', 'country', 'location',
+            'phoneNumber', 'education', 'experience', 'subjectExpertise',
+            'availability', 'canMeet', 'hobbies', 'isApproved', 'status',
+            'availableSlots', 'verified', 'suspended', 'createdAt'
+          ]);
+
+          const dbUpdates: Record<string, any> = {};
+          for (const [k, v] of Object.entries(updates)) {
+            if (validColumns.has(k) && v !== undefined) {
+              dbUpdates[k] = v;
+            }
+          }
+
+          if (Object.keys(dbUpdates).length > 0) {
+            await db.update(users).set(dbUpdates).where(eq(users.id, id));
+          }
         } catch (dbErr: any) {
           console.warn('[API] Notice updating user in DB:', dbErr.message);
         }
@@ -940,26 +1244,84 @@ async function startServer() {
       if (isDbConnected() && db) {
         try {
           let userRooms: any[] = [];
-          if (isAdmin && req.query.all === 'true') {
+          if (isAdmin) {
             userRooms = await db.select().from(chatRooms).orderBy(desc(chatRooms.updatedAt));
           } else {
             const memberOf = await db.select().from(chatRoomMembers).where(eq(chatRoomMembers.userId, currentUser.id));
             const roomIds = memberOf.map(m => m.roomId);
             if (roomIds.length > 0) {
               userRooms = await db.select().from(chatRooms).where(inArray(chatRooms.id, roomIds)).orderBy(desc(chatRooms.updatedAt));
-            } else if (isAdmin) {
-              userRooms = await db.select().from(chatRooms).orderBy(desc(chatRooms.updatedAt)).limit(50);
             }
           }
 
-          // Populate members and latest message for each room
+          // Populate members, users, and latest message for each room
           const populated = await Promise.all(userRooms.map(async (r) => {
             const members = await db.select().from(chatRoomMembers).where(eq(chatRoomMembers.roomId, r.id));
             const latestMsg = await db.select().from(messages).where(eq(messages.roomId, r.id)).orderBy(desc(messages.createdAt)).limit(1);
+            
+            // Fetch users for all members
+            const memberUserIds = members.map(m => m.userId);
+            let memberUsers: any[] = [];
+            if (memberUserIds.length > 0) {
+              memberUsers = await db.select().from(users).where(inArray(users.id, memberUserIds));
+            }
+
+            // Fetch associated order if any
+            let linkedOrder: any = null;
+            if (r.orderId) {
+              const oRes = await db.select().from(orders).where(eq(orders.id, r.orderId)).limit(1);
+              linkedOrder = oRes[0] || null;
+            }
+
+            const studentMember = memberUsers.find(u => u.role === 'student');
+            const tutorMember = memberUsers.find(u => u.role === 'tutor' || (!u.id.startsWith('admin_') && u.role !== 'admin' && u.id !== studentMember?.id));
+
+            let tutorUser = tutorMember || null;
+            let studentUser = studentMember || null;
+
+            if (!tutorUser && linkedOrder?.tutorId) {
+              const tRes = await db.select().from(users).where(eq(users.id, linkedOrder.tutorId)).limit(1);
+              tutorUser = tRes[0] || null;
+            }
+            if (!studentUser && linkedOrder?.studentId) {
+              const sRes = await db.select().from(users).where(eq(users.id, linkedOrder.studentId)).limit(1);
+              studentUser = sRes[0] || null;
+            }
+
             return {
               ...r,
-              members,
+              members: members.map(m => ({
+                ...m,
+                user: memberUsers.find(u => u.id === m.userId) ? {
+                  id: m.userId,
+                  name: memberUsers.find(u => u.id === m.userId).name,
+                  email: memberUsers.find(u => u.id === m.userId).email,
+                  role: memberUsers.find(u => u.id === m.userId).role,
+                  avatarUrl: memberUsers.find(u => u.id === m.userId).avatarUrl,
+                  rating: memberUsers.find(u => u.id === m.userId).rating,
+                  subjectExpertise: memberUsers.find(u => u.id === m.userId).subjectExpertise,
+                } : null
+              })),
               latestMessage: latestMsg[0] || null,
+              order: linkedOrder,
+              student: studentUser ? {
+                id: studentUser.id,
+                name: studentUser.name,
+                email: studentUser.email,
+                role: studentUser.role,
+                avatarUrl: studentUser.avatarUrl,
+              } : null,
+              tutor: tutorUser ? {
+                id: tutorUser.id,
+                name: tutorUser.name,
+                email: tutorUser.email,
+                role: tutorUser.role,
+                avatarUrl: tutorUser.avatarUrl,
+                rating: tutorUser.rating,
+                subjectExpertise: tutorUser.subjectExpertise,
+              } : null,
+              studentId: studentUser?.id || r.createdBy,
+              tutorId: tutorUser?.id || null,
             };
           }));
 

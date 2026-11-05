@@ -325,6 +325,28 @@ export class MemoryStore {
         status: 'approved',
         verified: true,
         suspended: false,
+      },
+      {
+        id: 'tutor_james',
+        role: 'tutor',
+        name: 'James Cook',
+        email: 'james@example.com',
+        passwordHash: tutorHash,
+        avatarUrl: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150&auto=format&fit=crop&q=80',
+        createdAt: new Date(Date.now() - 150 * 24 * 3600 * 1000).toISOString(),
+        bio: 'Fullstack Developer and Algorithms Engineer. Academic advisor for Computer Science students across AU and NZ. Specialized in Python, Java, C++, and database architecture.',
+        hourlyRate: 48,
+        rating: 5.0,
+        reviewCount: 215,
+        subjects: JSON.stringify(['Computer Science', 'Data Structures', 'Coding & Python', 'Database Systems']),
+        country: 'AU',
+        location: 'Sydney, AU',
+        education: 'University of Sydney - B.Sc, Computer Science & Software Systems',
+        experience: '6+ years coaching students in algorithmic problem solving, Python, C++, and systems programming.',
+        isApproved: true,
+        status: 'approved',
+        verified: true,
+        suspended: false,
       }
     ];
 
@@ -492,18 +514,44 @@ export class MemoryStore {
     return room;
   }
 
-  public getChatRoomsForUser(userId: string, isAdmin?: boolean): (ChatRoomRecord & { members: ChatRoomMemberRecord[]; latestMessage?: MessageRecord })[] {
-    const results: (ChatRoomRecord & { members: ChatRoomMemberRecord[]; latestMessage?: MessageRecord })[] = [];
+  public getChatRoomsForUser(userId: string, isAdmin?: boolean): (ChatRoomRecord & { members: any[]; latestMessage?: MessageRecord; order?: any; student?: any; tutor?: any; studentId?: string; tutorId?: string })[] {
+    const results: (ChatRoomRecord & { members: any[]; latestMessage?: MessageRecord; order?: any; student?: any; tutor?: any; studentId?: string; tutorId?: string })[] = [];
     for (const [roomId, room] of this.chatRooms.entries()) {
       const members = this.chatRoomMembers.get(roomId) || [];
       const isMember = members.some(m => m.userId === userId);
       if (isMember || isAdmin) {
         const roomMessages = this.getRoomMessages(roomId);
         const latestMessage = roomMessages[roomMessages.length - 1];
+        const linkedOrder = room.orderId ? this.orders.get(room.orderId) : null;
+        const membersWithUser = members.map(m => {
+          const u = this.users.get(m.userId);
+          return {
+            ...m,
+            user: u ? { id: u.id, name: u.name, email: u.email, role: u.role, avatarUrl: u.avatarUrl, rating: u.rating, subjectExpertise: u.subjectExpertise } : null
+          };
+        });
+        const studentMember = membersWithUser.find(m => m.user?.role === 'student' || m.role === 'student');
+        const tutorMember = membersWithUser.find(m => m.user?.role === 'tutor' || m.role === 'tutor' || (!m.userId.startsWith('admin_') && m.userId !== studentMember?.userId));
+        const studentUser = studentMember?.user || (linkedOrder?.studentId ? this.users.get(linkedOrder.studentId) : null) || (this.users.get(room.createdBy));
+        const tutorUser = tutorMember?.user || (linkedOrder?.tutorId ? this.users.get(linkedOrder.tutorId) : null);
         results.push({
           ...room,
-          members,
+          members: membersWithUser,
           latestMessage,
+          order: linkedOrder ? {
+            id: linkedOrder.id,
+            title: linkedOrder.title,
+            subject: linkedOrder.subject,
+            studentId: linkedOrder.studentId,
+            tutorId: linkedOrder.tutorId,
+            status: linkedOrder.status,
+            createdAt: linkedOrder.createdAt,
+            deadline: linkedOrder.deadline
+          } : undefined,
+          student: studentUser || undefined,
+          tutor: tutorUser || undefined,
+          studentId: studentUser?.id || room.createdBy,
+          tutorId: tutorUser?.id || undefined,
         });
       }
     }

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   LayoutDashboard,
   PlusSquare,
@@ -90,7 +90,7 @@ interface StudentDashboardProps {
   payments: Payment[];
   supportTickets: SupportTicket[];
   onSubmitAssignment: (data: any) => void;
-  onOpenChat: (tutorId: string, initialMessage?: string) => void;
+  onOpenChat: (tutorId: string, initialMessage?: string) => Chat | void;
   onSelectChat: (chat: Chat) => void;
   onSendMessage?: (chatId: string, senderId: string, content: string, fileUrl?: string, fileName?: string) => void;
   onSubscribeToChatDetails?: (chatId: string) => void;
@@ -154,12 +154,18 @@ export default function StudentDashboard({
   const [isQuoteDrawerOpen, setIsQuoteDrawerOpen] = useState(false);
   const [chatAttachedFileName, setChatAttachedFileName] = useState('');
   const [showSafetyBanner, setShowSafetyBanner] = useState(true);
+  const [isMobileChannelsOpen, setIsMobileChannelsOpen] = useState(false);
 
   useEffect(() => {
     if (activeTab === 'chat' && chats.length > 0) {
-      const support = chats.find(c => c.studentId === currentUser.id && (c.tutorId === 'admin_emily' || c.tutorId.startsWith('admin_')));
-      if (support && !localSelectedChatId) {
-        setLocalSelectedChatId(support.id);
+      const myChats = chats.filter(c => c.studentId === currentUser.id || c.tutorId === currentUser.id);
+      if (myChats.length > 0) {
+        if (!localSelectedChatId || !myChats.some(c => c.id === localSelectedChatId)) {
+          // Prefer assigned tutor chat first, otherwise support, otherwise first chat
+          const tutorChat = myChats.find(c => !c.tutorId.startsWith('admin_') && c.tutorId !== 'admin_emily');
+          const target = tutorChat || myChats[0];
+          setLocalSelectedChatId(target.id);
+        }
       }
     }
   }, [chats, activeTab, currentUser.id, localSelectedChatId]);
@@ -174,6 +180,14 @@ export default function StudentDashboard({
   const activeChatMessages = messages.filter(m => m.chatId === localSelectedChatId).sort(
     (a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
   );
+
+  const chatMessagesEndRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (activeTab === 'chat' && localSelectedChatId) {
+      chatMessagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [activeTab, localSelectedChatId, activeChatMessages.length]);
   const [showReviewModal, setShowReviewModal] = useState<string | null>(null);
   const [showRevisionModal, setShowRevisionModal] = useState<string | null>(null);
   const [reviewRating, setReviewRating] = useState(5);
@@ -1076,7 +1090,7 @@ CONTACT EMAIL COMPASS: ${studentEmail}
     const subtopic = selectedSubtopic || 'General';
     const duration = selectedDuration || '4 Hours';
     
-    // Automatically match with appropriate tutor based on profile criteria
+    // e-Optimal Matching Algorithm: automatically match with best qualified specialist
     const matchedTutor = getTutorForSubject(subject) || tutors[0];
     const targetTutorId = matchedTutor ? matchedTutor.id : 'admin_shaka';
 
@@ -1094,13 +1108,29 @@ CONTACT EMAIL COMPASS: ${studentEmail}
     setPremiumDeliverables({});
     setFunnelStep(1);
     
-    // Redirect to direct chat tab
+    // Directly route to Chat tab
     setActiveTab('chat');
 
-    // Trigger dynamic Tutor Chat with the matched specialist
+    // Trigger dynamic Tutor Chat with the matched specialist & route directly
     const tutorDisplayName = matchedTutor ? matchedTutor.name : 'Tutor';
-    const messageTemplate = `Hi ${tutorDisplayName}, I was just automatically matched with you for "${subject}" (${subtopic}, scheduled for ${duration}). I have submitted my brief and look forward to working together!`;
-    onOpenChat(targetTutorId, messageTemplate);
+    const messageTemplate = `Hi ${tutorDisplayName}, I was just automatically matched with you through the e-Optimal Matching System for "${subject}" (${subtopic}, scheduled for ${duration}). My Final Draft brief has been secured in our platform workspace. Looking forward to your guidance!`;
+    const createdChat = onOpenChat(targetTutorId, messageTemplate);
+
+    if (createdChat && createdChat.id) {
+      setLocalSelectedChatId(createdChat.id);
+      if (onSubscribeToChatDetails) onSubscribeToChatDetails(createdChat.id);
+    } else {
+      setTimeout(() => {
+        const found = chats.find(c => 
+          (c.studentId === currentUser.id && c.tutorId === targetTutorId) ||
+          (c.studentId === targetTutorId && c.tutorId === currentUser.id)
+        );
+        if (found) {
+          setLocalSelectedChatId(found.id);
+          if (onSubscribeToChatDetails) onSubscribeToChatDetails(found.id);
+        }
+      }, 50);
+    }
   };
 
   const submitInlineRequest = (e: React.FormEvent) => {
@@ -1364,7 +1394,7 @@ CONTACT EMAIL COMPASS: ${studentEmail}
         {/* ============================================== */}
         {/* WORKSPACE AREA RENDERING VARIOUS VIEWS        */}
         {/* ============================================== */}
-        <div className="p-5 md:p-8 flex-1 overflow-y-auto space-y-8" id="portal-content-body">
+        <div className={`flex-1 ${activeTab === 'chat' ? 'p-3 sm:p-4 md:p-6 overflow-hidden flex flex-col' : 'p-5 md:p-8 overflow-y-auto space-y-8'}`} id="portal-content-body">
           
           {/* ========================== */}
           {/* TAB 1: DASHBOARD (HOME VIEW) */}
@@ -2085,15 +2115,27 @@ CONTACT EMAIL COMPASS: ${studentEmail}
                     </div>
                   )}
 
-                  {/* FUNNEL PANEL 5: LEAD CONTACT PROFILE */}
+                  {/* FUNNEL PANEL 5: LEAD CONTACT PROFILE & FINAL DRAFT ROUTING */}
                   {funnelStep === 5 && (
                     <div className="space-y-6 animate-fade-in text-left">
                       <div className="mb-6">
                         <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md text-[9px] font-black uppercase tracking-wider bg-orange-55 text-orange-700">
-                          <UserIcon className="w-3" /> Step 5: Student Profile
+                          <UserIcon className="w-3" /> Step 5: Final Draft &amp; e-Optimal Match
                         </span>
-                        <h2 className="text-2xl font-black text-gray-900 mt-2.5 tracking-tight">Who should we match?</h2>
-                        <p className="text-xs text-gray-500 mt-1.5 leading-relaxed">Provide your contact email option to finalize registration inside our vetting matching cohort algorithms.</p>
+                        <h2 className="text-2xl font-black text-gray-900 mt-2.5 tracking-tight">Final Draft Review &amp; e-Optimal Match</h2>
+                        <p className="text-xs text-gray-500 mt-1.5 leading-relaxed">
+                          Your assignment brief is formatted into its Final Draft stage. The e-Optimal matching algorithm will secure your academic lead and route this section directly into your designated tutor's active chat.
+                        </p>
+                      </div>
+
+                      <div className="p-3.5 bg-emerald-50/70 border border-emerald-200/80 rounded-2xl flex items-center gap-3">
+                        <div className="p-2 bg-emerald-100 text-emerald-700 rounded-xl">
+                          <Sparkles className="w-4 h-4 animate-pulse" />
+                        </div>
+                        <div className="text-xs">
+                          <p className="font-bold text-emerald-900">e-Optimal Lead Routing Ready</p>
+                          <p className="text-emerald-700 text-[11px]">Submitting instantly connects you to your matched specialist with continuous escrow protection.</p>
+                        </div>
                       </div>
 
                       <div className="space-y-4">
@@ -2507,9 +2549,10 @@ CONTACT EMAIL COMPASS: ${studentEmail}
                           <button 
                             type="button" 
                             onClick={closeSuccessModal}
-                            className="w-full inline-flex justify-center bg-orange-500 hover:bg-orange-600 text-white font-black text-xs uppercase tracking-widest py-3 rounded-xl shadow-md cursor-pointer transition-all"
+                            className="w-full inline-flex items-center justify-center gap-2 bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white font-black text-xs uppercase tracking-widest py-3.5 rounded-xl shadow-md cursor-pointer transition-all active:scale-[0.99]"
                           >
-                            Launch Classroom Portal
+                            <span>Connect with Assigned Tutor &amp; View Chat</span>
+                            <Sparkles className="w-4 h-4 animate-pulse" />
                           </button>
                         </div>
                       </div>
@@ -3189,13 +3232,17 @@ CONTACT EMAIL COMPASS: ${studentEmail}
           {/* TAB 6: CHAT INTERFACE MESSENGER   */}
           {/* ================================== */}
           {activeTab === 'chat' && (
-            <div className="bg-white border border-slate-200/80 rounded-3xl flex flex-col h-[720px] overflow-hidden shadow-sm text-left relative animate-fade-in">
+            <div className="bg-white border border-slate-200/80 rounded-2xl md:rounded-3xl flex flex-col flex-1 min-h-[480px] overflow-hidden shadow-sm text-left relative animate-fade-in">
               
               {/* Discussion Channels + Center Chat Workspace */}
               <div className="flex-1 flex overflow-hidden w-full relative">
 
                 {/* LEFT SIDEBAR: DISCUSSION CHANNELS */}
-                <aside className="w-72 md:w-80 lg:w-88 bg-white border-r border-slate-200/80 flex flex-col shrink-0 shadow-xs overflow-hidden">
+                <aside className={`bg-white border-r border-slate-200/80 flex flex-col shrink-0 shadow-xs overflow-hidden transition-all duration-200 ${
+                  isMobileChannelsOpen 
+                    ? 'fixed inset-0 z-50 w-full h-full' 
+                    : 'hidden md:flex w-72 md:w-80 lg:w-88'
+                }`}>
                   
                   {/* Sidebar Title Header */}
                   <div className="p-4 border-b border-slate-100">
@@ -3204,9 +3251,21 @@ CONTACT EMAIL COMPASS: ${studentEmail}
                         <MessageSquare className="w-4 h-4 text-orange-500" />
                         <span>Discussion Channels</span>
                       </h2>
-                      <span className="text-[11px] font-semibold bg-orange-50 text-orange-600 px-2.5 py-0.5 rounded-full border border-orange-200/50">
-                        {studentChats.length || 1} Active
-                      </span>
+                      <div className="flex items-center gap-2">
+                        <span className="text-[11px] font-semibold bg-orange-50 text-orange-600 px-2.5 py-0.5 rounded-full border border-orange-200/50">
+                          {studentChats.length || 1} Active
+                        </span>
+                        {isMobileChannelsOpen && (
+                          <button 
+                            type="button" 
+                            onClick={() => setIsMobileChannelsOpen(false)}
+                            className="md:hidden p-1 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 cursor-pointer"
+                            title="Close channels"
+                          >
+                            <X className="w-5 h-5" />
+                          </button>
+                        )}
+                      </div>
                     </div>
 
                     {/* Channel Search */}
@@ -3227,12 +3286,29 @@ CONTACT EMAIL COMPASS: ${studentEmail}
 
                     {(() => {
                       const supportChat = studentChats.find(c => c.tutorId === 'admin_emily' || c.tutorId.startsWith('admin_'));
-                      const tutorChats = studentChats.filter(c => !c.tutorId.startsWith('admin_') && c.tutorId !== 'admin_emily');
-                      const filteredTutorChats = tutorChats.filter(c => {
+                      
+                      // AUTOMATED TUTOR MATCHING LOGIC:
+                      // Strictly display tutors who have been automatically assigned by the system
+                      const assignedTutorIds = new Set<string>(
+                        studentAssignments
+                          .filter(a => a.tutorId && !a.tutorId.startsWith('admin_') && a.tutorId !== 'admin_emily' && a.tutorId !== 'admin_shaka')
+                          .map(a => a.tutorId as string)
+                      );
+
+                      const assignedTutorChats = studentChats.filter(c => 
+                        !c.tutorId.startsWith('admin_') && c.tutorId !== 'admin_emily' && assignedTutorIds.has(c.tutorId)
+                      );
+
+                      const filteredTutorChats = assignedTutorChats.filter(c => {
                         const tutor = getTutor(c.tutorId);
                         const query = channelSearchFilter.toLowerCase();
                         return !query || (tutor?.name.toLowerCase().includes(query)) || (c.subject.toLowerCase().includes(query));
                       });
+
+                      // Assigned tutors that have an assignment matched but no chat thread instantiated yet
+                      const pendingAssignedTutorIds = Array.from(assignedTutorIds).filter(
+                        id => !assignedTutorChats.some(c => c.tutorId === id)
+                      );
 
                       return (
                         <>
@@ -3249,6 +3325,7 @@ CONTACT EMAIL COMPASS: ${studentEmail}
                               <div 
                                 onClick={() => {
                                   setLocalSelectedChatId(supportChat.id);
+                                  setIsMobileChannelsOpen(false);
                                   if (onSubscribeToChatDetails) onSubscribeToChatDetails(supportChat.id);
                                 }} 
                                 className={`p-3 rounded-xl cursor-pointer transition-all border flex items-start gap-3 relative group ${
@@ -3275,7 +3352,10 @@ CONTACT EMAIL COMPASS: ${studentEmail}
                               </div>
                             ) : (
                               <div 
-                                onClick={() => onOpenChat('admin_shaka')}
+                                onClick={() => {
+                                  onOpenChat('admin_shaka');
+                                  setIsMobileChannelsOpen(false);
+                                }}
                                 className="p-3 rounded-xl cursor-pointer transition-all border border-dashed border-orange-200 bg-orange-50/30 hover:bg-orange-50/60 flex items-start gap-3 relative group"
                               >
                                 <div className="relative shrink-0">
@@ -3295,11 +3375,14 @@ CONTACT EMAIL COMPASS: ${studentEmail}
                             )}
                           </div>
 
-                          {/* SECTION 2: MY TUTORS */}
+                          {/* SECTION 2: AUTOMATICALLY ASSIGNED TUTORS ONLY */}
                           <div>
                             <div className="px-2 mb-2 flex items-center justify-between">
-                              <span className="text-[10px] font-bold text-slate-400 tracking-wider uppercase">Chat with My Tutor</span>
-                              <span className="text-[10px] font-semibold text-slate-400">{tutorChats.length} Tutors</span>
+                              <span className="text-[10px] font-bold text-slate-400 tracking-wider uppercase">Assigned Academic Tutors</span>
+                              <span className="text-[10px] font-semibold text-emerald-600 flex items-center gap-1">
+                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                                {assignedTutorChats.length + pendingAssignedTutorIds.length} Matched
+                              </span>
                             </div>
 
                             <div className="space-y-1.5">
@@ -3307,11 +3390,13 @@ CONTACT EMAIL COMPASS: ${studentEmail}
                                 const tutor = getTutor(c.tutorId);
                                 const lastMsg = messages.filter(m => m.chatId === c.id).slice(-1)[0];
                                 const isSelected = localSelectedChatId === c.id;
+                                const linkedAssign = studentAssignments.find(a => a.tutorId === c.tutorId);
                                 return (
                                   <div 
                                     key={c.id} 
                                     onClick={() => {
                                       setLocalSelectedChatId(c.id);
+                                      setIsMobileChannelsOpen(false);
                                       if (onSubscribeToChatDetails) onSubscribeToChatDetails(c.id);
                                     }} 
                                     className={`p-3 rounded-xl cursor-pointer transition-all border flex items-start gap-3 relative group ${
@@ -3330,65 +3415,70 @@ CONTACT EMAIL COMPASS: ${studentEmail}
                                     </div>
                                     <div className="flex-1 min-w-0">
                                       <div className="flex items-center justify-between mb-0.5">
-                                        <h4 className="text-xs font-bold text-slate-900 truncate">{tutor?.name || 'Academic Tutor'}</h4>
-                                        <span className="text-[10px] font-medium text-slate-400">
+                                        <div className="flex items-center gap-1.5 truncate">
+                                          <h4 className="text-xs font-bold text-slate-900 truncate">{tutor?.name || 'Assigned Tutor'}</h4>
+                                          <span className="text-[9px] font-bold bg-emerald-50 text-emerald-700 px-1.5 py-0.2 rounded border border-emerald-200/60 shrink-0">
+                                            Matched
+                                          </span>
+                                        </div>
+                                        <span className="text-[10px] font-medium text-slate-400 shrink-0">
                                           {lastMsg ? new Date(lastMsg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}
                                         </span>
                                       </div>
-                                      <p className="text-xs text-slate-500 truncate">{lastMsg?.content || 'Discussion active'}</p>
+                                      <p className="text-[11px] text-slate-500 truncate">{c.subject || linkedAssign?.title || 'Academic Consultation'}</p>
+                                      {lastMsg && (
+                                        <p className="text-[11px] text-slate-400 truncate italic mt-0.5">{lastMsg.content}</p>
+                                      )}
                                     </div>
                                   </div>
                                 );
                               })}
 
-                              {tutorChats.length === 0 && (
-                                <div className="p-4 text-center text-[11px] text-slate-400 bg-slate-50 border border-dashed rounded-xl leading-relaxed">
-                                  No active tutor chats yet. Choose any verified scholar below to initiate 1-on-1 tutoring!
-                                </div>
-                              )}
-                            </div>
-                          </div>
-
-                          {/* SECTION 3: ALL VERIFIED SUBJECT TUTORS */}
-                          <div className="pt-2 border-t border-slate-100">
-                            <div className="px-2 mb-2 flex items-center justify-between">
-                              <span className="text-[10px] font-bold text-slate-400 tracking-wider uppercase">All Subject Tutors</span>
-                              <span className="text-[10px] text-orange-600 font-semibold">{tutors.length} Available</span>
-                            </div>
-
-                            <div className="space-y-1.5">
-                              {tutors.slice(0, 8).map((tutor) => {
-                                const hasChat = studentChats.some(c => c.tutorId === tutor.id);
+                              {/* Pending assigned tutors with an active assignment */}
+                              {pendingAssignedTutorIds.map((tutorId) => {
+                                const tutor = getTutor(tutorId);
+                                const linkedAssign = studentAssignments.find(a => a.tutorId === tutorId);
                                 return (
                                   <div
-                                    key={tutor.id}
-                                    onClick={() => onOpenChat(tutor.id, `Hi ${tutor.name}, I would like to consult with you about my academic studies.`)}
-                                    className="p-2.5 rounded-xl cursor-pointer transition-all border border-transparent hover:border-orange-200 hover:bg-orange-50/40 flex items-center justify-between group"
+                                    key={tutorId}
+                                    onClick={() => {
+                                      const tutorName = tutor?.name || 'Academic Tutor';
+                                      const msg = `Hi ${tutorName}, I am reaching out regarding my matched assignment: "${linkedAssign?.title || 'Coursework'}". Let's coordinate!`;
+                                      onOpenChat(tutorId, msg);
+                                      setIsMobileChannelsOpen(false);
+                                    }}
+                                    className="p-3 rounded-xl cursor-pointer transition-all border border-orange-100 bg-orange-50/20 hover:bg-orange-50/60 flex items-start gap-3 relative group"
                                   >
-                                    <div className="flex items-center gap-2.5 min-w-0">
-                                      <div className="relative shrink-0">
-                                        <img 
-                                          src={tutor.avatarUrl} 
-                                          alt="" 
-                                          className="w-8 h-8 rounded-lg object-cover ring-1 ring-slate-200" 
-                                        />
-                                        <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 bg-emerald-500 border border-white rounded-full"></span>
-                                      </div>
-                                      <div className="min-w-0">
-                                        <h5 className="text-xs font-bold text-slate-800 group-hover:text-orange-600 truncate">{tutor.name}</h5>
-                                        <span className="text-[10px] text-slate-400 font-mono block">★ {tutor.rating || 4.9}</span>
-                                      </div>
+                                    <div className="relative shrink-0">
+                                      <img 
+                                        src={tutor?.avatarUrl || 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=120&auto=format&fit=crop&q=80'} 
+                                        alt="" 
+                                        className="w-10 h-10 rounded-xl object-cover ring-2 ring-orange-200" 
+                                      />
+                                      <span className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 bg-emerald-500 border-2 border-white rounded-full"></span>
                                     </div>
-
-                                    <button
-                                      type="button"
-                                      className="px-2.5 py-1 bg-orange-100 group-hover:bg-orange-500 text-orange-700 group-hover:text-white rounded-lg text-[10px] font-bold transition-colors shrink-0"
-                                    >
-                                      {hasChat ? 'Resume' : 'Chat'}
-                                    </button>
+                                    <div className="flex-1 min-w-0">
+                                      <div className="flex items-center justify-between mb-0.5">
+                                        <div className="flex items-center gap-1.5 truncate">
+                                          <h4 className="text-xs font-bold text-slate-900 truncate">{tutor?.name || 'Assigned Tutor'}</h4>
+                                          <span className="text-[9px] font-bold bg-orange-100 text-orange-800 px-1.5 py-0.2 rounded border border-orange-200 shrink-0">
+                                            Start Chat
+                                          </span>
+                                        </div>
+                                      </div>
+                                      <p className="text-[11px] text-orange-700 font-semibold truncate">
+                                        Assigned for: {linkedAssign?.title || 'Academic Assignment'}
+                                      </p>
+                                    </div>
                                   </div>
                                 );
                               })}
+
+                              {assignedTutorChats.length === 0 && pendingAssignedTutorIds.length === 0 && (
+                                <div className="p-4 text-center text-[11px] text-slate-400 bg-slate-50 border border-dashed rounded-xl leading-relaxed">
+                                  No automated tutor matches active yet. Submit an assignment request to be automatically paired with a certified scholar!
+                                </div>
+                              )}
                             </div>
                           </div>
                         </>
@@ -3412,31 +3502,39 @@ CONTACT EMAIL COMPASS: ${studentEmail}
                   {selectedChat ? (
                     <>
                       {/* CHAT HEADER */}
-                      <div className="px-5 py-3.5 border-b border-slate-100 bg-white flex items-center justify-between shrink-0 z-10">
+                      <div className="px-4 sm:px-5 py-3.5 border-b border-slate-100 bg-white flex items-center justify-between shrink-0 z-10">
                         {/* Active User Details */}
-                        <div className="flex items-center gap-3">
-                          <div className="relative">
+                        <div className="flex items-center gap-2.5 sm:gap-3">
+                          <button 
+                            type="button" 
+                            onClick={() => setIsMobileChannelsOpen(true)}
+                            className="md:hidden p-2 rounded-xl bg-orange-50 hover:bg-orange-100 text-orange-700 border border-orange-200 transition-all cursor-pointer shrink-0"
+                            title="Open Channels Directory"
+                          >
+                            <MessageSquare className="w-4 h-4 text-orange-600" />
+                          </button>
+                          <div className="relative shrink-0">
                             <img 
                               src={selectedChat.tutorId.startsWith('admin_') 
                                 ? 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=120&auto=format&fit=crop&q=80' 
                                 : (getTutor(selectedChat.tutorId)?.avatarUrl || 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=120&auto=format&fit=crop&q=80')} 
                               alt="Tutor" 
-                              className="w-11 h-11 rounded-xl object-cover ring-2 ring-slate-100" 
+                              className="w-10 h-10 sm:w-11 sm:h-11 rounded-xl object-cover ring-2 ring-slate-100" 
                             />
                             <span className="w-3.5 h-3.5 bg-emerald-500 border-2 border-white rounded-full absolute -bottom-0.5 -right-0.5"></span>
                           </div>
-                          <div>
+                          <div className="min-w-0">
                             <div className="flex items-center gap-2">
-                              <h3 className="font-bold text-slate-900 text-sm md:text-base leading-tight">
+                              <h3 className="font-bold text-slate-900 text-sm md:text-base leading-tight truncate">
                                 {selectedChat.tutorId.startsWith('admin_') || selectedChat.tutorId === 'admin_emily'
                                   ? 'Official Support Desk (Emily Vance)'
                                   : (getTutor(selectedChat.tutorId)?.name || 'Academic Tutor')}
                               </h3>
-                              <span className="hidden sm:inline-block px-2 py-0.5 text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200/60 rounded-full">
+                              <span className="hidden sm:inline-block px-2 py-0.5 text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200/60 rounded-full shrink-0">
                                 Active Now
                               </span>
                             </div>
-                            <p className="text-xs text-slate-500 font-medium">
+                            <p className="text-xs text-slate-500 font-medium truncate">
                               Subject: {selectedChat.subject || 'Direct Consultation'}
                             </p>
                           </div>
@@ -3553,6 +3651,7 @@ CONTACT EMAIL COMPASS: ${studentEmail}
                             </div>
                           );
                         })}
+                        <div ref={chatMessagesEndRef} />
                       </div>
 
                       {/* QUICK PROMPT SUGGESTION CHIPS */}
@@ -3582,7 +3681,7 @@ CONTACT EMAIL COMPASS: ${studentEmail}
                       </div>
 
                       {/* CHAT INPUT COMPONENT */}
-                      <div className="p-3 md:p-4 bg-white border-t border-slate-100 shrink-0">
+                      <div className="p-3 md:p-4 bg-white border-t border-slate-200 shrink-0 sticky bottom-0 z-20 shadow-xs">
                         <form 
                           onSubmit={(e) => {
                             e.preventDefault();
@@ -3601,8 +3700,8 @@ CONTACT EMAIL COMPASS: ${studentEmail}
                           }} 
                           className="flex items-center gap-2"
                         >
-                          <div className="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5 flex items-center gap-2 focus-within:bg-white focus-within:border-orange-500 focus-within:ring-2 focus-within:ring-orange-500/20 transition-all">
-                            <label className="p-1.5 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-200/60 transition-colors cursor-pointer" title="Attach file">
+                          <div className="flex-1 bg-slate-50 border border-slate-300 rounded-xl px-3 py-1.5 flex items-center gap-2 focus-within:bg-white focus-within:border-orange-500 focus-within:ring-2 focus-within:ring-orange-500/20 transition-all">
+                            <label className="p-1.5 text-slate-500 hover:text-slate-800 rounded-lg hover:bg-slate-200 transition-colors cursor-pointer shrink-0" title="Attach file or coursework document">
                               <Paperclip className="w-4 h-4" />
                               <input 
                                 type="file" 
@@ -3616,8 +3715,16 @@ CONTACT EMAIL COMPASS: ${studentEmail}
                             </label>
 
                             {chatAttachedFileName && (
-                              <span className="text-[10px] bg-orange-100 text-orange-700 px-2 py-0.5 rounded font-mono font-bold truncate max-w-[120px]">
-                                {chatAttachedFileName}
+                              <span className="text-[10px] bg-orange-100 text-orange-800 px-2 py-0.5 rounded font-mono font-bold truncate max-w-[130px] flex items-center gap-1 shrink-0">
+                                <span className="truncate">{chatAttachedFileName}</span>
+                                <button 
+                                  type="button" 
+                                  onClick={() => setChatAttachedFileName('')}
+                                  className="text-orange-600 hover:text-red-600 font-bold ml-0.5 cursor-pointer"
+                                  title="Remove attachment"
+                                >
+                                  ×
+                                </button>
                               </span>
                             )}
 
@@ -3625,8 +3732,15 @@ CONTACT EMAIL COMPASS: ${studentEmail}
                               type="text" 
                               value={studentReply}
                               onChange={(e) => setStudentReply(e.target.value)}
-                              placeholder="Type your message here or paste details..." 
-                              className="w-full bg-transparent text-sm text-slate-800 placeholder-slate-400 outline-none py-1"
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter' && !e.shiftKey) {
+                                  e.preventDefault();
+                                  const form = (e.target as HTMLElement).closest('form');
+                                  if (form) form.requestSubmit();
+                                }
+                              }}
+                              placeholder="Type your message here or press Enter to send..." 
+                              className="w-full bg-transparent text-xs sm:text-sm text-slate-800 placeholder-slate-400 outline-none py-1"
                             />
 
                             <button type="button" className="p-1.5 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-200/60 transition-colors hidden sm:block">
@@ -3636,9 +3750,16 @@ CONTACT EMAIL COMPASS: ${studentEmail}
 
                           <button 
                             type="submit" 
-                            className="bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white p-3 rounded-xl shadow-xs flex items-center justify-center transition-all transform active:scale-95 cursor-pointer"
+                            disabled={!studentReply.trim() && !chatAttachedFileName}
+                            className={`p-3 rounded-xl shadow-xs flex items-center gap-1.5 transition-all transform active:scale-95 cursor-pointer shrink-0 ${
+                              (!studentReply.trim() && !chatAttachedFileName)
+                                ? 'bg-slate-200 text-slate-400 cursor-not-allowed opacity-60'
+                                : 'bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white shadow-orange-500/20'
+                            }`}
+                            title="Send Message"
                           >
                             <Send className="w-4 h-4" />
+                            <span className="hidden sm:inline font-bold text-xs">Send</span>
                           </button>
                         </form>
                       </div>
@@ -3735,11 +3856,38 @@ CONTACT EMAIL COMPASS: ${studentEmail}
                     </>
                   ) : (
                     <div className="flex-1 flex flex-col items-center justify-center text-center p-8 text-slate-400">
-                      <MessageSquare className="w-12 h-12 text-slate-300 mb-3" />
-                      <h5 className="font-bold text-slate-900 text-sm">Select a Discussion Channel</h5>
-                      <p className="text-xs text-slate-400 max-w-xs mt-1">
-                        Choose an administrative support ticket or an active tutor consultation channel from the left panel to begin chatting.
+                      <div className="w-14 h-14 rounded-2xl bg-orange-50 border border-orange-200/60 flex items-center justify-center text-orange-500 mb-3.5 shadow-xs">
+                        <MessageSquare className="w-7 h-7" />
+                      </div>
+                      <h5 className="font-bold text-slate-900 text-sm md:text-base">Select a Discussion Channel</h5>
+                      <p className="text-xs text-slate-500 max-w-sm mt-1.5 leading-relaxed">
+                        Access your official 24/7 administrative support desk or chat with your automatically assigned academic tutor.
                       </p>
+                      <div className="mt-4 flex flex-wrap gap-2.5 justify-center">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const support = studentChats.find(c => c.tutorId === 'admin_emily' || c.tutorId.startsWith('admin_'));
+                            if (support) {
+                              setLocalSelectedChatId(support.id);
+                            } else {
+                              onOpenChat('admin_shaka');
+                            }
+                          }}
+                          className="px-4 py-2 bg-orange-500 hover:bg-orange-600 text-white rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer flex items-center gap-1.5"
+                        >
+                          <Headset className="w-4 h-4" />
+                          <span>Chat with Support</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setIsMobileChannelsOpen(true)}
+                          className="md:hidden px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5"
+                        >
+                          <MessageSquare className="w-4 h-4 text-orange-600" />
+                          <span>View Channels</span>
+                        </button>
+                      </div>
                     </div>
                   )}
                 </main>

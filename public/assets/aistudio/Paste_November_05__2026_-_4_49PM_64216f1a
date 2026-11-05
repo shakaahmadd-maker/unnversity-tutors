@@ -1,0 +1,888 @@
+import React, { useState } from 'react';
+
+// Inline SVG Icon components to replace react-icons and ensure standalone compilation
+const IconFileText = () => (
+  <svg className="w-4 h-4 inline-block" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+);
+const IconUser = () => (
+  <svg className="w-4 h-4 inline-block" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
+);
+const IconClock = () => (
+  <svg className="w-4 h-4 inline-block" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+);
+const IconCheckCircle = () => (
+  <svg className="w-5 h-5 inline-block" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+);
+const IconAlertCircle = () => (
+  <svg className="w-4 h-4 inline-block" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+);
+const IconSearch = () => (
+  <svg className="w-4 h-4 inline-block" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+);
+const IconChevronRight = () => (
+  <svg className="w-4 h-4 inline-block" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7"/></svg>
+);
+const IconMessageSquare = () => (
+  <svg className="w-4 h-4 inline-block" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/></svg>
+);
+const IconSend = () => (
+  <svg className="w-4 h-4 inline-block" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"/></svg>
+);
+const IconX = () => (
+  <svg className="w-5 h-5 inline-block" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"/></svg>
+);
+const IconDownload = () => (
+  <svg className="w-4 h-4 inline-block" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+);
+const IconBriefcase = () => (
+  <svg className="w-5 h-5 inline-block" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.222-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
+);
+const IconStar = () => (
+  <svg className="w-3.5 h-3.5 inline-block" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+);
+const IconCalendar = () => (
+  <svg className="w-4 h-4 inline-block" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+);
+
+// Initial Mock Data representing student submissions and assignments
+const initialSubmissions = [
+  {
+    id: "assign_1793873317765_hby36a",
+    studentName: "Walter White",
+    studentEmail: "syed.asadullahbscs@gmail.com",
+    studentAvatar: "W",
+    studentPhone: "+1 (555) 019-2834",
+    totalSubmissions: 5,
+    joinedDate: "Jan 2026",
+    gpa: "3.85",
+    subject: "Science (Earth Sciences)",
+    title: "Sustained Coursework Tutoring",
+    pattern: "=== University-Tutors Matching Funnel Request === TUTORING SERVICE PATTERN: Sustained Coursework...",
+    fullDescription: "Comprehensive tutoring support needed for Earth Sciences advanced coursework, focusing on mineralogy, stratigraphy, and GIS mapping analysis. The student requires bi-weekly review sessions and feedback on lab reports.",
+    documentName: "Muhammad_Abdullah_Tufail_CV.pdf",
+    documentSize: "2.4 MB",
+    status: "Pending/Incoming",
+    deadline: "2026-11-06",
+    price: null,
+    assignedTutor: "Dr. Clara Stirling",
+    tutorRating: 4.9,
+    chatHistory: [
+      { sender: "admin", roleLabel: "Admin", text: "Hello Walter, we received your coursework brief.", time: "10:30 AM" },
+      { sender: "student", roleLabel: "Student", text: "Thank you! Looking forward to matching with a tutor.", time: "10:35 AM" },
+      { sender: "tutor", roleLabel: "Dr. Clara Stirling (Tutor)", text: "Hi Walter, I'll be guiding you through this Earth Sciences brief. Let's begin on Monday.", time: "11:00 AM" }
+    ],
+    submissionHistory: [
+      { id: "sub_01", title: "Sustained Coursework Tutoring", date: "2026-11-01", status: "Pending/Incoming", grade: "Pending" },
+      { id: "sub_02", title: "Mineralogy Lab Report 1", date: "2026-10-15", status: "Completed", grade: "A" },
+      { id: "sub_03", title: "Geology Field Study Brief", date: "2026-09-28", status: "Completed", grade: "A-" }
+    ]
+  },
+  {
+    id: "assign_1793810461156_4doocq",
+    studentName: "Walter White",
+    studentEmail: "syed.asadullahbscs@gmail.com",
+    studentAvatar: "W",
+    studentPhone: "+1 (555) 019-2834",
+    totalSubmissions: 5,
+    joinedDate: "Jan 2026",
+    gpa: "3.85",
+    subject: "Computer Science (Software Engineering)",
+    title: "Assignment Tutoring Support",
+    pattern: "=== University-Tutors Matching Funnel Request === TUTORING SERVICE PATTERN: Assignment Tutoring...",
+    fullDescription: "Need urgent guidance on data structures implementation in C++, specifically AVL trees, graph traversal algorithms, and memory management debugging.",
+    documentName: "Muhammad_Abdullah_Tufail_CV.pdf",
+    documentSize: "2.4 MB",
+    status: "In Progress",
+    deadline: "2026-11-13",
+    price: 150,
+    assignedTutor: "Dr. Clara Stirling",
+    tutorRating: 4.9,
+    chatHistory: [
+      { sender: "tutor", roleLabel: "Dr. Clara Stirling (Tutor)", text: "I've reviewed your C++ repository. Let's schedule a session tomorrow.", time: "Yesterday" }
+    ],
+    submissionHistory: [
+      { id: "sub_11", title: "Assignment Tutoring Support", date: "2026-11-02", status: "In Progress", grade: "Pending" },
+      { id: "sub_12", title: "Algorithm Complexity Analysis", date: "2026-10-10", status: "Completed", grade: "A+" }
+    ]
+  },
+  {
+    id: "assign_1793756218991_mx99z",
+    studentName: "Sarah Jenkins",
+    studentEmail: "sarah.j@university.edu",
+    studentAvatar: "S",
+    studentPhone: "+1 (555) 849-1122",
+    totalSubmissions: 3,
+    joinedDate: "Aug 2025",
+    gpa: "3.92",
+    subject: "Mathematics (Differential Equations)",
+    title: "Sustained Coursework Tutoring",
+    pattern: "=== University-Tutors Matching Funnel Request === TUTORING SERVICE PATTERN: Advanced Calculus...",
+    fullDescription: "Partial differential equations, Laplace transforms, and boundary value problems for engineering applications.",
+    documentName: "Sarah_Calculus_Brief.pdf",
+    documentSize: "1.8 MB",
+    status: "Completed",
+    deadline: "2026-10-28",
+    price: 220,
+    assignedTutor: "Prof. Alan Turing",
+    tutorRating: 5.0,
+    chatHistory: [
+      { sender: "tutor", roleLabel: "Prof. Alan Turing (Tutor)", text: "All coursework assignments are successfully completed and graded.", time: "Oct 28" }
+    ],
+    submissionHistory: [
+      { id: "sub_21", title: "Sustained Coursework Tutoring", date: "2026-10-01", status: "Completed", grade: "A" }
+    ]
+  },
+  {
+    id: "assign_1793612849102_bb88x",
+    studentName: "Liam O'Connor",
+    studentEmail: "liam.oconnor@student.org",
+    studentAvatar: "L",
+    studentPhone: "+1 (555) 332-9900",
+    totalSubmissions: 2,
+    joinedDate: "Sep 2026",
+    gpa: "3.40",
+    subject: "Economics & Finance",
+    title: "Macroeconomic Policy Review",
+    pattern: "=== University-Tutors Matching Funnel Request === TUTORING SERVICE PATTERN: Research Assistance...",
+    fullDescription: "Looking for analytical feedback on monetary policy impacts on emerging market inflation rates.",
+    documentName: "Liam_Draft_Macro.pdf",
+    documentSize: "3.1 MB",
+    status: "Revision",
+    deadline: "2026-11-18",
+    price: 180,
+    assignedTutor: "Dr. Robert Mundell",
+    tutorRating: 4.7,
+    chatHistory: [
+      { sender: "tutor", roleLabel: "Dr. Robert Mundell (Tutor)", text: "Please revise section 3 with the updated central bank metrics.", time: "3 days ago" }
+    ],
+    submissionHistory: [
+      { id: "sub_31", title: "Macroeconomic Policy Review", date: "2026-11-04", status: "Revision", grade: "Needs Revision" }
+    ]
+  }
+];
+
+const tutorsList = [
+  "Dr. Clara Stirling",
+  "Prof. Alan Turing",
+  "Dr. Robert Mundell",
+  "Dr. Evelyn Reed",
+  "Prof. Marcus Vance"
+];
+
+export default function App() {
+  const [submissions, setSubmissions] = useState(initialSubmissions);
+  const [activeTab, setActiveTab] = useState("All Requests");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [selectedStudent, setSelectedStudent] = useState(null); // Full student profile view
+  const [selectedSubmissionDetail, setSelectedSubmissionDetail] = useState(null); // Detailed submission drawer
+  
+  // Chat state supports chatMode: 'admin' or 'tutor'
+  const [activeChatSubmission, setActiveChatSubmission] = useState(null); 
+  const [chatMode, setChatMode] = useState("admin"); // 'admin' or 'tutor'
+  const [chatMessageInput, setChatMessageInput] = useState("");
+  const [notification, setNotification] = useState(null);
+  
+  // Editable states for price and tutor assignment in the main list
+  const [prices, setPrices] = useState(
+    initialSubmissions.reduce((acc, curr) => ({ ...acc, [curr.id]: curr.price || "" }), {})
+  );
+  const [tutors, setTutors] = useState(
+    initialSubmissions.reduce((acc, curr) => ({ ...acc, [curr.id]: curr.assignedTutor }), {})
+  );
+
+  const showNotification = (msg) => {
+    setNotification(msg);
+    setTimeout(() => setNotification(null), 3000);
+  };
+
+  const handlePriceChange = (id, val) => {
+    setPrices({ ...prices, [id]: val });
+  };
+
+  const handlePriceSave = (id) => {
+    const val = prices[id];
+    setSubmissions(submissions.map(sub => sub.id === id ? { ...sub, price: val ? Number(val) : null } : sub));
+    showNotification(`Price updated to ${val ? '$' + val : 'Unpriced'}`);
+  };
+
+  const handleTutorChange = (id, tutor) => {
+    setTutors({ ...tutors, [id]: tutor });
+    setSubmissions(submissions.map(sub => sub.id === id ? { ...sub, assignedTutor: tutor } : sub));
+    showNotification(`Assigned tutor updated to ${tutor}`);
+  };
+
+  const handleStatusChange = (id, newStatus) => {
+    setSubmissions(submissions.map(sub => sub.id === id ? { ...sub, status: newStatus } : sub));
+    showNotification(`Status updated to ${newStatus}`);
+  };
+
+  // Filter logic
+  const filteredSubmissions = submissions.filter(sub => {
+    const matchesTab = 
+      activeTab === "All Requests" ? true :
+      activeTab === "Pending/Incoming" ? sub.status === "Pending/Incoming" :
+      activeTab === "In Progress" ? sub.status === "In Progress" :
+      activeTab === "Completed" ? sub.status === "Completed" :
+      activeTab === "Revision" ? sub.status === "Revision" : true;
+
+    const matchesSearch = 
+      sub.studentName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      sub.subject.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      sub.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      sub.id.toLowerCase().includes(searchQuery.toLowerCase());
+
+    return matchesTab && matchesSearch;
+  });
+
+  const sendChatMessage = (subId) => {
+    if (!chatMessageInput.trim()) return;
+    
+    const senderKey = chatMode === 'admin' ? 'admin' : 'tutor';
+    const roleLabel = chatMode === 'admin' ? 'Admin' : `${tutors[subId] || submissions.find(s=>s.id===subId)?.assignedTutor} (Tutor)`;
+
+    setSubmissions(submissions.map(sub => {
+      if (sub.id === subId) {
+        return {
+          ...sub,
+          chatHistory: [...sub.chatHistory, { sender: senderKey, roleLabel: roleLabel, text: chatMessageInput, time: "Just now" }]
+        };
+      }
+      return sub;
+    }));
+    
+    // Also update active chat object in real-time
+    if (activeChatSubmission && activeChatSubmission.id === subId) {
+      setActiveChatSubmission({
+        ...activeChatSubmission,
+        chatHistory: [...activeChatSubmission.chatHistory, { sender: senderKey, roleLabel: roleLabel, text: chatMessageInput, time: "Just now" }]
+      });
+    }
+
+    setChatMessageInput("");
+    showNotification(`Message sent as ${chatMode === 'admin' ? 'Admin' : 'Assigned Tutor'}`);
+  };
+
+  const getStudentSubmissions = (studentName) => {
+    return submissions.filter(s => s.studentName === studentName);
+  };
+
+  return (
+    <div className="min-h-screen bg-slate-50 text-slate-800 font-sans pb-16">
+      {/* Top Notification Banner */}
+      {notification && (
+        <div className="fixed top-4 right-4 z-50 bg-slate-900 text-white px-5 py-3 rounded-xl shadow-xl flex items-center space-x-3 border border-slate-700 animate-fade-in">
+          <IconCheckCircle />
+          <span className="text-sm font-medium">{notification}</span>
+        </div>
+      )}
+
+      {/* Header Section */}
+      <header className="bg-white border-b border-slate-200 px-6 py-6 sticky top-0 z-30 shadow-sm">
+        <div className="max-w-7xl mx-auto flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+          <div>
+            <div className="flex items-center space-x-3">
+              <h1 className="text-2xl font-bold tracking-tight text-slate-900">INCOMING STUDENT DEMANDS & TASKS</h1>
+              <span className="bg-indigo-100 text-indigo-700 text-xs font-semibold px-2.5 py-1 rounded-full">
+                {submissions.length} Total Briefs
+              </span>
+            </div>
+            <p className="text-sm text-slate-500 mt-1">Review student profiles, set pricing, assign specialist tutors, and communicate via Admin or Tutor modes</p>
+          </div>
+
+          {/* Search Bar */}
+          <div className="flex items-center space-x-3">
+            <div className="relative">
+              <span className="absolute left-3.5 top-3 text-slate-400">
+                <IconSearch />
+              </span>
+              <input 
+                type="text" 
+                placeholder="Search student, subject, ID..." 
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-10 pr-4 py-2 bg-slate-100 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 w-64 md:w-80"
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* Filter Navigation Tabs */}
+        <div className="max-w-7xl mx-auto mt-6 flex flex-wrap items-center gap-2 border-t border-slate-100 pt-4">
+          {["All Requests", "Pending/Incoming", "In Progress", "Completed", "Revision"].map(tab => {
+            const count = tab === "All Requests" ? submissions.length : submissions.filter(s => s.status === tab).length;
+            return (
+              <button
+                key={tab}
+                onClick={() => setActiveTab(tab)}
+                className={`px-4 py-2 rounded-xl text-sm font-medium transition-all flex items-center space-x-2 ${
+                  activeTab === tab 
+                    ? 'bg-slate-900 text-white shadow-md' 
+                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                }`}
+              >
+                {tab === "Pending/Incoming" && <span className="text-amber-400"><IconAlertCircle /></span>}
+                <span>{tab}</span>
+                <span className={`text-xs px-1.5 py-0.5 rounded-md ${activeTab === tab ? 'bg-slate-800 text-slate-200' : 'bg-slate-200 text-slate-700'}`}>
+                  {count}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      </header>
+
+      {/* Main Table / Card Layout */}
+      <main className="max-w-7xl mx-auto px-4 md:px-6 mt-8">
+        <div className="hidden lg:grid grid-cols-12 gap-4 px-6 py-3 text-xs font-bold text-slate-400 uppercase tracking-wider">
+          <div className="col-span-3">Student & Project</div>
+          <div className="col-span-4">Academic Details & Brief</div>
+          <div className="col-span-2">Status & Deadline</div>
+          <div className="col-span-3">Quote Pricing & Tutor Assignment</div>
+        </div>
+
+        <div className="space-y-4 mt-2">
+          {filteredSubmissions.length === 0 ? (
+            <div className="bg-white rounded-2xl p-12 text-center border border-slate-200 shadow-sm">
+              <span className="text-slate-300 text-5xl mb-3 block"><IconBriefcase /></span>
+              <h3 className="text-lg font-semibold text-slate-700">No requests found</h3>
+              <p className="text-sm text-slate-400 mt-1">Try adjusting your search or category filter.</p>
+            </div>
+          ) : (
+            filteredSubmissions.map((sub) => (
+              <div 
+                key={sub.id} 
+                className="bg-white rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition-all p-6 grid grid-cols-1 lg:grid-cols-12 gap-6 items-start relative group"
+              >
+                {/* Column 1: Student & Project Info */}
+                <div className="lg:col-span-3 space-y-3">
+                  <div>
+                    <h3 className="font-bold text-slate-900 text-base leading-snug">{sub.subject}</h3>
+                    <p className="text-sm font-medium text-indigo-600 mt-0.5">{sub.title}</p>
+                  </div>
+
+                  <div className="flex items-center space-x-3 pt-2 border-t border-slate-100">
+                    <div className="w-10 h-10 rounded-full bg-indigo-600 text-white font-bold flex items-center justify-center text-sm shadow-inner">
+                      {sub.studentAvatar}
+                    </div>
+                    <div>
+                      <p className="text-xs text-slate-400">Submitted by</p>
+                      <button 
+                        onClick={() => setSelectedStudent(sub.studentName)}
+                        className="font-semibold text-slate-800 text-sm hover:text-indigo-600 hover:underline text-left"
+                      >
+                        {sub.studentName}
+                      </button>
+                      <p className="text-xs text-slate-500 truncate max-w-[180px]">{sub.studentEmail}</p>
+                    </div>
+                  </div>
+
+                  <div className="bg-amber-50 border border-amber-200/60 rounded-lg p-2.5 text-xs text-amber-900">
+                    <span className="font-semibold text-amber-800 block mb-0.5">Ref ID:</span>
+                    <span className="font-mono text-[11px] text-amber-950 select-all">{sub.id}</span>
+                  </div>
+
+                  {/* Action Buttons for Profile and Chat Options */}
+                  <div className="flex flex-wrap gap-1.5 pt-1">
+                    <button 
+                      onClick={() => setSelectedStudent(sub.studentName)}
+                      className="px-2.5 py-1.5 bg-slate-100 hover:bg-indigo-50 hover:text-indigo-600 text-slate-700 text-[11px] font-semibold rounded-lg flex items-center space-x-1 transition-colors border border-slate-200"
+                    >
+                      <IconUser />
+                      <span>View Profile</span>
+                    </button>
+                    <button 
+                      onClick={() => setSelectedSubmissionDetail(sub)}
+                      className="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-[11px] font-semibold rounded-lg flex items-center space-x-1 transition-colors border border-slate-200"
+                    >
+                      <IconFileText />
+                      <span>Full Brief</span>
+                    </button>
+                    <button 
+                      onClick={() => { setActiveChatSubmission(sub); setChatMode("admin"); }}
+                      className="px-2.5 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-[11px] font-semibold rounded-lg flex items-center space-x-1 transition-colors border border-indigo-200"
+                    >
+                      <IconMessageSquare />
+                      <span>Chat as Admin</span>
+                    </button>
+                    <button 
+                      onClick={() => { setActiveChatSubmission(sub); setChatMode("tutor"); }}
+                      className="px-2.5 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-800 text-[11px] font-semibold rounded-lg flex items-center space-x-1 transition-colors border border-amber-200"
+                      title={`Chat as assigned tutor: ${tutors[sub.id] || sub.assignedTutor}`}
+                    >
+                      <IconMessageSquare />
+                      <span>Chat as Tutor</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Column 2: Academic Details & Document */}
+                <div className="lg:col-span-4 space-y-3 bg-slate-50 p-4 rounded-xl border border-slate-100">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold uppercase tracking-wider text-slate-400">Brief Preview</span>
+                    <span className="text-xs bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded font-medium">Verified Request</span>
+                  </div>
+                  <p className="text-xs text-slate-600 font-mono leading-relaxed line-clamp-3 bg-white p-3 rounded-lg border border-slate-200">
+                    {sub.pattern}
+                  </p>
+
+                  <div className="flex items-center justify-between pt-1">
+                    <a 
+                      href="#download" 
+                      onClick={(e) => { e.preventDefault(); showNotification(`Downloading ${sub.documentName}`); }}
+                      className="text-xs font-semibold text-indigo-600 hover:underline flex items-center space-x-1.5 bg-white px-2.5 py-1.5 rounded-lg border border-indigo-100 shadow-xs"
+                    >
+                      <span className="text-indigo-500"><IconDownload /></span>
+                      <span className="truncate max-w-[150px]">{sub.documentName}</span>
+                    </a>
+                    <span className="text-[11px] text-slate-400">{sub.documentSize}</span>
+                  </div>
+                </div>
+
+                {/* Column 3: Status & Deadline */}
+                <div className="lg:col-span-2 space-y-3">
+                  <div>
+                    <label className="text-xs font-bold uppercase tracking-wider text-slate-400 block mb-1">Status</label>
+                    <select
+                      value={sub.status}
+                      onChange={(e) => handleStatusChange(sub.id, e.target.value)}
+                      className={`text-xs font-semibold px-3 py-1.5 rounded-lg border focus:outline-none focus:ring-2 focus:ring-indigo-500 w-full ${
+                        sub.status === 'Completed' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' :
+                        sub.status === 'In Progress' ? 'bg-blue-50 text-blue-700 border-blue-200' :
+                        sub.status === 'Pending/Incoming' ? 'bg-amber-50 text-amber-700 border-amber-200' :
+                        'bg-purple-50 text-purple-700 border-purple-200'
+                      }`}
+                    >
+                      <option value="Pending/Incoming">Pending/Incoming</option>
+                      <option value="In Progress">In Progress</option>
+                      <option value="Completed">Completed</option>
+                      <option value="Revision">Revision</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-bold uppercase tracking-wider text-slate-400 block mb-1">Deadline</label>
+                    <div className="flex items-center space-x-2 bg-white px-3 py-1.5 rounded-lg border border-slate-200 text-xs text-slate-700 font-medium">
+                      <span className="text-slate-400"><IconCalendar /></span>
+                      <span>{sub.deadline}</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Column 4: Quote Price & Subject Tutor */}
+                <div className="lg:col-span-3 space-y-3 bg-indigo-50/40 p-4 rounded-xl border border-indigo-100/60">
+                  {/* Price Setting */}
+                  <div>
+                    <label className="text-xs font-bold uppercase tracking-wider text-slate-500 block mb-1">
+                      Price: {sub.price ? `$${sub.price}` : 'Unpriced'}
+                    </label>
+                    <div className="flex items-center space-x-2">
+                      <div className="relative flex-1">
+                        <span className="absolute left-3 top-2 text-xs text-slate-400 font-semibold">$</span>
+                        <input 
+                          type="number"
+                          placeholder="Set USD"
+                          value={prices[sub.id]}
+                          onChange={(e) => handlePriceChange(sub.id, e.target.value)}
+                          className="w-full pl-7 pr-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                        />
+                      </div>
+                      <button 
+                        onClick={() => handlePriceSave(sub.id)}
+                        className="px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold rounded-lg shadow-sm"
+                      >
+                        Set
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Tutor Assignment */}
+                  <div>
+                    <label className="text-xs font-bold uppercase tracking-wider text-slate-500 block mb-1">
+                      Assigned Tutor
+                    </label>
+                    <select
+                      value={tutors[sub.id]}
+                      onChange={(e) => handleTutorChange(sub.id, e.target.value)}
+                      className="w-full bg-white border border-slate-200 text-slate-800 text-xs font-semibold rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    >
+                      {tutorsList.map(t => (
+                        <option key={t} value={t}>{t} (★4.9)</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="flex items-center justify-between pt-1">
+                    <span className="text-[11px] text-emerald-600 font-semibold flex items-center space-x-1">
+                      <IconCheckCircle /> <span>Ready</span>
+                    </span>
+                    <div className="space-x-2">
+                      <button 
+                        onClick={() => { setActiveChatSubmission(sub); setChatMode("admin"); }}
+                        className="text-[11px] font-semibold text-indigo-600 hover:underline"
+                      >
+                        Admin Chat
+                      </button>
+                      <span className="text-slate-300">|</span>
+                      <button 
+                        onClick={() => { setActiveChatSubmission(sub); setChatMode("tutor"); }}
+                        className="text-[11px] font-semibold text-amber-700 hover:underline"
+                      >
+                        Tutor Chat
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+              </div>
+            ))
+          )}
+        </div>
+      </main>
+
+      {/* STUDENT PROFILE EXPANDED MODAL */}
+      {selectedStudent && (
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex justify-end">
+          <div className="bg-white w-full max-w-2xl h-full shadow-2xl flex flex-col overflow-y-auto">
+            
+            <div className="bg-slate-900 text-white p-6 sticky top-0 z-10 flex items-center justify-between shadow-md">
+              <div className="flex items-center space-x-4">
+                <div className="w-14 h-14 rounded-full bg-indigo-600 text-white font-bold text-2xl flex items-center justify-center shadow-lg">
+                  {selectedStudent[0]}
+                </div>
+                <div>
+                  <h2 className="text-xl font-bold">{selectedStudent}</h2>
+                  <p className="text-xs text-slate-300">Complete Student Dossier & Active Submissions</p>
+                </div>
+              </div>
+              <button 
+                onClick={() => setSelectedStudent(null)}
+                className="p-2 hover:bg-slate-800 rounded-full text-slate-400 hover:text-white transition-colors"
+              >
+                <IconX />
+              </button>
+            </div>
+
+            <div className="p-8 space-y-8 flex-1">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div className="bg-slate-50 p-4 rounded-xl border border-slate-200">
+                  <span className="text-xs text-slate-400 block font-semibold uppercase">Total Briefs</span>
+                  <span className="text-2xl font-bold text-slate-900 mt-1 block">
+                    {getStudentSubmissions(selectedStudent).length}
+                  </span>
+                </div>
+                <div className="bg-slate-50 p-4 rounded-xl border border-slate-200">
+                  <span className="text-xs text-slate-400 block font-semibold uppercase">Student GPA</span>
+                  <span className="text-2xl font-bold text-indigo-600 mt-1 block">3.85</span>
+                </div>
+                <div className="bg-slate-50 p-4 rounded-xl border border-slate-200">
+                  <span className="text-xs text-slate-400 block font-semibold uppercase">Member Since</span>
+                  <span className="text-sm font-bold text-slate-800 mt-2 block">January 2026</span>
+                </div>
+                <div className="bg-slate-50 p-4 rounded-xl border border-slate-200">
+                  <span className="text-xs text-slate-400 block font-semibold uppercase">Status</span>
+                  <span className="text-xs font-bold text-emerald-600 bg-emerald-50 px-2.5 py-1 rounded-full mt-2 inline-block">Active Student</span>
+                </div>
+              </div>
+
+              <div className="bg-indigo-50/50 border border-indigo-100 p-5 rounded-2xl">
+                <h3 className="text-sm font-bold text-slate-900 mb-3 flex items-center space-x-2">
+                  <IconUser />
+                  <span>Contact Credentials</span>
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+                  <div>
+                    <span className="text-slate-400 block">Primary Email</span>
+                    <span className="font-semibold text-slate-800 text-sm">syed.asadullahbscs@gmail.com</span>
+                  </div>
+                  <div>
+                    <span className="text-slate-400 block">Phone Number</span>
+                    <span className="font-semibold text-slate-800 text-sm">+1 (555) 019-2834</span>
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-base font-bold text-slate-900 flex items-center space-x-2">
+                    <IconBriefcase />
+                    <span>All Submitted Assignments ({getStudentSubmissions(selectedStudent).length})</span>
+                  </h3>
+                  <span className="text-xs text-slate-400">Chronological Order</span>
+                </div>
+
+                <div className="space-y-4">
+                  {getStudentSubmissions(selectedStudent).map((item, idx) => (
+                    <div key={item.id} className="bg-white border border-slate-200 rounded-xl p-5 shadow-xs hover:shadow-md transition-all space-y-3">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-mono font-semibold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded">
+                          #{idx + 1} • {item.subject}
+                        </span>
+                        <span className={`text-xs font-semibold px-2.5 py-0.5 rounded-full ${
+                          item.status === 'Completed' ? 'bg-emerald-50 text-emerald-700' :
+                          item.status === 'In Progress' ? 'bg-blue-50 text-blue-700' :
+                          'bg-amber-50 text-amber-700'
+                        }`}>
+                          {item.status}
+                        </span>
+                      </div>
+
+                      <h4 className="font-bold text-slate-900 text-sm">{item.title}</h4>
+                      <p className="text-xs text-slate-600 bg-slate-50 p-2.5 rounded-lg border border-slate-100 font-mono">
+                        {item.pattern}
+                      </p>
+
+                      <div className="flex items-center justify-between pt-2 border-t border-slate-100 text-xs text-slate-500">
+                        <span>Deadline: <strong className="text-slate-700">{item.deadline}</strong></span>
+                        <span>Assigned Tutor: <strong className="text-indigo-600">{item.assignedTutor}</strong></span>
+                        <div className="space-x-3">
+                          <button 
+                            onClick={() => { setSelectedStudent(null); setSelectedSubmissionDetail(item); }}
+                            className="text-indigo-600 font-semibold hover:underline"
+                          >
+                            Brief
+                          </button>
+                          <button 
+                            onClick={() => { setSelectedStudent(null); setActiveChatSubmission(item); setChatMode("tutor"); }}
+                            className="text-amber-700 font-semibold hover:underline"
+                          >
+                            Chat as Tutor
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+            </div>
+
+            <div className="bg-slate-100 px-8 py-4 border-t border-slate-200 flex justify-end">
+              <button 
+                onClick={() => setSelectedStudent(null)}
+                className="px-5 py-2 bg-slate-900 text-white rounded-xl text-sm font-semibold hover:bg-slate-800 transition-colors"
+              >
+                Close Profile
+              </button>
+            </div>
+
+          </div>
+        </div>
+      )}
+
+      {/* DETAILED BRIEF INSPECTION MODAL */}
+      {selectedSubmissionDetail && (
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white w-full max-w-2xl rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+            
+            <div className="bg-slate-900 text-white p-6 flex items-center justify-between">
+              <div>
+                <span className="text-xs bg-indigo-500/30 text-indigo-300 px-2.5 py-1 rounded-md font-mono">
+                  {selectedSubmissionDetail.id}
+                </span>
+                <h2 className="text-xl font-bold mt-2">{selectedSubmissionDetail.subject}</h2>
+                <p className="text-xs text-slate-300">{selectedSubmissionDetail.title}</p>
+              </div>
+              <button 
+                onClick={() => setSelectedSubmissionDetail(null)}
+                className="p-2 hover:bg-slate-800 rounded-full text-slate-400 hover:text-white"
+              >
+                <IconX />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-6 overflow-y-auto flex-1 text-sm">
+              <div className="bg-indigo-50 p-4 rounded-xl border border-indigo-100">
+                <h4 className="font-bold text-slate-900 mb-1">Student Brief Full Overview</h4>
+                <p className="text-slate-700 text-xs leading-relaxed">{selectedSubmissionDetail.fullDescription}</p>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="p-4 bg-slate-50 rounded-xl border border-slate-200">
+                  <span className="text-xs text-slate-400 block font-semibold">Submitted Document</span>
+                  <div className="flex items-center space-x-2 mt-2">
+                    <span className="text-indigo-600 text-xl"><IconFileText /></span>
+                    <div>
+                      <span className="font-semibold text-slate-800 text-xs block">{selectedSubmissionDetail.documentName}</span>
+                      <span className="text-[10px] text-slate-400">{selectedSubmissionDetail.documentSize}</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="p-4 bg-slate-50 rounded-xl border border-slate-200">
+                  <span className="text-xs text-slate-400 block font-semibold">Assigned Specialist Tutor</span>
+                  <div className="flex items-center space-x-2 mt-2">
+                    <div className="w-8 h-8 rounded-full bg-slate-900 text-white flex items-center justify-center font-bold text-xs">
+                      {selectedSubmissionDetail.assignedTutor[0]}
+                    </div>
+                    <div>
+                      <span className="font-semibold text-slate-800 text-xs block">{selectedSubmissionDetail.assignedTutor}</span>
+                      <span className="text-[10px] text-amber-600 flex items-center"><IconStar /> <span className="ml-1">4.9 Rating</span></span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                <h4 className="font-bold text-slate-900 mb-2">Student Submission History Log</h4>
+                <div className="space-y-2">
+                  {selectedSubmissionDetail.submissionHistory.map(hist => (
+                    <div key={hist.id} className="flex items-center justify-between bg-slate-50 p-3 rounded-lg border border-slate-200 text-xs">
+                      <div>
+                        <span className="font-semibold text-slate-800 block">{hist.title}</span>
+                        <span className="text-slate-400">Submitted on {hist.date}</span>
+                      </div>
+                      <span className="px-2.5 py-1 bg-white border border-slate-200 font-medium rounded text-slate-700">
+                        {hist.status} ({hist.grade})
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-slate-100 px-6 py-4 border-t border-slate-200 flex justify-end space-x-3">
+              <button 
+                onClick={() => setSelectedSubmissionDetail(null)}
+                className="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-xl text-xs font-semibold"
+              >
+                Close
+              </button>
+              <button 
+                onClick={() => {
+                  const sub = selectedSubmissionDetail;
+                  setSelectedSubmissionDetail(null);
+                  setActiveChatSubmission(sub);
+                  setChatMode("admin");
+                }}
+                className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-semibold flex items-center space-x-1.5"
+              >
+                <IconMessageSquare />
+                <span>Admin Chat</span>
+              </button>
+              <button 
+                onClick={() => {
+                  const sub = selectedSubmissionDetail;
+                  setSelectedSubmissionDetail(null);
+                  setActiveChatSubmission(sub);
+                  setChatMode("tutor");
+                }}
+                className="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-semibold flex items-center space-x-1.5"
+              >
+                <IconMessageSquare />
+                <span>Chat as Tutor</span>
+              </button>
+            </div>
+
+          </div>
+        </div>
+      )}
+
+      {/* DUAL-MODE CHAT MODAL (ADMIN vs TUTOR) */}
+      {activeChatSubmission && (
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white w-full max-w-lg rounded-2xl shadow-2xl overflow-hidden flex flex-col h-[600px]">
+            
+            {/* Chat Header */}
+            <div className="bg-slate-900 text-white p-4 flex items-center justify-between">
+              <div className="flex items-center space-x-3">
+                <div className={`w-9 h-9 rounded-full flex items-center justify-center font-bold text-sm ${chatMode === 'admin' ? 'bg-indigo-600' : 'bg-amber-600'}`}>
+                  {chatMode === 'admin' ? 'A' : (tutors[activeChatSubmission.id] || activeChatSubmission.assignedTutor)[0]}
+                </div>
+                <div>
+                  <h3 className="font-bold text-sm">
+                    {chatMode === 'admin' ? `Admin Portal: ${activeChatSubmission.studentName}` : `Tutor Mode: ${tutors[activeChatSubmission.id] || activeChatSubmission.assignedTutor}`}
+                  </h3>
+                  <p className="text-[11px] text-slate-300 truncate max-w-[240px]">{activeChatSubmission.title}</p>
+                </div>
+              </div>
+              <button 
+                onClick={() => setActiveChatSubmission(null)}
+                className="p-1.5 hover:bg-slate-800 rounded-full text-slate-400 hover:text-white"
+              >
+                <IconX />
+              </button>
+            </div>
+
+            {/* Chat Mode Switcher */}
+            <div className="bg-slate-100 px-4 py-2 border-b border-slate-200 flex items-center justify-between">
+              <span className="text-xs text-slate-500 font-medium">Posting as:</span>
+              <div className="flex items-center space-x-2 bg-white p-1 rounded-xl border border-slate-200">
+                <button
+                  onClick={() => setChatMode("admin")}
+                  className={`px-3 py-1 rounded-lg text-xs font-semibold transition-all ${
+                    chatMode === 'admin' ? 'bg-indigo-600 text-white shadow-xs' : 'text-slate-600 hover:bg-slate-100'
+                  }`}
+                >
+                  General Admin
+                </button>
+                <button
+                  onClick={() => setChatMode("tutor")}
+                  className={`px-3 py-1 rounded-lg text-xs font-semibold transition-all ${
+                    chatMode === 'tutor' ? 'bg-amber-600 text-white shadow-xs' : 'text-slate-600 hover:bg-slate-100'
+                  }`}
+                >
+                  As Assigned Tutor ({tutors[activeChatSubmission.id] || activeChatSubmission.assignedTutor})
+                </button>
+              </div>
+            </div>
+
+            {/* Chat Messages */}
+            <div className="p-4 flex-1 overflow-y-auto space-y-3 bg-slate-50">
+              <div className="text-center my-2">
+                <span className="text-[10px] bg-slate-200 text-slate-600 px-2.5 py-1 rounded-full">
+                  Secure Channel • Ref: {activeChatSubmission.id}
+                </span>
+              </div>
+
+              {activeChatSubmission.chatHistory.map((msg, idx) => {
+                const isStudent = msg.sender === 'student';
+                const isTutor = msg.sender === 'tutor';
+                return (
+                  <div key={idx} className={`flex flex-col ${isStudent ? 'items-start' : 'items-end'}`}>
+                    <span className="text-[10px] text-slate-400 mb-0.5 px-1 font-medium">
+                      {msg.roleLabel || (isStudent ? activeChatSubmission.studentName : msg.sender === 'tutor' ? 'Assigned Tutor' : 'Admin')}
+                    </span>
+                    <div className={`max-w-[85%] rounded-2xl px-4 py-2.5 text-xs shadow-xs ${
+                      isStudent 
+                        ? 'bg-white text-slate-800 border border-slate-200 rounded-bl-none' 
+                        : isTutor 
+                          ? 'bg-amber-700 text-white rounded-br-none' 
+                          : 'bg-indigo-600 text-white rounded-br-none'
+                    }`}>
+                      <p>{msg.text}</p>
+                    </div>
+                    <span className="text-[9px] text-slate-400 mt-1 px-1">{msg.time}</span>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Chat Input */}
+            <div className="p-3 bg-white border-t border-slate-200 flex items-center space-x-2">
+              <input 
+                type="text" 
+                placeholder={chatMode === 'admin' ? "Type message as Admin..." : `Type message as tutor ${tutors[activeChatSubmission.id] || activeChatSubmission.assignedTutor}...`}
+                value={chatMessageInput}
+                onChange={(e) => setChatMessageInput(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && sendChatMessage(activeChatSubmission.id)}
+                className={`flex-1 bg-slate-100 border border-slate-200 rounded-xl px-4 py-2.5 text-xs focus:outline-none focus:ring-2 ${
+                  chatMode === 'admin' ? 'focus:ring-indigo-500' : 'focus:ring-amber-500'
+                }`}
+              />
+              <button 
+                onClick={() => sendChatMessage(activeChatSubmission.id)}
+                className={`p-2.5 text-white rounded-xl shadow-md transition-colors ${
+                  chatMode === 'admin' ? 'bg-indigo-600 hover:bg-indigo-700' : 'bg-amber-600 hover:bg-amber-700'
+                }`}
+              >
+                <IconSend />
+              </button>
+            </div>
+
+          </div>
+        </div>
+      )}
+
+    </div>
+  );
+}
