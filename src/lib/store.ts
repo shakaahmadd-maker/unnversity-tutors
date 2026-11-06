@@ -1199,6 +1199,118 @@ export class AppStore {
     }
   }
 
+  async updateAssignment(assignmentId: string, updates: Partial<Assignment>) {
+    const idx = this.assignments.findIndex(a => a.id === assignmentId);
+    if (idx !== -1) {
+      this.assignments[idx] = { ...this.assignments[idx], ...updates };
+      this.notify();
+    }
+    try {
+      const res = await fetch(`/api/orders/${assignmentId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updates)
+      });
+      return res.ok;
+    } catch {
+      return false;
+    }
+  }
+
+  async deleteAssignment(assignmentId: string) {
+    this.assignments = this.assignments.filter(a => a.id !== assignmentId);
+    this.notify();
+    try {
+      const res = await fetch(`/api/orders/${assignmentId}`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' }
+      });
+      return res.ok;
+    } catch {
+      return false;
+    }
+  }
+
+  async createAssignmentOrder(data: {
+    studentId: string;
+    title: string;
+    subject: string;
+    deadline: string;
+    academicLevel?: string;
+    pages?: number;
+    wordCount?: number;
+    referenceStyle?: string;
+    sourcesCount?: number;
+    instructions?: string;
+    budget?: number;
+    quoteAmount?: number;
+    tutorId?: string;
+    status?: AssignmentStatus;
+    escrowStatus?: string;
+    fileUrls?: string[];
+    fileNames?: string[];
+  }) {
+    const assignId = 'ord_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6);
+    const newAssignment: Assignment = {
+      id: assignId,
+      studentId: data.studentId,
+      tutorId: data.tutorId || '',
+      title: data.title,
+      subject: data.subject,
+      academicLevel: data.academicLevel || 'Undergraduate',
+      deadline: data.deadline,
+      pages: data.pages || 1,
+      wordCount: data.wordCount || 250,
+      referenceStyle: data.referenceStyle || 'APA 7th',
+      sourcesCount: data.sourcesCount || 0,
+      instructions: data.instructions || '',
+      budget: data.budget,
+      quoteAmount: data.quoteAmount,
+      fileUrls: data.fileUrls || [],
+      fileNames: data.fileNames || [],
+      status: data.status || (data.tutorId ? AssignmentStatus.IN_PROGRESS : AssignmentStatus.PENDING),
+      escrowStatus: data.escrowStatus || (data.quoteAmount ? 'secured' : 'pending'),
+      progressPercent: 0,
+      createdAt: new Date().toISOString()
+    };
+
+    this.assignments.unshift(newAssignment);
+    this.notify();
+
+    try {
+      const res = await fetch('/api/orders', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...newAssignment,
+          pages: newAssignment.pages,
+          wordCount: newAssignment.wordCount,
+          sourcesCount: newAssignment.sourcesCount,
+          quoteAmount: newAssignment.quoteAmount,
+          budget: newAssignment.budget,
+          fileUrls: newAssignment.fileUrls,
+          fileNames: newAssignment.fileNames
+        })
+      });
+      return { success: res.ok, order: newAssignment };
+    } catch (err: any) {
+      return { success: false, error: err.message, order: newAssignment };
+    }
+  }
+
+  async releaseEscrow(assignmentId: string) {
+    const assign = this.assignments.find(a => a.id === assignmentId);
+    if (assign) {
+      assign.escrowStatus = 'released';
+      this.notify();
+      fetch(`/api/orders/${assignmentId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ escrowStatus: 'released' })
+      }).catch(() => {});
+    }
+  }
+
   // ==========================================
   // INVOICES & PAYMENTS
   // ==========================================

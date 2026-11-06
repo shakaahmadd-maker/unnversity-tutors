@@ -489,6 +489,10 @@ export class MemoryStore {
     return updated;
   }
 
+  public deleteOrder(id: string): boolean {
+    return this.orders.delete(id);
+  }
+
   // --- Inquiries ---
   public getInquiries(): InquiryRecord[] {
     return Array.from(this.inquiries.values()).sort(

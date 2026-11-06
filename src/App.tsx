@@ -969,6 +969,12 @@ export default function App() {
 
                 onAssignTutor={store.assignTutorToAssignment.bind(store)}
                 onSetAssignmentPrice={store.setAssignmentPrice.bind(store)}
+                onUpdateAssignmentStatus={store.updateAssignmentStatus.bind(store)}
+                onUpdateAssignment={store.updateAssignment.bind(store)}
+                onDeleteAssignment={store.deleteAssignment.bind(store)}
+                onCreateAssignmentOrder={store.createAssignmentOrder.bind(store)}
+                onReleaseEscrow={store.releaseEscrow.bind(store)}
+                onRefreshData={store.fetchData.bind(store)}
                 onSettleInvoice={store.settleInvoice.bind(store)}
                 onCreateInvoice={store.createInvoice.bind(store)}
                 onSendNotification={store.sendAppNotification.bind(store)}

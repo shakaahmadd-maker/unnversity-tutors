@@ -1052,12 +1052,30 @@ async function startServer() {
       if (updates.fileNames && Array.isArray(updates.fileNames)) {
         updates.fileNames = JSON.stringify(updates.fileNames);
       }
+      if (updates.pages !== undefined) updates.pages = Number(updates.pages);
+      if (updates.wordCount !== undefined) updates.wordCount = Number(updates.wordCount);
+      if (updates.sourcesCount !== undefined) updates.sourcesCount = Number(updates.sourcesCount);
+      if (updates.budget !== undefined && updates.budget !== null) updates.budget = Number(updates.budget);
+      if (updates.quoteAmount !== undefined && updates.quoteAmount !== null) updates.quoteAmount = Number(updates.quoteAmount);
+      if (updates.progressPercent !== undefined) updates.progressPercent = Number(updates.progressPercent);
 
       memoryStore.updateOrder(id, updates);
 
       if (isDbConnected() && db) {
         try {
-          await db.update(orders).set(updates).where(eq(orders.id, id));
+          const allowedCols = [
+            'studentId', 'tutorId', 'title', 'subject', 'academicLevel', 'deadline',
+            'pages', 'wordCount', 'referenceStyle', 'sourcesCount', 'instructions',
+            'fileUrls', 'fileNames', 'budget', 'quoteAmount', 'status', 'escrowStatus',
+            'progressPercent', 'tutorWorkFileUrl', 'tutorWorkFileName', 'reviewed', 'updatedAt'
+          ];
+          const dbUpdates: Record<string, any> = {};
+          for (const col of allowedCols) {
+            if (updates[col] !== undefined) {
+              dbUpdates[col] = updates[col];
+            }
+          }
+          await db.update(orders).set(dbUpdates).where(eq(orders.id, id));
         } catch (dbErr: any) {
           console.warn('[API] Notice updating order in DB:', dbErr.message);
         }
@@ -1066,6 +1084,28 @@ async function startServer() {
       await logAudit('ORDER_UPDATE', `Updated order: ${id}`, undefined, undefined, undefined, req);
 
       return res.status(200).json({ success: true });
+    } catch (err: any) {
+      return res.status(500).json({ error: err.message });
+    }
+  });
+
+  // DELETE /api/orders/:id
+  app.delete('/api/orders/:id', async (req, res) => {
+    try {
+      const { id } = req.params;
+      memoryStore.deleteOrder(id);
+
+      if (isDbConnected() && db) {
+        try {
+          await db.delete(orders).where(eq(orders.id, id));
+        } catch (dbErr: any) {
+          console.warn('[API] Notice deleting order from DB:', dbErr.message);
+        }
+      }
+
+      await logAudit('ORDER_DELETE', `Deleted order: ${id}`, undefined, undefined, undefined, req);
+
+      return res.status(200).json({ success: true, message: 'Order removed successfully' });
     } catch (err: any) {
       return res.status(500).json({ error: err.message });
     }

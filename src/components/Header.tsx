@@ -114,11 +114,11 @@ export default function Header({
             <img 
               src="/logo.webp" 
               alt="Uni Tutors" 
-              width={215}
-              height={44}
+              width={220}
+              height={73}
               fetchPriority="high"
               decoding="async"
-              className="h-11 sm:h-13 md:h-15 w-auto max-w-[220px] object-contain transition-transform group-hover:scale-102"
+              className="h-10 sm:h-12 md:h-14 w-auto max-w-[220px] sm:max-w-[250px] object-contain transition-transform group-hover:scale-102"
             />
           </button>
 

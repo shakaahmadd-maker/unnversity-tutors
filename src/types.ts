@@ -142,6 +142,10 @@ export interface Assignment {
   status: AssignmentStatus;
   progressPercent: number; // 0 - 100
   quoteAmount?: number;
+  budget?: number;
+  academicLevel?: string;
+  pages?: number;
+  escrowStatus?: string; // 'pending' | 'secured' | 'released' | 'refunded'
   tutorWorkFileUrl?: string; // Uploaded by tutor when completed
   tutorWorkFileName?: string;
   reviewed?: boolean;

@@ -27,7 +27,18 @@ import {
   RefreshCw,
   Download,
   Paperclip,
-  GraduationCap
+  GraduationCap,
+  Filter,
+  CheckCircle,
+  Clock,
+  DollarSign,
+  FileCheck,
+  ExternalLink,
+  ChevronDown,
+  ShieldCheck,
+  CreditCard,
+  RotateCcw,
+  Copy
 } from 'lucide-react';
 import { 
   User, Blog, FAQ, Assignment, Payment, SupportTicket, UserRole, Chat, Message,
@@ -36,7 +47,51 @@ import {
 import { audioNotifier } from '../utils/audioNotification';
 import TutorsListAdmin from './TutorsListAdmin';
 import StudentProfilesAdmin from './StudentProfilesAdmin';
+import AssignmentLedgerView from './AssignmentLedgerView';
 import { store } from '../lib/store';
+// Inline SVG Icon components to replace react-icons and ensure standalone compilation
+const IconFileText = () => (
+  <svg className="w-4 h-4 inline-block" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+);
+const IconUser = () => (
+  <svg className="w-4 h-4 inline-block" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
+);
+const IconClock = () => (
+  <svg className="w-4 h-4 inline-block" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+);
+const IconCheckCircle = () => (
+  <svg className="w-5 h-5 inline-block" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+);
+const IconAlertCircle = () => (
+  <svg className="w-4 h-4 inline-block" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+);
+const IconSearch = () => (
+  <svg className="w-4 h-4 inline-block" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+);
+const IconChevronRight = () => (
+  <svg className="w-4 h-4 inline-block" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7"/></svg>
+);
+const IconMessageSquare = () => (
+  <svg className="w-4 h-4 inline-block" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/></svg>
+);
+const IconSend = () => (
+  <svg className="w-4 h-4 inline-block" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"/></svg>
+);
+const IconX = () => (
+  <svg className="w-5 h-5 inline-block" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"/></svg>
+);
+const IconDownload = () => (
+  <svg className="w-4 h-4 inline-block" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+);
+const IconBriefcase = () => (
+  <svg className="w-4 h-4 inline-block" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.222-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
+);
+const IconStar = () => (
+  <svg className="w-3.5 h-3.5 inline-block" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+);
+const IconCalendar = () => (
+  <svg className="w-4 h-4 inline-block" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+);
 
 interface AdminDashboardProps {
   currentUser: User;
@@ -77,6 +132,12 @@ interface AdminDashboardProps {
 
   onAssignTutor: (assignmentId: string, tutorId: string) => Promise<boolean>;
   onSetAssignmentPrice: (assignmentId: string, price: number) => Promise<boolean>;
+  onUpdateAssignmentStatus?: (assignmentId: string, status: AssignmentStatus) => Promise<void>;
+  onUpdateAssignment?: (assignmentId: string, updates: Partial<Assignment>) => Promise<boolean | void>;
+  onDeleteAssignment?: (assignmentId: string) => Promise<boolean | void>;
+  onCreateAssignmentOrder?: (orderData: any) => Promise<any>;
+  onReleaseEscrow?: (assignmentId: string) => Promise<void>;
+  onRefreshData?: () => Promise<void>;
   onSettleInvoice: (invoiceId: string, status: Invoice['status']) => Promise<boolean>;
   onCreateInvoice: (invoiceData: Omit<Invoice, 'id' | 'createdAt'>) => Promise<string>;
   onSendNotification: (title: string, message: string, targetUserId: string, type: 'email' | 'webapp' | 'both') => Promise<boolean>;
@@ -129,6 +190,12 @@ export default function AdminDashboard({
 
   onAssignTutor,
   onSetAssignmentPrice,
+  onUpdateAssignmentStatus,
+  onUpdateAssignment,
+  onDeleteAssignment,
+  onCreateAssignmentOrder,
+  onReleaseEscrow,
+  onRefreshData,
   onSettleInvoice,
   onCreateInvoice,
   onSendNotification,
@@ -244,7 +311,37 @@ export default function AdminDashboard({
   // 1. Assignments
   const [customPriceState, setCustomPriceState] = useState<{[key: string]: string}>({});
   const [assignTutorState, setAssignTutorState] = useState<{[key: string]: string}>({});
-  const [assignmentFilter, setAssignmentFilter] = useState<'all' | 'pending' | 'in_progress' | 'completed' | 'revision'>('all');
+  const [assignmentFilter, setAssignmentFilter] = useState<'all' | 'pending' | 'in_progress' | 'awaiting_payment' | 'completed' | 'revision'>('all');
+  const [assignmentSearchQuery, setAssignmentSearchQuery] = useState<string>('');
+  const [assignmentSubjectFilter, setAssignmentSubjectFilter] = useState<string>('all');
+  const [assignmentTutorFilter, setAssignmentTutorFilter] = useState<string>('all');
+  const [assignmentEscrowFilter, setAssignmentEscrowFilter] = useState<string>('all');
+  const [editingAssignment, setEditingAssignment] = useState<Assignment | null>(null);
+  const [isCreatingAssignment, setIsCreatingAssignment] = useState<boolean>(false);
+  const [isSyncingLedger, setIsSyncingLedger] = useState<boolean>(false);
+  const [updatingAssignmentId, setUpdatingAssignmentId] = useState<string | null>(null);
+  const [assignmentToast, setAssignmentToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+
+  // New Order Creation Form State
+  const [newOrderForm, setNewOrderForm] = useState({
+    studentId: '',
+    isNewStudent: false,
+    newStudentName: '',
+    newStudentEmail: '',
+    title: '',
+    subject: 'Computer Science & IT',
+    academicLevel: 'Undergraduate',
+    deadline: '',
+    pages: 1,
+    wordCount: 250,
+    referenceStyle: 'APA 7th',
+    sourcesCount: 2,
+    instructions: '',
+    quoteAmount: '',
+    escrowStatus: 'pending',
+    tutorId: '',
+    status: AssignmentStatus.PENDING,
+  });
 
   // Quick text dispatch state from assignment table row (send as Admin OR send as Tutor)
   const [quickTextAssignId, setQuickTextAssignId] = useState<string | null>(null);
@@ -1680,704 +1777,266 @@ export default function AdminDashboard({
             </div>
           )}
 
-          {/* ASSIGNMENTS MANAGEMENT VIEW */}
-          {activeTab === 'assignments' && (
-            <div className="space-y-6" id="admin-assignments-management">
-              <div className="bg-white rounded-3xl border border-gray-150 p-6 shadow-xs text-left">
-                <h3 className="font-bold text-base text-gray-950 font-sans tracking-tight">New Assignment Ledger (Incoming Requests)</h3>
-                <p className="text-xs text-gray-400 mt-1">Review incoming student tasks and demands, assign qualified subject tutors, set final balance payment pricing, and audit real-time chat sync.</p>
-                
-                {/* Visual Sheet Info Metrics Grid */}
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-6 border-t pt-6 border-dashed">
-                  <div className="bg-orange-50 border border-orange-100 p-4 rounded-2xl">
-                    <span className="text-xs text-orange-600 block font-bold uppercase tracking-wider">Total Orders</span>
-                    <span className="text-2xl font-bold font-mono text-orange-950 block mt-1">{assignments.length}</span>
-                  </div>
-                  <div className="bg-blue-50 border border-blue-100 p-4 rounded-2xl">
-                    <span className="text-xs text-blue-600 block font-bold uppercase tracking-wider">Unassigned Tasks</span>
-                    <span className="text-2xl font-bold font-mono text-blue-950 block mt-1">{assignments.filter(a => !a.tutorId).length}</span>
-                  </div>
-                  <div className="bg-emerald-50 border border-emerald-100 p-4 rounded-2xl">
-                    <span className="text-xs text-emerald-600 block font-bold uppercase tracking-wider">Active Students</span>
-                    <span className="text-2xl font-bold font-mono text-emerald-950 block mt-1">{new Set(assignments.map(a => a.studentId)).size}</span>
-                  </div>
-                  <div className="bg-purple-50 border border-purple-100 p-4 rounded-2xl">
-                    <span className="text-xs text-purple-600 block font-bold uppercase tracking-wider">Active Tutors</span>
-                    <span className="text-2xl font-bold font-mono text-purple-950 block mt-1">{new Set(assignments.filter(a => a.tutorId).map(a => a.tutorId)).size}</span>
-                  </div>
-                </div>
-              </div>
+          {/* ASSIGNMENTS MANAGEMENT VIEW - INCOMING STUDENT DEMANDS & TASKS */}
+          {activeTab === 'assignments' && (() => {
+            // Initial Mock Data representing student submissions and assignments
+            const initialSubmissionsData = [
+              {
+                id: "assign_1793873317765_hby36a",
+                studentName: "Walter White",
+                studentEmail: "syed.asadullahbscs@gmail.com",
+                studentAvatar: "W",
+                studentPhone: "+1 (555) 019-2834",
+                totalSubmissions: 5,
+                joinedDate: "Jan 2026",
+                gpa: "3.85",
+                subject: "Science (Earth Sciences)",
+                title: "Sustained Coursework Tutoring",
+                pattern: "=== University-Tutors Matching Funnel Request === TUTORING SERVICE PATTERN: Sustained Coursework...",
+                fullDescription: "Comprehensive tutoring support needed for Earth Sciences advanced coursework, focusing on mineralogy, stratigraphy, and GIS mapping analysis. The student requires bi-weekly review sessions and feedback on lab reports.",
+                documentName: "Muhammad_Abdullah_Tufail_CV.pdf",
+                documentSize: "2.4 MB",
+                documentUrl: "",
+                status: "Pending/Incoming",
+                deadline: "2026-11-06",
+                price: null as number | null,
+                assignedTutor: "Dr. Clara Stirling",
+                tutorRating: 4.9,
+                chatHistory: [
+                  { sender: "admin", roleLabel: "Admin", text: "Hello Walter, we received your coursework brief.", time: "10:30 AM" },
+                  { sender: "student", roleLabel: "Student", text: "Thank you! Looking forward to matching with a tutor.", time: "10:35 AM" },
+                  { sender: "tutor", roleLabel: "Dr. Clara Stirling (Tutor)", text: "Hi Walter, I'll be guiding you through this Earth Sciences brief. Let's begin on Monday.", time: "11:00 AM" }
+                ],
+                submissionHistory: [
+                  { id: "sub_01", title: "Sustained Coursework Tutoring", date: "2026-11-01", status: "Pending/Incoming", grade: "Pending" },
+                  { id: "sub_02", title: "Mineralogy Lab Report 1", date: "2026-10-15", status: "Completed", grade: "A" },
+                  { id: "sub_03", title: "Geology Field Study Brief", date: "2026-09-28", status: "Completed", grade: "A-" }
+                ]
+              },
+              {
+                id: "assign_1793810461156_4doocq",
+                studentName: "Walter White",
+                studentEmail: "syed.asadullahbscs@gmail.com",
+                studentAvatar: "W",
+                studentPhone: "+1 (555) 019-2834",
+                totalSubmissions: 5,
+                joinedDate: "Jan 2026",
+                gpa: "3.85",
+                subject: "Computer Science (Software Engineering)",
+                title: "Assignment Tutoring Support",
+                pattern: "=== University-Tutors Matching Funnel Request === TUTORING SERVICE PATTERN: Assignment Tutoring...",
+                fullDescription: "Need urgent guidance on data structures implementation in C++, specifically AVL trees, graph traversal algorithms, and memory management debugging.",
+                documentName: "Muhammad_Abdullah_Tufail_CV.pdf",
+                documentSize: "2.4 MB",
+                documentUrl: "",
+                status: "In Progress",
+                deadline: "2026-11-13",
+                price: 150 as number | null,
+                assignedTutor: "Dr. Clara Stirling",
+                tutorRating: 4.9,
+                chatHistory: [
+                  { sender: "tutor", roleLabel: "Dr. Clara Stirling (Tutor)", text: "I've reviewed your C++ repository. Let's schedule a session tomorrow.", time: "Yesterday" }
+                ],
+                submissionHistory: [
+                  { id: "sub_11", title: "Assignment Tutoring Support", date: "2026-11-02", status: "In Progress", grade: "Pending" },
+                  { id: "sub_12", title: "Algorithm Complexity Analysis", date: "2026-10-10", status: "Completed", grade: "A+" }
+                ]
+              },
+              {
+                id: "assign_1793756218991_mx99z",
+                studentName: "Sarah Jenkins",
+                studentEmail: "sarah.j@university.edu",
+                studentAvatar: "S",
+                studentPhone: "+1 (555) 849-1122",
+                totalSubmissions: 3,
+                joinedDate: "Aug 2025",
+                gpa: "3.92",
+                subject: "Mathematics (Differential Equations)",
+                title: "Sustained Coursework Tutoring",
+                pattern: "=== University-Tutors Matching Funnel Request === TUTORING SERVICE PATTERN: Advanced Calculus...",
+                fullDescription: "Partial differential equations, Laplace transforms, and boundary value problems for engineering applications.",
+                documentName: "Sarah_Calculus_Brief.pdf",
+                documentSize: "1.8 MB",
+                documentUrl: "",
+                status: "Completed",
+                deadline: "2026-10-28",
+                price: 220 as number | null,
+                assignedTutor: "Prof. Alan Turing",
+                tutorRating: 5.0,
+                chatHistory: [
+                  { sender: "tutor", roleLabel: "Prof. Alan Turing (Tutor)", text: "All coursework assignments are successfully completed and graded.", time: "Oct 28" }
+                ],
+                submissionHistory: [
+                  { id: "sub_21", title: "Sustained Coursework Tutoring", date: "2026-10-01", status: "Completed", grade: "A" }
+                ]
+              },
+              {
+                id: "assign_1793612849102_bb88x",
+                studentName: "Liam O'Connor",
+                studentEmail: "liam.oconnor@student.org",
+                studentAvatar: "L",
+                studentPhone: "+1 (555) 332-9900",
+                totalSubmissions: 2,
+                joinedDate: "Sep 2026",
+                gpa: "3.40",
+                subject: "Economics & Finance",
+                title: "Macroeconomic Policy Review",
+                pattern: "=== University-Tutors Matching Funnel Request === TUTORING SERVICE PATTERN: Research Assistance...",
+                fullDescription: "Looking for analytical feedback on monetary policy impacts on emerging market inflation rates.",
+                documentName: "Liam_Draft_Macro.pdf",
+                documentSize: "3.1 MB",
+                documentUrl: "",
+                status: "Revision",
+                deadline: "2026-11-18",
+                price: 180 as number | null,
+                assignedTutor: "Dr. Robert Mundell",
+                tutorRating: 4.7,
+                chatHistory: [
+                  { sender: "tutor", roleLabel: "Dr. Robert Mundell (Tutor)", text: "Please revise section 3 with the updated central bank metrics.", time: "3 days ago" }
+                ],
+                submissionHistory: [
+                  { id: "sub_31", title: "Macroeconomic Policy Review", date: "2026-11-04", status: "Revision", grade: "Needs Revision" }
+                ]
+              }
+            ];
 
-              {/* SECTION: ⚡ Incoming Requests Direct Dispatch Desk */}
-              <div className="bg-slate-50 rounded-3xl border border-gray-150 p-6 shadow-xs text-left space-y-4">
-                <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-2">
-                  <div>
-                    <h4 className="font-bold text-sm text-gray-950 flex items-center gap-2">
-                      <Sparkles className="w-4 h-4 text-orange-500 animate-pulse" />
-                      <span>⚡ Direct Tutor Assignment Desk (Incoming Requests)</span>
-                    </h4>
-                    <p className="text-[11px] text-gray-500 mt-0.5 font-medium">
-                      View new student demands and instantly pair them with subject specialists.
-                    </p>
-                  </div>
-                  <span className="text-[10px] font-bold font-mono bg-orange-150 text-orange-700 px-2.5 py-1 rounded-full border border-orange-200">
-                    {assignments.filter(a => !a.tutorId || a.status === AssignmentStatus.PENDING).length} Pending Assignment
-                  </span>
-                </div>
+            // Tutors fallback list
+            const defaultTutorsList = [
+              "Dr. Clara Stirling",
+              "Prof. Alan Turing",
+              "Dr. Robert Mundell",
+              "Dr. Evelyn Reed",
+              "Prof. Marcus Vance"
+            ];
 
-                {(() => {
-                  const pendingIncomingRequests = assignments.filter(a => !a.tutorId || a.status === AssignmentStatus.PENDING);
-                  const tutorsList = users.filter(u => u.role === UserRole.TUTOR || (u.role as string)?.toLowerCase() === 'tutor' || u.id.startsWith('tutor_') || u.id.startsWith('tutor-') || !!u.hourlyRate);
+            // Gather all tutors from users prop
+            const availableTutorsList = Array.from(new Set([
+              ...defaultTutorsList,
+              ...users
+                .filter(u => u.role === UserRole.TUTOR || (u.role as string)?.toLowerCase() === 'tutor' || u.id.startsWith('tutor_') || !!u.hourlyRate)
+                .map(t => t.name)
+            ]));
 
-                  if (pendingIncomingRequests.length === 0) {
-                    return (
-                      <div className="bg-white border border-dashed rounded-2xl p-8 text-center text-gray-500">
-                        <Check className="w-8 h-8 text-emerald-500 mx-auto mb-2 bg-emerald-50 p-1.5 rounded-full" />
-                        <p className="text-xs font-bold text-gray-800">All caught up!</p>
-                        <p className="text-[11px] text-gray-400 mt-0.5">No unassigned student requests remaining in the queue.</p>
-                        {onSeedMockStudentData && (
-                          <button
-                            onClick={async () => {
-                              setIsSeedingMock(true);
-                              const res = await onSeedMockStudentData();
-                              setIsSeedingMock(false);
-                              if (res.success) {
-                                alert("Database seeded successfully with student demands & matching chats!");
-                              } else {
-                                alert("Seeding failed: " + (res.error || "Please check your console/network permissions."));
-                              }
-                            }}
-                            disabled={isSeedingMock}
-                            className="mt-4 bg-orange-600 hover:bg-orange-700 text-white px-4 py-2 rounded-xl font-bold transition-all text-xs inline-flex items-center gap-1.5 cursor-pointer disabled:opacity-50 shadow-xs"
-                          >
-                            <Sparkles className={`w-3.5 h-3.5 ${isSeedingMock ? 'animate-bounce' : ''}`} />
-                            <span>{isSeedingMock ? 'Seeding requests...' : 'Seed Sample Student Demands'}</span>
-                          </button>
-                        )}
-                      </div>
-                    );
-                  }
+            // Helper to map status
+            const toLedgerStatus = (st?: string | AssignmentStatus) => {
+              const s = String(st || '').toLowerCase();
+              if (s.includes('progress')) return 'In Progress';
+              if (s.includes('complete')) return 'Completed';
+              if (s.includes('revision')) return 'Revision';
+              return 'Pending/Incoming';
+            };
 
-                  return (
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                      {pendingIncomingRequests.map(assign => {
-                        const student = users.find(u => u.id === assign.studentId);
-                        return (
-                          <div key={assign.id} className="bg-white rounded-2xl border border-gray-200 p-4.5 flex flex-col justify-between hover:shadow-xs hover:border-orange-200 transition-all">
-                            <div className="space-y-3">
-                              {/* Student and Reference info */}
-                              <div className="flex justify-between items-start">
-                                <span className="inline-block text-[9px] bg-orange-100 text-orange-800 font-bold font-mono px-1.5 py-0.5 rounded-md">
-                                  Ref: #{assign.id}
-                                </span>
-                                <span className="text-[10px] text-gray-400 font-mono font-bold">
-                                  📅 {assign.deadline}
-                                </span>
-                              </div>
+            const toStoreStatus = (st: string): AssignmentStatus => {
+              if (st === 'In Progress') return AssignmentStatus.IN_PROGRESS;
+              if (st === 'Completed') return AssignmentStatus.COMPLETED;
+              if (st === 'Revision') return AssignmentStatus.REVISION;
+              return AssignmentStatus.PENDING;
+            };
 
-                              {/* Title & Subject */}
-                              <div>
-                                <h5 className="font-bold text-xs text-gray-950 leading-snug line-clamp-1">{assign.title}</h5>
-                                <span className="text-[10.5px] font-bold text-orange-600 block mt-0.5">{assign.subject}</span>
-                                <span className="text-[9.5px] text-gray-400 block mt-0.5 font-bold">By: {student?.name || 'Student'}</span>
-                              </div>
-
-                              {/* Instructions snippet */}
-                              <p className="text-[10.5px] text-gray-500 bg-gray-50/50 p-2.5 rounded-xl border border-gray-100/70 line-clamp-3 leading-relaxed font-semibold italic">
-                                "{assign.instructions}"
-                              </p>
-
-                              {/* Files attached indicator */}
-                              {assign.fileNames && assign.fileNames.length > 0 && (
-                                <div className="flex flex-wrap gap-1">
-                                  {assign.fileNames.map((fn, idx) => {
-                                    const url = (assign.fileUrls && assign.fileUrls[idx]) ? assign.fileUrls[idx] : `https://universitytutors.com/uploads/${encodeURIComponent(fn)}`;
-                                    return (
-                                      <a 
-                                        key={idx} 
-                                        href={url} 
-                                        target="_blank" 
-                                        rel="noreferrer" 
-                                        download 
-                                        className="inline-flex items-center text-[9px] text-orange-600 hover:text-orange-800 font-bold bg-orange-50/50 hover:bg-orange-100 px-1.5 py-0.5 rounded border border-orange-200/80 max-w-full truncate transition-colors cursor-pointer no-underline" 
-                                        title={`Download ${fn}`}
-                                      >
-                                        📎 {fn}
-                                      </a>
-                                    );
-                                  })}
-                                </div>
-                              )}
-                            </div>
-
-                            {/* Quick assign actions inside card */}
-                            <div className="mt-4 pt-3 border-t border-dashed space-y-2.5">
-                              {/* Quote Price Setting */}
-                              <div>
-                                <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wide block mb-1">
-                                  Set Quote Price ($)
-                                </label>
-                                <div className="flex gap-1.5">
-                                  <input 
-                                    type="number"
-                                    placeholder="Enter Price Amount"
-                                    value={customPriceState[assign.id] || ''}
-                                    onChange={(e) => setCustomPriceState({...customPriceState, [assign.id]: e.target.value})}
-                                    className="w-full bg-gray-55 border border-gray-200 py-1.5 px-2.5 text-xs font-bold rounded-lg focus:outline-none focus:ring-1 focus:ring-orange-300"
-                                  />
-                                  {assign.quoteAmount && (
-                                    <span className="text-[10.5px] bg-slate-100 text-slate-700 py-1.5 px-2.5 rounded-lg font-bold shrink-0">
-                                      Current: ${assign.quoteAmount}
-                                    </span>
-                                  )}
-                                </div>
-                              </div>
-
-                              {/* Available Tutors selector */}
-                              <div>
-                                <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wide block mb-1">
-                                  Select Available Tutor
-                                </label>
-                                <select
-                                  value={assignTutorState[assign.id] || assign.tutorId || ''}
-                                  onChange={(e) => setAssignTutorState({...assignTutorState, [assign.id]: e.target.value})}
-                                  className="w-full bg-gray-55 border border-gray-200 py-1.5 px-2 rounded-lg text-xs font-bold focus:outline-none focus:ring-1 focus:ring-orange-300"
-                                >
-                                  <option value="">-- Choose Tutor --</option>
-                                  {tutorsList.map(t => (
-                                    <option key={t.id} value={t.id}>
-                                      {t.name} (★{t.rating}) - {t.subjects?.join(', ') || 'Academic Specialist'}
-                                    </option>
-                                  ))}
-                                </select>
-                              </div>
-
-                              {/* Quick Action Dispatch Button */}
-                              <button
-                                onClick={async () => {
-                                  const tId = assignTutorState[assign.id] || assign.tutorId;
-                                  const priceInput = customPriceState[assign.id];
-                                  
-                                  if (!tId) {
-                                    alert("Please choose an available tutor to dispatch this assignment!");
-                                    return;
-                                  }
-
-                                  try {
-                                    // Set price first if provided
-                                    if (priceInput && !isNaN(parseFloat(priceInput))) {
-                                      await onSetAssignmentPrice(assign.id, parseFloat(priceInput));
-                                    }
-                                    
-                                    // Assign tutor
-                                    await onAssignTutor(assign.id, tId);
-                                    
-                                    // Clear states
-                                    setAssignTutorState(prev => {
-                                      const next = {...prev};
-                                      delete next[assign.id];
-                                      return next;
-                                    });
-                                    setCustomPriceState(prev => {
-                                      const next = {...prev};
-                                      delete next[assign.id];
-                                      return next;
-                                    });
-                                    
-                                    const tName = tutorsList.find(ts => ts.id === tId)?.name || tId;
-                                    alert(`Successfully dispatched Assignment #${assign.id} to ${tName}!`);
-                                  } catch (err) {
-                                    alert("An error occurred during dispatch. Please try again.");
-                                  }
-                                }}
-                                className="w-full bg-orange-500 text-white font-bold text-xs py-2 rounded-xl hover:bg-orange-600 transition-all cursor-pointer shadow-sm hover:shadow-md flex items-center justify-center gap-1.5"
-                              >
-                                <span>⚡ Confirm Direct Tutor Dispatch</span>
-                              </button>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
+            // Merge store assignments with initial submissions
+            const liveSubmissions = assignments.length > 0 
+              ? assignments.map(a => {
+                  const student = users.find(u => 
+                    u.id.toLowerCase() === a.studentId.toLowerCase() || 
+                    u.email.toLowerCase().trim() === a.studentId.toLowerCase().trim()
                   );
-                })()}
-              </div>
-
-              {/* Assignments demands Table */}
-              <div className="bg-white rounded-3xl border border-gray-150 overflow-hidden shadow-xs text-left">
-                <div className="p-5 border-b border-gray-100 flex flex-col sm:flex-row gap-3 justify-between items-start sm:items-center bg-gray-50/50">
-                  <div>
-                    <span className="text-xs font-bold text-gray-700 uppercase tracking-widest font-mono">Incoming Student Demands & Tasks</span>
-                    <span className="text-[10px] text-gray-400 block mt-0.5">Filter and review details of all registered briefs</span>
-                  </div>
+                  const tutor = users.find(u => u.id === a.tutorId);
+                  const sName = student?.name || (a.studentId.includes('@') ? a.studentId.split('@')[0] : a.studentId);
+                  const sEmail = student?.email || (a.studentId.includes('@') ? a.studentId : `${a.studentId.replace(/\s+/g, '.').toLowerCase()}@universitytutors.com`);
                   
-                  {/* Status Filters */}
-                  <div className="flex flex-wrap gap-1">
-                    {[
-                      { id: 'all', label: 'All Requests' },
-                      { id: 'pending', label: '🚨 Pending/Incoming' },
-                      { id: 'in_progress', label: 'In Progress' },
-                      { id: 'completed', label: 'Completed' },
-                      { id: 'revision', label: 'Revision' }
-                    ].map(tab => (
-                      <button
-                        key={tab.id}
-                        onClick={() => setAssignmentFilter(tab.id as any)}
-                        className={`px-3 py-1 rounded-full text-[10.5px] font-bold transition-all border ${
-                          assignmentFilter === tab.id 
-                            ? 'bg-gray-900 text-white border-gray-900 shadow-xs' 
-                            : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-100'
-                        }`}
-                      >
-                        {tab.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
+                  return {
+                    id: a.id,
+                    studentName: sName,
+                    studentEmail: sEmail,
+                    studentAvatar: sName.charAt(0).toUpperCase() || 'S',
+                    studentPhone: (student as any)?.phone || "+1 (555) 019-2834",
+                    totalSubmissions: assignments.filter(x => x.studentId === a.studentId).length,
+                    joinedDate: "Jan 2026",
+                    gpa: "3.85",
+                    subject: a.subject,
+                    title: a.title,
+                    pattern: a.instructions ? (a.instructions.slice(0, 100) + '...') : "=== University-Tutors Matching Funnel Request === TUTORING SERVICE PATTERN: Coursework Guidance...",
+                    fullDescription: a.instructions || "Comprehensive academic tutoring and guidance requested by student.",
+                    documentName: (a.fileNames && a.fileNames[0]) ? a.fileNames[0] : "Assignment_Brief.pdf",
+                    documentSize: "2.4 MB",
+                    documentUrl: (a.fileUrls && a.fileUrls[0]) ? a.fileUrls[0] : "",
+                    status: toLedgerStatus(a.status),
+                    deadline: a.deadline,
+                    price: a.quoteAmount ? Number(a.quoteAmount) : null,
+                    assignedTutor: tutor?.name || (a.tutorId ? "Assigned Specialist" : ""),
+                    tutorRating: tutor?.rating || 4.9,
+                    chatHistory: [
+                      { sender: "admin", roleLabel: "Admin", text: `Hello ${sName}, we received your coursework brief for "${a.title}".`, time: "10:30 AM" },
+                      { sender: "student", roleLabel: "Student", text: "Thank you! Looking forward to working with my tutor.", time: "10:35 AM" }
+                    ],
+                    submissionHistory: assignments
+                      .filter(x => x.studentId === a.studentId)
+                      .map((x, idx) => ({
+                        id: x.id,
+                        title: x.title,
+                        date: x.createdAt ? x.createdAt.slice(0, 10) : "2026-11-01",
+                        status: toLedgerStatus(x.status),
+                        grade: x.status === AssignmentStatus.COMPLETED ? "A" : "Pending"
+                      }))
+                  };
+                })
+              : initialSubmissionsData;
 
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left text-xs">
-                    <thead>
-                      <tr className="bg-gray-100/70 border-b border-gray-150 text-gray-600 font-bold uppercase tracking-wider">
-                        <th className="p-4">Student & Project</th>
-                        <th className="p-4">Academic Details</th>
-                        <th className="p-4">Status & Deadline</th>
-                        <th className="p-4">Quote Price Setting</th>
-                        <th className="p-4 text-right">Assign Subject Tutor</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-100 font-medium">
-                      {assignments
-                        .filter(assign => {
-                          if (assignmentFilter === 'pending') return !assign.tutorId || assign.status === AssignmentStatus.PENDING;
-                          if (assignmentFilter === 'in_progress') return assign.status === AssignmentStatus.IN_PROGRESS;
-                          if (assignmentFilter === 'completed') return assign.status === AssignmentStatus.COMPLETED;
-                          if (assignmentFilter === 'revision') return assign.status === AssignmentStatus.REVISION;
-                          return true;
-                        })
-                        .map(assign => {
-                          const student = users.find(u => 
-                            u.id.toLowerCase() === assign.studentId.toLowerCase() || 
-                            u.email.toLowerCase().trim() === assign.studentId.toLowerCase().trim() ||
-                            u.name.toLowerCase().trim() === assign.studentId.toLowerCase().trim()
-                          );
-                          const studentName = student?.name || (assign.studentId.includes('@') ? assign.studentId.split('@')[0] : assign.studentId);
-                          const studentEmail = student?.email || (assign.studentId.includes('@') ? assign.studentId : `${assign.studentId.replace(/\s+/g, '.').toLowerCase()}@universitytutors.com`);
-                          const tutor = users.find(u => u.id === assign.tutorId);
-                          const tutorsList = users.filter(u => u.role === UserRole.TUTOR || (u.role as string)?.toLowerCase() === 'tutor' || u.id.startsWith('tutor_') || u.id.startsWith('tutor-') || !!u.hourlyRate);
-
-                        return (
-                          <React.Fragment key={assign.id}>
-                            <tr className="hover:bg-gray-50/70 transition-colors">
-                            <td className="p-4">
-                              <span className="font-bold text-gray-900 block text-xs">{assign.title}</span>
-                              <div className="flex items-center gap-1.5 mt-1">
-                                <span className="w-5 h-5 rounded-full bg-orange-100 text-orange-700 font-bold text-[9px] flex items-center justify-center border border-orange-200">
-                                  {studentName.charAt(0).toUpperCase()}
-                                </span>
-                                <span className="text-[10.5px] text-gray-700 font-semibold truncate max-w-[220px]" title={studentName}>
-                                  By: {studentName}
-                                </span>
-                              </div>
-                              <span className="text-[9.5px] text-gray-400 font-mono block mt-0.5">({studentEmail})</span>
-                              <span className="inline-block text-[9px] bg-orange-100 text-orange-800 font-bold font-mono px-1.5 py-0.5 rounded-md mt-1">Ref: #{assign.id}</span>
-
-                              {/* Interactive Actions for Admin and Tutor Persona Messaging */}
-                              <div className="flex flex-wrap gap-1.5 mt-2">
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    setAdminStudentDirectorySearch(studentName || studentEmail || assign.studentId);
-                                    setAdminStudentDirectoryId(student?.id || assign.studentId);
-                                    setActiveTab('student_profiles');
-                                  }}
-                                  className="inline-flex items-center gap-1 text-[9.5px] font-bold bg-white hover:bg-orange-50 text-orange-700 border border-orange-200 px-2 py-0.5 rounded-md transition-colors shadow-2xs cursor-pointer"
-                                  title="View this student's full profile & academic brief history"
-                                >
-                                  <Eye className="w-2.5 h-2.5" />
-                                  <span>View Profile</span>
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    const studentIdentifier = student?.id || assign.studentId;
-                                    const targetTutorId = assign.tutorId || 'tutor_clara';
-                                    let targetChat = chats.find(c => 
-                                      c.studentId === studentIdentifier || 
-                                      c.studentId.toLowerCase() === studentEmail.toLowerCase()
-                                    );
-                                    if (!targetChat && onGetOrCreateChat) {
-                                      targetChat = onGetOrCreateChat(studentIdentifier, targetTutorId, assign.title);
-                                    }
-                                    if (targetChat) {
-                                      onSelectChat(targetChat);
-                                      setSelectedChatId(targetChat.id);
-                                      setReplyAsTutor(false);
-                                    }
-                                    setActiveTab('chats');
-                                  }}
-                                  className="inline-flex items-center gap-1 text-[9.5px] font-bold bg-gray-900 hover:bg-black text-white px-2 py-0.5 rounded-md transition-colors shadow-2xs cursor-pointer"
-                                  title="Open live chat and send messages as Platform Admin"
-                                >
-                                  <span>👑 Chat as Admin</span>
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    const studentIdentifier = student?.id || assign.studentId;
-                                    const targetTutorId = assign.tutorId || 'tutor_clara';
-                                    let targetChat = chats.find(c => 
-                                      c.studentId === studentIdentifier || 
-                                      c.studentId.toLowerCase() === studentEmail.toLowerCase()
-                                    );
-                                    if (!targetChat && onGetOrCreateChat) {
-                                      targetChat = onGetOrCreateChat(studentIdentifier, targetTutorId, assign.title);
-                                    }
-                                    if (targetChat) {
-                                      onSelectChat(targetChat);
-                                      setSelectedChatId(targetChat.id);
-                                      setReplyAsTutor(true);
-                                    }
-                                    setActiveTab('chats');
-                                  }}
-                                  className="inline-flex items-center gap-1 text-[9.5px] font-bold bg-orange-500 hover:bg-orange-600 text-white px-2 py-0.5 rounded-md transition-colors shadow-2xs cursor-pointer"
-                                  title={`Open live chat and send messages as assigned tutor (${tutor?.name || 'Tutor'})`}
-                                >
-                                  <MessageSquare className="w-2.5 h-2.5" />
-                                  <span>🎓 Chat as Tutor</span>
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    setQuickTextAssignId(quickTextAssignId === assign.id ? null : assign.id);
-                                    setQuickTextSuccess(null);
-                                    setQuickTextPersona(assign.tutorId ? 'tutor' : 'admin');
-                                  }}
-                                  className={`inline-flex items-center gap-1 text-[9.5px] font-bold px-2 py-0.5 rounded-md transition-colors shadow-2xs cursor-pointer border ${
-                                    quickTextAssignId === assign.id
-                                      ? 'bg-amber-600 text-white border-amber-600'
-                                      : 'bg-amber-50 hover:bg-amber-100 text-amber-800 border-amber-300'
-                                  }`}
-                                  title="Quick inline text sender: send text directly to student as Admin or Tutor with audio chime"
-                                >
-                                  <Send className="w-2.5 h-2.5" />
-                                  <span>⚡ Quick Text</span>
-                                </button>
-                              </div>
-                            </td>
-                            <td className="p-4">
-                              <span className="font-bold text-gray-800 block text-[11px]">{assign.subject}</span>
-                              <p className="text-[10.5px] text-gray-500 line-clamp-2 mt-0.5">{assign.instructions}</p>
-                              {assign.fileNames && assign.fileNames.length > 0 && (
-                                <div className="space-y-0.5 mt-1">
-                                  {assign.fileNames.map((fn, idx) => {
-                                    const url = (assign.fileUrls && assign.fileUrls[idx]) ? assign.fileUrls[idx] : `https://universitytutors.com/uploads/${encodeURIComponent(fn)}`;
-                                    return (
-                                      <a 
-                                        key={idx} 
-                                        href={url} 
-                                        target="_blank" 
-                                        rel="noreferrer" 
-                                        download 
-                                        className="inline-flex items-center gap-1 text-[9.5px] text-orange-600 hover:text-orange-800 font-bold underline mr-2 transition-colors cursor-pointer"
-                                        title={`Download ${fn}`}
-                                      >
-                                        📎 {fn}
-                                      </a>
-                                    );
-                                  })}
-                                </div>
-                              )}
-                            </td>
-                            <td className="p-4 font-sans">
-                              <span className={`inline-block px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-widest ${
-                                assign.status === AssignmentStatus.COMPLETED ? 'bg-emerald-100 text-emerald-800' :
-                                assign.status === AssignmentStatus.IN_PROGRESS ? 'bg-blue-100 text-blue-800' :
-                                'bg-amber-100 text-amber-800'
-                              }`}>{assign.status}</span>
-                              <span className="text-[10px] text-gray-500 font-bold block mt-1.5 font-mono">📅 {assign.deadline}</span>
-                            </td>
-                            <td className="p-4">
-                              <div className="flex flex-col gap-1.5">
-                                <span className="font-bold text-gray-900 text-xs block">Price: {assign.quoteAmount ? `$${assign.quoteAmount}` : 'Unpriced'}</span>
-                                <div className="flex gap-1 max-w-[120px]">
-                                  <input 
-                                    type="number"
-                                    id={`price-input-${assign.id}`}
-                                    placeholder="Amount ($)"
-                                    value={customPriceState[assign.id] || ''}
-                                    onChange={(e) => setCustomPriceState({...customPriceState, [assign.id]: e.target.value})}
-                                    className="w-full bg-gray-50 border py-1 px-1.5 text-[10.5px] font-bold rounded-lg focus:outline-none"
-                                  />
-                                  <button
-                                    onClick={async () => {
-                                      const p = parseFloat(customPriceState[assign.id]);
-                                      if (!isNaN(p)) {
-                                        await onSetAssignmentPrice(assign.id, p);
-                                        setCustomPriceState({...customPriceState, [assign.id]: ''});
-                                        alert(`Successfully set Assignment #${assign.id} quote price to $${p}!`);
-                                      }
-                                    }}
-                                    className="bg-gray-950 text-white rounded-lg px-2 hover:bg-orange-500 font-bold text-[10px] cursor-pointer"
-                                  >
-                                    Set
-                                  </button>
-                                </div>
-                              </div>
-                            </td>
-                            <td className="p-4 text-right">
-                              <div className="flex flex-col items-end gap-1.5">
-                                <span className="text-[11px] uppercase font-bold text-gray-500 mt-1 block">
-                                  Assigned: <b>{tutor ? tutor.name : '🚨 None'}</b>
-                                </span>
-                                <div className="flex gap-1 items-center flex-wrap justify-end">
-                                  <select
-                                    id={`tutor-select-${assign.id}`}
-                                    value={assignTutorState[assign.id] || assign.tutorId || ''}
-                                    onChange={(e) => setAssignTutorState({...assignTutorState, [assign.id]: e.target.value})}
-                                    className="bg-gray-55 border py-1 px-1.5 rounded-lg text-[10.5px] max-w-[150px] font-bold"
-                                  >
-                                    <option value="">-- Choose Tutor --</option>
-                                    {tutorsList.map(t => (
-                                      <option key={t.id} value={t.id}>{t.name} (★{t.rating})</option>
-                                    ))}
-                                  </select>
-                                  <button
-                                    onClick={async () => {
-                                      const tId = assignTutorState[assign.id] || assign.tutorId;
-                                      if (tId) {
-                                        await onAssignTutor(assign.id, tId);
-                                        const tName = tutorsList.find(ts => ts.id === tId)?.name || tId;
-                                        
-                                        // Auto-create/sync chat room with student and tutor
-                                        const studentIdentifier = student?.id || assign.studentId;
-                                        if (onGetOrCreateChat) {
-                                          const chat = onGetOrCreateChat(studentIdentifier, tId, assign.title);
-                                          onSendMessage(
-                                            chat.id,
-                                            currentUser.id,
-                                            `🎉 Hello! Tutor ${tName} has been assigned to coordinate "${assign.title}". You can now discuss requirements and milestones directly in this room.`
-                                          );
-                                        }
-
-                                        alert(`Assignment #${assign.id} has been successfully dispatched to Tutor ${tName}! Chat room synchronized.`);
-                                      }
-                                    }}
-                                    className="bg-orange-500 text-white font-bold text-[10px] px-2.5 py-1.5 rounded-lg hover:bg-orange-600 transition-all cursor-pointer shadow-xs"
-                                  >
-                                    Assign
-                                  </button>
-
-                                  {assign.tutorId && (
-                                    <button
-                                      type="button"
-                                      onClick={() => {
-                                        const studentIdentifier = student?.id || assign.studentId;
-                                        let targetChat = chats.find(c => c.studentId === studentIdentifier || c.studentId.toLowerCase() === studentEmail.toLowerCase());
-                                        if (!targetChat && onGetOrCreateChat) {
-                                          targetChat = onGetOrCreateChat(studentIdentifier, assign.tutorId!, assign.title);
-                                        }
-                                        if (targetChat) {
-                                          onSelectChat(targetChat);
-                                          setSelectedChatId(targetChat.id);
-                                        }
-                                        setActiveTab('chats');
-                                      }}
-                                      className="bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-[10px] px-2 py-1.5 rounded-lg transition-colors flex items-center gap-1 cursor-pointer border border-slate-200"
-                                      title="Open active chat room for this task"
-                                    >
-                                      <MessageSquare className="w-3 h-3 text-orange-600" />
-                                      <span>Chat</span>
-                                    </button>
-                                  )}
-                                </div>
-                              </div>
-                            </td>
-                          </tr>
-
-                          {/* Quick Inline Direct Text Dispatch Row */}
-                          {quickTextAssignId === assign.id && (
-                            <tr key={`quick-text-row-${assign.id}`} className="bg-amber-50/75 border-y-2 border-amber-300 animate-fade-in">
-                              <td colSpan={5} className="p-4">
-                                <div className="bg-white rounded-2xl border border-amber-200 p-4 shadow-sm space-y-3">
-                                  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 border-b pb-2.5">
-                                    <div>
-                                      <div className="flex items-center gap-2">
-                                        <span className="text-[10px] bg-amber-100 text-amber-800 font-bold px-2 py-0.5 rounded-full uppercase tracking-wider font-mono">
-                                          Direct Text Dispatcher
-                                        </span>
-                                        <span className="text-xs font-bold text-gray-900 font-sans">
-                                          Send message to: {studentName} ({studentEmail})
-                                        </span>
-                                      </div>
-                                      <p className="text-[10.5px] text-gray-500 mt-0.5">
-                                        Regarding brief: <span className="font-semibold text-gray-700">"{assign.title}"</span>
-                                      </p>
-                                    </div>
-
-                                    <div className="flex items-center gap-2">
-                                      <button
-                                        type="button"
-                                        onClick={() => audioNotifier.playReceivedSound()}
-                                        className="text-[10px] font-bold text-gray-600 hover:text-orange-600 bg-gray-50 hover:bg-orange-50 border border-gray-200 px-2 py-1 rounded-lg transition-colors cursor-pointer flex items-center gap-1"
-                                        title="Test melodic chime music"
-                                      >
-                                        <span>🎵 Test Chime Music</span>
-                                      </button>
-                                      <button
-                                        type="button"
-                                        onClick={() => {
-                                          setQuickTextAssignId(null);
-                                          setQuickTextMessage('');
-                                          setQuickTextSuccess(null);
-                                        }}
-                                        className="text-gray-400 hover:text-gray-600 font-bold p-1 rounded-full hover:bg-gray-100 cursor-pointer"
-                                        title="Close quick text box"
-                                      >
-                                        ✕
-                                      </button>
-                                    </div>
-                                  </div>
-
-                                  {/* Persona Selection */}
-                                  <div className="flex flex-wrap items-center gap-4 bg-gray-50 p-2.5 rounded-xl border border-gray-100 text-xs">
-                                    <span className="text-[10px] font-bold uppercase tracking-wide text-gray-500 font-mono">Choose Identity Persona:</span>
-                                    
-                                    <label className="inline-flex items-center gap-1.5 cursor-pointer font-bold select-none text-[11px]">
-                                      <input
-                                        type="radio"
-                                        name={`persona-${assign.id}`}
-                                        checked={quickTextPersona === 'admin'}
-                                        onChange={() => setQuickTextPersona('admin')}
-                                        className="accent-gray-900"
-                                      />
-                                      <span className={quickTextPersona === 'admin' ? 'text-gray-950 underline underline-offset-2 font-extrabold' : 'text-gray-500'}>
-                                        👑 Send as Platform Admin ({currentUser.name})
-                                      </span>
-                                    </label>
-
-                                    <label className="inline-flex items-center gap-1.5 cursor-pointer font-bold select-none text-[11px]">
-                                      <input
-                                        type="radio"
-                                        name={`persona-${assign.id}`}
-                                        checked={quickTextPersona === 'tutor'}
-                                        onChange={() => setQuickTextPersona('tutor')}
-                                        className="accent-orange-600"
-                                      />
-                                      <span className={quickTextPersona === 'tutor' ? 'text-orange-700 underline underline-offset-2 font-extrabold' : 'text-gray-500'}>
-                                        🎓 Send as Assigned Tutor ({tutor?.name || 'Dr. Clara Stirling'})
-                                      </span>
-                                    </label>
-                                  </div>
-
-                                  {/* Message Input & Dispatch */}
-                                  <div className="space-y-2">
-                                    <div className="flex gap-2">
-                                      <input
-                                        type="text"
-                                        value={quickTextMessage}
-                                        onChange={(e) => setQuickTextMessage(e.target.value)}
-                                        onKeyDown={async (e) => {
-                                          if (e.key === 'Enter' && !e.shiftKey) {
-                                            e.preventDefault();
-                                            if (!quickTextMessage.trim()) return;
-                                            const studentIdentifier = student?.id || assign.studentId;
-                                            const targetTutorId = assign.tutorId || 'tutor_clara';
-                                            let targetChat = chats.find(c => 
-                                              c.studentId === studentIdentifier || 
-                                              c.studentId.toLowerCase() === studentEmail.toLowerCase()
-                                            );
-                                            if (!targetChat && onGetOrCreateChat) {
-                                              targetChat = onGetOrCreateChat(studentIdentifier, targetTutorId, assign.title);
-                                            }
-                                            if (targetChat) {
-                                              const senderId = quickTextPersona === 'tutor' ? targetTutorId : currentUser.id;
-                                              await onSendMessage(targetChat.id, senderId, quickTextMessage.trim());
-                                              audioNotifier.playSentSound();
-                                              setQuickTextSuccess(`Text sent as ${quickTextPersona === 'tutor' ? (tutor?.name || 'Tutor') : 'Platform Admin'} to ${studentName}!`);
-                                              setQuickTextMessage('');
-                                            }
-                                          }
-                                        }}
-                                        placeholder={`Type text to student as ${quickTextPersona === 'tutor' ? (tutor?.name || 'Assigned Tutor') : 'Platform Admin'}... (press Enter to send)`}
-                                        className="flex-1 bg-white border border-gray-300 p-2.5 rounded-xl text-xs font-semibold focus:outline-none focus:border-orange-500 shadow-2xs"
-                                      />
-                                      <button
-                                        type="button"
-                                        disabled={!quickTextMessage.trim() || quickTextSending}
-                                        onClick={async () => {
-                                          if (!quickTextMessage.trim()) return;
-                                          setQuickTextSending(true);
-                                          try {
-                                            const studentIdentifier = student?.id || assign.studentId;
-                                            const targetTutorId = assign.tutorId || 'tutor_clara';
-                                            let targetChat = chats.find(c => 
-                                              c.studentId === studentIdentifier || 
-                                              c.studentId.toLowerCase() === studentEmail.toLowerCase()
-                                            );
-                                            if (!targetChat && onGetOrCreateChat) {
-                                              targetChat = onGetOrCreateChat(studentIdentifier, targetTutorId, assign.title);
-                                            }
-                                            if (targetChat) {
-                                              const senderId = quickTextPersona === 'tutor' ? targetTutorId : currentUser.id;
-                                              await onSendMessage(targetChat.id, senderId, quickTextMessage.trim());
-                                              audioNotifier.playSentSound();
-                                              setQuickTextSuccess(`Text sent as ${quickTextPersona === 'tutor' ? (tutor?.name || 'Tutor') : 'Platform Admin'} to ${studentName}!`);
-                                              setQuickTextMessage('');
-                                            }
-                                          } catch (err: any) {
-                                            alert(`Failed to send message: ${err.message || 'Error'}`);
-                                          } finally {
-                                            setQuickTextSending(false);
-                                          }
-                                        }}
-                                        className="bg-orange-500 hover:bg-orange-600 disabled:opacity-50 text-white font-bold text-xs px-4 py-2.5 rounded-xl transition-all shadow-sm flex items-center gap-1.5 cursor-pointer shrink-0"
-                                      >
-                                        <Send className="w-3.5 h-3.5" />
-                                        <span>{quickTextSending ? 'Sending...' : 'Send Text Now 🚀'}</span>
-                                      </button>
-                                    </div>
-
-                                    {/* Quick Presets */}
-                                    <div className="flex flex-wrap items-center gap-1.5 pt-1 text-[10px]">
-                                      <span className="text-gray-400 font-semibold">Templates:</span>
-                                      {[
-                                        "Hello! Your assignment brief has been reviewed and accepted. We are proceeding now.",
-                                        "Hi, please check your uploaded reference materials to verify page count.",
-                                        "Good news! Your tutor has submitted the first draft milestone for your review."
-                                      ].map((preset, pIdx) => (
-                                        <button
-                                          key={pIdx}
-                                          type="button"
-                                          onClick={() => setQuickTextMessage(preset)}
-                                          className="bg-gray-100 hover:bg-orange-50 hover:text-orange-700 text-gray-600 px-2 py-0.5 rounded-md border border-gray-200 transition-colors truncate max-w-[260px] cursor-pointer"
-                                          title={preset}
-                                        >
-                                          {preset}
-                                        </button>
-                                      ))}
-                                    </div>
-
-                                    {quickTextSuccess && (
-                                      <div className="p-2 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-lg text-xs font-bold flex items-center justify-between animate-fade-in">
-                                        <span>✅ {quickTextSuccess}</span>
-                                        <span className="text-[10px] text-emerald-600 font-mono">Chime music played</span>
-                                      </div>
-                                    )}
-                                  </div>
-                                </div>
-                              </td>
-                            </tr>
-                          )}
-                        </React.Fragment>
-                      );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            </div>
-          )}
+            return (
+              <AssignmentLedgerView
+                initialData={liveSubmissions}
+                tutorsList={availableTutorsList}
+                currentUser={currentUser}
+                users={users}
+                chats={chats}
+                onAssignTutor={onAssignTutor}
+                onSetAssignmentPrice={onSetAssignmentPrice}
+                onUpdateAssignmentStatus={onUpdateAssignmentStatus}
+                onSendMessage={onSendMessage}
+                onGetOrCreateChat={onGetOrCreateChat}
+                onSelectChat={onSelectChat}
+                setActiveTab={setActiveTab}
+                setSelectedChatId={setSelectedChatId}
+                setReplyAsTutor={setReplyAsTutor}
+                toStoreStatus={toStoreStatus}
+                onSeedMockStudentData={async () => {
+                  try {
+                    await store.addAssignment(
+                      "user_student_alex",
+                      "Deep Learning Project Architecture",
+                      "Machine Learning (Neural Networks)",
+                      "2026-11-20",
+                      "Need guidance with PyTorch implementation of transformer attention layers and hyperparameter optimization.",
+                      1500,
+                      "IEEE",
+                      5,
+                      [],
+                      ["DeepLearning_Architecture_Brief.pdf"],
+                      ""
+                    );
+                    await store.addAssignment(
+                      "user_student_emma",
+                      "CRISPR Genome Editing Protocol",
+                      "Biochemistry & Genetics",
+                      "2026-11-22",
+                      "Requires review of molecular biology experimental methodology and statistical analysis of assay findings.",
+                      2000,
+                      "APA 7th",
+                      8,
+                      [],
+                      ["CRISPR_Protocol_Brief.pdf"],
+                      ""
+                    );
+                    if (onRefreshData) {
+                      await onRefreshData();
+                    }
+                  } catch (e) {
+                    console.warn("Error seeding mock student data:", e);
+                  }
+                }}
+              />
+            );
+          })()}
 
           {/* PAYMENTS & INVOICES LEDGER VIEW */}
           {activeTab === 'payments_ledger' && (
