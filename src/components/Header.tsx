@@ -115,7 +115,7 @@ export default function Header({
               src="/logo.webp" 
               alt="Uni Tutors" 
               width={220}
-              height={73}
+              height={84}
               fetchPriority="high"
               decoding="async"
               className="h-10 sm:h-12 md:h-14 w-auto max-w-[220px] sm:max-w-[250px] object-contain transition-transform group-hover:scale-102"

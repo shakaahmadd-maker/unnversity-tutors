@@ -961,10 +961,15 @@ export default function AdminDashboard({
       )}
 
       {/* Grid: left admin sidebar / right control panels */}
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-8 items-start">
         
-        <div className="space-y-4">
-          <div className="bg-white rounded-2xl border border-gray-150 p-4 space-y-1">
+        {/* Left Sticky Admin Sidebar Navigation Panel */}
+        <aside 
+          id="admin-dashboard-sidebar"
+          aria-label="Admin Navigation Panel"
+          className="lg:col-span-1 lg:sticky lg:top-24 space-y-4 max-h-[calc(100vh-7rem)] overflow-y-auto overscroll-contain pr-1.5 [scrollbar-width:thin] [scrollbar-color:#e2e8f0_transparent] z-20"
+        >
+          <div className="bg-white rounded-2xl border border-gray-150 p-4 space-y-1 shadow-xs">
             <span className="text-[9px] font-bold text-gray-400 uppercase px-3 pb-1 block tracking-wider">Academics & Tutors</span>
             {[
               { id: 'student_profiles', label: 'Student Profiles Directory', icon: <GraduationCap className="w-4 h-4 text-orange-400" /> },
@@ -1077,10 +1082,10 @@ export default function AdminDashboard({
               </button>
             ))}
           </div>
-        </div>
+        </aside>
 
         {/* Content switch displays */}
-        <div className="lg:col-span-3 space-y-6">
+        <div className="lg:col-span-3 space-y-6 min-w-0">
           
           {/* STUDENT PROFILES DIRECTORY */}
           {activeTab === 'student_profiles' && (
