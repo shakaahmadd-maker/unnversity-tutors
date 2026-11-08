@@ -1142,9 +1142,9 @@ export default function MarketingPages({
                       </div>
 
                       <div className="relative z-10 space-y-2 py-4">
-                        <h4 className="font-heading text-lg font-black italic uppercase text-white tracking-tight">
+                        <p className="font-heading text-lg font-black italic uppercase text-white tracking-tight">
                           {sc.title} Live
-                        </h4>
+                        </p>
                         <p className="text-[11px] text-slate-300 leading-relaxed font-semibold">
                           Click to expand active student forums, explore pricing plans, or chat with native coordinators specialized in regional assignments.
                         </p>
@@ -1298,7 +1298,7 @@ export default function MarketingPages({
               {/* Header Section matching visual text structure exactly */}
               <div className="max-w-3xl mx-auto text-center mb-16 sm:mb-20">
                 <h2 className="text-4xl sm:text-5xl lg:text-6xl font-black tracking-tight leading-tight mb-6 uppercase">
-                  <span className="text-amber-500 italic block sm:inline mr-2">WHY CONSIDER</span>
+                  <span className="text-amber-500 italic block sm:inline mr-2">WHY CONSIDER</span>{' '}
                   <span className="italic font-extrabold text-slate-800 block sm:inline">ONLINE CLASS HELP?</span>
                 </h2>
                 <p className="font-sans text-base sm:text-lg text-gray-500 max-w-2xl mx-auto leading-relaxed">
@@ -1505,7 +1505,7 @@ export default function MarketingPages({
                 <h2 className="text-4xl sm:text-5xl lg:text-6xl font-black tracking-tight leading-tight uppercase select-none">
                   <span className="italic block sm:inline mr-3 text-amber-500 bg-clip-text">
                     WHY STUDENTS TRUST US
-                  </span>
+                  </span>{' '}
                   <span className="block sm:inline text-slate-900 font-extrabold">
                     FOR SUCCESS
                   </span>
@@ -1664,7 +1664,7 @@ export default function MarketingPages({
                         <Check className="w-4 h-4 text-orange-600 stroke-[3]" />
                       </div>
                       <div>
-                        <h4 className="font-bold text-sm text-gray-950 font-sans">{bullet.t}</h4>
+                        <h3 className="font-bold text-sm text-gray-950 font-sans">{bullet.t}</h3>
                         <p className="text-xs text-gray-600 leading-tight mt-0.5 text-justify">{bullet.d}</p>
                       </div>
                     </div>

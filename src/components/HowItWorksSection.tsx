@@ -233,11 +233,11 @@ export default function HowItWorksSection({ onNavigate }: HowItWorksSectionProps
                   1
                 </div>
                 <div className="text-left flex-1">
-                  <h4 className={`font-bold text-lg mb-1.5 transition-colors ${
+                  <h3 className={`font-bold text-lg mb-1.5 transition-colors ${
                     activeStage === 1 ? 'text-[#0B1528]' : 'text-slate-800'
                   }`}>
                     Get Started
-                  </h4>
+                  </h3>
                   <p className="text-xs text-slate-500 leading-relaxed font-semibold">
                     <strong className="text-emerald-700">You do:</strong> Choose project specs and estimate complexity.
                   </p>
@@ -271,11 +271,11 @@ export default function HowItWorksSection({ onNavigate }: HowItWorksSectionProps
                   2
                 </div>
                 <div className="text-left flex-1">
-                  <h4 className={`font-bold text-lg mb-1.5 transition-colors ${
+                  <h3 className={`font-bold text-lg mb-1.5 transition-colors ${
                     activeStage === 2 ? 'text-[#0B1528]' : 'text-slate-800'
                   }`}>
                     Get Matched
-                  </h4>
+                  </h3>
                   <p className="text-xs text-slate-500 leading-relaxed font-semibold">
                     <strong className="text-emerald-700">You do:</strong> Securely approve spec constraints and quotes.
                   </p>
@@ -493,11 +493,11 @@ export default function HowItWorksSection({ onNavigate }: HowItWorksSectionProps
                   3
                 </div>
                 <div className="text-left flex-1">
-                  <h4 className={`font-bold text-lg mb-1.5 transition-colors ${
+                  <h3 className={`font-bold text-lg mb-1.5 transition-colors ${
                     activeStage === 3 ? 'text-[#0B1528]' : 'text-slate-800'
                   }`}>
                     Expert Collaboration
-                  </h4>
+                  </h3>
                   <p className="text-xs text-slate-500 leading-relaxed font-semibold">
                     <strong className="text-emerald-700">You do:</strong> Discuss requirements in real-time &amp; evaluate mock draft templates.
                   </p>
@@ -530,11 +530,11 @@ export default function HowItWorksSection({ onNavigate }: HowItWorksSectionProps
                   4
                 </div>
                 <div className="text-left flex-1">
-                  <h4 className={`font-bold text-lg mb-1.5 transition-colors ${
+                  <h3 className={`font-bold text-lg mb-1.5 transition-colors ${
                     activeStage === 4 ? 'text-[#0B1528]' : 'text-slate-800'
                   }`}>
                     Approve &amp; Download
-                  </h4>
+                  </h3>
                   <p className="text-xs text-slate-500 leading-relaxed font-semibold">
                     <strong className="text-emerald-700">You do:</strong> Approve double-checked uniqueness metrics and download final assets.
                   </p>
