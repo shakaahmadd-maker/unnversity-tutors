@@ -14,6 +14,7 @@ import { eq, desc, and, inArray } from 'drizzle-orm';
 import { runMigrations } from './src/db/migrate';
 import { memoryStore } from './src/db/memoryStore';
 import { DEFAULT_20_BLOGS } from './src/data/defaultBlogsData';
+import { TRENDING_TUTORS_200 } from './src/data/trendingTutors200Data';
 
 // Configurable Environment Variables read from process.env
 const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
@@ -567,19 +568,24 @@ async function startServer() {
       // Combine map: seed tutors + memory store + dbUsers
       const userMap = new Map<string, any>();
 
-      // 1. Initial seed tutors
+      // 1. Trending 200 Tutors dataset from PDF
+      for (const t of TRENDING_TUTORS_200) {
+        userMap.set(t.id, t);
+      }
+
+      // 2. Initial seed tutors
       for (const t of SEED_TUTORS) {
         const { passwordHash: _, ...safeT } = t as any;
         userMap.set(t.id, safeT);
       }
 
-      // 2. Memory store users
+      // 3. Memory store users
       for (const u of memUsers) {
         const { passwordHash: _, ...safeU } = u as any;
         userMap.set(u.id, safeU);
       }
 
-      // 3. PostgreSQL database (authoritative for persisted records)
+      // 4. PostgreSQL database (authoritative for persisted records)
       for (const u of dbUsers) {
         const { passwordHash: _, ...safeU } = u as any;
         userMap.set(u.id, safeU);
@@ -588,6 +594,106 @@ async function startServer() {
       return res.status(200).json({ users: Array.from(userMap.values()) });
     } catch (err: any) {
       return res.status(200).json({ users: memoryStore.getAllUsers() });
+    }
+  });
+
+  // GET /api/tutors
+  // Query parameters: country, subject, max_price, search, page, limit
+  app.get('/api/tutors', async (req, res) => {
+    try {
+      const countryQuery = (req.query.country as string || '').toLowerCase().trim();
+      const subjectQuery = (req.query.subject as string || '').toLowerCase().trim();
+      const maxPriceQuery = req.query.max_price ? parseFloat(req.query.max_price as string) : undefined;
+      const searchQuery = (req.query.search as string || req.query.q as string || '').toLowerCase().trim();
+      const page = parseInt(req.query.page as string || '1', 10);
+      const limit = parseInt(req.query.limit as string || '50', 10);
+
+      const tutorMap = new Map<string, any>();
+
+      // 1. Trending 200 Tutors dataset
+      for (const t of TRENDING_TUTORS_200) {
+        tutorMap.set(t.id, t);
+      }
+
+      // 2. Initial seed tutors
+      for (const t of SEED_TUTORS) {
+        const { passwordHash: _, ...safeT } = t as any;
+        tutorMap.set(t.id, safeT);
+      }
+
+      // 3. In-memory / dynamic tutors
+      for (const u of memoryStore.getAllUsers()) {
+        if (u.role === 'tutor' || u.id.startsWith('tutor_') || u.id.startsWith('tutor-') || u.hourlyRate) {
+          const { passwordHash: _, ...safeU } = u as any;
+          tutorMap.set(u.id, safeU);
+        }
+      }
+
+      // 4. Database persisted tutors
+      if (isDbConnected && db) {
+        try {
+          const dbTutors = await db.select().from(users).where(eq(users.role, 'tutor'));
+          for (const u of dbTutors) {
+            const { passwordHash: _, ...safeU } = u as any;
+            tutorMap.set(u.id, safeU);
+          }
+        } catch (dbErr) {
+          console.warn('[API] db query error in /api/tutors:', dbErr);
+        }
+      }
+
+      let allTutors = Array.from(tutorMap.values());
+
+      // Filter by country (code or name)
+      if (countryQuery && countryQuery !== 'all') {
+        allTutors = allTutors.filter(t => {
+          const cCode = (t.country || '').toLowerCase();
+          const cName = (t.countryName || t.location || '').toLowerCase();
+          return cCode === countryQuery || cName.includes(countryQuery);
+        });
+      }
+
+      // Filter by subject
+      if (subjectQuery && subjectQuery !== 'all') {
+        allTutors = allTutors.filter(t => {
+          const subs = Array.isArray(t.subjects) ? t.subjects : (typeof t.subjects === 'string' ? JSON.parse(t.subjects || '[]') : []);
+          const exp = Array.isArray(t.subjectExpertise) ? t.subjectExpertise : (typeof t.subjectExpertise === 'string' ? JSON.parse(t.subjectExpertise || '[]') : []);
+          const allSubs = [...subs, ...exp].map(s => String(s).toLowerCase());
+          return allSubs.some(s => s.includes(subjectQuery));
+        });
+      }
+
+      // Filter by max_price
+      if (maxPriceQuery !== undefined && !isNaN(maxPriceQuery)) {
+        allTutors = allTutors.filter(t => (t.hourlyRate || 0) <= maxPriceQuery);
+      }
+
+      // Filter by general search term
+      if (searchQuery) {
+        allTutors = allTutors.filter(t => {
+          const nameMatch = (t.name || '').toLowerCase().includes(searchQuery);
+          const eduMatch = (t.education || '').toLowerCase().includes(searchQuery);
+          const bioMatch = (t.bio || t.experience || '').toLowerCase().includes(searchQuery);
+          const subs = Array.isArray(t.subjectExpertise) ? t.subjectExpertise.join(' ').toLowerCase() : '';
+          return nameMatch || eduMatch || bioMatch || subs.includes(searchQuery);
+        });
+      }
+
+      const total = allTutors.length;
+      const startIndex = (page - 1) * limit;
+      const paginatedTutors = allTutors.slice(startIndex, startIndex + limit);
+
+      return res.status(200).json({
+        success: true,
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit),
+        tutors: paginatedTutors
+      });
+    } catch (err: any) {
+      console.error('[API] Error in GET /api/tutors:', err);
+      return res.status(500).json({ error: 'Failed to retrieve tutors' });
     }
   });
 

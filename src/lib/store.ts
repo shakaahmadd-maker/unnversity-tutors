@@ -21,6 +21,7 @@ import {
 } from '../types';
 import { DEFAULT_20_BLOGS } from '../data/defaultBlogsData';
 import { CURATED_SPECIALIZED_TUTORS } from '../data/tutorsDirectoryData';
+import { TRENDING_TUTORS_200 } from '../data/trendingTutors200Data';
 
 // Standard Initial Mock Data
 const INITIAL_TUTORS: User[] = [
@@ -170,6 +171,7 @@ export class AppStore {
   users: User[] = [
     ...INITIAL_TUTORS,
     ...CURATED_SPECIALIZED_TUTORS,
+    ...TRENDING_TUTORS_200,
     {
       id: 'student_alex',
       role: UserRole.STUDENT,

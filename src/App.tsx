@@ -25,6 +25,7 @@ import ChatNotificationToast from './components/ChatNotificationToast';
 import { audioNotifier, ToastNotification } from './utils/audioNotification';
 import { COUNTRY_ONLINE_TUTORING_PAGES } from './data/countryOnlineTutoringData';
 import { SPECIALIZED_SERVICE_PAGES_MAP } from './data/specializedTutoringServicesData';
+import { updatePageSeo } from './utils/seo';
 
 import { store } from './lib/store';
 import { UserRole, Chat, User, Assignment, Payment, Invoice, ActivityLog, AppNotification, SOP, AssignmentReport, Agreement } from './types';
@@ -131,6 +132,62 @@ export default function App() {
     }, 10000);
     return () => clearTimeout(timer);
   }, [activeView, selectedTutorProfile]);
+
+  // Automated Technical SEO: Canonicalization, parameter stripping, and dynamic metadata sync
+  useEffect(() => {
+    let title = 'University Tutors - Expert Academic Mentorship & Tutoring';
+    let description = 'Verified 1-on-1 expert academic tutoring, assignment guidance, coursework support, and study consultations across major universities.';
+    let canonicalPath = '/';
+
+    if (activeView === 'country-online-tutoring') {
+      const pageData = COUNTRY_ONLINE_TUTORING_PAGES[activeCountryTutoringSlug];
+      if (pageData) {
+        title = pageData.seoTitle || pageData.h1;
+        description = pageData.paragraphs?.[0] || description;
+        canonicalPath = `/online-tutoring-${activeCountryTutoringSlug}`;
+      }
+    } else if (activeView === 'specialized-service') {
+      const sPage = SPECIALIZED_SERVICE_PAGES_MAP[activeSpecializedServiceSlug] || SPECIALIZED_SERVICE_PAGES_MAP['/' + activeSpecializedServiceSlug];
+      if (sPage) {
+        title = sPage.seoTitle || sPage.h1;
+        description = sPage.summary || description;
+        canonicalPath = `/${activeSpecializedServiceSlug}`;
+      }
+    } else if (activeView === 'services') {
+      title = 'Academic Tutoring Services - University Tutors';
+      canonicalPath = '/services';
+    } else if (activeView === 'about') {
+      title = 'About Us - University Tutors Founding Mission';
+      canonicalPath = '/about-us';
+    } else if (activeView === 'faqs') {
+      title = 'Frequently Asked Questions - University Tutors';
+      canonicalPath = '/faqs';
+    } else if (activeView === 'contact') {
+      title = 'Contact Advising Team - University Tutors';
+      canonicalPath = '/contact-us';
+    } else if (activeView === 'blog') {
+      title = 'Academic Integrity Blog & Study Guides - University Tutors';
+      canonicalPath = '/our-blog';
+    } else if (activeView === 'tutors-directory') {
+      title = 'Find Verified University Mentors & Tutors - University Tutors';
+      canonicalPath = '/tutors-directory';
+    } else if (activeView === 'get-a-quote') {
+      title = 'Get a Binding Milestone Quote - University Tutors';
+      canonicalPath = '/get-a-quote';
+    } else if (activeView === 'privacy') {
+      title = 'Privacy Policy & Data Compliance - University Tutors';
+      canonicalPath = '/privacy';
+    } else if (activeView === 'terms') {
+      title = 'Terms of Service & Escrow Safeguards - University Tutors';
+      canonicalPath = '/terms';
+    }
+
+    updatePageSeo({
+      title,
+      description,
+      canonicalPath
+    });
+  }, [activeView, activeCountryTutoringSlug, activeSpecializedServiceSlug]);
 
   useEffect(() => {
     // Sync React state on any store notify() pattern

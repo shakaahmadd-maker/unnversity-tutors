@@ -67,7 +67,10 @@ export default function TutorsListAdmin({
   });
 
   const [statusFilter, setStatusFilter] = useState<'all' | 'pending' | 'approved' | 'rejected'>('all');
+  const [adminCountryFilter, setAdminCountryFilter] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
+  const [adminPage, setAdminPage] = useState<number>(1);
+  const adminPageSize = 25;
 
   // Modals state
   const [selectedTutorForDetail, setSelectedTutorForDetail] = useState<User | null>(null);
@@ -168,6 +171,13 @@ export default function TutorsListAdmin({
     if (statusFilter === 'approved' && !isApproved) return false;
     if (statusFilter === 'rejected' && !isRejected) return false;
 
+    if (adminCountryFilter !== 'all') {
+      const cCode = (tutor.country || '').toLowerCase();
+      const cLoc = ((tutor as any).countryName || tutor.location || tutor.city || '').toLowerCase();
+      const target = adminCountryFilter.toLowerCase();
+      if (cCode !== target && !cLoc.includes(target)) return false;
+    }
+
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase().trim();
       const matchName = (tutor.name || '').toLowerCase().includes(q);
@@ -181,12 +191,15 @@ export default function TutorsListAdmin({
       const matchSub = subStr.toLowerCase().includes(q);
       const matchHob = (tutor.hobbies || '').toLowerCase().includes(q);
       const matchCountry = (tutor.country || '').toLowerCase().includes(q);
-      const matchLoc = (tutor.location || tutor.city || '').toLowerCase().includes(q);
+      const matchLoc = (tutor.location || tutor.city || (tutor as any).countryName || '').toLowerCase();
       return matchName || matchEmail || matchBio || matchEdu || matchExp || matchSub || matchHob || matchCountry || matchLoc;
     }
 
     return true;
   });
+
+  const totalAdminPages = Math.ceil(filteredTutors.length / adminPageSize) || 1;
+  const paginatedTutors = filteredTutors.slice((adminPage - 1) * adminPageSize, adminPage * adminPageSize);
 
   const showNotification = (msg: string) => {
     setActionSuccessMsg(msg);
@@ -427,16 +440,40 @@ export default function TutorsListAdmin({
             </button>
           </div>
 
-          {/* Search Box */}
-          <div className="relative w-full md:w-72">
-            <Search className="w-4 h-4 absolute left-3 top-3 text-slate-400" />
-            <input
-              type="text"
-              placeholder="Search by name, subject, bio..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-9 pr-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:border-orange-500 outline-none transition-all"
-            />
+          {/* Country Filter & Search Box */}
+          <div className="flex flex-col sm:flex-row items-center gap-2.5 w-full md:w-auto">
+            <select
+              value={adminCountryFilter}
+              onChange={(e) => {
+                setAdminCountryFilter(e.target.value);
+                setAdminPage(1);
+              }}
+              className="text-xs bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 font-semibold text-slate-700 outline-none focus:border-orange-500 cursor-pointer w-full sm:w-auto"
+            >
+              <option value="all">🌍 All Countries ({allTutors.length})</option>
+              <option value="US">🇺🇸 USA</option>
+              <option value="GB">🇬🇧 UK</option>
+              <option value="AU">🇦🇺 Australia</option>
+              <option value="CA">🇨🇦 Canada</option>
+              <option value="SG">🇸🇬 Singapore</option>
+              <option value="IE">🇮🇪 Ireland</option>
+              <option value="NZ">🇳🇿 New Zealand</option>
+              <option value="AE">🇦🇪 UAE</option>
+            </select>
+
+            <div className="relative w-full sm:w-64">
+              <Search className="w-4 h-4 absolute left-3 top-3 text-slate-400" />
+              <input
+                type="text"
+                placeholder="Search name, subject, bio..."
+                value={searchQuery}
+                onChange={(e) => {
+                  setSearchQuery(e.target.value);
+                  setAdminPage(1);
+                }}
+                className="w-full pl-9 pr-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:border-orange-500 outline-none transition-all"
+              />
+            </div>
           </div>
         </div>
 
@@ -449,7 +486,7 @@ export default function TutorsListAdmin({
           </div>
         ) : (
           <div className="grid grid-cols-1 gap-4">
-            {filteredTutors.map((tutor) => {
+            {paginatedTutors.map((tutor) => {
               const isPending = tutor.status === 'pending' || (tutor.isApproved === false && tutor.status !== 'rejected');
               const isApproved = tutor.isApproved === true || tutor.status === 'approved' || (tutor.isApproved === undefined && tutor.status === undefined);
               const isRejected = tutor.status === 'rejected';
@@ -643,6 +680,45 @@ export default function TutorsListAdmin({
                 </div>
               );
             })}
+          </div>
+        )}
+
+        {/* Admin Pagination Controls */}
+        {totalAdminPages > 1 && (
+          <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-3 mt-4">
+            <span className="text-xs text-slate-500 font-medium">
+              Showing <strong className="text-slate-800">{(adminPage - 1) * adminPageSize + 1}</strong> to <strong className="text-slate-800">{Math.min(adminPage * adminPageSize, filteredTutors.length)}</strong> of <strong className="text-slate-800">{filteredTutors.length}</strong> tutors
+            </span>
+
+            <div className="flex items-center gap-2">
+              <button
+                disabled={adminPage === 1}
+                onClick={() => setAdminPage(prev => Math.max(prev - 1, 1))}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition-all ${
+                  adminPage === 1 
+                    ? 'text-slate-300 border-slate-200 cursor-not-allowed bg-white' 
+                    : 'text-slate-700 border-slate-200 hover:bg-white cursor-pointer shadow-xs'
+                }`}
+              >
+                Previous
+              </button>
+
+              <span className="text-xs font-bold text-slate-700 px-2">
+                Page {adminPage} / {totalAdminPages}
+              </span>
+
+              <button
+                disabled={adminPage === totalAdminPages}
+                onClick={() => setAdminPage(prev => Math.min(prev + 1, totalAdminPages))}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition-all ${
+                  adminPage === totalAdminPages 
+                    ? 'text-slate-300 border-slate-200 cursor-not-allowed bg-white' 
+                    : 'text-slate-700 border-slate-200 hover:bg-white cursor-pointer shadow-xs'
+                }`}
+              >
+                Next
+              </button>
+            </div>
           </div>
         )}
       </div>

@@ -7,6 +7,71 @@
     <meta name="theme-color" content="#EA580C" />
     <meta name="description" content="University Tutors - Verified 1-on-1 expert academic tutoring, assignment guidance, coursework support, and study consultations across major universities." />
     
+    <!-- Canonical URL (Parameter-stripped clean target) -->
+    <link rel="canonical" href="https://university-tutors.com/" id="canonical-url" />
+
+    <!-- Hreflang Alternate Regional Links -->
+    <link rel="alternate" hreflang="x-default" href="https://university-tutors.com/" />
+    <link rel="alternate" hreflang="en" href="https://university-tutors.com/" />
+    <link rel="alternate" hreflang="en-US" href="https://university-tutors.com/" />
+    <link rel="alternate" hreflang="en-GB" href="https://university-tutors.com/online-tutoring-uk" />
+    <link rel="alternate" hreflang="en-CA" href="https://university-tutors.com/online-tutoring-canada" />
+    <link rel="alternate" hreflang="en-AU" href="https://university-tutors.com/online-tutoring-australia" />
+    <link rel="alternate" hreflang="en-NZ" href="https://university-tutors.com/online-tutoring-new-zealand" />
+    <link rel="alternate" hreflang="en-SG" href="https://university-tutors.com/online-tutoring-singapore" />
+    <link rel="alternate" hreflang="en-IE" href="https://university-tutors.com/online-tutoring-ireland" />
+    <link rel="alternate" hreflang="en-AE" href="https://university-tutors.com/online-tutoring-uae" />
+
+    <!-- OpenGraph Social Cards -->
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="University Tutors" />
+    <meta property="og:url" content="https://university-tutors.com/" />
+    <meta property="og:title" content="University Tutors - Expert Academic Mentorship & Tutoring" />
+    <meta property="og:description" content="Verified 1-on-1 expert academic tutoring, assignment guidance, coursework support, and study consultations across major universities." />
+    <meta property="og:image" content="https://university-tutors.com/logo.webp" />
+
+    <!-- Twitter Social Cards -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:site" content="@UniversityTutors" />
+    <meta name="twitter:title" content="University Tutors - Expert Academic Mentorship & Tutoring" />
+    <meta name="twitter:description" content="Verified 1-on-1 expert academic tutoring, assignment guidance, coursework support, and study consultations across major universities." />
+    <meta name="twitter:image" content="https://university-tutors.com/logo.webp" />
+
+    <!-- Schema.org JSON-LD Structured Data -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@graph": [
+        {
+          "@type": "EducationalOrganization",
+          "@id": "https://university-tutors.com/#organization",
+          "name": "University Tutors",
+          "url": "https://university-tutors.com/",
+          "logo": "https://university-tutors.com/logo.webp",
+          "description": "Verified 1-on-1 expert academic tutoring, assignment guidance, coursework support, and study consultations across major universities.",
+          "sameAs": [
+            "https://twitter.com/UniversityTutors",
+            "https://linkedin.com/company/university-tutors"
+          ]
+        },
+        {
+          "@type": "WebSite",
+          "@id": "https://university-tutors.com/#website",
+          "url": "https://university-tutors.com/",
+          "name": "University Tutors",
+          "publisher": {
+            "@id": "https://university-tutors.com/#organization"
+          },
+          "potentialAction": {
+            "@type": "SearchAction",
+            "target": "https://university-tutors.com/?q={search_term_string}",
+            "query-input": "required name=search_term_string"
+          }
+        }
+      ]
+    }
+    </script>
+
     <!-- DNS and SSL preconnects -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -23,10 +88,16 @@
     <link rel="icon" type="image/x-icon" href="/favicon.ico" />
     <link rel="shortcut icon" href="/favicon.ico" />
     <link rel="apple-touch-icon" href="/logo.webp" />
-    <title>Uni tutors - Expert Academic Mentorship &amp; Tutoring</title>
+    <title>University Tutors - Expert Academic Mentorship & Tutoring</title>
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root">
+      <!-- Semantic crawler fallback matching client-rendered H1 -->
+      <header style="position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;">
+        <h1>Expert Tutors for Every University Subject Online, On-Demand</h1>
+        <p>Verified 1-on-1 expert academic tutoring, assignment guidance, coursework support, and study consultations across major universities.</p>
+      </header>
+    </div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
