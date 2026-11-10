@@ -22,7 +22,7 @@ import {
   X
 } from 'lucide-react';
 import { User } from '../types';
-import { TRENDING_TUTORS_200 } from '../data/trendingTutors200Data';
+import { TRENDING_TUTORS_500, TRENDING_TUTORS_200 } from '../data/trendingTutors500Data';
 import { getRelevantKeywordsForTutor } from '../data/subjectKeywordsData';
 
 interface TutorsDirectoryPageProps {
@@ -35,33 +35,53 @@ interface TutorsDirectoryPageProps {
 }
 
 const COUNTRY_OPTIONS = [
-  { label: 'All Countries', value: 'all', count: 200, flag: '🌍' },
-  { label: 'USA', value: 'USA', code: 'US', count: 100, flag: '🇺🇸' },
-  { label: 'United Kingdom', value: 'UK', code: 'GB', count: 20, flag: '🇬🇧' },
-  { label: 'Australia', value: 'Australia', code: 'AU', count: 18, flag: '🇦🇺' },
-  { label: 'Canada', value: 'Canada', code: 'CA', count: 15, flag: '🇨🇦' },
-  { label: 'Singapore', value: 'Singapore', code: 'SG', count: 15, flag: '🇸🇬' },
-  { label: 'Ireland', value: 'Ireland', code: 'IE', count: 12, flag: '🇮🇪' },
-  { label: 'New Zealand', value: 'New Zealand', code: 'NZ', count: 10, flag: '🇳🇿' },
-  { label: 'UAE', value: 'UAE', code: 'AE', count: 10, flag: '🇦🇪' },
+  { label: 'All Countries', value: 'all', count: 500, flag: '🌍' },
+  { label: 'USA', value: 'USA', code: 'US', count: 210, flag: '🇺🇸' },
+  { label: 'United Kingdom', value: 'UK', code: 'GB', count: 55, flag: '🇬🇧' },
+  { label: 'Australia', value: 'Australia', code: 'AU', count: 50, flag: '🇦🇺' },
+  { label: 'Canada', value: 'Canada', code: 'CA', count: 45, flag: '🇨🇦' },
+  { label: 'Singapore', value: 'Singapore', code: 'SG', count: 45, flag: '🇸🇬' },
+  { label: 'Ireland', value: 'Ireland', code: 'IE', count: 35, flag: '🇮🇪' },
+  { label: 'New Zealand', value: 'New Zealand', code: 'NZ', count: 30, flag: '🇳🇿' },
+  { label: 'UAE', value: 'UAE', code: 'AE', count: 30, flag: '🇦🇪' },
 ];
 
 const HIGH_DEMAND_SUBJECTS = [
   'All Subjects',
+  'Calculus',
+  'Data Science',
   'Artificial Intelligence',
+  'Web Development',
+  'Visual Arts (Drawing, Painting, Sculpture)',
+  'Cultural Studies',
+  'Environmental Science',
+  'Debate',
+  'Accounting',
+  'Agriculture',
+  'Genetics',
+  'Ethics',
+  'Information Technology',
+  'Health Education',
+  'Business Studies',
+  'Business Math',
+  'Physics',
+  'Psychology (AP/advanced)',
   'Generative AI',
   'Large Language Models (LLM)',
-  'Deep Learning',
-  'Neural Networks',
-  'Python & PyTorch',
-  'Data Science & Analytics',
-  'Full-Stack Software Engineering',
-  'Cloud Computing & DevOps',
   'Cybersecurity & Ethical Hacking',
-  'Quantitative Finance & Algorithmic Trading',
-  'Biomedical Engineering',
-  'Reinforcement Learning'
+  'Biomedical Engineering'
 ];
+
+export function getFallbackAvatar(name: string): string {
+  const initials = (name || 'Tutor')
+    .replace(/^(Dr\.|Prof\.|Mr\.|Ms\.|Mrs\.)\s+/i, '')
+    .split(' ')
+    .filter(Boolean)
+    .slice(0, 2)
+    .map(p => p[0].toUpperCase())
+    .join('') || 'UT';
+  return `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="120" height="120" viewBox="0 0 120 120"><rect width="120" height="120" rx="24" fill="%23FFF7ED"/><text x="50%" y="54%" font-family="system-ui, -apple-system, sans-serif" font-size="40" font-weight="800" fill="%23FF7A00" dominant-baseline="middle" text-anchor="middle">${initials}</text></svg>`;
+}
 
 export default function TutorsDirectoryPage({
   locationFilter,
@@ -74,17 +94,17 @@ export default function TutorsDirectoryPage({
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCountry, setSelectedCountry] = useState<string>('all');
   const [selectedSubject, setSelectedSubject] = useState<string>(subjectFilter || 'All Subjects');
-  const [maxPrice, setMaxPrice] = useState<number>(120);
+  const [maxPrice, setMaxPrice] = useState<number>(180);
   const [sortBy, setSortBy] = useState<'rating' | 'reviews' | 'price_low' | 'price_high'>('rating');
   const [currentPage, setCurrentPage] = useState<number>(1);
   const [showMobileFilters, setShowMobileFilters] = useState<boolean>(false);
   const pageSize = 15;
 
-  // Unify 200 international tutors with any extra store tutors
+  // Unify 500 international tutors with any extra store tutors
   const unifiedTutors = useMemo(() => {
     const map = new Map<string, User>();
-    // First seed the 200 trending tutors
-    TRENDING_TUTORS_200.forEach(t => map.set(t.id, t as User));
+    // Seed the 500 trending master tutors
+    TRENDING_TUTORS_500.forEach(t => map.set(t.id, (t as unknown) as User));
     // Then combine store tutors (override or add)
     allStoreTutors.forEach(st => {
       if (st.isApproved !== false) {
@@ -94,24 +114,35 @@ export default function TutorsDirectoryPage({
     return Array.from(map.values());
   }, [allStoreTutors]);
 
+  // Extract all distinct primary subjects across all tutors
+  const allDistinctPrimarySubjects = useMemo(() => {
+    const set = new Set<string>();
+    unifiedTutors.forEach(t => {
+      const ps = (t as any).primarySubject;
+      if (ps) set.add(ps);
+    });
+    return Array.from(set).sort();
+  }, [unifiedTutors]);
+
   // Filter list based on country, subject, maxPrice, and search query
   const filteredTutors = useMemo(() => {
     return unifiedTutors.filter(t => {
       // 1. Country Filter
       if (selectedCountry !== 'all') {
         const cCode = (t.country || '').toLowerCase();
-        const cName = ((t as any).countryName || t.location || '').toLowerCase();
+        const cName = ((t as any).countryName || (t as any).countryFull || t.location || '').toLowerCase();
         const target = selectedCountry.toLowerCase();
         const matchesCountry = cCode === target || cName.includes(target);
         if (!matchesCountry) return false;
       }
 
-      // 2. Subject Filter
+      // 2. Subject Filter (checks primarySubject first, then subjectExpertise and subjects)
       if (selectedSubject !== 'All Subjects') {
+        const targetSub = selectedSubject.toLowerCase();
+        const primSub = String((t as any).primarySubject || '').toLowerCase();
         const subs = Array.isArray(t.subjects) ? t.subjects : (t.subjectExpertise || []);
         const exp = (t as any).subjectExpertise || [];
-        const combined = [...subs, ...exp].map(s => String(s).toLowerCase());
-        const targetSub = selectedSubject.toLowerCase();
+        const combined = [primSub, ...subs, ...exp].map(s => String(s).toLowerCase());
         const matchesSubject = combined.some(s => s.includes(targetSub));
         if (!matchesSubject) return false;
       }
@@ -127,8 +158,11 @@ export default function TutorsDirectoryPage({
         const subExp = Array.isArray(t.subjectExpertise) ? t.subjectExpertise.join(' ') : String(t.subjectExpertise || '');
         const combinedSearchSpace = [
           t.name,
+          (t as any).primarySubject || '',
+          (t as any).tutorTier || '',
           t.location || '',
-          (t as any).countryName || '',
+          (t as any).countryName || (t as any).countryFull || '',
+          t.country || '',
           t.education || '',
           t.experience || '',
           t.bio || '',
@@ -138,6 +172,7 @@ export default function TutorsDirectoryPage({
 
         if (!combinedSearchSpace.includes(term)) return false;
       }
+
 
       return true;
     });
@@ -185,7 +220,7 @@ export default function TutorsDirectoryPage({
             <div className="flex items-center gap-2">
               <span className="text-[11px] font-bold uppercase tracking-wider text-orange-600 bg-orange-50 px-3 py-1 rounded-full border border-orange-200/80 flex items-center gap-1.5">
                 <Sparkles className="w-3.5 h-3.5 text-[#FF7A00]" />
-                Global Trending Faculty &amp; Tutors (200 Specialists)
+                Global Master Faculty &amp; Tutors (500 Specialists)
               </span>
               <span className="text-xs text-slate-400">•</span>
               <span className="text-xs font-semibold text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200">
@@ -196,7 +231,7 @@ export default function TutorsDirectoryPage({
               Find Expert <span className="text-[#FF7A00]">University Tutors</span>
             </h1>
             <p className="text-xs sm:text-sm text-slate-500 font-medium max-w-2xl leading-relaxed">
-              Explore 200 vetted professors, PhD mentors, and research advisors across USA, UK, Australia, Canada, Singapore, Ireland, New Zealand, and UAE. Specializing in trending AI, Generative Models, Machine Learning, and Engineering.
+              Explore 500 vetted professors, PhD mentors, and executive academic chairs across USA (210), UK (55), Australia (50), Canada (45), Singapore (45), Ireland (35), New Zealand (30), and UAE (30). Master tutors and senior experts with direct subject specialization.
             </p>
           </div>
 
@@ -313,7 +348,7 @@ export default function TutorsDirectoryPage({
               {/* 3. Subject Filter */}
               <div className="space-y-2">
                 <label className="text-xs font-bold uppercase tracking-wider text-slate-500 block">
-                  Trending Subject
+                  Subject Specialization
                 </label>
                 <select
                   value={selectedSubject}
@@ -323,9 +358,17 @@ export default function TutorsDirectoryPage({
                   }}
                   className="w-full py-2.5 px-3 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:border-[#FF7A00] focus:bg-white outline-none font-medium cursor-pointer"
                 >
-                  {HIGH_DEMAND_SUBJECTS.map((sub) => (
-                    <option key={sub} value={sub}>{sub}</option>
-                  ))}
+                  <option value="All Subjects">All Subjects (500 Tutors)</option>
+                  <optgroup label="High Demand Subjects">
+                    {HIGH_DEMAND_SUBJECTS.filter(s => s !== 'All Subjects').map((sub) => (
+                      <option key={sub} value={sub}>{sub}</option>
+                    ))}
+                  </optgroup>
+                  <optgroup label="All Direct Primary Subjects (77 Disciplines)">
+                    {allDistinctPrimarySubjects.map((sub) => (
+                      <option key={`prim-${sub}`} value={sub}>{sub}</option>
+                    ))}
+                  </optgroup>
                 </select>
               </div>
 
@@ -341,8 +384,8 @@ export default function TutorsDirectoryPage({
                 </div>
                 <input
                   type="range"
-                  min="50"
-                  max="120"
+                  min="40"
+                  max="180"
                   step="5"
                   value={maxPrice}
                   onChange={(e) => {
@@ -352,9 +395,9 @@ export default function TutorsDirectoryPage({
                   className="w-full accent-[#FF7A00] cursor-pointer"
                 />
                 <div className="flex justify-between text-[10px] text-slate-400 font-medium">
-                  <span>$50/hr</span>
-                  <span>$85/hr</span>
-                  <span>$120/hr</span>
+                  <span>$40/hr</span>
+                  <span>$110/hr</span>
+                  <span>$180/hr</span>
                 </div>
               </div>
 
@@ -411,9 +454,16 @@ export default function TutorsDirectoryPage({
                       {/* Avatar with Verified Status */}
                       <div className="relative shrink-0">
                         <img
-                          src={tutor.avatarUrl || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200&auto=format&fit=crop&q=80'}
+                          src={tutor.avatarUrl || getFallbackAvatar(tutor.name)}
                           alt={tutor.name}
-                          className="w-20 h-20 sm:w-24 sm:h-24 rounded-2xl object-cover border border-slate-200 shadow-xs"
+                          loading="lazy"
+                          decoding="async"
+                          referrerPolicy="no-referrer"
+                          onError={(e) => {
+                            e.currentTarget.onerror = null;
+                            e.currentTarget.src = getFallbackAvatar(tutor.name);
+                          }}
+                          className="w-20 h-20 sm:w-24 sm:h-24 rounded-2xl object-cover border border-slate-200 shadow-xs bg-orange-50/50"
                         />
                         <span className="absolute -bottom-2 -right-1 bg-emerald-600 text-white text-[9.5px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1 shadow-sm">
                           <ShieldCheck className="w-3 h-3" />
@@ -425,7 +475,7 @@ export default function TutorsDirectoryPage({
                       <div className="flex-1 space-y-3">
                         <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-2">
                           <div>
-                            <div className="flex items-center gap-2">
+                            <div className="flex flex-wrap items-center gap-2">
                               <h2
                                 onClick={() => onSelectTutorProfile(tutor)}
                                 className="text-xl font-bold text-slate-900 hover:text-[#FF7A00] transition-colors cursor-pointer"
@@ -435,6 +485,26 @@ export default function TutorsDirectoryPage({
                               <span className="text-base" title={countryName}>
                                 {flagEmoji}
                               </span>
+
+                              {/* Tutor Tier Badge */}
+                              {((tutor as any).tutorTier || (tutor as any).isMasterTutor) && (
+                                <span className={`text-[10px] font-extrabold uppercase tracking-wider px-2.5 py-0.5 rounded-full border flex items-center gap-1 ${
+                                  (tutor as any).isMasterTutor || ((tutor as any).tutorTier || '').includes('Master')
+                                    ? 'bg-amber-50 text-amber-900 border-amber-300 font-semibold shadow-2xs'
+                                    : 'bg-slate-100 text-slate-700 border-slate-200'
+                                }`}>
+                                  <Sparkles className="w-3 h-3 text-amber-500" />
+                                  {(tutor as any).tutorTier || 'Verified Expert'}
+                                </span>
+                              )}
+
+                              {/* Primary Direct Subject Badge */}
+                              {(tutor as any).primarySubject && (
+                                <span className="text-[10.5px] font-bold text-[#FF7A00] bg-orange-50 border border-orange-200 px-2.5 py-0.5 rounded-full flex items-center gap-1">
+                                  <Tag className="w-3 h-3 text-[#FF7A00]" />
+                                  <span>{(tutor as any).primarySubject}</span>
+                                </span>
+                              )}
                             </div>
                             
                             <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1 text-xs text-slate-500 font-medium">

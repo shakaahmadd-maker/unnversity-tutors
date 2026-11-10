@@ -21,7 +21,7 @@ import {
 } from '../types';
 import { DEFAULT_20_BLOGS } from '../data/defaultBlogsData';
 import { CURATED_SPECIALIZED_TUTORS } from '../data/tutorsDirectoryData';
-import { TRENDING_TUTORS_200 } from '../data/trendingTutors200Data';
+import { TRENDING_TUTORS_500, TRENDING_TUTORS_200 } from '../data/trendingTutors500Data';
 
 // Standard Initial Mock Data
 const INITIAL_TUTORS: User[] = [
@@ -171,7 +171,7 @@ export class AppStore {
   users: User[] = [
     ...INITIAL_TUTORS,
     ...CURATED_SPECIALIZED_TUTORS,
-    ...TRENDING_TUTORS_200,
+    ...((TRENDING_TUTORS_500 as unknown) as User[]),
     {
       id: 'student_alex',
       role: UserRole.STUDENT,
@@ -720,11 +720,15 @@ export class AppStore {
         localStorage.setItem('ut_current_user', JSON.stringify(this.currentUser));
       }
       this.notify();
-      fetch(`/api/users/${userId}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data)
-      }).catch(() => {});
+      try {
+        await fetch(`/api/users/${userId}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(data)
+        });
+      } catch (e) {
+        console.warn('[Store] Notice saving user profile to API:', e);
+      }
     }
   }
 

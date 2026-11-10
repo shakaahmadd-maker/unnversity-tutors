@@ -204,8 +204,8 @@ export default function AdminDashboard({
   onCreateAgreement,
   onSendTriggerEmail,
   onSeedMockStudentData,
-  connectionStatus = 'syncing',
-  lastSyncTime = null,
+  connectionStatus = 'connected',
+  lastSyncTime = 'Real-Time Sync Active',
   syncError = null
 }: AdminDashboardProps) {
 

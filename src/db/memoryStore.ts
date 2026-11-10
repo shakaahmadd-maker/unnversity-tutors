@@ -443,6 +443,10 @@ export class MemoryStore {
     return this.users.get(id);
   }
 
+  public getUser(id: string): UserRecord | undefined {
+    return this.findUserById(id);
+  }
+
   public findUserByEmail(email: string): UserRecord | undefined {
     const clean = email.toLowerCase().trim();
     for (const u of this.users.values()) {
@@ -457,10 +461,19 @@ export class MemoryStore {
     this.users.set(user.id, user);
   }
 
-  public updateUser(id: string, updates: Partial<UserRecord>): UserRecord | undefined {
+  public updateUser(id: string, updates: Partial<UserRecord>): UserRecord {
     const existing = this.users.get(id);
-    if (!existing) return undefined;
-    const updated = { ...existing, ...updates };
+    const updated: UserRecord = existing 
+      ? { ...existing, ...updates }
+      : ({
+          id,
+          role: updates.role || 'tutor',
+          name: updates.name || 'Tutor',
+          email: updates.email || `${id}@university-tutors.com`,
+          avatarUrl: updates.avatarUrl || '',
+          createdAt: updates.createdAt || new Date().toISOString(),
+          ...updates
+        } as UserRecord);
     this.users.set(id, updated);
     return updated;
   }

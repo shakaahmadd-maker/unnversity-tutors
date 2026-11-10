@@ -14,7 +14,7 @@ import { eq, desc, and, inArray } from 'drizzle-orm';
 import { runMigrations } from './src/db/migrate';
 import { memoryStore } from './src/db/memoryStore';
 import { DEFAULT_20_BLOGS } from './src/data/defaultBlogsData';
-import { TRENDING_TUTORS_200 } from './src/data/trendingTutors200Data';
+import { TRENDING_TUTORS_500, TRENDING_TUTORS_200 } from './src/data/trendingTutors500Data';
 
 // Configurable Environment Variables read from process.env
 const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
@@ -525,6 +525,32 @@ async function startServer() {
   // USERS & PRIVILEGED ACCOUNTS ENDPOINTS
   // ==========================================
 
+  const PERSISTED_UPDATES_FILE = path.join(process.cwd(), 'data', 'persisted_user_updates.json');
+
+  function getPersistedUserUpdates(): Record<string, any> {
+    try {
+      if (fs.existsSync(PERSISTED_UPDATES_FILE)) {
+        const raw = fs.readFileSync(PERSISTED_UPDATES_FILE, 'utf-8');
+        return JSON.parse(raw);
+      }
+    } catch (e) {
+      console.warn('[Storage] Notice reading persisted_user_updates.json:', e);
+    }
+    return {};
+  }
+
+  function savePersistedUserUpdate(userId: string, data: Record<string, any>) {
+    try {
+      const dir = path.dirname(PERSISTED_UPDATES_FILE);
+      if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+      const current = getPersistedUserUpdates();
+      current[userId] = { ...(current[userId] || {}), ...data, updatedAt: new Date().toISOString() };
+      fs.writeFileSync(PERSISTED_UPDATES_FILE, JSON.stringify(current, null, 2), 'utf-8');
+    } catch (e) {
+      console.warn('[Storage] Notice saving persisted_user_updates.json:', e);
+    }
+  }
+
   // GET /api/users - returns all platform users including seed tutors, memory store, and PostgreSQL
   app.get('/api/users', async (req, res) => {
     try {
@@ -568,8 +594,8 @@ async function startServer() {
       // Combine map: seed tutors + memory store + dbUsers
       const userMap = new Map<string, any>();
 
-      // 1. Trending 200 Tutors dataset from PDF
-      for (const t of TRENDING_TUTORS_200) {
+      // 1. Trending 500 Master Tutors dataset from PDF
+      for (const t of TRENDING_TUTORS_500) {
         userMap.set(t.id, t);
       }
 
@@ -579,13 +605,23 @@ async function startServer() {
         userMap.set(t.id, safeT);
       }
 
-      // 3. Memory store users
+      // 3. Disk persisted user updates (ensures updated images and edits survive across any restarts)
+      const persistedUpdates = getPersistedUserUpdates();
+      for (const [uId, uUpdates] of Object.entries(persistedUpdates)) {
+        if (userMap.has(uId)) {
+          userMap.set(uId, { ...userMap.get(uId), ...uUpdates });
+        } else {
+          userMap.set(uId, uUpdates);
+        }
+      }
+
+      // 4. Memory store users
       for (const u of memUsers) {
         const { passwordHash: _, ...safeU } = u as any;
         userMap.set(u.id, safeU);
       }
 
-      // 4. PostgreSQL database (authoritative for persisted records)
+      // 5. PostgreSQL database (authoritative for persisted records)
       for (const u of dbUsers) {
         const { passwordHash: _, ...safeU } = u as any;
         userMap.set(u.id, safeU);
@@ -610,8 +646,8 @@ async function startServer() {
 
       const tutorMap = new Map<string, any>();
 
-      // 1. Trending 200 Tutors dataset
-      for (const t of TRENDING_TUTORS_200) {
+      // 1. Trending 500 Master Tutors dataset
+      for (const t of TRENDING_TUTORS_500) {
         tutorMap.set(t.id, t);
       }
 
@@ -619,6 +655,14 @@ async function startServer() {
       for (const t of SEED_TUTORS) {
         const { passwordHash: _, ...safeT } = t as any;
         tutorMap.set(t.id, safeT);
+      }
+
+      // 2.5. Disk persisted updates for tutors
+      const persistedUpdates = getPersistedUserUpdates();
+      for (const [uId, uUpdates] of Object.entries(persistedUpdates)) {
+        if (tutorMap.has(uId)) {
+          tutorMap.set(uId, { ...tutorMap.get(uId), ...uUpdates });
+        }
       }
 
       // 3. In-memory / dynamic tutors
@@ -648,17 +692,18 @@ async function startServer() {
       if (countryQuery && countryQuery !== 'all') {
         allTutors = allTutors.filter(t => {
           const cCode = (t.country || '').toLowerCase();
-          const cName = (t.countryName || t.location || '').toLowerCase();
+          const cName = (t.countryName || t.countryFull || t.location || '').toLowerCase();
           return cCode === countryQuery || cName.includes(countryQuery);
         });
       }
 
-      // Filter by subject
+      // Filter by subject (including primarySubject)
       if (subjectQuery && subjectQuery !== 'all') {
         allTutors = allTutors.filter(t => {
           const subs = Array.isArray(t.subjects) ? t.subjects : (typeof t.subjects === 'string' ? JSON.parse(t.subjects || '[]') : []);
           const exp = Array.isArray(t.subjectExpertise) ? t.subjectExpertise : (typeof t.subjectExpertise === 'string' ? JSON.parse(t.subjectExpertise || '[]') : []);
-          const allSubs = [...subs, ...exp].map(s => String(s).toLowerCase());
+          const prim = t.primarySubject ? [t.primarySubject] : [];
+          const allSubs = [...subs, ...exp, ...prim].map(s => String(s).toLowerCase());
           return allSubs.some(s => s.includes(subjectQuery));
         });
       }
@@ -672,10 +717,13 @@ async function startServer() {
       if (searchQuery) {
         allTutors = allTutors.filter(t => {
           const nameMatch = (t.name || '').toLowerCase().includes(searchQuery);
+          const primMatch = (t.primarySubject || '').toLowerCase().includes(searchQuery);
+          const tierMatch = (t.tutorTier || '').toLowerCase().includes(searchQuery);
           const eduMatch = (t.education || '').toLowerCase().includes(searchQuery);
           const bioMatch = (t.bio || t.experience || '').toLowerCase().includes(searchQuery);
+          const countryMatch = (t.country || t.countryFull || t.location || '').toLowerCase().includes(searchQuery);
           const subs = Array.isArray(t.subjectExpertise) ? t.subjectExpertise.join(' ').toLowerCase() : '';
-          return nameMatch || eduMatch || bioMatch || subs.includes(searchQuery);
+          return nameMatch || primMatch || tierMatch || eduMatch || bioMatch || countryMatch || subs.includes(searchQuery);
         });
       }
 
@@ -1024,8 +1072,55 @@ async function startServer() {
         updates.location = updates.city;
       }
 
-      memoryStore.updateUser(id, updates);
+      // 1. Locate baseline user from memoryStore, trending tutors, or seed tutors
+      let existingUser: any = memoryStore.getUser(id);
+      if (!existingUser) {
+        const trendingTutor = TRENDING_TUTORS_500.find(t => t.id === id);
+        if (trendingTutor) {
+          existingUser = {
+            id: trendingTutor.id,
+            role: trendingTutor.role,
+            name: trendingTutor.name,
+            email: trendingTutor.email,
+            avatarUrl: trendingTutor.avatarUrl,
+            createdAt: new Date().toISOString(),
+            bio: trendingTutor.bio,
+            hourlyRate: trendingTutor.hourlyRate,
+            rating: trendingTutor.rating,
+            reviewCount: trendingTutor.reviewsCount,
+            subjects: JSON.stringify(trendingTutor.subjectExpertise || []),
+            country: trendingTutor.country,
+            location: trendingTutor.location,
+            education: trendingTutor.education,
+            experience: trendingTutor.experience,
+            subjectExpertise: JSON.stringify(trendingTutor.subjectExpertise || []),
+            availability: trendingTutor.availability,
+            canMeet: trendingTutor.canMeet,
+            hobbies: trendingTutor.hobbies,
+            isApproved: true,
+            status: 'approved'
+          };
+        } else {
+          const seedTutor = SEED_TUTORS.find(t => t.id === id);
+          if (seedTutor) {
+            existingUser = { ...seedTutor };
+          }
+        }
+      }
 
+      const mergedUser = {
+        ...(existingUser || {}),
+        ...updates,
+        id
+      };
+
+      // 2. Update memory store
+      memoryStore.setUser(mergedUser as any);
+
+      // 3. Save to disk persistent backup (guarantees updated images survive restarts)
+      savePersistedUserUpdate(id, updates);
+
+      // 4. Update or Insert into PostgreSQL Database
       if (isDbConnected() && db) {
         try {
           // Whitelist valid columns from users schema
@@ -1044,17 +1139,88 @@ async function startServer() {
             }
           }
 
-          if (Object.keys(dbUpdates).length > 0) {
-            await db.update(users).set(dbUpdates).where(eq(users.id, id));
+          const existingDb = await db.select().from(users).where(eq(users.id, id));
+          if (existingDb.length > 0) {
+            if (Object.keys(dbUpdates).length > 0) {
+              await db.update(users).set(dbUpdates).where(eq(users.id, id));
+              console.log(`[DB] Successfully updated user ${id} in PostgreSQL (avatarUrl: ${Boolean(dbUpdates.avatarUrl)})`);
+            }
+          } else {
+            // User does not exist in DB yet: insert complete record so image is permanently stored
+            const insertRecord: Record<string, any> = {
+              id,
+              role: mergedUser.role || 'tutor',
+              name: mergedUser.name || 'Tutor',
+              email: mergedUser.email || `${id}@university-tutors.com`,
+              avatarUrl: mergedUser.avatarUrl || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=300',
+              createdAt: mergedUser.createdAt || new Date().toISOString(),
+              verified: Boolean(mergedUser.verified),
+              suspended: Boolean(mergedUser.suspended),
+              isApproved: mergedUser.isApproved !== false,
+              status: mergedUser.status || 'approved'
+            };
+            for (const [k, v] of Object.entries(mergedUser)) {
+              if (validColumns.has(k) && v !== undefined) {
+                insertRecord[k] = v;
+              }
+            }
+            await db.insert(users).values(insertRecord as any);
+            console.log(`[DB] Successfully inserted user ${id} with updated avatar into PostgreSQL`);
           }
         } catch (dbErr: any) {
-          console.warn('[API] Notice updating user in DB:', dbErr.message);
+          console.warn('[DB] Notice updating/inserting user in PostgreSQL:', dbErr.message);
         }
       }
 
-      await logAudit('USER_UPDATE', `Updated user ${id}`, id, undefined, undefined, req);
+      await logAudit('USER_UPDATE', `Updated user ${id} (image/profile update)`, id, undefined, undefined, req);
 
-      return res.status(200).json({ success: true });
+      return res.status(200).json({ success: true, user: mergedUser });
+    } catch (err: any) {
+      return res.status(500).json({ error: err.message });
+    }
+  });
+
+  // POST /api/upload-avatar - Direct image upload endpoint for user/tutor avatars
+  app.post('/api/upload-avatar', async (req, res) => {
+    try {
+      const { userId, avatarUrl } = req.body;
+      if (!userId || !avatarUrl) {
+        return res.status(400).json({ error: 'userId and avatarUrl are required' });
+      }
+
+      // 1. Update disk persistence
+      savePersistedUserUpdate(userId, { avatarUrl });
+
+      // 2. Update memory store
+      memoryStore.updateUser(userId, { avatarUrl });
+
+      // 3. Update PostgreSQL
+      if (isDbConnected() && db) {
+        try {
+          const existing = await db.select().from(users).where(eq(users.id, userId));
+          if (existing.length > 0) {
+            await db.update(users).set({ avatarUrl }).where(eq(users.id, userId));
+            console.log(`[DB] Successfully updated avatar for ${userId} in PostgreSQL`);
+          } else {
+            const trending = TRENDING_TUTORS_500.find(t => t.id === userId);
+            await db.insert(users).values({
+              id: userId,
+              role: trending?.role || 'tutor',
+              name: trending?.name || 'Tutor',
+              email: trending?.email || `${userId}@university-tutors.com`,
+              avatarUrl,
+              createdAt: new Date().toISOString()
+            } as any);
+            console.log(`[DB] Successfully inserted user ${userId} with avatar into PostgreSQL`);
+          }
+        } catch (e: any) {
+          console.warn('[DB] Upload avatar notice in DB:', e.message);
+        }
+      }
+
+      await logAudit('AVATAR_UPLOAD', `Updated avatar image for ${userId}`, userId, undefined, undefined, req);
+
+      return res.status(200).json({ success: true, avatarUrl });
     } catch (err: any) {
       return res.status(500).json({ error: err.message });
     }

@@ -29,6 +29,7 @@ import {
 } from 'lucide-react';
 import { User, UserRole } from '../types';
 import TutorImageUploader from './TutorImageUploader';
+import { getFallbackAvatar } from './TutorsDirectoryPage';
 
 interface TutorsListAdminProps {
   users: User[];
@@ -173,9 +174,19 @@ export default function TutorsListAdmin({
 
     if (adminCountryFilter !== 'all') {
       const cCode = (tutor.country || '').toLowerCase();
-      const cLoc = ((tutor as any).countryName || tutor.location || tutor.city || '').toLowerCase();
+      const cLoc = ((tutor as any).countryName || (tutor as any).countryFull || tutor.location || tutor.city || '').toLowerCase();
       const target = adminCountryFilter.toLowerCase();
-      if (cCode !== target && !cLoc.includes(target)) return false;
+      const matchesCountry = cCode === target || 
+        cLoc.includes(target) || 
+        (target === 'usa' && (cCode === 'us' || cCode === 'usa' || cLoc.includes('united states'))) ||
+        (target === 'uk' && (cCode === 'gb' || cCode === 'uk' || cLoc.includes('united kingdom'))) ||
+        (target === 'australia' && (cCode === 'au' || cCode === 'australia')) ||
+        (target === 'canada' && (cCode === 'ca' || cCode === 'canada')) ||
+        (target === 'singapore' && (cCode === 'sg' || cCode === 'singapore')) ||
+        (target === 'ireland' && (cCode === 'ie' || cCode === 'ireland')) ||
+        (target === 'new zealand' && (cCode === 'nz' || cCode === 'new zealand')) ||
+        (target === 'uae' && (cCode === 'ae' || cCode === 'uae' || cLoc.includes('emirates')));
+      if (!matchesCountry) return false;
     }
 
     if (searchQuery.trim()) {
@@ -185,6 +196,8 @@ export default function TutorsListAdmin({
       const matchBio = (tutor.bio || '').toLowerCase().includes(q);
       const matchEdu = (tutor.education || '').toLowerCase().includes(q);
       const matchExp = (tutor.experiences || tutor.experience || '').toLowerCase().includes(q);
+      const matchPrim = ((tutor as any).primarySubject || '').toLowerCase().includes(q);
+      const matchTier = ((tutor as any).tutorTier || '').toLowerCase().includes(q);
       const subStr = Array.isArray(tutor.subjectExpertise) 
         ? tutor.subjectExpertise.join(' ') 
         : (tutor.subjectExpertise || (Array.isArray(tutor.subjects) ? tutor.subjects.join(' ') : (tutor.subjects || '')));
@@ -192,7 +205,7 @@ export default function TutorsListAdmin({
       const matchHob = (tutor.hobbies || '').toLowerCase().includes(q);
       const matchCountry = (tutor.country || '').toLowerCase().includes(q);
       const matchLoc = (tutor.location || tutor.city || (tutor as any).countryName || '').toLowerCase();
-      return matchName || matchEmail || matchBio || matchEdu || matchExp || matchSub || matchHob || matchCountry || matchLoc;
+      return matchName || matchEmail || matchBio || matchEdu || matchExp || matchPrim || matchTier || matchSub || matchHob || matchCountry || matchLoc;
     }
 
     return true;
@@ -451,14 +464,14 @@ export default function TutorsListAdmin({
               className="text-xs bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 font-semibold text-slate-700 outline-none focus:border-orange-500 cursor-pointer w-full sm:w-auto"
             >
               <option value="all">🌍 All Countries ({allTutors.length})</option>
-              <option value="US">🇺🇸 USA</option>
-              <option value="GB">🇬🇧 UK</option>
-              <option value="AU">🇦🇺 Australia</option>
-              <option value="CA">🇨🇦 Canada</option>
-              <option value="SG">🇸🇬 Singapore</option>
-              <option value="IE">🇮🇪 Ireland</option>
-              <option value="NZ">🇳🇿 New Zealand</option>
-              <option value="AE">🇦🇪 UAE</option>
+              <option value="USA">🇺🇸 USA (210)</option>
+              <option value="UK">🇬🇧 United Kingdom (55)</option>
+              <option value="Australia">🇦🇺 Australia (50)</option>
+              <option value="Canada">🇨🇦 Canada (45)</option>
+              <option value="Singapore">🇸🇬 Singapore (45)</option>
+              <option value="Ireland">🇮🇪 Ireland (35)</option>
+              <option value="New Zealand">🇳🇿 New Zealand (30)</option>
+              <option value="UAE">🇦🇪 UAE (30)</option>
             </select>
 
             <div className="relative w-full sm:w-64">
@@ -507,9 +520,16 @@ export default function TutorsListAdmin({
                     {/* Left: Avatar & Main Profile info */}
                     <div className="flex items-start gap-4">
                       <img 
-                        src={tutor.avatarUrl || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80'} 
+                        src={tutor.avatarUrl || getFallbackAvatar(tutor.name)} 
                         alt={tutor.name}
-                        className="w-14 h-14 rounded-2xl object-cover border border-slate-200 shadow-xs shrink-0"
+                        loading="lazy"
+                        decoding="async"
+                        referrerPolicy="no-referrer"
+                        onError={(e) => {
+                          e.currentTarget.onerror = null;
+                          e.currentTarget.src = getFallbackAvatar(tutor.name);
+                        }}
+                        className="w-14 h-14 rounded-2xl object-cover border border-slate-200 shadow-xs shrink-0 bg-orange-50/50"
                       />
 
                       <div className="space-y-1.5">
@@ -531,6 +551,11 @@ export default function TutorsListAdmin({
                               <Sparkles className="w-3 h-3 text-sky-600" />
                               Dummy Seed Profile
                             </span>
+                          ) : ((tutor as any).tutorTier || tutor.id.startsWith('tutor_global_')) ? (
+                            <span className="bg-amber-50 text-amber-900 border border-amber-300 text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full flex items-center gap-1" title="Master Faculty Tutor">
+                              <Award className="w-3 h-3 text-amber-600" />
+                              {(tutor as any).tutorTier || 'Global Master Tutor'}
+                            </span>
                           ) : (tutor.specializedKeywords || tutor.primaryDomain || tutor.id.startsWith('tutor-dr-') || tutor.id.startsWith('tutor-alex-') || tutor.id.startsWith('tutor-sarah-')) ? (
                             <span className="bg-indigo-50 text-indigo-700 border border-indigo-200 text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full flex items-center gap-1" title="Curated academic faculty profile">
                               <Sparkles className="w-3 h-3 text-indigo-600" />
@@ -540,6 +565,13 @@ export default function TutorsListAdmin({
                             <span className="bg-purple-50 text-purple-700 border border-purple-200 text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full flex items-center gap-1" title="Newly created or uploaded tutor profile">
                               <UserCheck className="w-3 h-3 text-purple-600" />
                               New Profile Creation
+                            </span>
+                          )}
+
+                          {/* Direct Primary Subject Badge */}
+                          {(tutor as any).primarySubject && (
+                            <span className="bg-orange-50 text-orange-800 border border-orange-200 text-[10px] font-bold px-2 py-0.5 rounded-full">
+                              {(tutor as any).primarySubject}
                             </span>
                           )}
 
@@ -730,9 +762,16 @@ export default function TutorsListAdmin({
             <div className="flex items-center justify-between border-b pb-4">
               <div className="flex items-center gap-3">
                 <img 
-                  src={selectedTutorForDetail.avatarUrl || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80'} 
-                  className="w-12 h-12 rounded-xl object-cover border" 
-                  alt="Avatar" 
+                  src={selectedTutorForDetail.avatarUrl || getFallbackAvatar(selectedTutorForDetail.name)} 
+                  loading="lazy"
+                  decoding="async"
+                  referrerPolicy="no-referrer"
+                  onError={(e) => {
+                    e.currentTarget.onerror = null;
+                    e.currentTarget.src = getFallbackAvatar(selectedTutorForDetail.name);
+                  }}
+                  className="w-12 h-12 rounded-xl object-cover border bg-orange-50/50" 
+                  alt={selectedTutorForDetail.name} 
                 />
                 <div>
                   <h3 className="text-xl font-bold text-slate-900">{selectedTutorForDetail.name}</h3>

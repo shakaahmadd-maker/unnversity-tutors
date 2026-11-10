@@ -23,6 +23,7 @@ import {
   Paperclip
 } from 'lucide-react';
 import { User, Assignment, Chat, Message, Invoice, UserRole, AssignmentStatus } from '../types';
+import { getFallbackAvatar } from './TutorsDirectoryPage';
 
 interface StudentProfilesAdminProps {
   users: User[];
@@ -406,9 +407,16 @@ export default function StudentProfilesAdmin({
                     <div className="flex items-center gap-3 min-w-0">
                       <div className="relative shrink-0">
                         <img
-                          src={student.avatarUrl}
+                          src={student.avatarUrl || getFallbackAvatar(student.name)}
                           alt={student.name}
-                          className="w-12 h-12 rounded-2xl object-cover border border-gray-200 shadow-2xs"
+                          loading="lazy"
+                          decoding="async"
+                          referrerPolicy="no-referrer"
+                          onError={(e) => {
+                            e.currentTarget.onerror = null;
+                            e.currentTarget.src = getFallbackAvatar(student.name);
+                          }}
+                          className="w-12 h-12 rounded-2xl object-cover border border-gray-200 shadow-2xs bg-orange-50/50"
                         />
                         {student.verified && (
                           <span className="absolute -bottom-1 -right-1 bg-emerald-500 text-white p-0.5 rounded-full border border-white" title="Verified student profile">
@@ -563,9 +571,16 @@ export default function StudentProfilesAdmin({
                       <td className="p-4">
                         <div className="flex items-center gap-3">
                           <img
-                            src={student.avatarUrl}
-                            alt=""
-                            className="w-10 h-10 rounded-xl object-cover border"
+                            src={student.avatarUrl || getFallbackAvatar(student.name)}
+                            alt={student.name}
+                            loading="lazy"
+                            decoding="async"
+                            referrerPolicy="no-referrer"
+                            onError={(e) => {
+                              e.currentTarget.onerror = null;
+                              e.currentTarget.src = getFallbackAvatar(student.name);
+                            }}
+                            className="w-10 h-10 rounded-xl object-cover border bg-orange-50/50"
                           />
                           <div>
                             <span className="font-bold text-gray-900 block">{student.name}</span>
@@ -668,9 +683,16 @@ export default function StudentProfilesAdmin({
             {/* Profile Header */}
             <div className="flex items-center gap-4 border-b border-gray-100 pb-5">
               <img
-                src={selectedStudentForModal.avatarUrl}
-                alt=""
-                className="w-16 h-16 rounded-2xl object-cover border-2 border-orange-200 shadow-sm"
+                src={selectedStudentForModal.avatarUrl || getFallbackAvatar(selectedStudentForModal.name)}
+                alt={selectedStudentForModal.name}
+                loading="lazy"
+                decoding="async"
+                referrerPolicy="no-referrer"
+                onError={(e) => {
+                  e.currentTarget.onerror = null;
+                  e.currentTarget.src = getFallbackAvatar(selectedStudentForModal.name);
+                }}
+                className="w-16 h-16 rounded-2xl object-cover border-2 border-orange-200 shadow-sm bg-orange-50/50"
               />
               <div>
                 <div className="flex items-center gap-2">
