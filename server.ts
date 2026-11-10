@@ -12,7 +12,7 @@ import { db, isDbConnected, checkDbConnection } from './src/db/index';
 import { users, orders, inquiries, messages, quotes, auditLogs, chatRooms, chatRoomMembers, blogs } from './src/db/schema';
 import { eq, desc, and, inArray } from 'drizzle-orm';
 import { runMigrations } from './src/db/migrate';
-import { memoryStore } from './src/db/memoryStore';
+import { memoryStore, PrivateFileRecord } from './src/db/memoryStore';
 import { DEFAULT_20_BLOGS } from './src/data/defaultBlogsData';
 import { TRENDING_TUTORS_500, TRENDING_TUTORS_200 } from './src/data/trendingTutors500Data';
 
@@ -308,15 +308,65 @@ async function startServer() {
   app.use(express.urlencoded({ extended: true, limit: '15mb' }));
   app.use(cookieParser());
 
-  // Mount public /uploads static directory with Cross-Origin Resource Policy & CORS headers
-  // so uploaded images render reliably across all browsers for both authenticated and unauthenticated visitors
-  app.use('/uploads', (req, res, next) => {
-    res.setHeader('Access-Control-Allow-Origin', '*');
+  // Strict Production CORS & Origin Headers
+  // Do not use wildcard Access-Control-Allow-Origin: * for authenticated cookie requests.
+  // Instead, strictly use APP_URL as the allowed origin (with localhost loopback allowed in dev).
+  const normalizedAppUrl = APP_URL.replace(/\/$/, '');
+  const allowedOrigins = new Set([
+    normalizedAppUrl,
+    `http://localhost:${PORT}`,
+    `http://127.0.0.1:${PORT}`,
+    `http://localhost:3000`,
+    `http://localhost:5173`,
+  ]);
+
+  app.use((req, res, next) => {
+    const origin = req.headers.origin;
+    if (origin) {
+      if (allowedOrigins.has(origin) || (NODE_ENV !== 'production' && origin.startsWith('http://localhost:'))) {
+        res.setHeader('Access-Control-Allow-Origin', origin);
+        res.setHeader('Access-Control-Allow-Credentials', 'true');
+      } else {
+        res.setHeader('Access-Control-Allow-Origin', normalizedAppUrl);
+        res.setHeader('Access-Control-Allow-Credentials', 'true');
+      }
+    } else {
+      res.setHeader('Access-Control-Allow-Origin', normalizedAppUrl);
+      res.setHeader('Access-Control-Allow-Credentials', 'true');
+    }
+
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With');
+    res.setHeader('Vary', 'Origin');
+
+    if (req.method === 'OPTIONS') {
+      return res.sendStatus(204);
+    }
+    next();
+  });
+
+  // =========================================================================
+  // PUBLIC STATIC STORAGE ROUTES (Avatars & Blogs only)
+  // All student documents, tutor documents, private attachments, and reports
+  // are strictly isolated and blocked from public static exposure.
+  // =========================================================================
+
+  // 1. Public static directory: Avatars (Photos & Icons only)
+  app.use('/uploads/avatars', (req, res, next) => {
     res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
-    res.setHeader('Cross-Origin-Embedder-Policy', 'unsafe-none');
     res.setHeader('Cache-Control', 'public, max-age=86400, stale-while-revalidate=604800');
     next();
-  }, express.static(UPLOADS_DIR, {
+  }, express.static(path.join(UPLOADS_DIR, 'avatars'), {
+    maxAge: '1d',
+    index: false,
+  }));
+
+  // 2. Public static directory: Blogs (Editorial header images only)
+  app.use('/uploads/blogs', (req, res, next) => {
+    res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+    res.setHeader('Cache-Control', 'public, max-age=86400, stale-while-revalidate=604800');
+    next();
+  }, express.static(path.join(UPLOADS_DIR, 'blogs'), {
     maxAge: '1d',
     index: false,
   }));
@@ -344,6 +394,224 @@ async function startServer() {
   };
 
   app.use(extractUser);
+
+  // Authentication requirement helper - rejects unauthenticated requests
+  const requireAuth = (req: express.Request, res: express.Response, next: express.NextFunction) => {
+    if (!(req as any).user) {
+      return res.status(401).json({ error: 'Unauthorized: Authentication required. Please log in.' });
+    }
+    next();
+  };
+
+  // Helper to check chat room access authorization
+  const canUserAccessRoom = async (userId: string, userRole: string, roomId: string): Promise<boolean> => {
+    if (userRole === 'admin' || userRole === 'subadmin') return true;
+    if (isDbConnected() && db) {
+      try {
+        const memberRows = await db.select().from(chatRoomMembers).where(
+          and(eq(chatRoomMembers.roomId, roomId), eq(chatRoomMembers.userId, userId))
+        ).limit(1);
+        if (memberRows.length > 0) return true;
+      } catch (dbErr: any) {
+        console.warn('[API] Notice checking room membership in DB:', dbErr.message);
+      }
+    }
+    return memoryStore.isRoomMember(roomId, userId, userRole === 'admin' || userRole === 'subadmin');
+  };
+
+  // Helper to find an order in DB or memoryStore
+  const findOrderById = async (orderId: string): Promise<any> => {
+    if (isDbConnected() && db) {
+      try {
+        const rows = await db.select().from(orders).where(eq(orders.id, orderId)).limit(1);
+        if (rows.length > 0) return rows[0];
+      } catch (dbErr: any) {
+        console.warn('[API] Notice finding order in DB:', dbErr.message);
+      }
+    }
+    return memoryStore.getOrder(orderId);
+  };
+
+  // Authenticated file download handler with strict role and ownership checks
+  const handleAuthenticatedFileDownload = async (req: express.Request, res: express.Response, identifier: string) => {
+    const currentUser = (req as any).user;
+    if (!currentUser || !currentUser.id) {
+      return res.status(401).json({
+        error: 'Unauthorized: You must be logged in to access or download private documents.',
+      });
+    }
+
+    const userId = currentUser.id;
+    const userRole = currentUser.role;
+
+    const cleanName = path.basename(identifier).trim();
+    if (!cleanName || cleanName === '.' || cleanName === '..') {
+      return res.status(400).json({ error: 'Invalid document identifier.' });
+    }
+
+    const fileRecord = memoryStore.getPrivateFile(cleanName) || memoryStore.getPrivateFileByStoredName(cleanName);
+    const storedDiskName = fileRecord ? fileRecord.storedName : cleanName;
+    const originalDisplayName = fileRecord ? fileRecord.fileName : cleanName;
+
+    const documentsDir = path.resolve(UPLOADS_DIR, 'documents');
+    let targetFilePath = path.resolve(documentsDir, storedDiskName);
+
+    // Prevent directory traversal
+    if (!targetFilePath.startsWith(documentsDir)) {
+      return res.status(403).json({ error: 'Access denied: Directory traversal detected.' });
+    }
+
+    if (!fs.existsSync(targetFilePath)) {
+      const generalDir = path.resolve(UPLOADS_DIR, 'general');
+      const altPath = path.resolve(generalDir, storedDiskName);
+      if (altPath.startsWith(generalDir) && fs.existsSync(altPath)) {
+        targetFilePath = altPath;
+      } else {
+        return res.status(404).json({ error: 'Document not found on storage disk.' });
+      }
+    }
+
+    // Role & Ownership Permission Verification
+    let isAuthorized = false;
+    let denyReason = 'You do not have permission to access or download this document.';
+
+    // Admin & Subadmin supervisory oversight
+    if (userRole === 'admin' || userRole === 'subadmin') {
+      isAuthorized = true;
+    }
+
+    // Direct file uploader / owner
+    if (!isAuthorized && fileRecord && fileRecord.uploaderId === userId) {
+      isAuthorized = true;
+    }
+
+    // Order participant check (student who ordered, or assigned tutor)
+    if (!isAuthorized && fileRecord && fileRecord.orderId) {
+      const order = await findOrderById(fileRecord.orderId);
+      if (order) {
+        if (order.studentId === userId || order.tutorId === userId) {
+          isAuthorized = true;
+        } else {
+          denyReason = 'Access denied: You are not an authorized participant in this order.';
+        }
+      }
+    }
+
+    // Chat room member check
+    if (!isAuthorized && fileRecord && fileRecord.roomId) {
+      const isMember = await canUserAccessRoom(userId, userRole, fileRecord.roomId);
+      if (isMember) {
+        isAuthorized = true;
+      } else {
+        denyReason = 'Access denied: You are not an authorized member of this chat room.';
+      }
+    }
+
+    // Fallback: Search all orders where user is student or tutor by filename
+    if (!isAuthorized) {
+      let userOrders: any[] = [];
+      if (isDbConnected() && db) {
+        try {
+          userOrders = await db.select().from(orders).where(
+            userRole === 'student' ? eq(orders.studentId, userId) : eq(orders.tutorId, userId)
+          );
+        } catch (e: any) {}
+      }
+      if (userOrders.length === 0) {
+        userOrders = memoryStore.getOrders(userRole === 'student' ? userId : undefined, userRole === 'tutor' ? userId : undefined);
+      }
+      for (const ord of userOrders) {
+        const allUrls = `${ord.fileUrls || ''} ${ord.fileNames || ''} ${ord.tutorWorkFileUrl || ''} ${ord.tutorWorkFileName || ''}`;
+        if (allUrls.includes(cleanName) || (fileRecord && allUrls.includes(fileRecord.id))) {
+          isAuthorized = true;
+          break;
+        }
+      }
+    }
+
+    // Protection for tutor credentials/transcripts: Never allow other students to view tutor diplomas/CVs
+    if (fileRecord && (fileRecord.fileType === 'tutor_credential' || fileRecord.fileType === 'tutor_document')) {
+      if (userRole !== 'admin' && userRole !== 'subadmin' && fileRecord.uploaderId !== userId) {
+        isAuthorized = false;
+        denyReason = 'Access denied: Tutor credentials may only be reviewed by administrators or the account owner.';
+      }
+    }
+
+    if (!isAuthorized) {
+      await logAudit('FILE_DOWNLOAD_BLOCKED', `Unauthorized attempt to download ${cleanName}`, userId, undefined, userRole, req);
+      return res.status(403).json({ error: `Forbidden: ${denyReason}` });
+    }
+
+    res.setHeader('Cache-Control', 'private, no-cache, no-store, must-revalidate');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('Content-Security-Policy', "default-src 'none'");
+
+    await logAudit('FILE_DOWNLOAD', `Downloaded private document: ${originalDisplayName}`, userId, undefined, userRole, req);
+    return res.download(targetFilePath, originalDisplayName);
+  };
+
+  // Authenticated download routes
+  app.get('/api/files/download/:id', requireAuth, async (req, res) => {
+    await handleAuthenticatedFileDownload(req, res, req.params.id);
+  });
+
+  app.get('/api/files/:id/download', requireAuth, async (req, res) => {
+    await handleAuthenticatedFileDownload(req, res, req.params.id);
+  });
+
+  app.get('/api/documents/download/:filename', requireAuth, async (req, res) => {
+    await handleAuthenticatedFileDownload(req, res, req.params.filename);
+  });
+
+  // Intercept direct requests to /uploads/documents/*
+  app.get('/uploads/documents/:filename', async (req, res) => {
+    if (!(req as any).user) {
+      return res.status(401).json({
+        error: 'Unauthorized: Direct public access to student/tutor documents is prohibited. Please sign in.',
+      });
+    }
+    await handleAuthenticatedFileDownload(req, res, req.params.filename);
+  });
+
+  app.use('/uploads/documents', (req, res) => {
+    return res.status(403).json({
+      error: 'Forbidden: Direct public access to documents directory is prohibited. Use authenticated download routes.',
+    });
+  });
+
+  // Intercept direct requests to /uploads/reports/*
+  app.get('/uploads/reports/:filename', async (req, res) => {
+    if (!(req as any).user) {
+      return res.status(401).json({
+        error: 'Unauthorized: Direct public access to internal reports is prohibited. Please sign in.',
+      });
+    }
+    await handleAuthenticatedFileDownload(req, res, req.params.filename);
+  });
+
+  app.use('/uploads/reports', (req, res) => {
+    return res.status(403).json({
+      error: 'Forbidden: Direct public access to internal reports is prohibited.',
+    });
+  });
+
+  // Intercept direct requests to /uploads/general/*
+  app.get('/uploads/general/:filename', async (req, res) => {
+    if (!(req as any).user) {
+      return res.status(401).json({
+        error: 'Unauthorized: Direct public access to private attachments is prohibited. Please sign in.',
+      });
+    }
+    await handleAuthenticatedFileDownload(req, res, req.params.filename);
+  });
+
+  app.use('/uploads/general', (req, res) => {
+    return res.status(403).json({
+      error: 'Forbidden: Direct public access to private attachments is prohibited.',
+    });
+  });
 
   // Helper function to record audit logs
   const logAudit = async (action: string, details?: string, userId?: string, userName?: string, userRole?: string, req?: express.Request) => {
@@ -595,6 +863,38 @@ async function startServer() {
   // ==========================================
 
   const PERSISTED_UPDATES_FILE = path.join(process.cwd(), 'data', 'persisted_user_updates.json');
+  const PERSISTED_PRIVATE_FILES_FILE = path.join(process.cwd(), 'data', 'persisted_private_files.json');
+
+  function loadPersistedPrivateFiles() {
+    try {
+      if (fs.existsSync(PERSISTED_PRIVATE_FILES_FILE)) {
+        const raw = fs.readFileSync(PERSISTED_PRIVATE_FILES_FILE, 'utf-8');
+        const list = JSON.parse(raw);
+        if (Array.isArray(list)) {
+          for (const item of list) {
+            memoryStore.setPrivateFile(item);
+          }
+        }
+        console.info(`[STORAGE] Synchronized ${list.length} private file records from disk.`);
+      }
+    } catch (e: any) {
+      console.warn('[STORAGE] Notice reading persisted_private_files.json:', e.message);
+    }
+  }
+
+  function savePersistedPrivateFile(record: PrivateFileRecord) {
+    try {
+      const dir = path.dirname(PERSISTED_PRIVATE_FILES_FILE);
+      if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+      memoryStore.setPrivateFile(record);
+      const all = memoryStore.getAllPrivateFiles();
+      fs.writeFileSync(PERSISTED_PRIVATE_FILES_FILE, JSON.stringify(all, null, 2), 'utf-8');
+    } catch (e: any) {
+      console.warn('[STORAGE] Notice saving persisted_private_files.json:', e.message);
+    }
+  }
+
+  loadPersistedPrivateFiles();
 
   function getPersistedUserUpdates(): Record<string, any> {
     try {
@@ -1255,49 +1555,63 @@ async function startServer() {
   });
 
   // POST /api/upload-avatar - Direct image upload endpoint for user/tutor avatars
-  app.post('/api/upload-avatar', async (req, res) => {
+  // Strictly verifies authentication and prevents unauthorized account hijacking
+  app.post('/api/upload-avatar', requireAuth, async (req, res) => {
     try {
-      let { userId, avatarUrl } = req.body;
-      if (!userId || !avatarUrl) {
-        return res.status(400).json({ error: 'userId and avatarUrl are required' });
+      const currentUser = (req as any).user;
+      let targetUserId = currentUser.id;
+
+      // Security rule: Only administrators can update avatars for other users
+      if (req.body.userId && typeof req.body.userId === 'string' && req.body.userId !== currentUser.id) {
+        if (currentUser.role === 'admin' || currentUser.role === 'subadmin') {
+          targetUserId = req.body.userId;
+        } else {
+          // Non-admins can only update their own avatar
+          targetUserId = currentUser.id;
+        }
+      }
+
+      let { avatarUrl } = req.body;
+      if (!avatarUrl || typeof avatarUrl !== 'string') {
+        return res.status(400).json({ error: 'avatarUrl is required' });
       }
 
       // Convert base64 data URI to persistent file on disk
-      if (typeof avatarUrl === 'string' && avatarUrl.startsWith('data:image/')) {
-        avatarUrl = saveBase64ImageToUploads(avatarUrl, 'avatars', `avatar_${userId}`);
+      if (avatarUrl.startsWith('data:image/')) {
+        avatarUrl = saveBase64ImageToUploads(avatarUrl, 'avatars', `avatar_${targetUserId}`);
       }
 
       // 1. Update disk persistence
-      savePersistedUserUpdate(userId, { avatarUrl });
+      savePersistedUserUpdate(targetUserId, { avatarUrl });
 
       // 2. Update memory store
-      memoryStore.updateUser(userId, { avatarUrl });
+      memoryStore.updateUser(targetUserId, { avatarUrl });
 
       // 3. Update PostgreSQL
       if (isDbConnected() && db) {
         try {
-          const existing = await db.select().from(users).where(eq(users.id, userId));
+          const existing = await db.select().from(users).where(eq(users.id, targetUserId));
           if (existing.length > 0) {
-            await db.update(users).set({ avatarUrl }).where(eq(users.id, userId));
-            console.log(`[DB] Successfully updated avatar for ${userId} in PostgreSQL: ${avatarUrl}`);
+            await db.update(users).set({ avatarUrl }).where(eq(users.id, targetUserId));
+            console.log(`[DB] Successfully updated avatar for ${targetUserId} in PostgreSQL: ${avatarUrl}`);
           } else {
-            const trending = TRENDING_TUTORS_500.find(t => t.id === userId);
+            const trending = TRENDING_TUTORS_500.find(t => t.id === targetUserId);
             await db.insert(users).values({
-              id: userId,
+              id: targetUserId,
               role: trending?.role || 'tutor',
               name: trending?.name || 'Tutor',
-              email: trending?.email || `${userId}@university-tutors.com`,
+              email: trending?.email || `${targetUserId}@university-tutors.com`,
               avatarUrl,
               createdAt: new Date().toISOString()
             } as any);
-            console.log(`[DB] Successfully inserted user ${userId} with avatar into PostgreSQL: ${avatarUrl}`);
+            console.log(`[DB] Successfully inserted user ${targetUserId} with avatar into PostgreSQL: ${avatarUrl}`);
           }
         } catch (e: any) {
           console.warn('[DB] Upload avatar notice in DB:', e.message);
         }
       }
 
-      await logAudit('AVATAR_UPLOAD', `Updated avatar image for ${userId}`, userId, undefined, undefined, req);
+      await logAudit('AVATAR_UPLOAD', `Updated avatar image for ${targetUserId}`, targetUserId, undefined, currentUser.role, req);
 
       return res.status(200).json({ success: true, avatarUrl });
     } catch (err: any) {
@@ -1305,14 +1619,125 @@ async function startServer() {
     }
   });
 
-  // POST /api/upload - Generic persistent file/image upload endpoint
-  app.post('/api/upload', (req, res) => {
+  // POST /api/upload-document - Authenticated upload endpoint for private student and tutor documents
+  // Strictly derives uploaderId and role from the authenticated session (never trusts frontend)
+  app.post('/api/upload-document', requireAuth, async (req, res) => {
     try {
-      const { file, folder = 'general', prefix = 'file' } = req.body;
+      const currentUser = (req as any).user;
+      const uploaderId = currentUser.id;
+      const uploaderRole = currentUser.role;
+
+      const { file, fileName, orderId, roomId, fileType = 'student_document' } = req.body;
+      if (!file || typeof file !== 'string') {
+        return res.status(400).json({ error: 'file (data URI or base64) is required.' });
+      }
+
+      // If associated with an order, verify the authenticated user has permission for that order
+      if (orderId && typeof orderId === 'string') {
+        const order = await findOrderById(orderId);
+        if (order && uploaderRole !== 'admin' && uploaderRole !== 'subadmin' && order.studentId !== uploaderId && order.tutorId !== uploaderId) {
+          return res.status(403).json({ error: 'Forbidden: You are not authorized to attach documents to this order.' });
+        }
+      }
+
+      // If associated with a chat room, verify the authenticated user is an active member
+      if (roomId && typeof roomId === 'string') {
+        const isMember = await canUserAccessRoom(uploaderId, uploaderRole, roomId);
+        if (!isMember) {
+          return res.status(403).json({ error: 'Forbidden: You are not authorized to attach files to this chat room.' });
+        }
+      }
+
+      let rawBase64 = file;
+      let mimeType = 'application/octet-stream';
+      let ext = 'pdf';
+
+      if (file.startsWith('data:')) {
+        const match = file.match(/^data:([a-zA-Z0-9/+-]+);base64,(.+)$/);
+        if (match) {
+          mimeType = match[1];
+          rawBase64 = match[2];
+          const rawExt = mimeType.split('/')[1];
+          if (rawExt) {
+            ext = rawExt.toLowerCase()
+              .replace('vnd.openxmlformats-officedocument.wordprocessingml.document', 'docx')
+              .replace('msword', 'doc')
+              .replace('plain', 'txt')
+              .replace('jpeg', 'jpg');
+          }
+        }
+      }
+
+      if (fileName && typeof fileName === 'string' && fileName.includes('.')) {
+        const cleanExt = path.extname(fileName).toLowerCase().replace(/[^a-z0-9]/g, '');
+        if (cleanExt) ext = cleanExt;
+      }
+
+      const buffer = Buffer.from(rawBase64, 'base64');
+      if (buffer.length > 50 * 1024 * 1024) {
+        return res.status(400).json({ error: 'File size exceeds maximum 50MB limit.' });
+      }
+
+      const storedName = `doc_${Date.now()}_${crypto.randomBytes(6).toString('hex')}.${ext}`;
+      const documentsDir = path.resolve(UPLOADS_DIR, 'documents');
+      const targetFilePath = path.join(documentsDir, storedName);
+
+      fs.writeFileSync(targetFilePath, buffer);
+
+      const fileId = `file_${Date.now()}_${crypto.randomBytes(4).toString('hex')}`;
+      const fileRecord: PrivateFileRecord = {
+        id: fileId,
+        fileName: fileName ? path.basename(fileName) : storedName,
+        storedName,
+        fileSize: buffer.length,
+        mimeType,
+        uploaderId,
+        uploaderRole,
+        orderId: orderId || null,
+        roomId: roomId || null,
+        fileType,
+        createdAt: new Date().toISOString(),
+      };
+
+      savePersistedPrivateFile(fileRecord);
+
+      await logAudit('FILE_UPLOAD_PRIVATE', `Uploaded private file: ${fileRecord.fileName} (${fileId})`, uploaderId, undefined, uploaderRole, req);
+
+      return res.status(200).json({
+        success: true,
+        fileId,
+        fileName: fileRecord.fileName,
+        downloadUrl: `/api/files/download/${fileId}`,
+      });
+    } catch (err: any) {
+      return res.status(500).json({ error: err.message });
+    }
+  });
+
+  // POST /api/upload - Generic persistent upload endpoint for public images (e.g. avatars, approved public media)
+  app.post('/api/upload', requireAuth, (req, res) => {
+    try {
+      const currentUser = (req as any).user;
+      let { file, folder = 'general', prefix = 'file' } = req.body;
       if (!file) {
         return res.status(400).json({ error: 'file (data URI or base64) is required' });
       }
-      const publicUrl = saveBase64ImageToUploads(file, folder, prefix);
+
+      // Restrict public blog uploads strictly to administrators
+      if (folder === 'blogs' && currentUser.role !== 'admin' && currentUser.role !== 'subadmin') {
+        return res.status(403).json({ error: 'Forbidden: Only administrators can upload blog media.' });
+      }
+
+      // Prevent private documents from being routed through general public endpoint
+      if (folder === 'documents') {
+        return res.status(400).json({ error: 'Private documents must be uploaded via /api/upload-document.' });
+      }
+
+      // Sanitize folder name to prevent path traversal
+      const safeFolder = (folder === 'avatars' || folder === 'blogs') ? folder : 'general';
+      const safePrefix = prefix.replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 30) || 'file';
+
+      const publicUrl = saveBase64ImageToUploads(file, safeFolder, safePrefix);
       return res.status(200).json({ success: true, url: publicUrl });
     } catch (err: any) {
       return res.status(500).json({ error: err.message });
@@ -1542,33 +1967,6 @@ async function startServer() {
   // ==========================================
   // CHAT ROOMS & MESSAGES
   // ==========================================
-
-  // Authentication requirement helper
-  const requireAuth = (req: express.Request, res: express.Response, next: express.NextFunction) => {
-    if (!(req as any).user) {
-      return res.status(401).json({ error: 'Unauthorized: Authentication required. Please log in.' });
-    }
-    next();
-  };
-
-  // Authorization helper to check if a user is allowed to access a chat room
-  const canUserAccessRoom = async (userId: string, userRole: string, roomId: string): Promise<boolean> => {
-    // Explicit role rules: Admins and subadmins have platform oversight for support and dispute moderation
-    if (userRole === 'admin' || userRole === 'subadmin') {
-      return true;
-    }
-    if (isDbConnected() && db) {
-      try {
-        const memberRows = await db.select().from(chatRoomMembers).where(
-          and(eq(chatRoomMembers.roomId, roomId), eq(chatRoomMembers.userId, userId))
-        ).limit(1);
-        if (memberRows.length > 0) return true;
-      } catch (dbErr: any) {
-        console.warn('[API] Notice checking room membership in DB:', dbErr.message);
-      }
-    }
-    return memoryStore.isRoomMember(roomId, userId, userRole === 'admin' || userRole === 'subadmin');
-  };
 
   // POST /api/chat-rooms - Create a chat room
   app.post('/api/chat-rooms', requireAuth, async (req, res) => {

@@ -507,6 +507,10 @@ export class MemoryStore {
     return list.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
   }
 
+  public getOrder(id: string): OrderRecord | undefined {
+    return this.orders.get(id);
+  }
+
   public setOrder(order: OrderRecord): void {
     this.orders.set(order.id, order);
   }
