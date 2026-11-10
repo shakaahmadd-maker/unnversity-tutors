@@ -51,6 +51,14 @@ export interface User {
   researchKeywords?: string[];
   jobKeywords?: string[];
   highGrowthKeywords?: string[];
+  primarySubject?: string;
+  tutorTier?: string;
+  tier?: string;
+  cityLocation?: string;
+  searchableKeywords?: string;
+  experienceSummary?: string;
+  verificationStatus?: string;
+  profileImageUrl?: string;
 }
 
 export interface Service {

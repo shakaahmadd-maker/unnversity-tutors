@@ -46,6 +46,14 @@ export interface UserRecord {
   hobbies?: string | null;
   isApproved?: boolean;
   status?: string;
+  primarySubject?: string | null;
+  searchableKeywords?: string | null;
+  cityLocation?: string | null;
+  city?: string | null;
+  tutorTier?: string | null;
+  tier?: string | null;
+  verificationStatus?: string | null;
+  profileImageUrl?: string | null;
 }
 
 export interface OrderRecord {

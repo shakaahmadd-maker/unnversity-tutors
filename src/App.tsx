@@ -168,9 +168,9 @@ export default function App() {
     } else if (activeView === 'blog') {
       title = 'Academic Integrity Blog & Study Guides - University Tutors';
       canonicalPath = '/our-blog';
-    } else if (activeView === 'tutors-directory') {
+    } else if (activeView === 'tutors-directory' || activeView === 'tutors') {
       title = 'Find Verified University Mentors & Tutors - University Tutors';
-      canonicalPath = '/tutors-directory';
+      canonicalPath = '/tutors';
     } else if (activeView === 'get-a-quote') {
       title = 'Get a Binding Milestone Quote - University Tutors';
       canonicalPath = '/get-a-quote';
@@ -296,10 +296,24 @@ export default function App() {
       return;
     }
 
-    if (view === 'tutors-directory') {
+    if (view === 'tutors' || view === 'tutors-directory') {
       setSelectedTutorProfile(null);
+      setLocationFilter('');
+      setSubjectFilter('');
       setActiveView('tutors-directory');
-      path = '/tutors-directory';
+      path = '/tutors';
+      window.history.pushState(null, '', path);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
+
+    if (view.startsWith('search-tutors:')) {
+      const q = decodeURIComponent(view.replace('search-tutors:', ''));
+      setSelectedTutorProfile(null);
+      setSubjectFilter(q);
+      setLocationFilter('');
+      setActiveView('tutors-directory');
+      path = '/tutors?q=' + encodeURIComponent(q);
       window.history.pushState(null, '', path);
       window.scrollTo({ top: 0, behavior: 'smooth' });
       return;
@@ -460,6 +474,29 @@ export default function App() {
         setActiveSpecializedServiceSlug(cleanSlug || 'assignment-guidance');
         setActiveView('specialized-service');
       } else if (
+        decodedPath === '/tutors' || 
+        decodedPath === '/tutors-directory' || 
+        decodedPath === '/tutors directory' ||
+        decodedPath === '/find-a-tutor' ||
+        hash === '#tutors' || 
+        hash === '#tutors-directory'
+      ) {
+        const urlParams = new URLSearchParams(window.location.search);
+        const loc = urlParams.get('location') || urlParams.get('country') || '';
+        const subj = urlParams.get('subject') || urlParams.get('q') || urlParams.get('search') || '';
+        if (loc) setLocationFilter(loc);
+        if (subj) setSubjectFilter(subj);
+        setSelectedTutorProfile(null);
+        setActiveView('tutors-directory');
+      } else if (
+        decodedPath === '/sop' || 
+        decodedPath === '/sop-guide' || 
+        decodedPath === '/sop guide' ||
+        hash === '#sop' || 
+        hash === '#sop-guide'
+      ) {
+        setIsSopModalOpen(true);
+      } else if (
         decodedPath === '' || 
         decodedPath === '/' || 
         decodedPath === '/home' || 
@@ -574,6 +611,15 @@ export default function App() {
             .split('#')[0]
             .trim();
           handleNavigate(slug);
+        } else if (
+          href === '/tutors' || 
+          href === '/tutors-directory' || 
+          href === '#tutors' || 
+          href === '#tutors-directory' ||
+          href.endsWith('/tutors')
+        ) {
+          e.preventDefault();
+          handleNavigate('tutors');
         } else if (href === '/home' || href === '/' || href === '#home') {
           e.preventDefault();
           handleNavigate('home');

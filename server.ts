@@ -7,9 +7,10 @@ import path from 'path';
 import fs from 'fs';
 import crypto from 'crypto';
 import cookieParser from 'cookie-parser';
+import multer from 'multer';
 import { createServer as createViteServer } from 'vite';
 import { db, isDbConnected, checkDbConnection } from './src/db/index';
-import { users, orders, inquiries, messages, quotes, auditLogs, chatRooms, chatRoomMembers, blogs } from './src/db/schema';
+import { users, orders, inquiries, messages, quotes, auditLogs, chatRooms, chatRoomMembers, blogs, tutors } from './src/db/schema';
 import { eq, desc, and, inArray } from 'drizzle-orm';
 import { runMigrations } from './src/db/migrate';
 import { memoryStore, PrivateFileRecord } from './src/db/memoryStore';
@@ -81,12 +82,42 @@ export function saveBase64ImageToUploads(dataUriOrBase64: string, folder: string
     fs.writeFileSync(filePath, buffer);
 
     console.info(`[UPLOADS] Saved uploaded asset to persistent disk: ${filePath}`);
-    return `/uploads/${folder}/${filename}`;
+    return `/uploads/${folder}/${filename}?v=${Date.now()}`;
   } catch (err: any) {
     console.warn(`[UPLOADS] Error saving uploaded image to disk: ${err.message}`);
     return dataUriOrBase64;
   }
 }
+
+// Multer Disk Storage Configuration for Persistent Profile Image Uploads
+const avatarStorage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    const dir = path.join(UPLOADS_DIR, 'avatars');
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true });
+    }
+    cb(null, dir);
+  },
+  filename: (req, file, cb) => {
+    const ext = path.extname(file.originalname).toLowerCase();
+    const cleanExt = ['.jpg', '.jpeg', '.png', '.webp'].includes(ext) ? ext : '.jpg';
+    const uniqueName = `avatar_${Date.now()}_${crypto.randomBytes(6).toString('hex')}${cleanExt}`;
+    cb(null, uniqueName);
+  }
+});
+
+export const avatarMulterUpload = multer({
+  storage: avatarStorage,
+  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB
+  fileFilter: (req, file, cb) => {
+    const allowed = ['image/jpeg', 'image/png', 'image/webp', 'image/jpg'];
+    if (allowed.includes(file.mimetype.toLowerCase())) {
+      cb(null, true);
+    } else {
+      cb(new Error('Invalid image format. Only JPEG, PNG, and WEBP are supported.'));
+    }
+  }
+});
 
 // Secure Password Hashing using Scrypt (Salted + Constant-Time comparison)
 export function hashPassword(password: string): string {
@@ -295,6 +326,39 @@ async function seedInitialDatabase() {
     } catch (blogErr: any) {
       console.warn('[SEED] Notice during blog table verification:', blogErr.message);
     }
+
+    // Check if tutors table exists and seed if empty
+    try {
+      const existingTutors = await db.select().from(tutors).limit(1);
+      if (existingTutors.length === 0) {
+        for (const t of TRENDING_TUTORS_500) {
+          await db.insert(tutors).values({
+            id: t.id,
+            name: t.name,
+            tier: t.tutorTier || 'Senior Tutor / Expert',
+            country: t.country || 'USA',
+            cityLocation: t.location || 'Miami, FL',
+            rating: t.rating || 4.95,
+            reviewsCount: t.reviewsCount || 50,
+            hourlyRate: t.hourlyRate || 45,
+            primarySubject: t.primarySubject,
+            subjectExpertise: JSON.stringify(t.subjectExpertise || []),
+            searchableKeywords: t.searchableKeywords || `${t.location}, ${t.country}, ${t.primarySubject}, ${t.name}`,
+            education: t.education || null,
+            experienceSummary: t.experience || null,
+            availability: t.availability || 'Flexible video sessions',
+            canMeet: t.canMeet || 'Virtual Online 1-on-1',
+            hobbies: t.hobbies || null,
+            verificationStatus: t.verificationStatus || 'Verified Degree & Background',
+            profileImageUrl: t.avatarUrl,
+            createdAt: new Date().toISOString()
+          }).onConflictDoNothing();
+        }
+        console.log('[SEED] Seeded 500 Master Tutors into PostgreSQL tutors table with zero duplicates.');
+      }
+    } catch (tutorDbErr: any) {
+      console.warn('[SEED] Notice during tutors table verification:', tutorDbErr.message);
+    }
   } catch (err: any) {
     console.warn('[SEED] Notice during initial database seeding check:', err.message);
   }
@@ -353,6 +417,7 @@ async function startServer() {
 
   // 1. Public static directory: Avatars (Photos & Icons only)
   app.use('/uploads/avatars', (req, res, next) => {
+    res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
     res.setHeader('Cache-Control', 'public, max-age=86400, stale-while-revalidate=604800');
     next();
@@ -363,6 +428,7 @@ async function startServer() {
 
   // 2. Public static directory: Blogs (Editorial header images only)
   app.use('/uploads/blogs', (req, res, next) => {
+    res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
     res.setHeader('Cache-Control', 'public, max-age=86400, stale-while-revalidate=604800');
     next();
@@ -1003,9 +1069,12 @@ async function startServer() {
   });
 
   // GET /api/tutors
-  // Query parameters: country, subject, max_price, search, page, limit
+  // Public directory search with CORS, searchable keywords matching, and zero duplicates
   app.get('/api/tutors', async (req, res) => {
     try {
+      res.setHeader('Access-Control-Allow-Origin', '*');
+      res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+
       const countryQuery = (req.query.country as string || '').toLowerCase().trim();
       const subjectQuery = (req.query.subject as string || '').toLowerCase().trim();
       const maxPriceQuery = req.query.max_price ? parseFloat(req.query.max_price as string) : undefined;
@@ -1015,9 +1084,9 @@ async function startServer() {
 
       const tutorMap = new Map<string, any>();
 
-      // 1. Trending 500 Master Tutors dataset
+      // 1. Trending 500 Master Tutors dataset (with searchableKeywords)
       for (const t of TRENDING_TUTORS_500) {
-        tutorMap.set(t.id, t);
+        tutorMap.set(t.id, { ...t });
       }
 
       // 2. Initial seed tutors
@@ -1026,7 +1095,7 @@ async function startServer() {
         tutorMap.set(t.id, safeT);
       }
 
-      // 2.5. Disk persisted updates for tutors
+      // 3. Disk persisted updates for tutors
       const persistedUpdates = getPersistedUserUpdates();
       for (const [uId, uUpdates] of Object.entries(persistedUpdates)) {
         if (tutorMap.has(uId)) {
@@ -1034,7 +1103,7 @@ async function startServer() {
         }
       }
 
-      // 3. In-memory / dynamic tutors
+      // 4. In-memory / dynamic tutors
       for (const u of memoryStore.getAllUsers()) {
         if (u.role === 'tutor' || u.id.startsWith('tutor_') || u.id.startsWith('tutor-') || u.hourlyRate) {
           const { passwordHash: _, ...safeU } = u as any;
@@ -1042,20 +1111,69 @@ async function startServer() {
         }
       }
 
-      // 4. Database persisted tutors
-      if (isDbConnected && db) {
+      // 5. Database persisted tutors from tutors table
+      if (isDbConnected() && db) {
         try {
-          const dbTutors = await db.select().from(users).where(eq(users.role, 'tutor'));
-          for (const u of dbTutors) {
-            const { passwordHash: _, ...safeU } = u as any;
-            tutorMap.set(u.id, safeU);
+          const dbTutorsList = await db.select().from(tutors);
+          for (const t of dbTutorsList) {
+            let expArr: string[] = [];
+            try {
+              expArr = t.subjectExpertise.startsWith('[') ? JSON.parse(t.subjectExpertise) : t.subjectExpertise.split(',').map((s: string) => s.trim());
+            } catch {
+              expArr = [t.primarySubject];
+            }
+            tutorMap.set(t.id, {
+              id: t.id,
+              name: t.name,
+              tutorTier: t.tier,
+              tier: t.tier,
+              country: t.country,
+              countryFull: t.country,
+              location: t.cityLocation,
+              cityLocation: t.cityLocation,
+              rating: t.rating || 4.90,
+              reviewsCount: t.reviewsCount || 0,
+              hourlyRate: t.hourlyRate,
+              primarySubject: t.primarySubject,
+              subjectExpertise: expArr,
+              searchableKeywords: t.searchableKeywords,
+              education: t.education,
+              experience: t.experienceSummary,
+              experienceSummary: t.experienceSummary,
+              availability: t.availability,
+              canMeet: t.canMeet,
+              hobbies: t.hobbies,
+              verificationStatus: t.verificationStatus,
+              isVerified: true,
+              avatarUrl: t.profileImageUrl,
+              role: 'tutor'
+            });
           }
         } catch (dbErr) {
-          console.warn('[API] db query error in /api/tutors:', dbErr);
+          console.warn('[API] Notice querying tutors table in /api/tutors:', dbErr);
         }
       }
 
       let allTutors = Array.from(tutorMap.values());
+
+      // STRICT ZERO DUPLICATES ENFORCEMENT: Deduplicate by composite key: (name, primarySubject, cityLocation)
+      const uniqueCompositeMap = new Map<string, any>();
+      for (const t of allTutors) {
+        const cName = (t.name || '').trim().toLowerCase();
+        const cSub = (t.primarySubject || (Array.isArray(t.subjectExpertise) ? t.subjectExpertise[0] : '') || '').trim().toLowerCase();
+        const cLoc = (t.cityLocation || t.location || '').trim().toLowerCase();
+        const compositeKey = `${cName}|${cSub}|${cLoc}`;
+        if (!uniqueCompositeMap.has(compositeKey)) {
+          uniqueCompositeMap.set(compositeKey, t);
+        } else {
+          // If a version with a persistent upload URL exists, prefer it
+          const existing = uniqueCompositeMap.get(compositeKey);
+          if (t.avatarUrl?.includes('/uploads/avatars/') && !existing.avatarUrl?.includes('/uploads/avatars/')) {
+            uniqueCompositeMap.set(compositeKey, t);
+          }
+        }
+      }
+      allTutors = Array.from(uniqueCompositeMap.values());
 
       // Filter by country (code or name)
       if (countryQuery && countryQuery !== 'all') {
@@ -1066,7 +1184,7 @@ async function startServer() {
         });
       }
 
-      // Filter by subject (including primarySubject)
+      // Filter by subject
       if (subjectQuery && subjectQuery !== 'all') {
         allTutors = allTutors.filter(t => {
           const subs = Array.isArray(t.subjects) ? t.subjects : (typeof t.subjects === 'string' ? JSON.parse(t.subjects || '[]') : []);
@@ -1082,17 +1200,19 @@ async function startServer() {
         allTutors = allTutors.filter(t => (t.hourlyRate || 0) <= maxPriceQuery);
       }
 
-      // Filter by general search term
+      // Filter by general search term against searchable_keywords, name, primary_subject, city_location
       if (searchQuery) {
         allTutors = allTutors.filter(t => {
           const nameMatch = (t.name || '').toLowerCase().includes(searchQuery);
           const primMatch = (t.primarySubject || '').toLowerCase().includes(searchQuery);
-          const tierMatch = (t.tutorTier || '').toLowerCase().includes(searchQuery);
+          const tierMatch = (t.tutorTier || t.tier || '').toLowerCase().includes(searchQuery);
           const eduMatch = (t.education || '').toLowerCase().includes(searchQuery);
-          const bioMatch = (t.bio || t.experience || '').toLowerCase().includes(searchQuery);
-          const countryMatch = (t.country || t.countryFull || t.location || '').toLowerCase().includes(searchQuery);
+          const bioMatch = (t.bio || t.experience || t.experienceSummary || '').toLowerCase().includes(searchQuery);
+          const countryMatch = (t.country || t.countryFull || '').toLowerCase().includes(searchQuery);
+          const locMatch = (t.location || t.cityLocation || '').toLowerCase().includes(searchQuery);
+          const kwMatch = (t.searchableKeywords || '').toLowerCase().includes(searchQuery);
           const subs = Array.isArray(t.subjectExpertise) ? t.subjectExpertise.join(' ').toLowerCase() : '';
-          return nameMatch || primMatch || tierMatch || eduMatch || bioMatch || countryMatch || subs.includes(searchQuery);
+          return nameMatch || primMatch || tierMatch || eduMatch || bioMatch || countryMatch || locMatch || kwMatch || subs.includes(searchQuery);
         });
       }
 
@@ -1111,6 +1231,374 @@ async function startServer() {
     } catch (err: any) {
       console.error('[API] Error in GET /api/tutors:', err);
       return res.status(500).json({ error: 'Failed to retrieve tutors' });
+    }
+  });
+
+  // POST /api/admin/tutors/upload-avatar
+  // Dedicated multipart image upload controller for admin tutor headshots
+  app.post('/api/admin/tutors/upload-avatar', (req, res) => {
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    avatarMulterUpload.single('image')(req, res, async (err: any) => {
+      if (err) {
+        console.error('[API] Multer upload error:', err);
+        return res.status(400).json({ error: err.message || 'File upload failed' });
+      }
+
+      try {
+        if (req.file) {
+          const timestamp = Date.now();
+          const publicUrl = `${APP_URL}/uploads/avatars/${req.file.filename}?v=${timestamp}`;
+          const relativeUrl = `/uploads/avatars/${req.file.filename}?v=${timestamp}`;
+          return res.status(200).json({
+            success: true,
+            url: publicUrl,
+            relativeUrl,
+            filename: req.file.filename
+          });
+        }
+
+        // Fallback: check if base64 data URI was sent in JSON body
+        const { image, avatarUrl } = req.body || {};
+        const dataUri = image || avatarUrl;
+        if (dataUri && typeof dataUri === 'string' && dataUri.startsWith('data:image/')) {
+          const relativeUrl = saveBase64ImageToUploads(dataUri, 'avatars', 'avatar');
+          const publicUrl = relativeUrl.startsWith('http') ? relativeUrl : `${APP_URL}${relativeUrl}`;
+          return res.status(200).json({
+            success: true,
+            url: publicUrl,
+            relativeUrl,
+            filename: path.basename(relativeUrl.split('?')[0])
+          });
+        }
+
+        return res.status(400).json({ error: 'No image file or valid image data provided.' });
+      } catch (uploadErr: any) {
+        console.error('[API] Error saving uploaded avatar:', uploadErr);
+        return res.status(500).json({ error: 'Failed to process image upload.' });
+      }
+    });
+  });
+
+  // POST /api/admin/tutors
+  // Dynamic Admin Profile Creation with deduplication guarantee and instant indexing
+  app.post('/api/admin/tutors', (req, res, next) => {
+    if (req.is('multipart/form-data')) {
+      avatarMulterUpload.single('profileImage')(req, res, (err) => {
+        if (err) return res.status(400).json({ error: err.message });
+        next();
+      });
+    } else {
+      next();
+    }
+  }, async (req, res) => {
+    try {
+      const {
+        name,
+        tier,
+        country,
+        cityLocation,
+        location,
+        rating,
+        reviewsCount,
+        hourlyRate,
+        primarySubject,
+        subjectExpertise,
+        searchableKeywords,
+        education,
+        experienceSummary,
+        experience,
+        availability,
+        canMeet,
+        hobbies,
+        verificationStatus,
+        profileImageUrl,
+        avatarUrl,
+        email,
+        phoneNumber
+      } = req.body;
+
+      if (!name || !name.trim()) {
+        return res.status(400).json({ error: 'Tutor name is required.' });
+      }
+      if (!primarySubject || !primarySubject.trim()) {
+        return res.status(400).json({ error: 'Primary subject is required.' });
+      }
+
+      const locText = (cityLocation || location || 'Miami, FL').trim();
+      const cleanName = name.trim();
+      const cleanSubject = primarySubject.trim();
+
+      // ZERO DUPLICATE VERIFICATION:
+      // Verify no tutor profile already exists with same (name, primarySubject, cityLocation)
+      const compKey = `${cleanName.toLowerCase()}|${cleanSubject.toLowerCase()}|${locText.toLowerCase()}`;
+      
+      const existingInMem = memoryStore.getAllUsers().find(u => {
+        const uAny = u as any;
+        const uName = (uAny.name || '').trim().toLowerCase();
+        const uSub = (uAny.primarySubject || (Array.isArray(uAny.subjects) ? uAny.subjects[0] : '') || '').trim().toLowerCase();
+        const uLoc = (uAny.cityLocation || uAny.location || uAny.city || '').trim().toLowerCase();
+        return `${uName}|${uSub}|${uLoc}` === compKey;
+      });
+
+      const existingIn500 = TRENDING_TUTORS_500.find(t => {
+        const tName = t.name.trim().toLowerCase();
+        const tSub = t.primarySubject.trim().toLowerCase();
+        const tLoc = (t.cityLocation || t.location).trim().toLowerCase();
+        return `${tName}|${tSub}|${tLoc}` === compKey;
+      });
+
+      let existingInDb = false;
+      if (isDbConnected() && db) {
+        try {
+          const match = await db.select().from(tutors).where(
+            and(
+              eq(tutors.name, cleanName),
+              eq(tutors.primarySubject, cleanSubject),
+              eq(tutors.cityLocation, locText)
+            )
+          ).limit(1);
+          if (match.length > 0) existingInDb = true;
+        } catch (dbErr) {
+          // ignore
+        }
+      }
+
+      if (existingInMem || existingIn500 || existingInDb) {
+        return res.status(409).json({
+          error: `Duplicate Profile Detected: A tutor profile for "${cleanName}" teaching "${cleanSubject}" in "${locText}" already exists in the directory.`,
+          isDuplicate: true
+        });
+      }
+
+      // Handle profile image: file upload > base64 > provided URL > fallback
+      let finalImageUrl = profileImageUrl || avatarUrl || '';
+      if (req.file) {
+        finalImageUrl = `${APP_URL}/uploads/avatars/${req.file.filename}?v=${Date.now()}`;
+      } else if (finalImageUrl.startsWith('data:image/')) {
+        const rel = saveBase64ImageToUploads(finalImageUrl, 'avatars', 'avatar');
+        finalImageUrl = rel.startsWith('http') ? rel : `${APP_URL}${rel}`;
+      } else if (!finalImageUrl) {
+        finalImageUrl = 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=256';
+      }
+
+      // Append cache-busting timestamp to local uploads
+      if (finalImageUrl.includes('/uploads/avatars/') && !finalImageUrl.includes('?v=')) {
+        finalImageUrl = `${finalImageUrl}?v=${Date.now()}`;
+      }
+
+      // Normalize subject expertise
+      let subjectExpertiseStr = '';
+      if (Array.isArray(subjectExpertise)) {
+        subjectExpertiseStr = subjectExpertise.join(', ');
+      } else if (typeof subjectExpertise === 'string') {
+        subjectExpertiseStr = subjectExpertise.trim();
+      } else {
+        subjectExpertiseStr = cleanSubject;
+      }
+
+      // Generate rich searchable keywords if empty
+      const generatedKeywords = searchableKeywords && searchableKeywords.trim()
+        ? searchableKeywords.trim()
+        : `${locText}, ${country || 'USA'}, ${cleanSubject}, ${cleanName}, ${cleanSubject} tutor, exam prep, homework solver, 1-on-1 online tutoring, university tutors, certified tutor, test prep`;
+
+      const tutorId = 'tutor_' + Date.now() + '_' + crypto.randomBytes(4).toString('hex');
+      const nowIso = new Date().toISOString();
+      const rate = hourlyRate ? parseFloat(hourlyRate) : 45.0;
+      const parsedRating = rating ? parseFloat(rating) : 4.95;
+      const parsedReviews = reviewsCount ? parseInt(reviewsCount, 10) : 0;
+      const tutorTier = tier || 'Senior Tutor / Expert';
+      const cleanCountry = country || 'USA';
+      const cleanEmail = (email && email.trim()) ? email.trim().toLowerCase() : `${tutorId}@university-tutors.com`;
+
+      const newTutorRecord = {
+        id: tutorId,
+        name: cleanName,
+        tier: tutorTier,
+        country: cleanCountry,
+        cityLocation: locText,
+        rating: parsedRating,
+        reviewsCount: parsedReviews,
+        hourlyRate: rate,
+        primarySubject: cleanSubject,
+        subjectExpertise: subjectExpertiseStr,
+        searchableKeywords: generatedKeywords,
+        education: education || null,
+        experienceSummary: experienceSummary || experience || null,
+        availability: availability || 'Flexible video sessions',
+        canMeet: canMeet || 'Virtual Online 1-on-1',
+        hobbies: hobbies || null,
+        verificationStatus: verificationStatus || 'Verified Degree & Background',
+        profileImageUrl: finalImageUrl,
+        createdAt: nowIso
+      };
+
+      // 1. Insert into PostgreSQL tutors table
+      if (isDbConnected() && db) {
+        try {
+          await db.insert(tutors).values(newTutorRecord);
+          console.log(`[DB] Successfully inserted new tutor into PostgreSQL tutors table: ${tutorId}`);
+        } catch (dbErr: any) {
+          console.warn('[DB] Warning inserting into tutors table:', dbErr.message);
+        }
+      }
+
+      // 2. Also insert into users table and memoryStore so auth and orders work
+      const userRecord: any = {
+        id: tutorId,
+        role: 'tutor',
+        name: cleanName,
+        email: cleanEmail,
+        avatarUrl: finalImageUrl,
+        createdAt: nowIso,
+        verified: true,
+        suspended: false,
+        bio: experienceSummary || experience || 'Certified academic tutor.',
+        hourlyRate: Math.round(rate),
+        rating: parsedRating,
+        reviewCount: parsedReviews,
+        subjects: JSON.stringify([cleanSubject]),
+        country: cleanCountry,
+        location: locText,
+        phoneNumber: phoneNumber || null,
+        education: education || null,
+        experience: experienceSummary || experience || null,
+        subjectExpertise: JSON.stringify(subjectExpertiseStr.split(',').map(s => s.trim())),
+        availability: availability || null,
+        canMeet: canMeet || 'Online',
+        hobbies: hobbies || null,
+        isApproved: true,
+        status: 'approved',
+        searchableKeywords: generatedKeywords
+      };
+
+      memoryStore.setUser(userRecord);
+
+      if (isDbConnected() && db) {
+        try {
+          await db.insert(users).values(userRecord).onConflictDoNothing();
+        } catch (userErr: any) {
+          console.warn('[DB] Notice syncing new tutor to users table:', userErr.message);
+        }
+      }
+
+      savePersistedUserUpdate(tutorId, { avatarUrl: finalImageUrl, profileImageUrl: finalImageUrl });
+
+      await logAudit('CREATE_TUTOR_PROFILE', `Admin created tutor profile: ${cleanName} (${cleanSubject})`, tutorId, cleanName, 'admin', req);
+
+      return res.status(201).json({
+        success: true,
+        tutor: newTutorRecord,
+        user: userRecord
+      });
+    } catch (err: any) {
+      console.error('[API] Error creating tutor in POST /api/admin/tutors:', err);
+      return res.status(500).json({ error: err.message || 'Internal server error while creating tutor profile' });
+    }
+  });
+
+  // PUT /api/admin/tutors/:id
+  // Update tutor attributes, handle image replacement with cache-busting (?v=timestamp)
+  app.put('/api/admin/tutors/:id', (req, res, next) => {
+    if (req.is('multipart/form-data')) {
+      avatarMulterUpload.single('profileImage')(req, res, (err) => {
+        if (err) return res.status(400).json({ error: err.message });
+        next();
+      });
+    } else {
+      next();
+    }
+  }, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const updates = { ...req.body };
+
+      // Handle image upload / replacement
+      if (req.file) {
+        updates.profileImageUrl = `${APP_URL}/uploads/avatars/${req.file.filename}?v=${Date.now()}`;
+        updates.avatarUrl = updates.profileImageUrl;
+      } else if (updates.profileImageUrl && updates.profileImageUrl.startsWith('data:image/')) {
+        const rel = saveBase64ImageToUploads(updates.profileImageUrl, 'avatars', `avatar_${id}`);
+        updates.profileImageUrl = rel.startsWith('http') ? rel : `${APP_URL}${rel}`;
+        updates.avatarUrl = updates.profileImageUrl;
+      } else if (updates.avatarUrl && updates.avatarUrl.startsWith('data:image/')) {
+        const rel = saveBase64ImageToUploads(updates.avatarUrl, 'avatars', `avatar_${id}`);
+        updates.avatarUrl = rel.startsWith('http') ? rel : `${APP_URL}${rel}`;
+        updates.profileImageUrl = updates.avatarUrl;
+      }
+
+      // Always append cache-busting timestamp to updated avatar URLs
+      if (updates.profileImageUrl && updates.profileImageUrl.includes('/uploads/avatars/') && !updates.profileImageUrl.includes('?v=')) {
+        updates.profileImageUrl = `${updates.profileImageUrl}?v=${Date.now()}`;
+      }
+      if (updates.avatarUrl && updates.avatarUrl.includes('/uploads/avatars/') && !updates.avatarUrl.includes('?v=')) {
+        updates.avatarUrl = `${updates.avatarUrl}?v=${Date.now()}`;
+      }
+
+      // Update disk persistence
+      savePersistedUserUpdate(id, updates);
+
+      // Update memory store
+      memoryStore.updateUser(id, updates);
+
+      // Update PostgreSQL tutors table if connected
+      if (isDbConnected() && db) {
+        try {
+          const tutorDbUpdates: Record<string, any> = {};
+          if (updates.name) tutorDbUpdates.name = updates.name.trim();
+          if (updates.tier) tutorDbUpdates.tier = updates.tier;
+          if (updates.country) tutorDbUpdates.country = updates.country;
+          if (updates.cityLocation || updates.location) tutorDbUpdates.cityLocation = (updates.cityLocation || updates.location).trim();
+          if (updates.rating) tutorDbUpdates.rating = parseFloat(updates.rating);
+          if (updates.reviewsCount) tutorDbUpdates.reviewsCount = parseInt(updates.reviewsCount, 10);
+          if (updates.hourlyRate) tutorDbUpdates.hourlyRate = parseFloat(updates.hourlyRate);
+          if (updates.primarySubject) tutorDbUpdates.primarySubject = updates.primarySubject.trim();
+          if (updates.subjectExpertise) {
+            tutorDbUpdates.subjectExpertise = Array.isArray(updates.subjectExpertise) ? updates.subjectExpertise.join(', ') : updates.subjectExpertise;
+          }
+          if (updates.searchableKeywords) tutorDbUpdates.searchableKeywords = updates.searchableKeywords;
+          if (updates.education) tutorDbUpdates.education = updates.education;
+          if (updates.experienceSummary || updates.experience) tutorDbUpdates.experienceSummary = updates.experienceSummary || updates.experience;
+          if (updates.availability) tutorDbUpdates.availability = updates.availability;
+          if (updates.canMeet) tutorDbUpdates.canMeet = updates.canMeet;
+          if (updates.hobbies) tutorDbUpdates.hobbies = updates.hobbies;
+          if (updates.verificationStatus) tutorDbUpdates.verificationStatus = updates.verificationStatus;
+          if (updates.profileImageUrl || updates.avatarUrl) tutorDbUpdates.profileImageUrl = updates.profileImageUrl || updates.avatarUrl;
+
+          if (Object.keys(tutorDbUpdates).length > 0) {
+            await db.update(tutors).set(tutorDbUpdates).where(eq(tutors.id, id));
+            console.log(`[DB] Successfully updated tutor ${id} in tutors table.`);
+          }
+        } catch (dbErr: any) {
+          console.warn('[DB] Warning updating tutors table:', dbErr.message);
+        }
+
+        // Also update users table
+        try {
+          const userUpdates: Record<string, any> = {};
+          if (updates.name) userUpdates.name = updates.name.trim();
+          if (updates.avatarUrl || updates.profileImageUrl) userUpdates.avatarUrl = updates.avatarUrl || updates.profileImageUrl;
+          if (updates.hourlyRate) userUpdates.hourlyRate = Math.round(parseFloat(updates.hourlyRate));
+          if (updates.location || updates.cityLocation) userUpdates.location = updates.cityLocation || updates.location;
+          if (updates.bio || updates.experience || updates.experienceSummary) userUpdates.bio = updates.experienceSummary || updates.experience || updates.bio;
+          if (updates.education) userUpdates.education = updates.education;
+          if (updates.searchableKeywords) userUpdates.searchableKeywords = updates.searchableKeywords;
+          if (Object.keys(userUpdates).length > 0) {
+            await db.update(users).set(userUpdates).where(eq(users.id, id));
+          }
+        } catch (uErr: any) {
+          console.warn('[DB] Notice updating users table:', uErr.message);
+        }
+      }
+
+      await logAudit('TUTOR_PROFILE_UPDATED', `Admin updated tutor profile ${id}`, id, updates.name, 'admin', req);
+
+      return res.status(200).json({
+        success: true,
+        tutor: { id, ...updates }
+      });
+    } catch (err: any) {
+      console.error('[API] Error in PUT /api/admin/tutors/:id:', err);
+      return res.status(500).json({ error: err.message || 'Failed to update tutor profile' });
     }
   });
 

@@ -1,4 +1,4 @@
-import { pgTable, text, boolean, integer, doublePrecision, index } from 'drizzle-orm/pg-core';
+import { pgTable, text, boolean, integer, doublePrecision, index, uniqueIndex } from 'drizzle-orm/pg-core';
 
 // 1. Users Table (Students, Tutors, and Admins / Subadmins)
 export const users = pgTable('users', {
@@ -28,6 +28,7 @@ export const users = pgTable('users', {
   isApproved: boolean('is_approved').default(true),
   status: text('status').default('active'),
   availableSlots: text('available_slots'), // JSON stringified array
+  searchableKeywords: text('searchable_keywords'),
 });
 
 // 2. Orders Table (Assignments & Tutoring Requests)
@@ -167,4 +168,34 @@ export const blogs = pgTable('blogs', {
   index('idx_blogs_published_at').on(table.publishedAt),
   index('idx_blogs_category').on(table.category),
 ]);
+
+// 8. Tutors Table (Comprehensive Tutor Directory with Searchable Keywords and Zero Duplicates)
+export const tutors = pgTable('tutors', {
+  id: text('id').primaryKey(),
+  name: text('name').notNull(),
+  tier: text('tier').notNull().default('Senior Tutor / Expert'),
+  country: text('country').notNull().default('USA'),
+  cityLocation: text('city_location').notNull(),
+  rating: doublePrecision('rating').default(4.90),
+  reviewsCount: integer('reviews_count').default(0),
+  hourlyRate: doublePrecision('hourly_rate').notNull(),
+  primarySubject: text('primary_subject').notNull(),
+  subjectExpertise: text('subject_expertise').notNull(), // JSON string or text
+  searchableKeywords: text('searchable_keywords').notNull(),
+  education: text('education'),
+  experienceSummary: text('experience_summary'),
+  availability: text('availability'),
+  canMeet: text('can_meet'),
+  hobbies: text('hobbies'),
+  verificationStatus: text('verification_status').default('Verified Degree & Background'),
+  profileImageUrl: text('profile_image_url').notNull(),
+  createdAt: text('created_at').notNull(),
+}, (table) => [
+  uniqueIndex('idx_tutors_unique_profile').on(table.name, table.primarySubject, table.cityLocation),
+  index('idx_tutors_searchable_keywords').on(table.searchableKeywords),
+  index('idx_tutors_name').on(table.name),
+  index('idx_tutors_primary_subject').on(table.primarySubject),
+  index('idx_tutors_city_location').on(table.cityLocation),
+]);
+
 

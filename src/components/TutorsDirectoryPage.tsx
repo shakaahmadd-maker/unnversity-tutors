@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { 
   GraduationCap, 
   Briefcase, 
@@ -100,7 +100,31 @@ export default function TutorsDirectoryPage({
   const [showMobileFilters, setShowMobileFilters] = useState<boolean>(false);
   const pageSize = 15;
 
-  // Unify 500 international tutors with any extra store tutors
+  // Sync URL search parameters and props on mount or change
+  useEffect(() => {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const urlQ = params.get('q') || params.get('search');
+      const urlCountry = params.get('location') || params.get('country');
+      const urlSubject = params.get('subject');
+
+      if (urlQ) setSearchTerm(urlQ);
+      if (urlCountry) setSelectedCountry(urlCountry);
+      if (urlSubject) setSelectedSubject(urlSubject);
+    } catch {
+      // ignore in SSR or constrained environments
+    }
+  }, []);
+
+  useEffect(() => {
+    if (locationFilter) setSelectedCountry(locationFilter);
+    if (subjectFilter) {
+      setSelectedSubject(subjectFilter);
+      setSearchTerm(subjectFilter);
+    }
+  }, [locationFilter, subjectFilter]);
+
+  // Unify 500 international tutors with any extra store tutors (guaranteeing zero duplicates)
   const unifiedTutors = useMemo(() => {
     const map = new Map<string, User>();
     // Seed the 500 trending master tutors
@@ -111,7 +135,26 @@ export default function TutorsDirectoryPage({
         map.set(st.id, st);
       }
     });
-    return Array.from(map.values());
+
+    // Enforce ZERO duplicates by composite key: (name, primarySubject, location)
+    const uniqueMap = new Map<string, User>();
+    map.forEach(t => {
+      const cName = (t.name || '').trim().toLowerCase();
+      const cSub = ((t as any).primarySubject || (Array.isArray(t.subjects) ? t.subjects[0] : '') || '').trim().toLowerCase();
+      const cLoc = (t.location || (t as any).cityLocation || t.city || '').trim().toLowerCase();
+      const compKey = `${cName}|${cSub}|${cLoc}`;
+      if (!uniqueMap.has(compKey)) {
+        uniqueMap.set(compKey, t);
+      } else {
+        // If a version has a persistent uploaded image, prefer it
+        const existing = uniqueMap.get(compKey)!;
+        if (t.avatarUrl?.includes('/uploads/avatars/') && !existing.avatarUrl?.includes('/uploads/avatars/')) {
+          uniqueMap.set(compKey, t);
+        }
+      }
+    });
+
+    return Array.from(uniqueMap.values());
   }, [allStoreTutors]);
 
   // Extract all distinct primary subjects across all tutors
@@ -152,17 +195,19 @@ export default function TutorsDirectoryPage({
         return false;
       }
 
-      // 4. Text Search
+      // 4. Text Search against keywords, name, primary subject, location, expertise
       if (searchTerm.trim()) {
         const term = searchTerm.toLowerCase().trim();
         const subExp = Array.isArray(t.subjectExpertise) ? t.subjectExpertise.join(' ') : String(t.subjectExpertise || '');
+        const keywords = String((t as any).searchableKeywords || '');
         const combinedSearchSpace = [
           t.name,
           (t as any).primarySubject || '',
           (t as any).tutorTier || '',
-          t.location || '',
+          t.location || (t as any).cityLocation || '',
           (t as any).countryName || (t as any).countryFull || '',
           t.country || '',
+          keywords,
           t.education || '',
           t.experience || '',
           t.bio || '',
@@ -172,7 +217,6 @@ export default function TutorsDirectoryPage({
 
         if (!combinedSearchSpace.includes(term)) return false;
       }
-
 
       return true;
     });

@@ -80,6 +80,15 @@ export default function TutorsListAdmin({
 
   // Success toast state
   const [actionSuccessMsg, setActionSuccessMsg] = useState<string | null>(null);
+  const [modalError, setModalError] = useState<string | null>(null);
+
+  const generateAutoKeywords = (name: string, subject: string, location: string, country: string, expertise: string) => {
+    const loc = location || 'Miami, FL';
+    const ctry = country || 'USA';
+    const subj = subject || 'General Academics';
+    const tutorName = name || 'Academic Tutor';
+    return `${loc}, ${ctry}, ${subj}, ${tutorName}, ${subj} tutor, ${expertise ? expertise + ', ' : ''}AP exam prep, homework solver, 1-on-1 online tutoring, university tutors, certified tutor, test prep`;
+  };
 
   // Edit Form state
   const [editForm, setEditForm] = useState<{
@@ -99,6 +108,10 @@ export default function TutorsListAdmin({
     avatarUrl: string;
     isApproved: boolean;
     status: 'pending' | 'approved' | 'rejected';
+    tutorTier: string;
+    primarySubject: string;
+    searchableKeywords: string;
+    verificationStatus: string;
   }>({
     name: '',
     email: '',
@@ -115,7 +128,11 @@ export default function TutorsListAdmin({
     country: 'US',
     avatarUrl: '',
     isApproved: true,
-    status: 'approved'
+    status: 'approved',
+    tutorTier: 'Senior Tutor / Expert',
+    primarySubject: '',
+    searchableKeywords: '',
+    verificationStatus: 'Verified Degree & Background'
   });
 
   // Add Form state
@@ -136,6 +153,10 @@ export default function TutorsListAdmin({
     avatarUrl: string;
     isApproved: boolean;
     status: 'pending' | 'approved' | 'rejected';
+    tutorTier: string;
+    primarySubject: string;
+    searchableKeywords: string;
+    verificationStatus: string;
   }>({
     name: '',
     email: '',
@@ -152,7 +173,11 @@ export default function TutorsListAdmin({
     country: 'US',
     avatarUrl: '',
     isApproved: true,
-    status: 'approved'
+    status: 'approved',
+    tutorTier: 'Senior Tutor / Expert',
+    primarySubject: '',
+    searchableKeywords: '',
+    verificationStatus: 'Verified Degree & Background'
   });
 
   const [isSubmittingAdd, setIsSubmittingAdd] = useState(false);
@@ -236,8 +261,15 @@ export default function TutorsListAdmin({
   };
 
   const handleStartEdit = (tutor: User) => {
+    setModalError(null);
     setEditingTutor(tutor);
     const isApp = tutor.isApproved === true || tutor.status === 'approved' || (tutor.isApproved === undefined && tutor.status === undefined);
+    const primSub = (tutor as any).primarySubject || (Array.isArray(tutor.subjects) && tutor.subjects.length > 0 ? tutor.subjects[0] : (typeof tutor.subjects === 'string' ? tutor.subjects : 'General Academics'));
+    const tier = (tutor as any).tutorTier || (tutor as any).tier || 'Senior Tutor / Expert';
+    const expertiseStr = tutor.subjectExpertise ? (Array.isArray(tutor.subjectExpertise) ? tutor.subjectExpertise.join(', ') : tutor.subjectExpertise) : (tutor.subjects ? (Array.isArray(tutor.subjects) ? tutor.subjects.join(', ') : tutor.subjects) : '');
+    const keywords = (tutor as any).searchableKeywords || generateAutoKeywords(tutor.name, primSub, tutor.location || tutor.city || 'Miami, FL', tutor.country || 'USA', expertiseStr);
+    const verif = (tutor as any).verificationStatus || 'Verified Degree & Background';
+
     setEditForm({
       name: tutor.name,
       email: tutor.email,
@@ -245,40 +277,67 @@ export default function TutorsListAdmin({
       location: tutor.location || tutor.city || 'Miami, FL',
       bio: tutor.bio || '',
       education: tutor.education || '',
-      experiences: tutor.experiences || '',
-      subjectExpertise: tutor.subjectExpertise ? (Array.isArray(tutor.subjectExpertise) ? tutor.subjectExpertise.join(', ') : tutor.subjectExpertise) : (tutor.subjects ? tutor.subjects.join(', ') : ''),
-      availabilities: tutor.availabilities || tutor.availability || '',
+      experiences: tutor.experiences || (tutor as any).experience || '',
+      subjectExpertise: expertiseStr,
+      availabilities: tutor.availabilities || (tutor as any).availability || '',
       canMeet: (tutor.canMeet as any) || 'Online',
       hobbies: tutor.hobbies || '',
       hourlyRate: tutor.hourlyRate || 40,
       country: tutor.country || 'US',
       avatarUrl: tutor.avatarUrl || '',
       isApproved: isApp,
-      status: tutor.status || (isApp ? 'approved' : 'pending')
+      status: tutor.status || (isApp ? 'approved' : 'pending'),
+      tutorTier: tier,
+      primarySubject: primSub,
+      searchableKeywords: keywords,
+      verificationStatus: verif
     });
   };
 
-  const handleSaveEdit = (e: React.FormEvent) => {
+  const handleSaveEdit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingTutor) return;
+    setModalError(null);
+
+    // Duplicate verification against other tutors in directory
+    const compKey = `${editForm.name.trim().toLowerCase()}|${editForm.primarySubject.trim().toLowerCase()}|${editForm.location.trim().toLowerCase()}`;
+    const duplicate = allTutors.find(t => {
+      if (t.id === editingTutor.id) return false;
+      const tName = (t.name || '').trim().toLowerCase();
+      const tSub = ((t as any).primarySubject || (Array.isArray(t.subjects) ? t.subjects[0] : '') || '').trim().toLowerCase();
+      const tLoc = (t.location || t.city || '').trim().toLowerCase();
+      return `${tName}|${tSub}|${tLoc}` === compKey;
+    });
+
+    if (duplicate) {
+      setModalError(`Duplicate profile conflict: Another tutor ("${duplicate.name}") is already registered for "${editForm.primarySubject}" in "${editForm.location}".`);
+      return;
+    }
 
     const subjectsArr = editForm.subjectExpertise
       .split(',')
       .map(s => s.trim())
       .filter(s => s.length > 0);
 
-    onUpdateUserProfile(editingTutor.id, {
+    const updatedData: any = {
       name: editForm.name,
       email: editForm.email,
       phoneNumber: editForm.phoneNumber,
       location: editForm.location,
+      cityLocation: editForm.location,
       city: editForm.location ? editForm.location.split(',')[0].trim() : 'Miami',
       bio: editForm.bio,
       education: editForm.education,
       experiences: editForm.experiences,
       experience: editForm.experiences,
+      experienceSummary: editForm.experiences,
       subjectExpertise: editForm.subjectExpertise,
       subjects: subjectsArr,
+      primarySubject: editForm.primarySubject,
+      tutorTier: editForm.tutorTier,
+      tier: editForm.tutorTier,
+      searchableKeywords: editForm.searchableKeywords || generateAutoKeywords(editForm.name, editForm.primarySubject, editForm.location, editForm.country, editForm.subjectExpertise),
+      verificationStatus: editForm.verificationStatus,
       availabilities: editForm.availabilities,
       availability: editForm.availabilities,
       canMeet: editForm.canMeet,
@@ -286,48 +345,135 @@ export default function TutorsListAdmin({
       hourlyRate: editForm.hourlyRate,
       country: editForm.country,
       avatarUrl: editForm.avatarUrl,
+      profileImageUrl: editForm.avatarUrl,
       isApproved: editForm.isApproved,
       status: editForm.isApproved ? 'approved' : editForm.status
-    });
+    };
 
+    try {
+      // Direct call to PUT /api/admin/tutors/:id
+      await fetch(`/api/admin/tutors/${editingTutor.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updatedData)
+      });
+    } catch (e) {
+      console.warn('[Admin] Notice updating tutor via API:', e);
+    }
+
+    onUpdateUserProfile(editingTutor.id, updatedData);
     setEditingTutor(null);
     showNotification(`Tutor profile for ${editForm.name} updated successfully!`);
   };
 
   const handleSaveNewTutor = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!addForm.name.trim() || !addForm.email.trim()) return;
+    setModalError(null);
+
+    if (!addForm.name.trim()) {
+      setModalError('Full name is required.');
+      return;
+    }
+    if (!addForm.primarySubject.trim()) {
+      setModalError('Primary Subject is required.');
+      return;
+    }
+
+    const locText = addForm.location.trim() || 'Miami, FL';
+    // Duplicate verification against all tutors in directory
+    const compKey = `${addForm.name.trim().toLowerCase()}|${addForm.primarySubject.trim().toLowerCase()}|${locText.toLowerCase()}`;
+    const duplicate = allTutors.find(t => {
+      const tName = (t.name || '').trim().toLowerCase();
+      const tSub = ((t as any).primarySubject || (Array.isArray(t.subjects) ? t.subjects[0] : '') || '').trim().toLowerCase();
+      const tLoc = (t.location || t.city || '').trim().toLowerCase();
+      return `${tName}|${tSub}|${tLoc}` === compKey;
+    });
+
+    if (duplicate) {
+      setModalError(`Duplicate Profile: A tutor profile for "${addForm.name}" teaching "${addForm.primarySubject}" in "${locText}" already exists in the directory.`);
+      return;
+    }
 
     setIsSubmittingAdd(true);
     try {
-      const ok = await onAddNewTutor({
-        ...addForm,
+      const generatedKws = addForm.searchableKeywords && addForm.searchableKeywords.trim()
+        ? addForm.searchableKeywords.trim()
+        : generateAutoKeywords(addForm.name, addForm.primarySubject, locText, addForm.country, addForm.subjectExpertise);
+
+      const payload = {
+        name: addForm.name.trim(),
+        email: addForm.email.trim() || `tutor_${Date.now()}@university-tutors.com`,
+        phoneNumber: addForm.phoneNumber,
+        location: locText,
+        cityLocation: locText,
+        tier: addForm.tutorTier,
+        tutorTier: addForm.tutorTier,
+        primarySubject: addForm.primarySubject.trim(),
+        subjectExpertise: addForm.subjectExpertise || addForm.primarySubject,
+        searchableKeywords: generatedKws,
+        bio: addForm.bio || addForm.experiences || 'Dedicated academic faculty specialist.',
+        education: addForm.education,
+        experienceSummary: addForm.experiences,
+        experiences: addForm.experiences,
+        availabilities: addForm.availabilities,
+        availability: addForm.availabilities,
+        canMeet: addForm.canMeet,
+        hobbies: addForm.hobbies,
+        hourlyRate: addForm.hourlyRate || 45,
+        country: addForm.country || 'USA',
+        avatarUrl: addForm.avatarUrl || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=256',
+        profileImageUrl: addForm.avatarUrl || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=256',
+        verificationStatus: addForm.verificationStatus || 'Verified Degree & Background',
         isApproved: addForm.isApproved,
         status: addForm.isApproved ? 'approved' : addForm.status
+      };
+
+      const res = await fetch('/api/admin/tutors', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
       });
-      if (ok) {
-        setIsAddModalOpen(false);
-        showNotification(`New tutor profile for ${addForm.name} created successfully!`);
-        setAddForm({
-          name: '',
-          email: '',
-          phoneNumber: '',
-          bio: '',
-          education: '',
-          experiences: '',
-          subjectExpertise: '',
-          availabilities: '',
-          canMeet: 'Online',
-          hobbies: '',
-          hourlyRate: 45,
-          country: 'US',
-          avatarUrl: '',
-          isApproved: true,
-          status: 'approved'
-        });
+
+      if (res.status === 409) {
+        const err = await res.json();
+        setModalError(err.error || 'Duplicate tutor profile detected in directory.');
+        return;
       }
-    } catch (err) {
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || 'Failed to create tutor profile');
+      }
+
+      setIsAddModalOpen(false);
+      showNotification(`New tutor profile for ${addForm.name} created successfully!`);
+      await onAddNewTutor(payload);
+
+      setAddForm({
+        name: '',
+        email: '',
+        phoneNumber: '',
+        location: 'Miami, FL',
+        bio: '',
+        education: '',
+        experiences: '',
+        subjectExpertise: '',
+        availabilities: '',
+        canMeet: 'Online',
+        hobbies: '',
+        hourlyRate: 45,
+        country: 'USA',
+        avatarUrl: '',
+        isApproved: true,
+        status: 'approved',
+        tutorTier: 'Senior Tutor / Expert',
+        primarySubject: '',
+        searchableKeywords: '',
+        verificationStatus: 'Verified Degree & Background'
+      });
+    } catch (err: any) {
       console.error(err);
+      setModalError(err.message || 'Error occurred while saving tutor profile.');
     } finally {
       setIsSubmittingAdd(false);
     }
@@ -842,22 +988,32 @@ export default function TutorsListAdmin({
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/70 backdrop-blur-sm overflow-y-auto">
           <div className="relative w-full max-w-2xl bg-white rounded-3xl shadow-2xl p-6 sm:p-8 my-8 space-y-6">
             <div className="flex items-center justify-between border-b pb-4">
-              <h3 className="text-lg font-bold text-slate-900">Edit Tutor Data: {editingTutor.name}</h3>
-              <button onClick={() => setEditingTutor(null)} className="p-2 text-slate-400 hover:text-slate-700">
+              <div>
+                <h3 className="text-lg font-bold text-slate-900">Edit Tutor Profile: {editingTutor.name}</h3>
+                <p className="text-xs text-slate-500">Update headshot, credentials, and searchable keywords with instant live indexing.</p>
+              </div>
+              <button onClick={() => { setEditingTutor(null); setModalError(null); }} className="p-2 text-slate-400 hover:text-slate-700">
                 <X className="w-5 h-5" />
               </button>
             </div>
+
+            {modalError && (
+              <div className="p-3 bg-rose-50 border border-rose-200 rounded-2xl text-rose-800 text-xs flex items-center gap-2">
+                <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
+                <span className="font-semibold">{modalError}</span>
+              </div>
+            )}
 
             <form onSubmit={handleSaveEdit} className="space-y-4 max-h-[65vh] overflow-y-auto text-xs pr-1">
               <TutorImageUploader
                 currentImageUrl={editForm.avatarUrl}
                 onImageChange={(url) => setEditForm({ ...editForm, avatarUrl: url })}
-                label="Tutor Profile Picture"
+                label="Tutor Profile Headshot"
               />
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="block font-semibold mb-1">Full Name</label>
+                  <label className="block font-semibold mb-1">Full Name *</label>
                   <input
                     type="text"
                     required
@@ -874,6 +1030,33 @@ export default function TutorsListAdmin({
                     value={editForm.email}
                     onChange={(e) => setEditForm({ ...editForm, email: e.target.value })}
                     className="w-full p-2.5 bg-slate-50 border rounded-xl"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-semibold mb-1">Tutor Tier</label>
+                  <select
+                    value={editForm.tutorTier}
+                    onChange={(e) => setEditForm({ ...editForm, tutorTier: e.target.value })}
+                    className="w-full p-2.5 bg-slate-50 border rounded-xl font-medium"
+                  >
+                    <option value="Master Tutor (Executive / Chair)">Master Tutor (Executive / Chair)</option>
+                    <option value="Senior Tutor / Subject Specialist">Senior Tutor / Subject Specialist</option>
+                    <option value="Senior Tutor / Expert">Senior Tutor / Expert</option>
+                    <option value="Associate Tutor / Academic Specialist">Associate Tutor / Academic Specialist</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block font-semibold mb-1">Primary Subject (Direct Name) *</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. Biology / Life Science"
+                    value={editForm.primarySubject}
+                    onChange={(e) => setEditForm({ ...editForm, primarySubject: e.target.value })}
+                    className="w-full p-2.5 bg-slate-50 border rounded-xl font-medium"
                   />
                 </div>
               </div>
@@ -900,8 +1083,64 @@ export default function TutorsListAdmin({
                 </div>
               </div>
 
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-semibold mb-1">Country</label>
+                  <input
+                    type="text"
+                    placeholder="USA, UK, Australia..."
+                    value={editForm.country}
+                    onChange={(e) => setEditForm({ ...editForm, country: e.target.value })}
+                    className="w-full p-2.5 bg-slate-50 border rounded-xl"
+                  />
+                </div>
+                <div>
+                  <label className="block font-semibold mb-1">Verification Status</label>
+                  <select
+                    value={editForm.verificationStatus}
+                    onChange={(e) => setEditForm({ ...editForm, verificationStatus: e.target.value })}
+                    className="w-full p-2.5 bg-slate-50 border rounded-xl"
+                  >
+                    <option value="Verified Degree & Background (Gold Tier - Master)">Verified Degree & Background (Gold Tier - Master)</option>
+                    <option value="Verified Degree & Background">Verified Degree & Background</option>
+                    <option value="Under Academic Review">Under Academic Review</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* SEARCHABLE KEYWORDS DEDICATED SECTION */}
+              <div className="space-y-1.5 bg-orange-50/60 p-3.5 rounded-2xl border border-orange-200">
+                <div className="flex items-center justify-between">
+                  <label className="block font-bold text-slate-900 text-xs flex items-center gap-1.5">
+                    <Sparkles className="w-3.5 h-3.5 text-orange-600" />
+                    <span>Searchable Keywords (Directory Search Index)</span>
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const autoKws = generateAutoKeywords(editForm.name, editForm.primarySubject, editForm.location, editForm.country, editForm.subjectExpertise);
+                      setEditForm({ ...editForm, searchableKeywords: autoKws });
+                    }}
+                    className="text-[11px] font-bold text-orange-700 hover:text-orange-900 bg-white px-2.5 py-1 rounded-lg border border-orange-300 shadow-2xs hover:bg-orange-50 cursor-pointer flex items-center gap-1 transition-all"
+                  >
+                    <Sparkles className="w-3 h-3 text-orange-500" />
+                    <span>Auto-Generate Keywords</span>
+                  </button>
+                </div>
+                <textarea
+                  rows={3}
+                  placeholder="e.g. San Diego, CA, USA, Biology / Life Science, Biology tutor, AP Biology, exam prep, homework solver..."
+                  value={editForm.searchableKeywords}
+                  onChange={(e) => setEditForm({ ...editForm, searchableKeywords: e.target.value })}
+                  className="w-full p-2.5 bg-white border border-orange-200 rounded-xl text-xs font-mono leading-relaxed"
+                />
+                <p className="text-[10px] text-slate-500">
+                  Matches student queries for cities, direct subjects, synonyms, and high-intent phrases like homework help & exam prep.
+                </p>
+              </div>
+
               <div>
-                <label className="block font-semibold mb-1">Bio</label>
+                <label className="block font-semibold mb-1">Bio / Headline</label>
                 <textarea
                   rows={2}
                   value={editForm.bio}
@@ -911,7 +1150,7 @@ export default function TutorsListAdmin({
               </div>
 
               <div>
-                <label className="block font-semibold mb-1">Educations</label>
+                <label className="block font-semibold mb-1">Education Credentials</label>
                 <textarea
                   rows={2}
                   value={editForm.education}
@@ -921,7 +1160,7 @@ export default function TutorsListAdmin({
               </div>
 
               <div>
-                <label className="block font-semibold mb-1">Experiences (All Details)</label>
+                <label className="block font-semibold mb-1">Experience Summary</label>
                 <textarea
                   rows={2}
                   value={editForm.experiences}
@@ -931,7 +1170,7 @@ export default function TutorsListAdmin({
               </div>
 
               <div>
-                <label className="block font-semibold mb-1">Subject Expertise</label>
+                <label className="block font-semibold mb-1">Subject Expertise (Comma-separated)</label>
                 <input
                   type="text"
                   value={editForm.subjectExpertise}
@@ -1003,14 +1242,14 @@ export default function TutorsListAdmin({
               <div className="pt-4 border-t flex justify-end gap-2">
                 <button
                   type="button"
-                  onClick={() => setEditingTutor(null)}
-                  className="px-4 py-2 border rounded-xl text-xs font-semibold"
+                  onClick={() => { setEditingTutor(null); setModalError(null); }}
+                  className="px-4 py-2 border rounded-xl text-xs font-semibold hover:bg-slate-50 cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="bg-orange-500 text-white font-bold px-5 py-2 rounded-xl text-xs shadow-md"
+                  className="bg-orange-500 hover:bg-orange-600 text-white font-bold px-5 py-2 rounded-xl text-xs shadow-md cursor-pointer transition-all"
                 >
                   Save Profile Changes
                 </button>
@@ -1025,17 +1264,27 @@ export default function TutorsListAdmin({
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/70 backdrop-blur-sm overflow-y-auto">
           <div className="relative w-full max-w-2xl bg-white rounded-3xl shadow-2xl p-6 sm:p-8 my-8 space-y-6">
             <div className="flex items-center justify-between border-b pb-4">
-              <h3 className="text-lg font-bold text-slate-900">Add New Tutor Profile</h3>
-              <button onClick={() => setIsAddModalOpen(false)} className="p-2 text-slate-400 hover:text-slate-700">
+              <div>
+                <h3 className="text-lg font-bold text-slate-900">Add New Tutor Profile</h3>
+                <p className="text-xs text-slate-500">Add verified academic faculty member with zero-duplicate enforcement and instant search indexing.</p>
+              </div>
+              <button onClick={() => { setIsAddModalOpen(false); setModalError(null); }} className="p-2 text-slate-400 hover:text-slate-700">
                 <X className="w-5 h-5" />
               </button>
             </div>
+
+            {modalError && (
+              <div className="p-3 bg-rose-50 border border-rose-200 rounded-2xl text-rose-800 text-xs flex items-center gap-2">
+                <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
+                <span className="font-semibold">{modalError}</span>
+              </div>
+            )}
 
             <form onSubmit={handleSaveNewTutor} className="space-y-4 max-h-[65vh] overflow-y-auto text-xs pr-1">
               <TutorImageUploader
                 currentImageUrl={addForm.avatarUrl}
                 onImageChange={(url) => setAddForm({ ...addForm, avatarUrl: url })}
-                label="Tutor Profile Picture"
+                label="Tutor Profile Headshot"
               />
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -1044,21 +1293,47 @@ export default function TutorsListAdmin({
                   <input
                     type="text"
                     required
-                    placeholder="e.g. Dr. Robert Chen"
+                    placeholder="e.g. Prof. Dr. Evelyn Harris"
                     value={addForm.name}
                     onChange={(e) => setAddForm({ ...addForm, name: e.target.value })}
                     className="w-full p-2.5 bg-slate-50 border rounded-xl"
                   />
                 </div>
                 <div>
-                  <label className="block font-semibold mb-1">Email *</label>
+                  <label className="block font-semibold mb-1">Email</label>
                   <input
                     type="email"
-                    required
-                    placeholder="robert@example.com"
+                    placeholder="e.g. evelyn.harris@example.com"
                     value={addForm.email}
                     onChange={(e) => setAddForm({ ...addForm, email: e.target.value })}
                     className="w-full p-2.5 bg-slate-50 border rounded-xl"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-semibold mb-1">Tutor Tier</label>
+                  <select
+                    value={addForm.tutorTier}
+                    onChange={(e) => setAddForm({ ...addForm, tutorTier: e.target.value })}
+                    className="w-full p-2.5 bg-slate-50 border rounded-xl font-medium"
+                  >
+                    <option value="Master Tutor (Executive / Chair)">Master Tutor (Executive / Chair)</option>
+                    <option value="Senior Tutor / Subject Specialist">Senior Tutor / Subject Specialist</option>
+                    <option value="Senior Tutor / Expert">Senior Tutor / Expert</option>
+                    <option value="Associate Tutor / Academic Specialist">Associate Tutor / Academic Specialist</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block font-semibold mb-1">Primary Subject (Direct Name) *</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. Environmental Science, Economics, Chemistry"
+                    value={addForm.primarySubject}
+                    onChange={(e) => setAddForm({ ...addForm, primarySubject: e.target.value })}
+                    className="w-full p-2.5 bg-slate-50 border rounded-xl font-medium"
                   />
                 </div>
               </div>
@@ -1086,11 +1361,67 @@ export default function TutorsListAdmin({
                 </div>
               </div>
 
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-semibold mb-1">Country</label>
+                  <input
+                    type="text"
+                    placeholder="USA, UK, Australia..."
+                    value={addForm.country}
+                    onChange={(e) => setAddForm({ ...addForm, country: e.target.value })}
+                    className="w-full p-2.5 bg-slate-50 border rounded-xl"
+                  />
+                </div>
+                <div>
+                  <label className="block font-semibold mb-1">Verification Status</label>
+                  <select
+                    value={addForm.verificationStatus}
+                    onChange={(e) => setAddForm({ ...addForm, verificationStatus: e.target.value })}
+                    className="w-full p-2.5 bg-slate-50 border rounded-xl"
+                  >
+                    <option value="Verified Degree & Background (Gold Tier - Master)">Verified Degree & Background (Gold Tier - Master)</option>
+                    <option value="Verified Degree & Background">Verified Degree & Background</option>
+                    <option value="Under Academic Review">Under Academic Review</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* SEARCHABLE KEYWORDS DEDICATED SECTION */}
+              <div className="space-y-1.5 bg-orange-50/60 p-3.5 rounded-2xl border border-orange-200">
+                <div className="flex items-center justify-between">
+                  <label className="block font-bold text-slate-900 text-xs flex items-center gap-1.5">
+                    <Sparkles className="w-3.5 h-3.5 text-orange-600" />
+                    <span>Searchable Keywords (Directory Search Index)</span>
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const autoKws = generateAutoKeywords(addForm.name, addForm.primarySubject, addForm.location, addForm.country, addForm.subjectExpertise);
+                      setAddForm({ ...addForm, searchableKeywords: autoKws });
+                    }}
+                    className="text-[11px] font-bold text-orange-700 hover:text-orange-900 bg-white px-2.5 py-1 rounded-lg border border-orange-300 shadow-2xs hover:bg-orange-50 cursor-pointer flex items-center gap-1 transition-all"
+                  >
+                    <Sparkles className="w-3 h-3 text-orange-500" />
+                    <span>Auto-Generate Keywords</span>
+                  </button>
+                </div>
+                <textarea
+                  rows={3}
+                  placeholder="e.g. San Diego, CA, USA, Biology / Life Science, Biology tutor, AP Biology, exam prep, homework solver..."
+                  value={addForm.searchableKeywords}
+                  onChange={(e) => setAddForm({ ...addForm, searchableKeywords: e.target.value })}
+                  className="w-full p-2.5 bg-white border border-orange-200 rounded-xl text-xs font-mono leading-relaxed"
+                />
+                <p className="text-[10px] text-slate-500">
+                  Matches student queries for cities, direct subjects, synonyms, and high-intent phrases like homework help & exam prep.
+                </p>
+              </div>
+
               <div>
-                <label className="block font-semibold mb-1">Bio</label>
+                <label className="block font-semibold mb-1">Bio / Headline</label>
                 <textarea
                   rows={2}
-                  placeholder="Professional background overview..."
+                  placeholder="Distinguished educator specializing in advanced coursework..."
                   value={addForm.bio}
                   onChange={(e) => setAddForm({ ...addForm, bio: e.target.value })}
                   className="w-full p-2.5 bg-slate-50 border rounded-xl"
@@ -1098,10 +1429,10 @@ export default function TutorsListAdmin({
               </div>
 
               <div>
-                <label className="block font-semibold mb-1">Educations</label>
+                <label className="block font-semibold mb-1">Education Credentials</label>
                 <textarea
                   rows={2}
-                  placeholder="PhD/MSc qualifications..."
+                  placeholder="e.g. Johns Hopkins University - Ph.D. in Environmental Science"
                   value={addForm.education}
                   onChange={(e) => setAddForm({ ...addForm, education: e.target.value })}
                   className="w-full p-2.5 bg-slate-50 border rounded-xl"
@@ -1109,10 +1440,10 @@ export default function TutorsListAdmin({
               </div>
 
               <div>
-                <label className="block font-semibold mb-1">Experiences (All Details)</label>
+                <label className="block font-semibold mb-1">Experience Summary</label>
                 <textarea
                   rows={2}
-                  placeholder="Teaching & lecturing experience..."
+                  placeholder="Specialist guiding students through advanced coursework, thesis writing, and competitive exams..."
                   value={addForm.experiences}
                   onChange={(e) => setAddForm({ ...addForm, experiences: e.target.value })}
                   className="w-full p-2.5 bg-slate-50 border rounded-xl"
@@ -1120,10 +1451,10 @@ export default function TutorsListAdmin({
               </div>
 
               <div>
-                <label className="block font-semibold mb-1">Subject Expertise</label>
+                <label className="block font-semibold mb-1">Subject Expertise (Comma-separated)</label>
                 <input
                   type="text"
-                  placeholder="Statistics, Physics, Calculus..."
+                  placeholder="Environmental Science, Chemistry, Civics..."
                   value={addForm.subjectExpertise}
                   onChange={(e) => setAddForm({ ...addForm, subjectExpertise: e.target.value })}
                   className="w-full p-2.5 bg-slate-50 border rounded-xl"
@@ -1135,7 +1466,7 @@ export default function TutorsListAdmin({
                   <label className="block font-semibold mb-1">Availabilities</label>
                   <input
                     type="text"
-                    placeholder="Mon-Fri 10am-4pm"
+                    placeholder="Weekends only, 1-on-1 video sessions"
                     value={addForm.availabilities}
                     onChange={(e) => setAddForm({ ...addForm, availabilities: e.target.value })}
                     className="w-full p-2.5 bg-slate-50 border rounded-xl"
@@ -1148,19 +1479,19 @@ export default function TutorsListAdmin({
                     onChange={(e) => setAddForm({ ...addForm, canMeet: e.target.value as any })}
                     className="w-full p-2.5 bg-slate-50 border rounded-xl"
                   >
-                    <option value="Online">Online</option>
-                    <option value="In-Person">In-Person</option>
-                    <option value="Hybrid">Hybrid</option>
+                    <option value="Online">Virtual Online 1-on-1</option>
+                    <option value="In-Person">In-Person (Up to 25 miles)</option>
+                    <option value="Hybrid">Hybrid (Online & Local)</option>
                   </select>
                 </div>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="block font-semibold mb-1">Hobbies</label>
+                  <label className="block font-semibold mb-1">Hobbies / Interests</label>
                   <input
                     type="text"
-                    placeholder="Chess, Piano..."
+                    placeholder="Research publications, peer review, chess..."
                     value={addForm.hobbies}
                     onChange={(e) => setAddForm({ ...addForm, hobbies: e.target.value })}
                     className="w-full p-2.5 bg-slate-50 border rounded-xl"
@@ -1187,7 +1518,7 @@ export default function TutorsListAdmin({
                       onChange={(e) => setAddForm({ ...addForm, isApproved: e.target.checked, status: e.target.checked ? 'approved' : 'pending' })}
                       className="w-4 h-4 text-emerald-600 rounded"
                     />
-                    <span className="font-bold text-slate-800">Publish & Make Live Immediately</span>
+                    <span className="font-bold text-slate-800">Publish & Make Live in Directory Immediately</span>
                   </label>
                 </div>
               </div>
@@ -1195,15 +1526,15 @@ export default function TutorsListAdmin({
               <div className="pt-4 border-t flex justify-end gap-2">
                 <button
                   type="button"
-                  onClick={() => setIsAddModalOpen(false)}
-                  className="px-4 py-2 border rounded-xl text-xs font-semibold"
+                  onClick={() => { setIsAddModalOpen(false); setModalError(null); }}
+                  className="px-4 py-2 border rounded-xl text-xs font-semibold hover:bg-slate-50 cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={isSubmittingAdd}
-                  className="bg-orange-500 text-white font-bold px-5 py-2 rounded-xl text-xs shadow-md"
+                  className="bg-orange-500 hover:bg-orange-600 text-white font-bold px-5 py-2 rounded-xl text-xs shadow-md cursor-pointer transition-all"
                 >
                   {isSubmittingAdd ? 'Creating Profile...' : 'Create Tutor Profile'}
                 </button>

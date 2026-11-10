@@ -937,7 +937,7 @@ export default function MarketingPages({
                 <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 sm:gap-4 pt-1 sm:pt-2">
                   <button 
                     id="hero-find-tutor-btn"
-                    onClick={() => onNavigate('services')}
+                    onClick={() => onNavigate('tutors')}
                     className="bg-orange-500 hover:bg-orange-650 text-white font-bold text-xs tracking-wider uppercase px-7 py-3.5 sm:px-8 sm:py-4 rounded-xl shadow-lg shadow-orange-500/15 cursor-pointer hover:-translate-y-0.5 transition-all duration-200 text-center"
                   >
                     Find a Tutor

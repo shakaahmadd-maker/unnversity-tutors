@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { Camera, Upload, Image as ImageIcon, Check, RefreshCw, X, Link as LinkIcon, User } from 'lucide-react';
+import { Camera, Upload, Check, RefreshCw, X, Link as LinkIcon, User, Loader2, AlertCircle } from 'lucide-react';
 
 interface TutorImageUploaderProps {
   currentImageUrl?: string;
@@ -8,12 +8,12 @@ interface TutorImageUploaderProps {
 }
 
 const PRESET_AVATARS = [
-  { id: 'p1', url: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=300&auto=format&fit=crop&q=80', label: 'Female Academic 1' },
-  { id: 'p2', url: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=300&auto=format&fit=crop&q=80', label: 'Male Academic 1' },
-  { id: 'p3', url: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=300&auto=format&fit=crop&q=80', label: 'Female Academic 2' },
-  { id: 'p4', url: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=300&auto=format&fit=crop&q=80', label: 'Male Academic 2' },
-  { id: 'p5', url: 'https://images.unsplash.com/photo-1580489944761-15a19d654956?w=300&auto=format&fit=crop&q=80', label: 'Female Academic 3' },
-  { id: 'p6', url: 'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=300&auto=format&fit=crop&q=80', label: 'Male Academic 3' },
+  { id: 'p1', url: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=256', label: 'Female Academic 1' },
+  { id: 'p2', url: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80&w=256', label: 'Male Academic 1' },
+  { id: 'p3', url: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&q=80&w=256', label: 'Female Academic 2' },
+  { id: 'p4', url: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&q=80&w=256', label: 'Male Academic 2' },
+  { id: 'p5', url: 'https://images.unsplash.com/photo-1580489944761-15a19d654956?auto=format&fit=crop&q=80&w=256', label: 'Female Academic 3' },
+  { id: 'p6', url: 'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?auto=format&fit=crop&q=80&w=256', label: 'Male Academic 3' },
 ];
 
 export default function TutorImageUploader({
@@ -24,57 +24,75 @@ export default function TutorImageUploader({
   const [activeTab, setActiveTab] = useState<'upload' | 'preset' | 'url'>('upload');
   const [customUrlInput, setCustomUrlInput] = useState('');
   const [isDragging, setIsDragging] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const [localPreviewUrl, setLocalPreviewUrl] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    processFile(file);
+    uploadFile(file);
   };
 
-  const processFile = (file: File) => {
-    if (!file.type.startsWith('image/')) {
-      alert('Please select an image file (PNG, JPG, WEBP, etc.)');
+  const uploadFile = async (file: File) => {
+    setUploadError(null);
+
+    // Validate file type
+    const validMimes = ['image/jpeg', 'image/png', 'image/webp', 'image/jpg'];
+    if (!validMimes.includes(file.type.toLowerCase()) && !file.type.startsWith('image/')) {
+      setUploadError('Invalid format: Only JPEG, PNG, and WEBP images are supported.');
       return;
     }
+
+    // Validate file size (10MB max)
     if (file.size > 10 * 1024 * 1024) {
-      alert('Image file size must be under 10MB.');
+      setUploadError('Image size exceeds 10MB limit. Please choose a smaller photo.');
       return;
     }
 
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const rawDataUrl = event.target?.result as string;
-      if (!rawDataUrl) return;
+    // Local temporary preview for instant visual feedback only (never persisted to DB)
+    const tempPreview = URL.createObjectURL(file);
+    setLocalPreviewUrl(tempPreview);
+    setIsUploading(true);
 
-      const img = new Image();
-      img.onload = () => {
-        try {
-          const canvas = document.createElement('canvas');
-          const size = 300;
-          canvas.width = size;
-          canvas.height = size;
-          const ctx = canvas.getContext('2d');
-          if (ctx) {
-            const minDim = Math.min(img.width, img.height);
-            const startX = (img.width - minDim) / 2;
-            const startY = (img.height - minDim) / 2;
-            ctx.drawImage(img, startX, startY, minDim, minDim, 0, 0, size, size);
-            const compressed = canvas.toDataURL('image/jpeg', 0.88);
-            onImageChange(compressed);
-          } else {
-            onImageChange(rawDataUrl);
-          }
-        } catch {
-          onImageChange(rawDataUrl);
-        }
-      };
-      img.onerror = () => {
-        onImageChange(rawDataUrl);
-      };
-      img.src = rawDataUrl;
-    };
-    reader.readAsDataURL(file);
+    try {
+      const formData = new FormData();
+      formData.append('image', file);
+
+      const res = await fetch('/api/admin/tutors/upload-avatar', {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.error || `Upload failed with HTTP ${res.status}`);
+      }
+
+      const data = await res.json();
+      if (!data.url && !data.relativeUrl) {
+        throw new Error('Server did not return a valid public image URL');
+      }
+
+      // Ensure cache-busting timestamp is appended
+      let permanentUrl = data.url || data.relativeUrl;
+      if (!permanentUrl.includes('?v=')) {
+        permanentUrl = `${permanentUrl}?v=${Date.now()}`;
+      }
+
+      // Propagate permanent URL to form state (never the blob URL)
+      onImageChange(permanentUrl);
+      setUploadError(null);
+    } catch (err: any) {
+      console.error('[Uploader] Image upload error:', err);
+      setUploadError(err.message || 'Failed to upload photo. Please try again.');
+    } finally {
+      setIsUploading(false);
+      // Clean up object URL after upload finishes
+      URL.revokeObjectURL(tempPreview);
+      setLocalPreviewUrl(null);
+    }
   };
 
   const handleDrop = (e: React.DragEvent) => {
@@ -82,17 +100,24 @@ export default function TutorImageUploader({
     setIsDragging(false);
     const file = e.dataTransfer.files?.[0];
     if (file) {
-      processFile(file);
+      uploadFile(file);
     }
   };
 
   const handleApplyCustomUrl = (e: React.FormEvent) => {
     e.preventDefault();
     if (customUrlInput.trim()) {
-      onImageChange(customUrlInput.trim());
+      let finalUrl = customUrlInput.trim();
+      if (finalUrl.includes('/uploads/avatars/') && !finalUrl.includes('?v=')) {
+        finalUrl = `${finalUrl}?v=${Date.now()}`;
+      }
+      onImageChange(finalUrl);
       setCustomUrlInput('');
+      setUploadError(null);
     }
   };
+
+  const activeDisplayUrl = localPreviewUrl || currentImageUrl || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=256';
 
   return (
     <div className="space-y-3 bg-slate-50 border border-slate-200 rounded-2xl p-4">
@@ -117,24 +142,47 @@ export default function TutorImageUploader({
       <div className="flex items-center gap-4 bg-white p-3 rounded-xl border border-slate-200">
         <div className="relative shrink-0">
           <img
-            src={currentImageUrl || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=300&auto=format&fit=crop&q=80'}
+            src={activeDisplayUrl}
             alt="Tutor Preview"
             className="w-16 h-16 rounded-2xl object-cover border-2 border-orange-500 shadow-sm"
           />
-          <span className="absolute -bottom-1 -right-1 bg-orange-500 text-white text-[9px] p-1 rounded-full shadow-xs">
-            <Camera className="w-3 h-3" />
-          </span>
+          {isUploading ? (
+            <span className="absolute inset-0 bg-slate-900/60 rounded-2xl flex items-center justify-center text-white">
+              <Loader2 className="w-5 h-5 animate-spin text-orange-400" />
+            </span>
+          ) : (
+            <span className="absolute -bottom-1 -right-1 bg-orange-500 text-white text-[9px] p-1 rounded-full shadow-xs">
+              <Camera className="w-3 h-3" />
+            </span>
+          )}
         </div>
 
         <div className="flex-1 space-y-1">
-          <span className="text-xs font-bold text-slate-900 block">
-            {currentImageUrl ? 'Custom Image Selected' : 'Default Sample Photo Selected'}
+          <span className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
+            {isUploading ? (
+              <span className="text-orange-600 flex items-center gap-1">
+                <Loader2 className="w-3.5 h-3.5 animate-spin" /> Uploading to persistent storage...
+              </span>
+            ) : currentImageUrl ? (
+              <span className="text-emerald-700 flex items-center gap-1">
+                <Check className="w-3.5 h-3.5 text-emerald-600" /> Permanent Public Image Saved
+              </span>
+            ) : (
+              'Default Sample Photo Selected'
+            )}
           </span>
           <p className="text-[11px] text-slate-500 leading-snug">
-            Upload your professional photo, drag and drop an image file, or choose from standard avatar templates.
+            Photos are saved to persistent server storage with instant cross-browser cache invalidation.
           </p>
         </div>
       </div>
+
+      {uploadError && (
+        <div className="p-2.5 bg-rose-50 border border-rose-200 rounded-xl text-rose-700 text-xs flex items-center gap-2">
+          <AlertCircle className="w-4 h-4 shrink-0 text-rose-600" />
+          <span>{uploadError}</span>
+        </div>
+      )}
 
       {/* Tabs for Upload Method */}
       <div className="flex items-center gap-1 bg-slate-200/70 p-1 rounded-xl text-xs font-semibold">
@@ -178,26 +226,27 @@ export default function TutorImageUploader({
           onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
           onDragLeave={() => setIsDragging(false)}
           onDrop={handleDrop}
-          onClick={() => fileInputRef.current?.click()}
+          onClick={() => !isUploading && fileInputRef.current?.click()}
           className={`border-2 border-dashed rounded-2xl p-5 text-center cursor-pointer transition-all bg-white ${
             isDragging ? 'border-orange-500 bg-orange-50/50 scale-[1.01]' : 'border-slate-300 hover:border-orange-400 hover:bg-slate-50/80'
-          }`}
+          } ${isUploading ? 'opacity-60 cursor-not-allowed' : ''}`}
         >
           <input
             type="file"
             ref={fileInputRef}
             onChange={handleFileChange}
-            accept="image/*"
+            accept="image/jpeg,image/png,image/webp,image/jpg"
             className="hidden"
+            disabled={isUploading}
           />
           <div className="w-10 h-10 bg-orange-100 text-orange-600 rounded-full flex items-center justify-center mx-auto mb-2">
-            <Upload className="w-5 h-5" />
+            {isUploading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Upload className="w-5 h-5" />}
           </div>
           <span className="text-xs font-bold text-slate-800 block">
-            Click to upload or drag & drop image file
+            {isUploading ? 'Uploading image to persistent storage...' : 'Click to upload or drag & drop image file'}
           </span>
           <span className="text-[10px] text-slate-400 block mt-0.5">
-            Supports PNG, JPG, JPEG, WEBP (Max 5MB)
+            Supports PNG, JPG, JPEG, WEBP (Max 10MB)
           </span>
         </div>
       )}
@@ -210,7 +259,7 @@ export default function TutorImageUploader({
           </span>
           <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
             {PRESET_AVATARS.map((avatar) => {
-              const isSelected = currentImageUrl === avatar.url;
+              const isSelected = currentImageUrl?.startsWith(avatar.url.split('?')[0]);
               return (
                 <button
                   type="button"

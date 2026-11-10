@@ -42,10 +42,10 @@ export default function Header({
 
   const navLinks = [
     { name: 'Home', view: 'home' },
+    { name: 'Tutors', view: 'tutors' },
     { name: 'Get a Quote', view: 'get-a-quote' },
     { name: 'About Us', view: 'about' },
     { name: 'FAQs', view: 'faqs' },
-    { name: 'SOP Guide', view: 'sop' },
     { name: 'Contact', view: 'contact' },
     { name: 'Our Blog', view: 'blog' },
   ];
@@ -215,7 +215,7 @@ export default function Header({
                 id={`nav-${link.view}`}
                 onClick={() => handleLinkClick(link.view)}
                 className={`text-sm font-semibold tracking-wide transition-colors cursor-pointer ${
-                  activeView === link.view
+                  activeView === link.view || (link.view === 'tutors' && (activeView === 'tutors' || activeView === 'tutors-directory'))
                     ? 'text-orange-500 border-b-2 border-orange-500 pb-1'
                     : 'text-gray-650 hover:text-orange-500 pb-1'
                 }`}
@@ -257,7 +257,7 @@ export default function Header({
                 </button>
                 <button
                   id="nav-join-find"
-                  onClick={() => handleLinkClick('services')}
+                  onClick={() => handleLinkClick('tutors')}
                   className="bg-orange-500 text-white font-semibold text-xs tracking-wider uppercase px-3.5 py-2 rounded-xl shadow-md shadow-orange-500/15 hover:bg-orange-600 hover:shadow-orange-500/20 hover:-translate-y-0.5 transition-all duration-200 cursor-pointer"
                 >
                   Find a Tutor
@@ -359,7 +359,7 @@ export default function Header({
                 id={`mob-nav-${link.view}`}
                 onClick={() => handleLinkClick(link.view)}
                 className={`flex w-full items-center px-4 py-3 text-base font-semibold rounded-xl min-h-[44px] ${
-                  activeView === link.view
+                  activeView === link.view || (link.view === 'tutors' && (activeView === 'tutors' || activeView === 'tutors-directory'))
                     ? 'text-orange-500 bg-orange-50'
                     : 'text-gray-750 hover:text-orange-500 hover:bg-gray-50'
                 }`}
@@ -367,17 +367,6 @@ export default function Header({
                 {link.name}
               </button>
             ))}
-            <button
-              id="mob-nav-sop"
-              onClick={() => handleLinkClick('sop')}
-              className="flex w-full items-center justify-between px-4 py-3 text-base font-semibold rounded-xl text-slate-800 hover:bg-orange-50 hover:text-orange-600 min-h-[44px] border border-orange-200/60 bg-orange-50/40 cursor-pointer my-1"
-            >
-              <span className="flex items-center gap-2">
-                <BookOpen className="w-5 h-5 text-orange-500" />
-                <span>System SOP Guide</span>
-              </span>
-              <span className="text-[10px] bg-orange-500 text-white font-bold px-2 py-0.5 rounded-full uppercase">Interactive</span>
-            </button>
             <div className="pt-4 border-t border-gray-100 space-y-2">
               {currentUser ? (
                 <>
@@ -411,7 +400,7 @@ export default function Header({
                   </button>
                   <button
                     id="mob-nav-find"
-                    onClick={() => handleLinkClick('services')}
+                    onClick={() => handleLinkClick('tutors')}
                     className="flex w-full items-center justify-center bg-orange-500 text-white font-semibold px-4 py-2.5 rounded-xl shadow-md hover:bg-orange-650"
                   >
                     Find a Tutor
