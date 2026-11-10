@@ -201,6 +201,20 @@ export interface InvoiceRecord {
   createdAt: string;
 }
 
+export interface PrivateFileRecord {
+  id: string;
+  fileName: string;
+  storedName: string;
+  fileSize: number;
+  mimeType: string;
+  uploaderId: string;
+  uploaderRole: string;
+  orderId?: string | null;
+  roomId?: string | null;
+  fileType: string; // 'student_document' | 'tutor_deliverable' | 'chat_attachment' | 'tutor_credential' | 'report' | 'general'
+  createdAt: string;
+}
+
 export class MemoryStore {
   private users: Map<string, UserRecord> = new Map();
   private orders: Map<string, OrderRecord> = new Map();
@@ -214,14 +228,16 @@ export class MemoryStore {
   private notifications: Map<string, NotificationRecord> = new Map();
   private payments: Map<string, PaymentRecord> = new Map();
   private invoices: Map<string, InvoiceRecord> = new Map();
+  private privateFiles: Map<string, PrivateFileRecord> = new Map();
 
   constructor() {
     this.seedDefaults();
   }
 
   private seedDefaults() {
-    // Superior Administrator
-    const adminHash = internalHashPassword('Admin@123456');
+    // Superior Administrator - password derived from environment or secure runtime entropy
+    const adminPass = process.env.INITIAL_ADMIN_PASSWORD || crypto.randomBytes(16).toString('hex');
+    const adminHash = internalHashPassword(adminPass);
     const adminUser: UserRecord = {
       id: 'admin_shaka',
       role: 'admin',
@@ -239,8 +255,9 @@ export class MemoryStore {
     };
     this.users.set(adminUser.id, adminUser);
 
-    // Initial Certified Tutors
-    const tutorHash = internalHashPassword('Tutor@123456');
+    // Initial Certified Tutors - password derived from environment or secure runtime entropy
+    const tutorPass = process.env.INITIAL_TUTOR_PASSWORD || crypto.randomBytes(16).toString('hex');
+    const tutorHash = internalHashPassword(tutorPass);
     const initialTutors: UserRecord[] = [
       {
         id: 'tutor_clara',
@@ -803,6 +820,32 @@ export class MemoryStore {
     const updated = { ...existing, ...updates };
     this.invoices.set(id, updated);
     return updated;
+  }
+
+  // --- Private Files Management ---
+  public getPrivateFile(id: string): PrivateFileRecord | undefined {
+    return this.privateFiles.get(id);
+  }
+
+  public getPrivateFileByStoredName(storedName: string): PrivateFileRecord | undefined {
+    for (const f of this.privateFiles.values()) {
+      if (f.storedName === storedName || f.id === storedName) {
+        return f;
+      }
+    }
+    return undefined;
+  }
+
+  public setPrivateFile(file: PrivateFileRecord): void {
+    this.privateFiles.set(file.id, file);
+  }
+
+  public getAllPrivateFiles(): PrivateFileRecord[] {
+    return Array.from(this.privateFiles.values());
+  }
+
+  public deletePrivateFile(id: string): boolean {
+    return this.privateFiles.delete(id);
   }
 }
 

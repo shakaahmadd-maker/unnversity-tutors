@@ -927,7 +927,7 @@ export default function MarketingPages({
                 
                 <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold tracking-tight text-gray-950 font-sans leading-tight">
                   Expert Tutors for Every <span className="text-orange-500 relative inline-block">University Subject</span> <br className="hidden md:inline" />
-                  Online, On‑Demand
+                  Online, On-Demand
                 </h1>
                 
                 <p className="text-xs sm:text-sm md:text-base text-gray-650 max-w-2xl leading-relaxed text-left">
@@ -1298,7 +1298,7 @@ export default function MarketingPages({
               {/* Header Section matching visual text structure exactly */}
               <div className="max-w-3xl mx-auto text-center mb-16 sm:mb-20">
                 <h2 className="text-4xl sm:text-5xl lg:text-6xl font-black tracking-tight leading-tight mb-6 uppercase">
-                  <span className="text-amber-500 italic block sm:inline mr-2">WHY CONSIDER</span>{' '}
+                  <span className="text-amber-500 italic block sm:inline mr-2">WHY CONSIDER </span>
                   <span className="italic font-extrabold text-slate-800 block sm:inline">ONLINE CLASS HELP?</span>
                 </h2>
                 <p className="font-sans text-base sm:text-lg text-gray-500 max-w-2xl mx-auto leading-relaxed">
@@ -1504,8 +1504,8 @@ export default function MarketingPages({
               <div className="text-center max-w-3xl mx-auto mb-16 lg:mb-20 animate-fade-in">
                 <h2 className="text-4xl sm:text-5xl lg:text-6xl font-black tracking-tight leading-tight uppercase select-none">
                   <span className="italic block sm:inline mr-3 text-amber-500 bg-clip-text">
-                    WHY STUDENTS TRUST US
-                  </span>{' '}
+                    WHY STUDENTS TRUST US{' '}
+                  </span>
                   <span className="block sm:inline text-slate-900 font-extrabold">
                     FOR SUCCESS
                   </span>
@@ -1590,7 +1590,7 @@ export default function MarketingPages({
               {/* Header Block */}
               <div className="text-center max-w-3xl mx-auto mb-16 sm:mb-20">
                 <h2 className="font-heading text-4xl sm:text-5xl md:text-6xl font-black italic tracking-tight uppercase leading-none mb-6">
-                  <span className="text-[#F99B0C] mr-2">Who Can Benefit</span> 
+                  <span className="text-[#F99B0C] mr-2">Who Can Benefit </span>
                   <span className="text-[#0B1528]">From Our Services?</span>
                 </h2>
                 <p className="text-[#64748B] text-base sm:text-lg leading-relaxed font-normal px-4">

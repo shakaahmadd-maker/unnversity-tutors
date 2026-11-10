@@ -44,10 +44,9 @@ export default function AdminLoginPage({ onLogin, onNavigate }: AdminLoginPagePr
     }
   };
 
-  // Pre-load credentials helper for the designated administrator
+  // Quick fill admin email helper
   const handleQuickFillAdmin = () => {
     setEmail(targetAdminEmail);
-    setPassword('Admin@123456');
     setErrorMsg('');
   };
 

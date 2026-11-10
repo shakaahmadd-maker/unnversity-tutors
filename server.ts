@@ -34,6 +34,60 @@ if (!process.env.SESSION_SECRET) {
 
 const COOKIE_NAME = 'auth_session';
 
+// Persistent Uploads Directory (Docker persistent volume or VPS path)
+export const UPLOADS_DIR = process.env.UPLOADS_DIR
+  ? path.resolve(process.env.UPLOADS_DIR)
+  : (fs.existsSync('/app/uploads') ? '/app/uploads' : path.join(process.cwd(), 'uploads'));
+
+// Ensure required upload subdirectories exist on disk immediately
+try {
+  const uploadSubdirs = ['avatars', 'blogs', 'documents', 'general'];
+  for (const sub of uploadSubdirs) {
+    const fullSubDir = path.join(UPLOADS_DIR, sub);
+    if (!fs.existsSync(fullSubDir)) {
+      fs.mkdirSync(fullSubDir, { recursive: true });
+    }
+  }
+  console.info(`[STORAGE] Uploads directory initialized at: ${UPLOADS_DIR}`);
+} catch (e: any) {
+  console.warn(`[STORAGE] Warning initializing uploads directory: ${e.message}`);
+}
+
+// Helper to save base64 image data URI to persistent disk and return public path
+export function saveBase64ImageToUploads(dataUriOrBase64: string, folder: string = 'avatars', prefix: string = 'avatar'): string {
+  if (!dataUriOrBase64 || typeof dataUriOrBase64 !== 'string') return dataUriOrBase64;
+  if (!dataUriOrBase64.startsWith('data:image/') && !dataUriOrBase64.startsWith('data:application/')) {
+    return dataUriOrBase64;
+  }
+
+  try {
+    const match = dataUriOrBase64.match(/^data:image\/([a-zA-Z0-9+]+);base64,(.+)$/);
+    if (!match) return dataUriOrBase64;
+
+    let ext = match[1].toLowerCase();
+    if (ext === 'jpeg') ext = 'jpg';
+    if (ext === 'svg+xml') ext = 'svg';
+
+    const base64Data = match[2];
+    const buffer = Buffer.from(base64Data, 'base64');
+
+    const targetSubDir = path.join(UPLOADS_DIR, folder);
+    if (!fs.existsSync(targetSubDir)) {
+      fs.mkdirSync(targetSubDir, { recursive: true });
+    }
+
+    const filename = `${prefix}_${Date.now()}_${crypto.randomBytes(4).toString('hex')}.${ext}`;
+    const filePath = path.join(targetSubDir, filename);
+    fs.writeFileSync(filePath, buffer);
+
+    console.info(`[UPLOADS] Saved uploaded asset to persistent disk: ${filePath}`);
+    return `/uploads/${folder}/${filename}`;
+  } catch (err: any) {
+    console.warn(`[UPLOADS] Error saving uploaded image to disk: ${err.message}`);
+    return dataUriOrBase64;
+  }
+}
+
 // Secure Password Hashing using Scrypt (Salted + Constant-Time comparison)
 export function hashPassword(password: string): string {
   const salt = crypto.randomBytes(16).toString('hex');
@@ -178,7 +232,8 @@ async function seedInitialDatabase() {
     const adminEmail = 'shaka.ahmadd@gmail.com';
     const existingAdmin = await db.select().from(users).where(eq(users.email, adminEmail)).limit(1);
     if (existingAdmin.length === 0) {
-      const defaultHash = hashPassword('Admin@123456');
+      const adminPass = process.env.INITIAL_ADMIN_PASSWORD || crypto.randomBytes(16).toString('hex');
+      const defaultHash = hashPassword(adminPass);
       await db.insert(users).values({
         id: 'admin_shaka',
         role: 'admin',
@@ -198,7 +253,8 @@ async function seedInitialDatabase() {
     }
 
     // Seed each certified initial tutor individually if not yet in DB
-    const defaultTutorHash = hashPassword('Tutor@123456');
+    const tutorPass = process.env.INITIAL_TUTOR_PASSWORD || crypto.randomBytes(16).toString('hex');
+    const defaultTutorHash = hashPassword(tutorPass);
     for (const t of SEED_TUTORS) {
       try {
         const existing = await db.select().from(users).where(eq(users.id, t.id)).limit(1);
@@ -251,6 +307,19 @@ async function startServer() {
   app.use(express.json({ limit: '15mb' }));
   app.use(express.urlencoded({ extended: true, limit: '15mb' }));
   app.use(cookieParser());
+
+  // Mount public /uploads static directory with Cross-Origin Resource Policy & CORS headers
+  // so uploaded images render reliably across all browsers for both authenticated and unauthenticated visitors
+  app.use('/uploads', (req, res, next) => {
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+    res.setHeader('Cross-Origin-Embedder-Policy', 'unsafe-none');
+    res.setHeader('Cache-Control', 'public, max-age=86400, stale-while-revalidate=604800');
+    next();
+  }, express.static(UPLOADS_DIR, {
+    maxAge: '1d',
+    index: false,
+  }));
 
   // Check database connectivity
   await checkDbConnection();
@@ -1072,6 +1141,11 @@ async function startServer() {
         updates.location = updates.city;
       }
 
+      // Convert base64 data URI avatars to persistent files in UPLOADS_DIR
+      if (updates.avatarUrl && typeof updates.avatarUrl === 'string' && updates.avatarUrl.startsWith('data:image/')) {
+        updates.avatarUrl = saveBase64ImageToUploads(updates.avatarUrl, 'avatars', `user_${id}`);
+      }
+
       // 1. Locate baseline user from memoryStore, trending tutors, or seed tutors
       let existingUser: any = memoryStore.getUser(id);
       if (!existingUser) {
@@ -1183,9 +1257,14 @@ async function startServer() {
   // POST /api/upload-avatar - Direct image upload endpoint for user/tutor avatars
   app.post('/api/upload-avatar', async (req, res) => {
     try {
-      const { userId, avatarUrl } = req.body;
+      let { userId, avatarUrl } = req.body;
       if (!userId || !avatarUrl) {
         return res.status(400).json({ error: 'userId and avatarUrl are required' });
+      }
+
+      // Convert base64 data URI to persistent file on disk
+      if (typeof avatarUrl === 'string' && avatarUrl.startsWith('data:image/')) {
+        avatarUrl = saveBase64ImageToUploads(avatarUrl, 'avatars', `avatar_${userId}`);
       }
 
       // 1. Update disk persistence
@@ -1200,7 +1279,7 @@ async function startServer() {
           const existing = await db.select().from(users).where(eq(users.id, userId));
           if (existing.length > 0) {
             await db.update(users).set({ avatarUrl }).where(eq(users.id, userId));
-            console.log(`[DB] Successfully updated avatar for ${userId} in PostgreSQL`);
+            console.log(`[DB] Successfully updated avatar for ${userId} in PostgreSQL: ${avatarUrl}`);
           } else {
             const trending = TRENDING_TUTORS_500.find(t => t.id === userId);
             await db.insert(users).values({
@@ -1211,7 +1290,7 @@ async function startServer() {
               avatarUrl,
               createdAt: new Date().toISOString()
             } as any);
-            console.log(`[DB] Successfully inserted user ${userId} with avatar into PostgreSQL`);
+            console.log(`[DB] Successfully inserted user ${userId} with avatar into PostgreSQL: ${avatarUrl}`);
           }
         } catch (e: any) {
           console.warn('[DB] Upload avatar notice in DB:', e.message);
@@ -1221,6 +1300,20 @@ async function startServer() {
       await logAudit('AVATAR_UPLOAD', `Updated avatar image for ${userId}`, userId, undefined, undefined, req);
 
       return res.status(200).json({ success: true, avatarUrl });
+    } catch (err: any) {
+      return res.status(500).json({ error: err.message });
+    }
+  });
+
+  // POST /api/upload - Generic persistent file/image upload endpoint
+  app.post('/api/upload', (req, res) => {
+    try {
+      const { file, folder = 'general', prefix = 'file' } = req.body;
+      if (!file) {
+        return res.status(400).json({ error: 'file (data URI or base64) is required' });
+      }
+      const publicUrl = saveBase64ImageToUploads(file, folder, prefix);
+      return res.status(200).json({ success: true, url: publicUrl });
     } catch (err: any) {
       return res.status(500).json({ error: err.message });
     }
