@@ -1,0 +1,494 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Collapsible Footer Disclosures</title>
+  <!-- Tailwind CSS CDN for styling -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              DEFAULT: '#ea580c',
+              dark: '#c2410c',
+              light: '#fff7ed',
+              border: '#fed7aa',
+              badgeBg: '#e6f7f2',
+              badgeText: '#0f766e',
+              badgeBorder: '#99f6e4'
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    /* Smooth CSS height transitions for accordion behavior */
+    .collapsible-container {
+      max-height: 0;
+      opacity: 0;
+      overflow: hidden;
+      transition: max-height 0.4s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s ease;
+    }
+    .collapsible-container.is-expanded {
+      max-height: 1200px;
+      opacity: 1;
+    }
+    .rotate-chevron {
+      transition: transform 0.3s ease;
+    }
+    .is-expanded .rotate-chevron {
+      transform: rotate(180deg);
+    }
+
+    /* 3D Isometric Educational Letter Styling & Floating Animation */
+    .edu-3d-scene {
+      perspective: 700px;
+    }
+    .edu-3d-wrapper {
+      transform-style: preserve-3d;
+      transition: transform 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+      animation: gentle-float 4s ease-in-out infinite alternate;
+    }
+    .group:hover .edu-3d-wrapper {
+      transform: translateY(-8px) scale(1.08);
+      animation-play-state: paused;
+    }
+    @keyframes gentle-float {
+      0% {
+        transform: translateY(0px);
+      }
+      100% {
+        transform: translateY(-6px);
+      }
+    }
+  </style>
+</head>
+<body class="bg-amber-50/40 text-gray-800 font-sans min-h-screen flex flex-col justify-between">
+
+  <!-- ================= MAIN CONTENT: 4 PILLARS SECTION ================= -->
+  <main class="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
+    
+    <!-- Header Badge & Titles -->
+    <div class="text-center max-w-3xl mx-auto mb-14">
+      <div class="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full bg-orange-50/90 border border-orange-200/80 text-orange-600 text-xs font-semibold tracking-wider uppercase mb-5 shadow-xs">
+        <svg class="w-3.5 h-3.5 text-orange-500" fill="currentColor" viewBox="0 0 20 20">
+          <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/>
+        </svg>
+        <span>Double-Vetted Native Syllabus Support</span>
+      </div>
+
+      <h1 class="text-3xl sm:text-4xl md:text-5xl font-black italic tracking-tight text-gray-950 uppercase leading-tight">
+        OUR 4 PILLARS OF <span class="text-orange-500 not-italic">ACADEMIC TUTORING</span>
+      </h1>
+
+      <p class="mt-4 text-sm sm:text-base text-gray-600 font-normal max-w-2xl mx-auto leading-relaxed">
+        Click any core category below to inspect matched regional curriculums, try interactive outline tools, and communicate with available verified country specialists.
+      </p>
+    </div>
+
+    <!-- 4 Pillars Cards Grid -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+      
+      <!-- Card 1: 1-on-1 Live Tutoring -->
+      <div class="group relative bg-white border border-slate-200/90 hover:border-orange-300 rounded-3xl p-6 flex flex-col justify-between shadow-xs hover:shadow-xl hover:-translate-y-1 transition-all duration-300 cursor-pointer overflow-hidden">
+        <div>
+          <!-- Header: Icon & Category Tag -->
+          <div class="flex items-center justify-between gap-2 mb-4">
+            <div class="w-11 h-11 rounded-2xl bg-orange-50 border border-orange-200/60 flex items-center justify-center text-orange-600 group-hover:scale-105 transition-transform">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"/>
+              </svg>
+            </div>
+            <span class="px-2.5 py-1 rounded-full bg-orange-50/70 border border-orange-200/60 text-[10px] font-bold tracking-wider text-orange-600 uppercase">
+              Whiteboard & Video
+            </span>
+          </div>
+
+          <!-- 3D Cutout Character: Smiling Female Live Tutor with Headset -->
+          <div class="edu-3d-scene w-full h-48 rounded-2xl mb-5 flex items-center justify-center relative overflow-visible">
+            <div class="edu-3d-wrapper relative z-10 flex flex-col items-center">
+              <svg class="w-44 h-44 filter drop-shadow-[0_16px_20px_rgba(234,88,12,0.28)]" viewBox="0 0 200 200" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <defs>
+                  <radialGradient id="tutor-skin" cx="45%" cy="40%" r="55%">
+                    <stop offset="0%" stop-color="#fed7aa"/>
+                    <stop offset="75%" stop-color="#fdba74"/>
+                    <stop offset="100%" stop-color="#fb923c"/>
+                  </radialGradient>
+                  <linearGradient id="tutor-hair" x1="0" y1="0" x2="1" y2="1">
+                    <stop offset="0%" stop-color="#7c2d12"/>
+                    <stop offset="100%" stop-color="#431407"/>
+                  </linearGradient>
+                  <linearGradient id="tutor-clothes" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stop-color="#fb923c"/>
+                    <stop offset="100%" stop-color="#c2410c"/>
+                  </linearGradient>
+                  <linearGradient id="headset-grad" x1="0" y1="0" x2="1" y2="1">
+                    <stop offset="0%" stop-color="#1e293b"/>
+                    <stop offset="100%" stop-color="#0f172a"/>
+                  </linearGradient>
+                </defs>
+
+                <!-- Floating Floor Glow (Zero background, soft shadow only) -->
+                <ellipse cx="100" cy="188" rx="42" ry="7" fill="#ea580c" fill-opacity="0.2"/>
+
+                <!-- Hair Back -->
+                <circle cx="100" cy="85" r="42" fill="url(#tutor-hair)"/>
+                <path d="M60 90 C 58 135, 70 148, 76 154 L 124 154 C 130 148, 142 135, 140 90 Z" fill="url(#tutor-hair)"/>
+
+                <!-- Body / Shirt (Cropped at shoulders) -->
+                <path d="M64 156 C64 135 80 130 100 130 C120 130 136 135 136 156 L144 182 C144 186 140 190 135 190 L65 190 C60 190 56 186 56 182 Z" fill="url(#tutor-clothes)"/>
+                <!-- Polo Collar -->
+                <polygon points="100,146 84,131 93,130 100,140 107,130 116,131" fill="#fff7ed"/>
+
+                <!-- Neck -->
+                <rect x="91" y="118" width="18" height="18" rx="7" fill="url(#tutor-skin)"/>
+                
+                <!-- Head / Face -->
+                <ellipse cx="100" cy="88" rx="30" ry="33" fill="url(#tutor-skin)"/>
+
+                <!-- Hair Front Fringe -->
+                <path d="M72 74 C 82 58, 120 56, 128 72 C 120 66, 92 68, 72 74 Z" fill="#9a3412"/>
+
+                <!-- Cheerful 3D Eyes -->
+                <ellipse cx="89" cy="84" rx="4.5" ry="5.5" fill="#1e293b"/>
+                <ellipse cx="111" cy="84" rx="4.5" ry="5.5" fill="#1e293b"/>
+                <circle cx="90.5" cy="82.5" r="1.6" fill="#ffffff"/>
+                <circle cx="112.5" cy="82.5" r="1.6" fill="#ffffff"/>
+
+                <!-- Rosy Cheeks -->
+                <circle cx="81" cy="94" r="5" fill="#f43f5e" fill-opacity="0.35"/>
+                <circle cx="119" cy="94" r="5" fill="#f43f5e" fill-opacity="0.35"/>
+
+                <!-- Big Friendly Smile with Teeth -->
+                <path d="M88 97 Q100 113 112 97 Z" fill="#991b1b"/>
+                <path d="M89 97 Q100 103 111 97" fill="#ffffff"/>
+
+                <!-- Professional Live Headset -->
+                <path d="M68 85 A 34 34 0 0 1 132 85" stroke="url(#headset-grad)" stroke-width="4.5" stroke-linecap="round"/>
+                <!-- Headset Ear Cushions -->
+                <rect x="65" y="77" width="8" height="18" rx="4" fill="url(#headset-grad)"/>
+                <rect x="127" y="77" width="8" height="18" rx="4" fill="url(#headset-grad)"/>
+                <!-- Mic stem & tip -->
+                <path d="M70 90 Q 72 108 86 107" stroke="#334155" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+                <circle cx="86" cy="107" r="3" fill="#ea580c"/>
+
+                <!-- Floating Live Badge / Sparkle -->
+                <circle cx="138" cy="52" r="9" fill="#10b981"/>
+                <polygon points="135,48 143,52 135,56" fill="#ffffff"/>
+              </svg>
+            </div>
+          </div>
+
+          <h3 class="text-lg font-bold text-gray-900 group-hover:text-orange-600 transition-colors">
+            1-on-1 Live Tutoring
+          </h3>
+          <p class="mt-2 text-xs sm:text-[13px] text-gray-600 leading-relaxed font-normal">
+            Interact with native instructors on high-speed webcams and digital whiteboard systems. Schedule instant sessions.
+          </p>
+        </div>
+
+        <div class="mt-6 pt-4 border-t border-dashed border-gray-200 flex items-center justify-between">
+          <span class="text-xs font-semibold text-gray-700">Recording &amp; stream included</span>
+          <div class="w-7 h-7 rounded-full bg-orange-50 border border-orange-200 text-orange-600 flex items-center justify-center group-hover:bg-orange-500 group-hover:text-white transition-all">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M14 5l7 7m0 0l-7 7m7-7H3"/>
+            </svg>
+          </div>
+        </div>
+      </div>
+
+      <!-- Card 2: Assignment Tutoring -->
+      <div class="group relative bg-white border border-slate-200/90 hover:border-orange-300 rounded-3xl p-6 flex flex-col justify-between shadow-xs hover:shadow-xl hover:-translate-y-1 transition-all duration-300 cursor-pointer overflow-hidden">
+        <div>
+          <!-- Header: Icon & Category Tag -->
+          <div class="flex items-center justify-between gap-2 mb-4">
+            <div class="w-11 h-11 rounded-2xl bg-orange-50 border border-orange-200/60 flex items-center justify-center text-orange-600 group-hover:scale-105 transition-transform">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+              </svg>
+            </div>
+            <span class="px-2.5 py-1 rounded-full bg-orange-50/70 border border-orange-200/60 text-[10px] font-bold tracking-wider text-orange-600 uppercase">
+              Structural Reviews
+            </span>
+          </div>
+
+          <!-- 3D Cutout Character: Smiling Student Celebrating an A+ Assignment -->
+          <div class="edu-3d-scene w-full h-48 rounded-2xl mb-5 flex items-center justify-center relative overflow-visible">
+            <div class="edu-3d-wrapper relative z-10 flex flex-col items-center" style="animation-delay: -1s;">
+              <svg class="w-44 h-44 filter drop-shadow-[0_16px_20px_rgba(234,88,12,0.28)]" viewBox="0 0 200 200" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <defs>
+                  <radialGradient id="student-skin" cx="50%" cy="40%" r="50%">
+                    <stop offset="0%" stop-color="#ffedd5"/>
+                    <stop offset="70%" stop-color="#fed7aa"/>
+                    <stop offset="100%" stop-color="#fb923c"/>
+                  </radialGradient>
+                  <linearGradient id="student-hoodie" x1="0" y1="0" x2="1" y2="1">
+                    <stop offset="0%" stop-color="#f97316"/>
+                    <stop offset="100%" stop-color="#ea580c"/>
+                  </linearGradient>
+                </defs>
+
+                <!-- Floor Shadow -->
+                <ellipse cx="100" cy="188" rx="44" ry="7" fill="#ea580c" fill-opacity="0.2"/>
+
+                <!-- Hoodie / Shoulders -->
+                <path d="M60 156 C60 134 76 128 100 128 C124 128 140 134 140 156 L148 184 C148 188 144 190 138 190 L62 190 C56 190 52 188 52 184 Z" fill="url(#student-hoodie)"/>
+                
+                <!-- Hoodie Drawstrings & Neck -->
+                <rect x="91" y="116" width="18" height="18" rx="6" fill="url(#student-skin)"/>
+                <path d="M92 136 L92 154 M108 136 L108 154" stroke="#ffffff" stroke-width="2.5" stroke-linecap="round"/>
+
+                <!-- Smiling Head -->
+                <ellipse cx="100" cy="85" rx="30" ry="32" fill="url(#student-skin)"/>
+
+                <!-- Side Hair / Curls -->
+                <path d="M68 76 C65 65 72 52 86 52 C90 52 95 54 99 56 C105 52 115 50 124 56 C134 62 134 75 131 82 Z" fill="#292524"/>
+
+                <!-- Eyes Happy Arches (Smiling widely) -->
+                <path d="M85 82 Q90 76 95 82" stroke="#1c1917" stroke-width="3" stroke-linecap="round" fill="none"/>
+                <path d="M105 82 Q110 76 115 82" stroke="#1c1917" stroke-width="3" stroke-linecap="round" fill="none"/>
+
+                <!-- Blush -->
+                <ellipse cx="80" cy="89" rx="5" ry="3" fill="#f43f5e" fill-opacity="0.4"/>
+                <ellipse cx="120" cy="89" rx="5" ry="3" fill="#f43f5e" fill-opacity="0.4"/>
+
+                <!-- Joyful Grin -->
+                <path d="M87 91 Q100 110 113 91 Z" fill="#881337"/>
+                <path d="M89 91 Q100 97 111 91" fill="#ffffff"/>
+
+                <!-- 3D Mini Mortarboard Graduation Cap -->
+                <polygon points="100,32 132,44 100,54 68,44" fill="#0f172a"/>
+                <polygon points="100,54 132,44 132,48 100,58" fill="#1e293b"/>
+                <circle cx="100" cy="43" r="2.5" fill="#f59e0b"/>
+                <path d="M100 43 Q 120 46 122 58" stroke="#f59e0b" stroke-width="2" fill="none" stroke-linecap="round"/>
+
+                <!-- Hand holding "A+" Assignment Paper -->
+                <g transform="translate(120, 115) rotate(12)">
+                  <rect x="0" y="0" width="30" height="40" rx="3" fill="#ffffff" stroke="#fed7aa" stroke-width="1.5" filter="drop-shadow(0 4px 6px rgba(0,0,0,0.1))"/>
+                  <line x1="6" y1="8" x2="24" y2="8" stroke="#f97316" stroke-width="2"/>
+                  <line x1="6" y1="14" x2="20" y2="14" stroke="#cbd5e1" stroke-width="1.5"/>
+                  <line x1="6" y1="19" x2="22" y2="19" stroke="#cbd5e1" stroke-width="1.5"/>
+                  <text x="7" y="32" font-size="12" font-weight="900" fill="#dc2626" font-family="sans-serif">A+</text>
+                  <!-- Thumb -->
+                  <circle cx="2" cy="24" r="4.5" fill="url(#student-skin)"/>
+                </g>
+              </svg>
+            </div>
+          </div>
+
+          <h3 class="text-lg font-bold text-gray-900 group-hover:text-orange-600 transition-colors">
+            Assignment Tutoring
+          </h3>
+          <p class="mt-2 text-xs sm:text-[13px] text-gray-600 leading-relaxed font-normal">
+            Step-by-step drafting structures, proper citation style reviews (APA/MLA/Harvard), and customized formula guides.
+          </p>
+        </div>
+
+        <div class="mt-6 pt-4 border-t border-dashed border-gray-200 flex items-center justify-between">
+          <span class="text-xs font-semibold text-gray-700">APA/MLA grading check</span>
+          <div class="w-7 h-7 rounded-full bg-orange-50 border border-orange-200 text-orange-600 flex items-center justify-center group-hover:bg-orange-500 group-hover:text-white transition-all">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M14 5l7 7m0 0l-7 7m7-7H3"/>
+            </svg>
+          </div>
+        </div>
+      </div>
+
+      <!-- Card 3: Coursework Tutoring -->
+      <div class="group relative bg-white border border-slate-200/90 hover:border-orange-300 rounded-3xl p-6 flex flex-col justify-between shadow-xs hover:shadow-xl hover:-translate-y-1 transition-all duration-300 cursor-pointer overflow-hidden">
+        <div>
+          <!-- Header: Icon & Category Tag -->
+          <div class="flex items-center justify-between gap-2 mb-4">
+            <div class="w-11 h-11 rounded-2xl bg-orange-50 border border-orange-200/60 flex items-center justify-center text-orange-600 group-hover:scale-105 transition-transform">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+              </svg>
+            </div>
+            <span class="px-2.5 py-1 rounded-full bg-orange-50/70 border border-orange-200/60 text-[10px] font-bold tracking-wider text-orange-600 uppercase">
+              Syllabus Alignment
+            </span>
+          </div>
+
+          <!-- 3D Cutout Character: Smiling Academic Advisor with Checklist Tablet -->
+          <div class="edu-3d-scene w-full h-48 rounded-2xl mb-5 flex items-center justify-center relative overflow-visible">
+            <div class="edu-3d-wrapper relative z-10 flex flex-col items-center" style="animation-delay: -2s;">
+              <svg class="w-44 h-44 filter drop-shadow-[0_16px_20px_rgba(234,88,12,0.28)]" viewBox="0 0 200 200" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <defs>
+                  <radialGradient id="prof-skin" cx="50%" cy="40%" r="50%">
+                    <stop offset="0%" stop-color="#ffedd5"/>
+                    <stop offset="75%" stop-color="#fdba74"/>
+                    <stop offset="100%" stop-color="#f97316"/>
+                  </radialGradient>
+                  <linearGradient id="prof-suit" x1="0" y1="0" x2="1" y2="1">
+                    <stop offset="0%" stop-color="#0284c7"/>
+                    <stop offset="100%" stop-color="#0369a1"/>
+                  </linearGradient>
+                </defs>
+
+                <!-- Floor Shadow -->
+                <ellipse cx="100" cy="188" rx="44" ry="7" fill="#0284c7" fill-opacity="0.2"/>
+
+                <!-- Blazer / Torso -->
+                <path d="M58 158 C58 136 74 130 100 130 C126 130 142 136 142 158 L148 184 C148 188 144 190 138 190 L62 190 C56 190 52 188 52 184 Z" fill="url(#prof-suit)"/>
+                <!-- Shirt & Tie -->
+                <polygon points="100,150 90,130 110,130" fill="#ffffff"/>
+                <polygon points="100,135 103,158 100,166 97,158" fill="#ea580c"/>
+
+                <!-- Neck -->
+                <rect x="91" y="118" width="18" height="18" rx="6" fill="url(#prof-skin)"/>
+
+                <!-- Hair (Trim, tidy parted hair) -->
+                <path d="M68 84 C66 60 76 46 100 46 C122 46 132 58 132 80 C125 70 110 65 96 66 C82 67 74 74 68 84 Z" fill="#334155"/>
+
+                <!-- Smiling Face -->
+                <ellipse cx="100" cy="88" rx="29" ry="32" fill="url(#prof-skin)"/>
+
+                <!-- Cheerful Eyes -->
+                <circle cx="88" cy="85" r="4.5" fill="#0f172a"/>
+                <circle cx="112" cy="85" r="4.5" fill="#0f172a"/>
+                <circle cx="89.5" cy="83.5" r="1.5" fill="#ffffff"/>
+                <circle cx="113.5" cy="83.5" r="1.5" fill="#ffffff"/>
+
+                <!-- Warm Smile -->
+                <path d="M88 98 Q100 114 112 98" stroke="#7c2d12" stroke-width="3" stroke-linecap="round" fill="none"/>
+
+                <!-- Stylus / Checklist Tablet in Forefront -->
+                <g transform="translate(116, 122) rotate(-8)">
+                  <rect x="0" y="0" width="34" height="46" rx="5" fill="#0f172a" stroke="#38bdf8" stroke-width="1.5" filter="drop-shadow(0 6px 8px rgba(0,0,0,0.2))"/>
+                  <!-- Screen -->
+                  <rect x="3" y="4" width="28" height="38" rx="3" fill="#f8fafc"/>
+                  <!-- Progress bars / Checkmarks -->
+                  <circle cx="9" cy="12" r="2.5" fill="#10b981"/>
+                  <line x1="14" y1="12" x2="25" y2="12" stroke="#64748b" stroke-width="2" stroke-linecap="round"/>
+                  <circle cx="9" cy="20" r="2.5" fill="#10b981"/>
+                  <line x1="14" y1="20" x2="24" y2="20" stroke="#64748b" stroke-width="2" stroke-linecap="round"/>
+                  <circle cx="9" cy="28" r="2.5" fill="#f59e0b"/>
+                  <line x1="14" y1="28" x2="20" y2="28" stroke="#f59e0b" stroke-width="2" stroke-linecap="round"/>
+                  <!-- Thumb -->
+                  <circle cx="2" cy="26" r="4.5" fill="url(#prof-skin)"/>
+                </g>
+              </svg>
+            </div>
+          </div>
+
+          <h3 class="text-lg font-bold text-gray-900 group-hover:text-orange-600 transition-colors">
+            Coursework Tutoring
+          </h3>
+          <p class="mt-2 text-xs sm:text-[13px] text-gray-600 leading-relaxed font-normal">
+            Comprehensive ongoing syllabus track mentoring. Monitor interactive weekly targets to secure peak score outcomes.
+          </p>
+        </div>
+
+        <div class="mt-6 pt-4 border-t border-dashed border-gray-200 flex items-center justify-between">
+          <span class="text-xs font-semibold text-gray-700">Weekly progress reports</span>
+          <div class="w-7 h-7 rounded-full bg-orange-50 border border-orange-200 text-orange-600 flex items-center justify-center group-hover:bg-orange-500 group-hover:text-white transition-all">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M14 5l7 7m0 0l-7 7m7-7H3"/>
+            </svg>
+          </div>
+        </div>
+      </div>
+
+      <!-- Card 4: Academic Writing Coach -->
+      <div class="group relative bg-white border border-slate-200/90 hover:border-orange-300 rounded-3xl p-6 flex flex-col justify-between shadow-xs hover:shadow-xl hover:-translate-y-1 transition-all duration-300 cursor-pointer overflow-hidden">
+        <div>
+          <!-- Header: Icon & Category Tag -->
+          <div class="flex items-center justify-between gap-2 mb-4">
+            <div class="w-11 h-11 rounded-2xl bg-orange-50 border border-orange-200/60 flex items-center justify-center text-orange-600 group-hover:scale-105 transition-transform">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/>
+              </svg>
+            </div>
+            <span class="px-2.5 py-1 rounded-full bg-orange-50/70 border border-orange-200/60 text-[10px] font-bold tracking-wider text-orange-600 uppercase">
+              Thesis & Citations
+            </span>
+          </div>
+
+          <!-- 3D Cutout Character: Smiling Writing Coach with Glasses & Golden Quill -->
+          <div class="edu-3d-scene w-full h-48 rounded-2xl mb-5 flex items-center justify-center relative overflow-visible">
+            <div class="edu-3d-wrapper relative z-10 flex flex-col items-center" style="animation-delay: -3s;">
+              <svg class="w-44 h-44 filter drop-shadow-[0_16px_20px_rgba(234,88,12,0.28)]" viewBox="0 0 200 200" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <defs>
+                  <radialGradient id="coach-skin" cx="50%" cy="40%" r="50%">
+                    <stop offset="0%" stop-color="#fde68a"/>
+                    <stop offset="70%" stop-color="#fcd34d"/>
+                    <stop offset="100%" stop-color="#f59e0b"/>
+                  </radialGradient>
+                  <linearGradient id="coach-sweater" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stop-color="#059669"/>
+                    <stop offset="100%" stop-color="#047857"/>
+                  </linearGradient>
+                  <linearGradient id="gold-pen" x1="0" y1="0" x2="1" y2="1">
+                    <stop offset="0%" stop-color="#fef08a"/>
+                    <stop offset="50%" stop-color="#eab308"/>
+                    <stop offset="100%" stop-color="#a16207"/>
+                  </linearGradient>
+                </defs>
+
+                <!-- Floor Shadow -->
+                <ellipse cx="100" cy="188" rx="44" ry="7" fill="#047857" fill-opacity="0.2"/>
+
+                <!-- Hair (Bun on top) -->
+                <circle cx="100" cy="46" r="16" fill="#1c1917"/>
+                <path d="M66 85 C64 62 76 52 100 52 C124 52 134 62 134 85 C124 76 112 72 100 72 C88 72 76 76 66 85 Z" fill="#1c1917"/>
+
+                <!-- Emerald Knit Sweater -->
+                <path d="M58 156 C58 134 74 128 100 128 C126 128 142 134 142 156 L148 184 C148 188 144 190 138 190 L62 190 C56 190 52 188 52 184 Z" fill="url(#coach-sweater)"/>
+                <!-- Scarf / Turtleneck collar -->
+                <ellipse cx="100" cy="132" rx="18" ry="8" fill="#10b981"/>
+
+                <!-- Head -->
+                <ellipse cx="100" cy="88" rx="29" ry="32" fill="url(#coach-skin)"/>
+
+                <!-- Stylish Round Academic Glasses -->
+                <circle cx="87" cy="86" r="11" fill="none" stroke="#ea580c" stroke-width="2.5"/>
+                <circle cx="113" cy="86" r="11" fill="none" stroke="#ea580c" stroke-width="2.5"/>
+                <line x1="98" y1="86" x2="102" y2="86" stroke="#ea580c" stroke-width="2.5"/>
+
+                <!-- Eyes behind glasses -->
+                <circle cx="87" cy="86" r="3.5" fill="#1c1917"/>
+                <circle cx="113" cy="86" r="3.5" fill="#1c1917"/>
+                <circle cx="88.5" cy="84.5" r="1.2" fill="#ffffff"/>
+                <circle cx="114.5" cy="84.5" r="1.2" fill="#ffffff"/>
+
+                <!-- Warm, confident smile -->
+                <path d="M89 101 Q100 114 111 101 Z" fill="#991b1b"/>
+                <path d="M91 101 Q100 105 109 101" fill="#ffffff"/>
+
+                <!-- 3D Golden Fountain Quill Pen in hand -->
+                <g transform="translate(126, 80) rotate(-22)">
+                  <path d="M12 0 C 14 18, 8 38, 2 56 L 6 58 C 14 38, 24 18, 12 0 Z" fill="url(#gold-pen)" filter="drop-shadow(0 4px 6px rgba(0,0,0,0.15))"/>
+                  <!-- Nib -->
+                  <polygon points="2,56 4,68 6,58" fill="#ffffff"/>
+                  <line x1="4" y1="58" x2="4" y2="65" stroke="#713f12" stroke-width="0.8"/>
+                  <!-- Sparkle on pen tip -->
+                  <circle cx="4" cy="69" r="1.5" fill="#fde047"/>
+                </g>
+              </svg>
+            </div>
+          </div>
+
+          <h3 class="text-lg font-bold text-gray-900 group-hover:text-orange-600 transition-colors">
+            Academic Writing Coach
+          </h3>
+          <p class="mt-2 text-xs sm:text-[13px] text-gray-600 leading-relaxed font-normal">
+            Outline compelling thesis claims, map critical arguments, proofread sentence syntax, and correct grammar layouts.
+          </p>
+        </div>
+
+        <div class="mt-6 pt-4 border-t border-dashed border-gray-200 flex items-center justify-between">
+          <span class="text-xs font-semibold text-gray-700">Co-author editing template</span>
+          <div class="w-7 h-7 rounded-full bg-orange-50 border border-orange-200 text-orange-600 flex items-center justify-center group-hover:bg-orange-500 group-hover:text-white transition-all">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M14 5l7 7m0 0l-7 7m7-7H3"/>
+            </svg>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </main>

@@ -90,3 +90,25 @@
 ::-webkit-scrollbar-thumb:hover {
   background: #94A3B8;
 }
+
+/* 3D Isometric Educational Character Styling & Floating Animation */
+.edu-3d-scene {
+  perspective: 700px;
+}
+.edu-3d-wrapper {
+  transform-style: preserve-3d;
+  transition: transform 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+  animation: gentle-float 4s ease-in-out infinite alternate;
+}
+.group:hover .edu-3d-wrapper {
+  transform: translateY(-8px) scale(1.08);
+  animation-play-state: paused;
+}
+@keyframes gentle-float {
+  0% {
+    transform: translateY(0px);
+  }
+  100% {
+    transform: translateY(-6px);
+  }
+}

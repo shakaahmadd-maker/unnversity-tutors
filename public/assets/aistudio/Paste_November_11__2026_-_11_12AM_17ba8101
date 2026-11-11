@@ -1,0 +1,508 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Academic Pillars</title>
+  
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;600;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  
+  <!-- Phosphor Icons -->
+  <script src="https://unpkg.com/@phosphor-icons/web"></script>
+
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', '-apple-system', 'BlinkMacSystemFont', 'sans-serif'],
+            heading: ['Plus Jakarta Sans', 'sans-serif'],
+          },
+          colors: {
+            brand: {
+              orange: '#EA580C',
+              orangeLight: '#FFF7ED',
+              dark: '#0F172A',
+              slate: '#334155',
+              muted: '#64748B',
+              surface: '#F8FAFC',
+            }
+          }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    /* Prevent bouncy horizontal scroll & smooth rendering */
+    body {
+      -webkit-tap-highlight-color: transparent;
+      touch-action: manipulation;
+    }
+    .no-scrollbar::-webkit-scrollbar {
+      display: none;
+    }
+    .no-scrollbar {
+      -ms-overflow-style: none;
+      scrollbar-width: none;
+    }
+    /* Bottom Sheet slide animation */
+    .sheet-enter {
+      transform: translateY(100%);
+      transition: transform 0.28s cubic-bezier(0.32, 0.72, 0, 1);
+    }
+    .sheet-open {
+      transform: translateY(0);
+    }
+  </style>
+</head>
+<body class="bg-[#F8FAFC] text-slate-800 antialiased pb-28">
+
+  <!-- ==========================================
+       MOBILE TOP APP BAR
+       ========================================== -->
+  <nav class="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-slate-100 px-4 py-3 flex items-center justify-between">
+    <div class="flex items-center gap-2.5">
+      <div class="w-8 h-8 rounded-lg bg-orange-600 flex items-center justify-center text-white font-bold text-sm shadow-sm shadow-orange-500/20">
+        P
+      </div>
+      <div>
+        <span class="font-heading font-extrabold text-sm tracking-tight text-slate-900 block leading-tight">PRECISE</span>
+        <span class="text-[10px] uppercase font-semibold tracking-wider text-slate-400 block leading-tight">Academic Mentorship</span>
+      </div>
+    </div>
+    
+    <div class="flex items-center gap-2">
+      <button class="w-9 h-9 flex items-center justify-center rounded-full bg-slate-100 text-slate-700 active:scale-95 transition">
+        <i class="ph-bold ph-phone-call text-base"></i>
+      </button>
+      <button onclick="toggleMobileMenu()" class="w-9 h-9 flex items-center justify-center rounded-full bg-slate-100 text-slate-700 active:scale-95 transition">
+        <i class="ph-bold ph-list text-lg"></i>
+      </button>
+    </div>
+  </nav>
+
+  <!-- Mobile Drawer Menu (Hidden by default) -->
+  <div id="mobile-menu" class="hidden fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex justify-end">
+    <div class="w-4/5 max-w-xs bg-white h-full p-5 shadow-2xl flex flex-col justify-between">
+      <div>
+        <div class="flex items-center justify-between pb-4 border-b border-slate-100 mb-4">
+          <span class="font-heading font-bold text-base text-slate-900">Explore Pillars</span>
+          <button onclick="toggleMobileMenu()" class="p-1 rounded-full text-slate-400 hover:text-slate-700">
+            <i class="ph-bold ph-x text-xl"></i>
+          </button>
+        </div>
+        <ul class="space-y-3 text-sm font-medium text-slate-700">
+          <li><a href="#pillar-1" onclick="toggleMobileMenu()" class="block py-2 px-3 rounded-xl hover:bg-slate-50">1. Personalized 1-1 Tutoring</a></li>
+          <li><a href="#pillar-2" onclick="toggleMobileMenu()" class="block py-2 px-3 rounded-xl hover:bg-slate-50">2. Professional Assignment Tutoring</a></li>
+          <li><a href="#pillar-3" onclick="toggleMobileMenu()" class="block py-2 px-3 rounded-xl hover:bg-slate-50">3. Coursework Tutoring</a></li>
+          <li><a href="#pillar-4" onclick="toggleMobileMenu()" class="block py-2 px-3 rounded-xl hover:bg-slate-50">4. Academic Writing Consultation</a></li>
+        </ul>
+      </div>
+      <div class="pt-4 border-t border-slate-100">
+        <button onclick="openBookingSheet('General Inquiry')" class="w-full py-3 bg-brand-orange text-white rounded-xl font-heading font-bold text-xs uppercase tracking-wider">
+          Book Advisor
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==========================================
+       HERO HEADER SECTION
+       ========================================== -->
+  <header class="px-5 pt-7 pb-5">
+    <!-- Tagline with line indicator -->
+    <div class="inline-flex items-center gap-2 mb-2.5">
+      <span class="text-[11px] font-extrabold uppercase tracking-widest text-brand-orange font-heading">
+        ACADEMIC PILLARS
+      </span>
+      <span class="w-6 h-[2px] bg-brand-orange rounded-full"></span>
+    </div>
+
+    <!-- Main Title: Polished mobile proportion with tight tracking -->
+    <h1 class="font-heading font-extrabold text-[26px] leading-[1.2] text-brand-dark mb-3 tracking-tight">
+      Precision Mentorship for Academic Excellence
+    </h1>
+
+    <!-- Subtitle -->
+    <p class="text-xs sm:text-sm text-slate-600 leading-relaxed max-w-xl">
+      Navigate your university landscape with elite educational guidance, custom coursework planning, and world-class academic writing coaching.
+    </p>
+  </header>
+
+  <!-- ==========================================
+       MOBILE CARDS LIST (Alternating Left/Right Thumbnails with Full Text)
+       ========================================== -->
+  <main class="px-4 space-y-4">
+
+    <!-- ----------------------------------------
+         CARD 1: 1-1 Tutoring Services (Image LEFT)
+         ---------------------------------------- -->
+    <article id="pillar-1" class="bg-white rounded-2xl border border-slate-200/90 p-4 shadow-sm scroll-mt-16 transition-all">
+      <!-- Top Row: Compact Thumbnail (LEFT) + Heading Block -->
+      <div class="flex items-start gap-3.5 mb-3">
+        <!-- Compact Image -->
+        <div class="w-20 h-20 sm:w-24 sm:h-24 shrink-0 rounded-xl overflow-hidden bg-slate-100 shadow-xs border border-slate-100">
+          <img 
+            src="https://images.unsplash.com/photo-1522202176988-66273c2fd55f?auto=format&fit=crop&w=350&q=80" 
+            alt="1-1 Academic Tutoring" 
+            class="w-full h-full object-cover"
+            loading="lazy"
+            onerror="this.src='https://placehold.co/200x200/1e293b/ffffff?text=1-1';"
+          />
+        </div>
+
+        <!-- Heading & Category -->
+        <div class="flex-1 min-w-0">
+          <div class="inline-flex items-center gap-1.5 mb-1">
+            <span class="text-[10px] font-extrabold uppercase tracking-wider text-brand-orange">
+              ACADEMIC MENTORSHIP
+            </span>
+            <span class="w-3.5 h-[1.5px] bg-brand-orange rounded-full"></span>
+          </div>
+          <h2 class="font-heading font-extrabold text-base sm:text-[17px] text-slate-900 leading-snug">
+            1. Personalized 1-1 Tutoring Services
+          </h2>
+        </div>
+      </div>
+
+      <!-- Full Unclipped Body Text -->
+      <p class="text-[12.5px] leading-[1.65] text-slate-600 text-justify mb-3">
+        In today's competitive academic landscape, students face immense pressure to maintain high grades while balancing tight schedules, making professional educational support a necessity rather than a luxury. Opting for online 1 on 1 tutoring offers a customized learning experience where a dedicated mentor identifies specific knowledge gaps, simplifies complex theories, and provides targeted feedback. Instead of getting lost in a crowded lecture hall, students can easily hire expert tutor for university levels to focus entirely on their weak areas. This personalized online tutoring ensures that an individual's unique learning style is accommodated, dramatically accelerating their comprehension, boosting their confidence, and driving rapid academic growth.
+      </p>
+
+      <!-- Bottom Action Link -->
+      <div class="flex items-center justify-end pt-2 border-t border-slate-100">
+        <button 
+          onclick="openBookingSheet('1. Personalized 1-1 Tutoring Services')" 
+          class="text-xs font-bold text-brand-orange inline-flex items-center gap-1 py-1 px-2 rounded-lg hover:bg-orange-50 active:scale-95 transition">
+          <span>Book 1-1 Tutoring</span>
+          <i class="ph-bold ph-arrow-right text-xs"></i>
+        </button>
+      </div>
+    </article>
+
+    <!-- ----------------------------------------
+         CARD 2: Assignment Tutoring & Guidance (Image RIGHT)
+         ---------------------------------------- -->
+    <article id="pillar-2" class="bg-white rounded-2xl border border-slate-200/90 p-4 shadow-sm scroll-mt-16 transition-all">
+      <!-- Top Row: Heading Block + Compact Thumbnail (RIGHT) -->
+      <div class="flex items-start gap-3.5 mb-3">
+        <!-- Heading & Category -->
+        <div class="flex-1 min-w-0">
+          <div class="inline-flex items-center gap-1.5 mb-1">
+            <span class="text-[10px] font-extrabold uppercase tracking-wider text-brand-orange">
+              LOGIC &amp; REASONING
+            </span>
+            <span class="w-3.5 h-[1.5px] bg-brand-orange rounded-full"></span>
+          </div>
+          <h2 class="font-heading font-extrabold text-base sm:text-[17px] text-slate-900 leading-snug">
+            2. Professional Assignment Tutoring &amp; Guidance
+          </h2>
+        </div>
+
+        <!-- Compact Image (Right) -->
+        <div class="w-20 h-20 sm:w-24 sm:h-24 shrink-0 rounded-xl overflow-hidden bg-slate-100 shadow-xs border border-slate-100">
+          <img 
+            src="https://images.unsplash.com/photo-1497633762265-9d179a990aa6?auto=format&fit=crop&w=350&q=80" 
+            alt="Assignment Guidance and Books" 
+            class="w-full h-full object-cover"
+            loading="lazy"
+            onerror="this.src='https://placehold.co/200x200/1e293b/ffffff?text=Assgn';"
+          />
+        </div>
+      </div>
+
+      <!-- Full Unclipped Body Text -->
+      <p class="text-[12.5px] leading-[1.65] text-slate-600 text-justify mb-3">
+        When it comes to managing the heavy influx of continuous assessments, utilizing expert assignment tutoring transforms overwhelming homework into manageable, stress-free milestones. Many students find themselves searching for reliable university tutoring support when deadlines loom close and instructions are ambiguous. Working with a dedicated specialist allows students to break down intricate prompts, organize their foundational research, and develop the skills needed to meet strict rubric standards. This structured guidance not only prevents stress but also teaches students how to approach complex problem-solving independently.
+      </p>
+
+      <!-- Bottom Action Link -->
+      <div class="flex items-center justify-end pt-2 border-t border-slate-100">
+        <button 
+          onclick="openBookingSheet('2. Professional Assignment Tutoring & Guidance')" 
+          class="text-xs font-bold text-brand-orange inline-flex items-center gap-1 py-1 px-2 rounded-lg hover:bg-orange-50 active:scale-95 transition">
+          <span>Book Assignment Help</span>
+          <i class="ph-bold ph-arrow-right text-xs"></i>
+        </button>
+      </div>
+    </article>
+
+    <!-- ----------------------------------------
+         CARD 3: Coursework Tutoring (Image LEFT)
+         ---------------------------------------- -->
+    <article id="pillar-3" class="bg-white rounded-2xl border border-slate-200/90 p-4 shadow-sm scroll-mt-16 transition-all">
+      <!-- Top Row: Compact Thumbnail (LEFT) + Heading Block -->
+      <div class="flex items-start gap-3.5 mb-3">
+        <!-- Compact Image (Left) -->
+        <div class="w-20 h-20 sm:w-24 sm:h-24 shrink-0 rounded-xl overflow-hidden bg-slate-100 shadow-xs border border-slate-100">
+          <img 
+            src="https://images.unsplash.com/photo-1434030216411-0b793f4b4173?auto=format&fit=crop&w=350&q=80" 
+            alt="Coursework writing & research" 
+            class="w-full h-full object-cover"
+            loading="lazy"
+            onerror="this.src='https://placehold.co/200x200/1e293b/ffffff?text=Course';"
+          />
+        </div>
+
+        <!-- Heading & Category -->
+        <div class="flex-1 min-w-0">
+          <div class="inline-flex items-center gap-1.5 mb-1">
+            <span class="text-[10px] font-extrabold uppercase tracking-wider text-brand-orange">
+              MILESTONE MANAGEMENT
+            </span>
+            <span class="w-3.5 h-[1.5px] bg-brand-orange rounded-full"></span>
+          </div>
+          <h2 class="font-heading font-extrabold text-base sm:text-[17px] text-slate-900 leading-snug">
+            3. Comprehensive Coursework Tutoring
+          </h2>
+        </div>
+      </div>
+
+      <!-- Full Unclipped Body Text -->
+      <p class="text-[12.5px] leading-[1.65] text-slate-600 text-justify mb-3">
+        Beyond standard homework, managing extensive, multi-phase projects requires specialized university coursework tutoring. This long-term academic support is invaluable for helping students maintain consistency across deep-dive modules, laboratory reports, and major term papers. Professional mentors guide them through the critical phases of outlining, analyzing data, and synthesizing findings, ensuring their final output is cohesive and academically rigorous. Investing in long-term coursework assistance ensures that major, high-stakes academic projects stay on track from week one all the way to final submission.
+      </p>
+
+      <!-- Bottom Action Link -->
+      <div class="flex items-center justify-end pt-2 border-t border-slate-100">
+        <button 
+          onclick="openBookingSheet('3. Comprehensive Coursework Tutoring')" 
+          class="text-xs font-bold text-brand-orange inline-flex items-center gap-1 py-1 px-2 rounded-lg hover:bg-orange-50 active:scale-95 transition">
+          <span>Book Coursework Guidance</span>
+          <i class="ph-bold ph-arrow-right text-xs"></i>
+        </button>
+      </div>
+    </article>
+
+    <!-- ----------------------------------------
+         CARD 4: Academic Writing Consultation (Image RIGHT)
+         ---------------------------------------- -->
+    <article id="pillar-4" class="bg-white rounded-2xl border border-slate-200/90 p-4 shadow-sm scroll-mt-16 transition-all">
+      <!-- Top Row: Heading Block + Compact Thumbnail (RIGHT) -->
+      <div class="flex items-start gap-3.5 mb-3">
+        <!-- Heading & Category -->
+        <div class="flex-1 min-w-0">
+          <div class="inline-flex items-center gap-1.5 mb-1">
+            <span class="text-[10px] font-extrabold uppercase tracking-wider text-brand-orange">
+              QUALITY ASSURANCE
+            </span>
+            <span class="w-3.5 h-[1.5px] bg-brand-orange rounded-full"></span>
+          </div>
+          <h2 class="font-heading font-extrabold text-base sm:text-[17px] text-slate-900 leading-snug">
+            4. Expert Academic Writing Consultation
+          </h2>
+        </div>
+
+        <!-- Compact Image (Right) -->
+        <div class="w-20 h-20 sm:w-24 sm:h-24 shrink-0 rounded-xl overflow-hidden bg-slate-100 shadow-xs border border-slate-100">
+          <img 
+            src="https://images.unsplash.com/photo-1583521214690-73421a1829a9?auto=format&fit=crop&w=350&q=80" 
+            alt="Scholarly Writing with Fountain Pen" 
+            class="w-full h-full object-cover"
+            loading="lazy"
+            onerror="this.src='https://placehold.co/200x200/1e293b/ffffff?text=Writing';"
+          />
+        </div>
+      </div>
+
+      <!-- Full Unclipped Body Text -->
+      <p class="text-[12.5px] leading-[1.65] text-slate-600 text-justify mb-3">
+        Mastering the mechanics of scholarly prose can be incredibly challenging, which is why integrated professional academic writing coaching is crucial for modern students. Expert assistance in this area helps students refine their arguments, eliminate structural ambiguity, and master complex citation styles like APA, Harvard, or MLA. Whether a student needs help editing and proofreading university essays or requires guidance on scholarly essay structuring, learning how to articulate thoughts clearly and professionally is vital. By refining their written communication, students don't just secure academic clarity—they build essential skills that prepare them for future career success.
+      </p>
+
+      <!-- Bottom Action Link -->
+      <div class="flex items-center justify-end pt-2 border-t border-slate-100">
+        <button 
+          onclick="openBookingSheet('4. Expert Academic Writing Consultation')" 
+          class="text-xs font-bold text-brand-orange inline-flex items-center gap-1 py-1 px-2 rounded-lg hover:bg-orange-50 active:scale-95 transition">
+          <span>Book Writing Consultation</span>
+          <i class="ph-bold ph-arrow-right text-xs"></i>
+        </button>
+      </div>
+    </article>
+
+  </main>
+
+  <!-- ==========================================
+       BOTTOM SHEET: Detail View (Prevents long scroll)
+       ========================================== -->
+  <div id="detail-sheet-backdrop" class="hidden fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-end">
+    <div id="detail-sheet" class="w-full bg-white rounded-t-3xl p-5 max-h-[85vh] overflow-y-auto sheet-enter shadow-2xl">
+      <!-- Drag handle indicator -->
+      <div class="w-12 h-1 bg-slate-300 rounded-full mx-auto mb-4"></div>
+      
+      <div class="flex items-center justify-between mb-2">
+        <span id="sheet-category" class="text-[10px] font-extrabold uppercase tracking-wider text-brand-orange"></span>
+        <button onclick="closePillarDetail()" class="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-500 hover:text-slate-800">
+          <i class="ph-bold ph-x"></i>
+        </button>
+      </div>
+
+      <h3 id="sheet-title" class="font-heading font-extrabold text-lg text-slate-900 mb-3 leading-snug"></h3>
+      
+      <div class="prose prose-sm text-xs text-slate-600 leading-relaxed space-y-3 mb-6" id="sheet-body"></div>
+
+      <button onclick="closeAndBook()" class="w-full py-3.5 bg-brand-orange text-white rounded-xl font-heading font-bold text-xs uppercase tracking-wider shadow-md shadow-orange-500/20 active:scale-[0.99] transition">
+        Book This Service
+      </button>
+    </div>
+  </div>
+
+  <!-- ==========================================
+       BOTTOM SHEET: Booking / Inquiry
+       ========================================== -->
+  <div id="booking-sheet-backdrop" class="hidden fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-end">
+    <div id="booking-sheet" class="w-full bg-white rounded-t-3xl p-5 max-h-[90vh] overflow-y-auto sheet-enter shadow-2xl">
+      <div class="w-12 h-1 bg-slate-300 rounded-full mx-auto mb-4"></div>
+
+      <div class="flex items-center justify-between mb-3">
+        <div>
+          <span class="text-[10px] font-extrabold uppercase tracking-wider text-brand-orange">INSTANT RESERVATION</span>
+          <h3 class="font-heading font-extrabold text-base text-slate-900">Get Matched with a Mentor</h3>
+        </div>
+        <button onclick="closeBookingSheet()" class="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-500">
+          <i class="ph-bold ph-x"></i>
+        </button>
+      </div>
+
+      <!-- Quick Form -->
+      <form onsubmit="handleFormSubmit(event)" class="space-y-3 text-xs">
+        <div>
+          <label class="block font-semibold text-slate-700 mb-1">Selected Pillar</label>
+          <input id="booking-service-input" type="text" readonly class="w-full bg-slate-100 border border-slate-200 px-3 py-2 rounded-lg font-medium text-slate-700" value="1-1 Mentorship">
+        </div>
+
+        <div>
+          <label class="block font-semibold text-slate-700 mb-1">Your Full Name</label>
+          <input required type="text" placeholder="e.g. Alex Henderson" class="w-full border border-slate-200 px-3 py-2 rounded-lg focus:outline-orange-500">
+        </div>
+
+        <div>
+          <label class="block font-semibold text-slate-700 mb-1">University / Academic Level</label>
+          <input required type="text" placeholder="e.g. Undergraduate Year 2" class="w-full border border-slate-200 px-3 py-2 rounded-lg focus:outline-orange-500">
+        </div>
+
+        <div>
+          <label class="block font-semibold text-slate-700 mb-1">Brief Note / Deadline</label>
+          <textarea rows="2" placeholder="Tell us about your upcoming project or goals..." class="w-full border border-slate-200 px-3 py-2 rounded-lg focus:outline-orange-500"></textarea>
+        </div>
+
+        <button type="submit" class="w-full py-3.5 bg-brand-orange text-white rounded-xl font-heading font-bold text-xs uppercase tracking-wider shadow-md shadow-orange-500/20 active:scale-[0.99] transition mt-2">
+          Request Callback
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Success Notification Toast -->
+  <div id="toast" class="hidden fixed top-4 left-4 right-4 z-50 bg-slate-900 text-white p-3 rounded-xl shadow-lg flex items-center gap-3 transition">
+    <div class="w-7 h-7 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center">
+      <i class="ph-bold ph-check"></i>
+    </div>
+    <div class="text-xs">
+      <strong class="block font-bold">Request Received</strong>
+      <span class="text-slate-300">An academic advisor will text you shortly.</span>
+    </div>
+  </div>
+
+  <!-- ==========================================
+       STICKY BOTTOM MOBILE THUMB ACTION BAR
+       ========================================== -->
+  <div class="fixed bottom-0 inset-x-0 z-30 bg-white/95 backdrop-blur-md border-t border-slate-200/80 px-4 py-2.5 flex items-center gap-3">
+    <div class="flex-1">
+      <span class="text-[10px] text-slate-400 block leading-tight font-medium">Free 20-min consultation</span>
+      <span class="text-xs font-bold text-slate-900 block leading-tight">Start with an Advisor</span>
+    </div>
+    <button onclick="openBookingSheet('General Consultation')" class="px-5 py-2.5 bg-brand-orange hover:bg-orange-600 active:scale-95 text-white font-heading font-bold text-xs rounded-xl shadow-md shadow-orange-500/25 flex items-center gap-1.5 transition">
+      <span>Book Session</span>
+      <i class="ph-bold ph-arrow-right text-xs"></i>
+    </button>
+  </div>
+
+  <!-- JavaScript Controls -->
+  <script>
+    // Mobile Drawer
+    function toggleMobileMenu() {
+      const menu = document.getElementById('mobile-menu');
+      menu.classList.toggle('hidden');
+    }
+
+    // Detail Bottom Sheet
+    function openPillarDetail(title, category, text) {
+      const backdrop = document.getElementById('detail-sheet-backdrop');
+      const sheet = document.getElementById('detail-sheet');
+      
+      document.getElementById('sheet-title').textContent = title;
+      document.getElementById('sheet-category').textContent = category;
+      document.getElementById('sheet-body').innerHTML = `<p>${text}</p>`;
+
+      backdrop.classList.remove('hidden');
+      setTimeout(() => {
+        sheet.classList.add('sheet-open');
+      }, 10);
+    }
+
+    function closePillarDetail() {
+      const backdrop = document.getElementById('detail-sheet-backdrop');
+      const sheet = document.getElementById('detail-sheet');
+      
+      sheet.classList.remove('sheet-open');
+      setTimeout(() => {
+        backdrop.classList.add('hidden');
+      }, 250);
+    }
+
+    // Booking Bottom Sheet
+    function openBookingSheet(serviceName) {
+      const backdrop = document.getElementById('booking-sheet-backdrop');
+      const sheet = document.getElementById('booking-sheet');
+      
+      document.getElementById('booking-service-input').value = serviceName || 'General Mentorship';
+
+      backdrop.classList.remove('hidden');
+      setTimeout(() => {
+        sheet.classList.add('sheet-open');
+      }, 10);
+    }
+
+    function closeBookingSheet() {
+      const backdrop = document.getElementById('booking-sheet-backdrop');
+      const sheet = document.getElementById('booking-sheet');
+      
+      sheet.classList.remove('sheet-open');
+      setTimeout(() => {
+        backdrop.classList.add('hidden');
+      }, 250);
+    }
+
+    function closeAndBook() {
+      const service = document.getElementById('sheet-title').textContent;
+      closePillarDetail();
+      setTimeout(() => {
+        openBookingSheet(service);
+      }, 300);
+    }
+
+    // Form Handling
+    function handleFormSubmit(e) {
+      e.preventDefault();
+      closeBookingSheet();
+      
+      const toast = document.getElementById('toast');
+      toast.classList.remove('hidden');
+      
+      setTimeout(() => {
+        toast.classList.add('hidden');
+      }, 3500);
+    }
+  </script>
+</body>
+</html>

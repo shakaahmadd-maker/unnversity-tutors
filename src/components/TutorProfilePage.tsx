@@ -17,10 +17,16 @@ import {
   Search,
   Sparkles,
   Award,
-  Compass
+  Compass,
+  Heart,
+  Share2,
+  Video,
+  Receipt,
+  MessageCircle
 } from 'lucide-react';
 import { User } from '../types';
 import { getRelevantKeywordsForTutor } from '../data/subjectKeywordsData';
+import { getFallbackAvatar } from './TutorsDirectoryPage';
 import SEOKeywordLinksBlock from './SEOKeywordLinksBlock';
 
 interface TutorProfilePageProps {
@@ -75,6 +81,40 @@ export default function TutorProfilePage({
     ? tutor.highGrowthKeywords
     : relevantKw.combinedKeywords;
 
+  const [isFavorited, setIsFavorited] = useState(false);
+  const [toastMsg, setToastMsg] = useState<string | null>(null);
+
+  const showToast = (message: string) => {
+    setToastMsg(message);
+    setTimeout(() => {
+      setToastMsg((current) => (current === message ? null : current));
+    }, 2800);
+  };
+
+  const toggleFavorite = () => {
+    setIsFavorited(!isFavorited);
+    if (!isFavorited) {
+      showToast(`Saved ${tutor.name} to your favorites!`);
+    } else {
+      showToast('Removed from favorites');
+    }
+  };
+
+  const handleShare = () => {
+    if (typeof navigator !== 'undefined' && navigator.share) {
+      navigator.share({
+        title: `${tutor.name} - University Tutor`,
+        text: `Book a session with ${tutor.name} on University Tutors!`,
+        url: window.location.href,
+      }).catch(() => {});
+    } else {
+      if (typeof navigator !== 'undefined' && navigator.clipboard) {
+        navigator.clipboard.writeText(window.location.href);
+      }
+      showToast('Profile link copied to clipboard!');
+    }
+  };
+
   const handleKeywordClick = (kw: string) => {
     if (onSearchKeyword) {
       onSearchKeyword(kw);
@@ -84,8 +124,415 @@ export default function TutorProfilePage({
   };
 
   return (
-    <div className="bg-[#f2f4f7] min-h-screen py-8 px-4 sm:px-6 lg:px-8 font-sans text-slate-800">
-      <div className="max-w-5xl mx-auto space-y-6">
+    <>
+      {/* ================= MOBILE VIEW (Exact App Design as per User Code) ================= */}
+      <div className="block md:hidden bg-[#f3f6f9] text-slate-800 font-sans antialiased min-h-screen flex flex-col relative">
+        
+        {/* Top Mobile App Header / Navigation Bar */}
+        <header className="sticky top-0 z-30 bg-white/90 backdrop-blur-md border-b border-slate-100 px-4 py-3 flex items-center justify-between transition-all">
+          <button 
+            onClick={() => onNavigate('tutors-directory')} 
+            className="w-10 h-10 rounded-full flex items-center justify-center text-slate-700 hover:bg-slate-100 active:scale-95 transition cursor-pointer" 
+            aria-label="Go Back"
+          >
+            <ArrowLeft className="w-5 h-5" />
+          </button>
+          <div className="text-center min-w-0 px-2">
+            <h1 className="text-xs font-semibold text-slate-400 tracking-wider uppercase">Tutor Profile</h1>
+            <p className="text-sm font-bold text-slate-800 truncate">{tutor.name}</p>
+          </div>
+          <div className="flex items-center gap-1">
+            <button 
+              onClick={toggleFavorite} 
+              className="w-10 h-10 rounded-full flex items-center justify-center text-slate-600 hover:bg-slate-100 active:scale-95 transition cursor-pointer" 
+              aria-label="Bookmark Profile"
+            >
+              <Heart className={`w-5 h-5 transition-colors ${isFavorited ? 'fill-rose-500 text-rose-500 scale-110' : 'text-slate-600'}`} />
+            </button>
+            <button 
+              onClick={handleShare} 
+              className="w-10 h-10 rounded-full flex items-center justify-center text-slate-600 hover:bg-slate-100 active:scale-95 transition cursor-pointer" 
+              aria-label="Share Profile"
+            >
+              <Share2 className="w-5 h-5" />
+            </button>
+          </div>
+        </header>
+
+        {/* Scrollable Content Body */}
+        <main className="flex-1 overflow-y-auto px-4 pt-3 pb-32 space-y-3.5">
+          
+          {/* Primary Profile Identity Card */}
+          <section className="bg-white rounded-2xl p-4 shadow-sm border border-slate-150 relative">
+            <div className="flex items-start gap-3.5">
+              {/* Profile Avatar with Online Status Indicator */}
+              <div className="relative shrink-0">
+                <div className="w-20 h-20 rounded-2xl overflow-hidden shadow-inner ring-2 ring-slate-100 bg-slate-200">
+                  <img 
+                    src={tutor.avatarUrl || getFallbackAvatar(tutor.name)} 
+                    alt={tutor.name} 
+                    className="w-full h-full object-cover object-top"
+                    onError={(e) => {
+                      e.currentTarget.onerror = null;
+                      e.currentTarget.src = getFallbackAvatar(tutor.name);
+                    }}
+                  />
+                </div>
+                {/* Online status green pulse dot */}
+                <span className="absolute -bottom-1 -right-1 flex h-4 w-4">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-4 w-4 bg-emerald-500 border-2 border-white"></span>
+                </span>
+              </div>
+
+              {/* Main Header Info */}
+              <div className="flex-1 min-w-0">
+                <h2 className="text-xl font-bold font-serif text-slate-900 leading-snug tracking-tight">
+                  {tutor.name}
+                </h2>
+
+                {/* Verification Tag */}
+                <div className="mt-1.5 inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200/80 text-[11px] font-semibold whitespace-nowrap">
+                  <ShieldCheck className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                  <span>Verified Degree &amp; Background</span>
+                </div>
+
+                {/* Location */}
+                <div className="mt-1.5 flex items-center text-xs font-medium text-slate-500">
+                  <MapPin className="w-3.5 h-3.5 text-blue-500 mr-1.5 shrink-0" />
+                  <span className="truncate">Private tutor in {tutor.location || tutor.city || 'Miami, FL'}</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Rating & Pricing Row */}
+            <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between bg-slate-50/70 -mx-4 -mb-4 px-4 py-2.5 rounded-b-2xl">
+              {/* Rating badge */}
+              <div className="flex items-center gap-1.5">
+                <div className="flex items-center text-amber-500">
+                  <Star className="w-4 h-4 fill-amber-500 text-amber-500" />
+                  <span className="ml-1 text-sm font-bold text-slate-900">{tutor.rating || '5.0'}</span>
+                </div>
+                <span className="text-xs text-slate-400 font-medium">({tutor.reviewCount || 120} reviews)</span>
+              </div>
+
+              {/* Hourly Rate */}
+              <div className="flex items-baseline gap-0.5">
+                <span className="text-xl font-extrabold text-slate-900 tracking-tight">${tutor.hourlyRate || 166}</span>
+                <span className="text-xs font-medium text-slate-500">/hr</span>
+              </div>
+            </div>
+          </section>
+
+          {/* Key Logistics Grid (Quick View: Availability, Meeting Mode, Hobbies) */}
+          <section className="grid grid-cols-1 gap-2.5">
+            {/* Availability */}
+            <div className="bg-white rounded-xl p-3.5 shadow-sm border border-slate-100 flex items-start gap-3">
+              <div className="w-9 h-9 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center shrink-0 mt-0.5">
+                <Calendar className="w-4.5 h-4.5 text-blue-600" />
+              </div>
+              <div>
+                <div className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Availability</div>
+                <p className="text-xs font-semibold text-slate-800 mt-0.5 leading-relaxed">
+                  {tutor.availability || 'Flexible global scheduling'} <span className="text-blue-600 font-medium">(EST, GMT, GST, AEST)</span>
+                </p>
+              </div>
+            </div>
+
+            {/* Can Meet */}
+            <div className="bg-white rounded-xl p-3.5 shadow-sm border border-slate-100 flex items-start gap-3">
+              <div className="w-9 h-9 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0 mt-0.5">
+                <Video className="w-4.5 h-4.5 text-indigo-600" />
+              </div>
+              <div>
+                <div className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Can Meet</div>
+                <p className="text-xs font-medium text-slate-800 mt-0.5 leading-relaxed">
+                  {tutor.canMeet || 'Virtual Online 1-on-1 worldwide interactive platform'}
+                </p>
+              </div>
+            </div>
+
+            {/* Hobbies */}
+            <div className="bg-white rounded-xl p-3.5 shadow-sm border border-slate-100 flex items-start gap-3">
+              <div className="w-9 h-9 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center shrink-0 mt-0.5">
+                <Smile className="w-4.5 h-4.5 text-amber-600" />
+              </div>
+              <div>
+                <div className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Hobbies &amp; Interests</div>
+                <p className="text-xs font-medium text-slate-700 mt-0.5 leading-relaxed">
+                  {tutor.hobbies || 'Capture-The-Flag (CTF) competitions, reverse engineering, hardware security'}
+                </p>
+              </div>
+            </div>
+          </section>
+
+          {/* Education Section Card */}
+          <section className="bg-white rounded-2xl p-4 shadow-sm border border-slate-100 space-y-2.5">
+            <div className="flex items-center gap-2 text-slate-800 font-bold text-sm">
+              <div className="w-7 h-7 rounded-md bg-blue-50 text-blue-600 flex items-center justify-center">
+                <GraduationCap className="w-4 h-4 text-blue-600" />
+              </div>
+              <h3>Education</h3>
+            </div>
+            <div className="p-3 rounded-xl bg-slate-50/80 border border-slate-100 text-xs font-medium text-slate-700 leading-relaxed">
+              {tutor.education || 'Caltech — Ph.D. / D.Sc. in Cybersecurity & Senior Faculty Fellowship'}
+            </div>
+          </section>
+
+          {/* Experience Section Card */}
+          <section className="bg-white rounded-2xl p-4 shadow-sm border border-slate-100 space-y-2.5">
+            <div className="flex items-center gap-2 text-slate-800 font-bold text-sm">
+              <div className="w-7 h-7 rounded-md bg-blue-50 text-blue-600 flex items-center justify-center">
+                <Briefcase className="w-4 h-4 text-blue-600" />
+              </div>
+              <h3>Experience</h3>
+            </div>
+            <div className="p-3 rounded-xl bg-slate-50/80 border border-slate-100 text-xs font-medium text-slate-700 leading-relaxed whitespace-pre-line">
+              {tutor.experience || tutor.bio || 'Certified information security analyst training students in vulnerability assessments, encryption math, and network packet analysis.'}
+            </div>
+          </section>
+
+          {/* Subject Expertise Badges */}
+          <section className="bg-white rounded-2xl p-4 shadow-sm border border-slate-100 space-y-2.5">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2 text-slate-800 font-bold text-sm">
+                <div className="w-7 h-7 rounded-md bg-blue-50 text-blue-600 flex items-center justify-center">
+                  <BookOpen className="w-4 h-4 text-blue-600" />
+                </div>
+                <h3>Subject Expertise</h3>
+              </div>
+              <span className="text-[11px] font-semibold text-slate-400">{subjects.length} Topics</span>
+            </div>
+            <div className="flex flex-wrap gap-1.5 pt-0.5">
+              {subjects.slice(0, 8).map((subject, idx) => (
+                <span 
+                  key={idx}
+                  className="px-3 py-1.5 rounded-lg bg-blue-50/90 text-blue-700 text-xs font-semibold border border-blue-200/70"
+                >
+                  {subject}
+                </span>
+              ))}
+            </div>
+          </section>
+
+          {/* 100% Satisfaction Guarantee Box */}
+          <section className="bg-gradient-to-br from-amber-50/90 to-orange-50/70 rounded-2xl p-4 border border-amber-200/80 shadow-xs flex items-start gap-3">
+            <div className="w-9 h-9 rounded-full bg-amber-500 text-white flex items-center justify-center shrink-0 shadow-xs mt-0.5">
+              <ShieldCheck className="w-5 h-5" />
+            </div>
+            <div className="space-y-1">
+              <h4 className="text-xs font-bold text-amber-950 uppercase tracking-wide flex items-center gap-1.5">
+                100% Satisfaction Guarantee
+              </h4>
+              <p className="text-[11px] font-medium text-amber-900/90 leading-relaxed">
+                Book with complete peace of mind. Payment is held securely in escrow until tutor sessions are completed.
+              </p>
+            </div>
+          </section>
+
+          {/* Quick Message Action (Alternative touchpoint) */}
+          <div className="text-center pt-1 pb-2">
+            <button 
+              onClick={() => {
+                if (onOpenChat) onOpenChat(tutor.id);
+              }} 
+              className="text-xs font-semibold text-slate-500 hover:text-slate-800 transition inline-flex items-center gap-1.5 py-1 px-3 rounded-full hover:bg-slate-200/60 cursor-pointer"
+            >
+              <MessageCircle className="w-3.5 h-3.5 text-blue-600" />
+              <span>Have questions? Chat with {tutor.name.split(' ')[0] || 'Tutor'} first</span>
+            </button>
+          </div>
+
+          {/* Relevant Subject & Industry Keywords Card (Mobile View - Compact Sizing) */}
+          <section className="bg-white rounded-2xl p-3.5 shadow-sm border border-slate-150 space-y-3">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-2.5">
+              <div className="flex items-center gap-2">
+                <div className="bg-orange-100 text-orange-600 p-1 rounded-lg">
+                  <Tag className="w-3.5 h-3.5 stroke-[2.5]" />
+                </div>
+                <div>
+                  <h3 className="text-xs font-bold text-[#1f3a60] leading-tight">
+                    Searchable Domain &amp; Subject Keywords
+                  </h3>
+                  <p className="text-[10px] text-slate-500 font-medium">
+                    Mapped to {relevantKw.primaryDomain}
+                  </p>
+                </div>
+              </div>
+              <span className="text-[9.5px] bg-blue-50 text-blue-700 font-bold px-2 py-0.5 rounded-full border border-blue-200 flex items-center gap-1 shrink-0">
+                <Sparkles className="w-2.5 h-2.5 text-blue-600" />
+                <span>Searchable</span>
+              </span>
+            </div>
+
+            <div className="grid grid-cols-1 gap-2.5">
+              {/* 1. High-Search Subject Terms */}
+              <div className="bg-slate-50/80 rounded-xl p-2.5 border border-slate-200/70 space-y-2">
+                <div className="flex items-center justify-between text-[10px] font-bold text-slate-700 uppercase tracking-wider">
+                  <span className="flex items-center gap-1">
+                    <Search className="w-3 h-3 text-blue-600" />
+                    <span>High-Search Subject Terms</span>
+                  </span>
+                  <span className="text-[9px] font-mono bg-white px-1.5 py-0.2 rounded border border-slate-200 text-slate-500 font-semibold">
+                    {highSearchKws.length}
+                  </span>
+                </div>
+                <div className="flex flex-wrap gap-1">
+                  {(showAllKeywords ? highSearchKws : highSearchKws.slice(0, 8)).map((kw, idx) => (
+                    <button
+                      key={idx}
+                      onClick={() => handleKeywordClick(kw)}
+                      className="text-[10px] bg-white hover:bg-orange-500 hover:text-white text-slate-700 border border-slate-200 font-medium px-2 py-0.5 rounded-md transition-all shadow-2xs cursor-pointer flex items-center gap-0.5"
+                    >
+                      <span>{kw}</span>
+                      <span className="text-[9px] text-slate-400">↗</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* 2. Research & Academic Focus Keywords */}
+              <div className="bg-slate-50/80 rounded-xl p-2.5 border border-slate-200/70 space-y-2">
+                <div className="flex items-center justify-between text-[10px] font-bold text-slate-700 uppercase tracking-wider">
+                  <span className="flex items-center gap-1">
+                    <Compass className="w-3 h-3 text-emerald-600" />
+                    <span>Research &amp; Methodologies</span>
+                  </span>
+                  <span className="text-[9px] font-mono bg-white px-1.5 py-0.2 rounded border border-slate-200 text-slate-500 font-semibold">
+                    {researchKws.length}
+                  </span>
+                </div>
+                <div className="flex flex-wrap gap-1">
+                  {researchKws.slice(0, 8).map((kw, idx) => (
+                    <button
+                      key={idx}
+                      onClick={() => handleKeywordClick(kw)}
+                      className="text-[10px] bg-emerald-50/60 hover:bg-emerald-600 hover:text-white text-emerald-900 border border-emerald-200/80 font-medium px-2 py-0.5 rounded-md transition-all shadow-2xs cursor-pointer flex items-center gap-0.5"
+                    >
+                      <span>{kw}</span>
+                      <span className="text-[9px] text-emerald-600">↗</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* 3. Job Search & Industry Target Keywords */}
+              <div className="bg-slate-50/80 rounded-xl p-2.5 border border-slate-200/70 space-y-2">
+                <div className="flex items-center justify-between text-[10px] font-bold text-slate-700 uppercase tracking-wider">
+                  <span className="flex items-center gap-1">
+                    <Briefcase className="w-3 h-3 text-indigo-600" />
+                    <span>Target Careers &amp; Roles</span>
+                  </span>
+                  <span className="text-[9px] font-mono bg-white px-1.5 py-0.2 rounded border border-slate-200 text-slate-500 font-semibold">
+                    {jobKws.length}
+                  </span>
+                </div>
+                <div className="flex flex-wrap gap-1">
+                  {jobKws.slice(0, 8).map((kw, idx) => (
+                    <button
+                      key={idx}
+                      onClick={() => handleKeywordClick(kw)}
+                      className="text-[10px] bg-indigo-50/60 hover:bg-indigo-600 hover:text-white text-indigo-900 border border-indigo-200/80 font-medium px-2 py-0.5 rounded-md transition-all shadow-2xs cursor-pointer flex items-center gap-0.5"
+                    >
+                      <span>{kw}</span>
+                      <span className="text-[9px] text-indigo-500">↗</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* 4. High-Growth & Interdisciplinary Combinations */}
+              <div className="bg-slate-50/80 rounded-xl p-2.5 border border-slate-200/70 space-y-2">
+                <div className="flex items-center justify-between text-[10px] font-bold text-slate-700 uppercase tracking-wider">
+                  <span className="flex items-center gap-1">
+                    <Award className="w-3 h-3 text-amber-600" />
+                    <span>High-Growth Topics</span>
+                  </span>
+                  <span className="text-[9px] font-mono bg-white px-1.5 py-0.2 rounded border border-slate-200 text-slate-500 font-semibold">
+                    USA / Canada
+                  </span>
+                </div>
+                <div className="flex flex-wrap gap-1">
+                  {combinedKws.slice(0, 8).map((kw, idx) => (
+                    <button
+                      key={idx}
+                      onClick={() => handleKeywordClick(kw)}
+                      className="text-[10px] bg-amber-50/70 hover:bg-amber-600 hover:text-white text-amber-950 border border-amber-200/80 font-medium px-2 py-0.5 rounded-md transition-all shadow-2xs cursor-pointer flex items-center gap-0.5"
+                    >
+                      <span>{kw}</span>
+                      <span className="text-[9px] text-amber-600">↗</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {highSearchKws.length > 8 && (
+              <div className="pt-1 text-center">
+                <button
+                  onClick={() => setShowAllKeywords(!showAllKeywords)}
+                  className="text-[10.5px] font-bold text-blue-700 hover:text-blue-900 bg-blue-50/80 px-3 py-1 rounded-xl border border-blue-200 cursor-pointer transition-all"
+                >
+                  {showAllKeywords ? '▲ Show Fewer Keywords' : `▼ View All ${highSearchKws.length} Search Keywords`}
+                </button>
+              </div>
+            )}
+          </section>
+
+          {/* SEO Keyword Links Block for Nearby Locations & Subjects (Mobile Compact) */}
+          <div className="pt-1">
+            <SEOKeywordLinksBlock 
+              locationName={tutor.location || tutor.city || 'Atlanta, GA'}
+              tutorName={tutor.name}
+              onNavigateLocation={(loc) => onNavigate('tutors-directory')}
+              onNavigateSubject={(subj) => onNavigate('tutors-directory')}
+              className="rounded-2xl border border-slate-200/80 shadow-xs text-xs"
+            />
+          </div>
+
+        </main>
+
+        {/* Sticky Bottom CTA Bar */}
+        <footer className="sticky bottom-0 z-30 bg-white/95 backdrop-blur-lg border-t border-slate-200 px-4 py-3 shadow-[0_-4px_20px_rgba(0,0,0,0.06)]">
+          <div className="flex items-center gap-2.5">
+            {/* Secondary Action: Custom Price Quote */}
+            <button 
+              onClick={() => onNavigate('get-a-quote')}
+              className="w-12 h-12 rounded-xl bg-slate-900 hover:bg-slate-800 text-white flex items-center justify-center shrink-0 active:scale-95 transition shadow-sm group cursor-pointer"
+              title="Get Custom Price Quote"
+              aria-label="Get Custom Price Quote"
+            >
+              <Receipt className="w-5 h-5 group-hover:scale-110 transition-transform text-orange-400" />
+            </button>
+
+            {/* Primary Action: Let's Begin (Request Session) */}
+            <button 
+              onClick={() => {
+                if (onOpenChat) onOpenChat(tutor.id);
+                else if (onBookSession) onBookSession(tutor);
+                else onNavigate('get-a-quote');
+              }}
+              className="flex-1 h-12 rounded-xl bg-[#eb5310] hover:bg-[#d44709] active:scale-[0.98] transition font-bold text-white text-sm flex items-center justify-center gap-2 shadow-[0_8px_30px_rgba(235,83,16,0.28)] tracking-wide cursor-pointer"
+            >
+              <Send className="w-4 h-4" />
+              <span>Let's Begin (Request Session)</span>
+            </button>
+          </div>
+        </footer>
+
+        {/* Interactive Feedback Toast */}
+        {toastMsg && (
+          <div className="fixed top-16 left-1/2 -translate-x-1/2 z-50 pointer-events-none transition-all duration-300 ease-out bg-slate-900 text-white text-xs font-semibold px-4 py-2.5 rounded-full shadow-xl flex items-center gap-2 animate-in fade-in slide-in-from-top-4">
+            <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+            <span>{toastMsg}</span>
+          </div>
+        )}
+
+      </div>
+
+      {/* ================= DESKTOP VIEW ================= */}
+      <div className="hidden md:block bg-[#f2f4f7] min-h-screen py-8 px-4 sm:px-6 lg:px-8 font-sans text-slate-800">
+        <div className="max-w-5xl mx-auto space-y-6">
         
         {/* Breadcrumbs & Back Button */}
         <div className="flex items-center justify-between">
@@ -429,5 +876,6 @@ export default function TutorProfilePage({
 
       </div>
     </div>
+  </>
   );
 }

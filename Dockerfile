@@ -8,7 +8,7 @@ RUN npm ci
 
 # Copy application source and build production bundle
 COPY . .
-RUN npm run build:app
+RUN npm run build
 
 # Stage 2: Production Node.js 22 Runtime
 FROM node:22-alpine

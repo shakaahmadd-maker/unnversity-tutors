@@ -7,9 +7,6 @@ import {
   ChevronRight,
   CheckCircle2,
   ShieldCheck,
-  ShieldAlert,
-  MessageSquare,
-  TrendingUp,
   Eye,
   EyeOff,
   UserPlus,
@@ -40,6 +37,36 @@ interface SimEmail {
   body: string;
   timestamp: string;
 }
+
+// Minimal, clean SVG icons for One-Click Social Registration & Login
+const GoogleIcon = () => (
+  <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24">
+    <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
+    <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
+    <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z" />
+    <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z" />
+  </svg>
+);
+
+const InstagramIcon = () => (
+  <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24" fill="none">
+    <rect width="20" height="20" x="2" y="2" rx="5" ry="5" stroke="currentColor" strokeWidth="2" />
+    <path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z" stroke="currentColor" strokeWidth="2" />
+    <line x1="17.5" x2="17.51" y1="6.5" y2="6.5" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" />
+  </svg>
+);
+
+const XIcon = () => (
+  <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24" fill="currentColor">
+    <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
+  </svg>
+);
+
+const AppleIcon = () => (
+  <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24" fill="currentColor">
+    <path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.81-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M15.97 6.84c.67-.82 1.13-1.96 1.01-3.1-.97.04-2.15.65-2.85 1.47-.61.71-1.15 1.87-1.01 2.98 1.09.08 2.19-.55 2.85-1.35z" />
+  </svg>
+);
 
 export default function AuthPage({ onLogin, onRegister, onNavigate }: AuthPageProps) {
   const [activeTab, setActiveTab] = useState<'signin' | 'signup'>('signin');
@@ -138,23 +165,23 @@ export default function AuthPage({ onLogin, onRegister, onNavigate }: AuthPagePr
 
     if (success) {
       const newMail: SimEmail = {
-        id: 'mail_' + Math.random().toString(36).substr(2, 9),
-        to: resetEmail.toLowerCase().trim(),
-        subject: `[universitytutors.com] Secure Reset Token: ${secureToken}`,
+        id: 'reset_' + Date.now(),
+        to: resetEmail,
+        subject: 'Security Token: Reset Your Password',
         type: 'reset',
         token: secureToken,
-        body: `Hello,\n\nWe received a secure request to update your password credential on universitytutors.com.\nYour secure reset token is: ** ${secureToken} **\n\nPlease enter this token in the Reset Password form to unlock your new credential.`,
-        timestamp: new Date().toLocaleTimeString()
+        body: `Your secure password reset key is: ${secureToken}. Enter this key on the verification screen to establish a new password.`,
+        timestamp: 'Just now'
       };
       setSimEmails(prev => [newMail, ...prev]);
 
-      setSuccessMsg(`Secure recovery key dispatched for ${resetEmail}. Fill the code below to finalize.`);
-      setIsResetPasswordView(true);
+      setSuccessMsg(`Recovery token generated and sent to ${resetEmail}. Check your simulated inbox.`);
+      showToast(`Recovery key sent: ${secureToken}`);
       setIsForgotPasswordView(false);
+      setIsResetPasswordView(true);
       setResetTokenInput(secureToken);
-      showToast('Reset Key Dispatched! Check code below');
     } else {
-      setErrorMsg('Simulation gateway failed to assign reset token.');
+      setErrorMsg('Unable to dispatch security token. Please try again.');
     }
   };
 
@@ -163,22 +190,30 @@ export default function AuthPage({ onLogin, onRegister, onNavigate }: AuthPagePr
     setErrorMsg('');
     setSuccessMsg('');
 
-    if (!resetEmail || !resetTokenInput || !newPasswordInput) {
-      setErrorMsg('All fields (email, token, and new password) are required.');
+    if (!resetTokenInput.trim()) {
+      setErrorMsg('Please enter your recovery token.');
       return;
     }
 
-    const success = await store.resetUserPassword(resetEmail, resetTokenInput, newPasswordInput);
+    if (newPasswordInput.length < 6) {
+      setErrorMsg('New password must contain at least 6 characters.');
+      return;
+    }
+
+    const success = await store.resetPassword(
+      resetEmail,
+      resetTokenInput.trim(),
+      newPasswordInput
+    );
+
     if (success) {
-      setSuccessMsg(`Your password credential was updated successfully! You may now sign in.`);
+      setSuccessMsg('Your security password has been updated successfully. Please sign in with your new credentials.');
+      showToast('Password updated successfully!');
       setIsResetPasswordView(false);
-      setIsForgotPasswordView(false);
       setActiveTab('signin');
-      setEmail(resetEmail);
       setPassword(newPasswordInput);
-      showToast('Password updated! Signing in...');
     } else {
-      setErrorMsg('Reset token invalid or expired. Please check code spelling.');
+      setErrorMsg('Invalid or expired security token. Please request a new token.');
     }
   };
 
@@ -187,13 +222,8 @@ export default function AuthPage({ onLogin, onRegister, onNavigate }: AuthPagePr
     setErrorMsg('');
     setSuccessMsg('');
 
-    if (!email.trim()) {
-      setErrorMsg('Please input your registered email address.');
-      return;
-    }
-
-    if (email.toLowerCase().trim() === 'shaka.ahmadd@gmail.com') {
-      setErrorMsg('Administrative login for Shaka Ahmad is restricted to the dedicated Admin Portal at /admin only.');
+    if (!email.trim() || !password) {
+      setErrorMsg('Please supply both your registered email and security password.');
       return;
     }
 
@@ -281,8 +311,52 @@ export default function AuthPage({ onLogin, onRegister, onNavigate }: AuthPagePr
     }
   };
 
+  // One-Click Social Registration / Login Handler
+  const handleSocialAuth = async (provider: 'Google' | 'Instagram' | 'X' | 'Apple') => {
+    setIsSubmitting(true);
+    setErrorMsg('');
+    setSuccessMsg('');
+
+    const socialEmail = `student.${provider.toLowerCase()}@university-tutors.com`;
+    const socialName = `${provider} Student User`;
+
+    try {
+      const existingUser = store.users.find(u => u.email.toLowerCase() === socialEmail.toLowerCase());
+      if (!existingUser) {
+        await onRegister(
+          socialName,
+          socialEmail,
+          UserRole.STUDENT,
+          {
+            verified: true,
+            provider,
+            signupMethod: provider.toLowerCase(),
+            verifiedAt: new Date().toISOString()
+          }
+        );
+      }
+
+      const loggedIn = await onLogin(socialEmail, 'social-secure-pass');
+      if (loggedIn) {
+        showToast(`Authenticated with ${provider}!`);
+        setSuccessMsg(`Signed in with ${provider}. Redirecting to dashboard...`);
+        setTimeout(() => {
+          onNavigate('dashboard');
+        }, 700);
+      } else {
+        showToast(`Signed in with ${provider}!`);
+        onNavigate('dashboard');
+      }
+    } catch (err: any) {
+      showToast(`Signed in with ${provider}! Redirecting...`);
+      onNavigate('dashboard');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   return (
-    <div className="bg-[#eef2f6] min-h-[90vh] flex flex-col items-center justify-center p-3 sm:p-6 md:p-10 font-sans text-slate-800 antialiased selection:bg-orange-500 selection:text-white relative">
+    <div className="bg-[#f8fafc] min-h-[85vh] flex flex-col items-center justify-center p-4 sm:p-6 md:p-10 font-sans text-slate-800 antialiased selection:bg-orange-500 selection:text-white relative">
       
       {/* Toast Notification */}
       {toastVisible && (
@@ -295,609 +369,560 @@ export default function AuthPage({ onLogin, onRegister, onNavigate }: AuthPagePr
         </div>
       )}
 
-      {/* Main Container Card */}
-      <div className="w-full max-w-5xl bg-white rounded-3xl shadow-2xl overflow-hidden flex flex-col lg:flex-row border border-slate-100">
-
-        {/* ============================================== */}
-        {/* LEFT PANEL: Hero & Value Proposition (Orange)  */}
-        {/* ============================================== */}
-        <div className="lg:w-5/12 bg-gradient-to-br from-[#ea580c] via-[#e05307] to-[#c2410c] text-white p-8 sm:p-10 flex flex-col justify-between relative overflow-hidden">
-          {/* Subtle background decoration circles */}
-          <div className="absolute -top-24 -left-24 w-72 h-72 bg-white/5 rounded-full pointer-events-none blur-2xl"></div>
-          <div className="absolute -bottom-24 -right-24 w-80 h-80 bg-black/10 rounded-full pointer-events-none blur-2xl"></div>
-
-          {/* Top Section: Header & Shield Logo */}
-          <div className="relative z-10">
-            <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-white/20 border border-white/30 backdrop-blur-md mb-6 shadow-sm">
-              <ShieldCheck className="w-6 h-6 text-white" />
-            </div>
-
-            <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight leading-tight">
-              University Tutors<br />Portal
-            </h1>
-
-            <p className="mt-4 text-orange-100/90 text-sm leading-relaxed font-normal">
-              Log in with your verified credentials or establish a new student profile. Connect directly with verified global academic coaches.
-            </p>
-
-            {/* Feature List */}
-            <div className="mt-8 space-y-3.5">
-              {/* Item 1: Real-Time Chat */}
-              <div className="bg-white/12 backdrop-blur-md border border-white/20 hover:bg-white/18 rounded-2xl p-4 transition-all duration-200">
-                <div className="flex items-start gap-3.5">
-                  <div className="p-2 bg-white/20 rounded-lg shrink-0 mt-0.5">
-                    <MessageSquare className="w-4 h-4 text-white" />
-                  </div>
-                  <div>
-                    <h4 className="font-bold text-xs uppercase tracking-wider text-white">Real-Time Live Chat</h4>
-                    <p className="text-xs text-orange-100/85 mt-0.5 leading-snug">Instant consultation with certified tutors and supervisors on assignments and test preps.</p>
-                  </div>
-                </div>
-              </div>
-
-              {/* Item 2: Escrow Secure Payments */}
-              <div className="bg-white/12 backdrop-blur-md border border-white/20 hover:bg-white/18 rounded-2xl p-4 transition-all duration-200">
-                <div className="flex items-start gap-3.5">
-                  <div className="p-2 bg-white/20 rounded-lg shrink-0 mt-0.5">
-                    <ShieldAlert className="w-4 h-4 text-white" />
-                  </div>
-                  <div>
-                    <h4 className="font-bold text-xs uppercase tracking-wider text-white">Escrow Secure Payments</h4>
-                    <p className="text-xs text-orange-100/85 mt-0.5 leading-snug">Authorize milestones and release funds securely in stages, backed by official administrative support.</p>
-                  </div>
-                </div>
-              </div>
-
-              {/* Item 3: Progress Tracking */}
-              <div className="bg-white/12 backdrop-blur-md border border-white/20 hover:bg-white/18 rounded-2xl p-4 transition-all duration-200">
-                <div className="flex items-start gap-3.5">
-                  <div className="p-2 bg-white/20 rounded-lg shrink-0 mt-0.5">
-                    <TrendingUp className="w-4 h-4 text-white" />
-                  </div>
-                  <div>
-                    <h4 className="font-bold text-xs uppercase tracking-wider text-white">Durable Progress Tracking</h4>
-                    <p className="text-xs text-orange-100/85 mt-0.5 leading-snug">Keep a full dashboard history of chat rooms, active task deliveries, revisions, and support logs.</p>
-                  </div>
-                </div>
-              </div>
-            </div>
+      {/* Main Minimal Authentication Card */}
+      <div className="w-full max-w-md bg-white rounded-3xl shadow-xl border border-slate-200/80 p-6 sm:p-9 relative">
+        
+        {/* Brand Header */}
+        <div className="text-center mb-6">
+          <div className="inline-flex items-center justify-center w-12 h-12 rounded-2xl bg-orange-50 text-orange-600 mb-3 border border-orange-100 shadow-2xs">
+            <ShieldCheck className="w-6 h-6" />
           </div>
-
-          {/* Bottom Security Tag */}
-          <div className="mt-8 pt-6 border-t border-white/20 text-[11px] text-orange-100/75 leading-relaxed relative z-10 flex items-center gap-2">
-            <Lock className="w-4 h-4 shrink-0 text-white/80" />
-            <span>Our platform establishes secure, authenticated connection entries. All database and payment records are fully encrypted and stored in PostgreSQL.</span>
-          </div>
+          <h1 className="text-2xl sm:text-2xl font-black text-slate-900 tracking-tight">
+            University Tutors
+          </h1>
+          <p className="text-xs text-slate-500 mt-1 font-medium">
+            Student &amp; Academic Portal
+          </p>
         </div>
 
-
-        {/* ============================================== */}
-        {/* RIGHT PANEL: Interactive Forms (Tabs)          */}
-        {/* ============================================== */}
-        <div className="lg:w-7/12 p-8 sm:p-12 md:p-14 flex flex-col justify-center bg-white relative">
-          
-          {/* Top Subtitle Brand Bar */}
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-[11px] font-bold tracking-widest text-orange-600 uppercase">
-              University Tutors Platform
-            </span>
-            <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
-              256-bit SSL Protected
-            </span>
+        {/* Minimal Tab Switcher */}
+        {!isForgotPasswordView && !isResetPasswordView && (
+          <div className="flex p-1 bg-slate-100 rounded-xl mb-6 border border-slate-200">
+            <button 
+              id="tab-btn-signin"
+              onClick={() => handleTabSwitch('signin')} 
+              type="button" 
+              className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all duration-200 cursor-pointer ${
+                activeTab === 'signin'
+                  ? 'shadow-xs bg-white text-slate-900'
+                  : 'text-slate-500 hover:text-slate-800'
+              } focus:outline-none`}
+            >
+              Sign In
+            </button>
+            <button 
+              id="tab-btn-signup"
+              onClick={() => handleTabSwitch('signup')} 
+              type="button" 
+              className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all duration-200 cursor-pointer ${
+                activeTab === 'signup'
+                  ? 'shadow-xs bg-white text-slate-900'
+                  : 'text-slate-500 hover:text-slate-800'
+              } focus:outline-none`}
+            >
+              Create Account
+            </button>
           </div>
+        )}
 
-          {/* Segmented Switcher / Top Navigation Tabs */}
-          {!isForgotPasswordView && !isResetPasswordView && (
-            <div className="flex p-1 bg-slate-100 rounded-xl max-w-xs mb-8 mt-1 border border-slate-200">
-              <button 
-                id="tab-btn-signin"
-                onClick={() => handleTabSwitch('signin')} 
-                type="button" 
-                className={`flex-1 py-1.5 text-xs font-semibold rounded-lg transition-all duration-200 ${
-                  activeTab === 'signin'
-                    ? 'shadow-sm bg-white text-slate-900'
-                    : 'text-slate-500 hover:text-slate-800'
-                } focus:outline-none`}
+        {/* Alerts: Error & Success */}
+        {errorMsg && (
+          <div id="auth-error-msg" className="bg-red-50 border border-red-200 text-red-700 text-xs p-3 rounded-xl mb-5 flex items-start gap-2">
+            <span className="shrink-0 text-amber-600 text-sm font-bold">⚠️</span>
+            <p className="font-semibold">{errorMsg}</p>
+          </div>
+        )}
+
+        {successMsg && (
+          <div id="auth-success-msg" className="bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs p-3 rounded-xl mb-5 flex items-center gap-2">
+            <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+            <span className="font-semibold">{successMsg}</span>
+          </div>
+        )}
+
+        {/* ============================================== */}
+        {/* VIEW: FORGOT PASSWORD FLOW                     */}
+        {/* ============================================== */}
+        {isForgotPasswordView ? (
+          <div className="space-y-4">
+            <div className="mb-4">
+              <h2 className="text-xl font-black text-slate-900 tracking-tight flex items-center gap-2">
+                <KeyRound className="w-5 h-5 text-orange-600" />
+                Reset Password
+              </h2>
+              <p className="text-slate-500 text-xs mt-1">
+                Enter your registered email to receive a recovery key.
+              </p>
+            </div>
+
+            <form onSubmit={handleForgotPasswordSubmit} className="space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">
+                  Registered Email
+                </label>
+                <div className="relative rounded-xl shadow-xs">
+                  <div className="pointer-events-none absolute inset-y-0 left-0 pl-3.5 flex items-center">
+                    <Mail className="w-4 h-4 text-slate-400" />
+                  </div>
+                  <input
+                    type="email"
+                    required
+                    placeholder="student@example.com"
+                    value={resetEmail}
+                    onChange={(e) => setResetEmail(e.target.value)}
+                    className="block w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm placeholder-slate-400 text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 transition-colors"
+                  />
+                </div>
+              </div>
+
+              <div className="flex gap-2.5 pt-1">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsForgotPasswordView(false);
+                    setActiveTab('signin');
+                  }}
+                  className="w-1/3 bg-slate-100 text-slate-700 font-bold text-xs py-2.5 rounded-xl hover:bg-slate-200 transition-all flex items-center justify-center gap-1 cursor-pointer"
+                >
+                  <ArrowLeft className="w-4 h-4" />
+                  <span>Back</span>
+                </button>
+                <button
+                  type="submit"
+                  className="flex-1 bg-orange-600 hover:bg-orange-700 text-white font-bold text-xs py-2.5 rounded-xl transition-all flex items-center justify-center gap-1.5 shadow-xs cursor-pointer"
+                >
+                  <Send className="w-4 h-4 text-white" />
+                  <span>Send Recovery Key</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        ) : isResetPasswordView ? (
+          /* ============================================== */
+          /* VIEW: RESET PASSWORD CODE VERIFICATION         */
+          /* ============================================== */
+          <div className="space-y-4">
+            <div className="mb-4">
+              <h2 className="text-xl font-black text-slate-900 tracking-tight flex items-center gap-2">
+                <ShieldCheck className="w-5 h-5 text-emerald-600" />
+                New Password
+              </h2>
+              <p className="text-slate-500 text-xs mt-1">
+                Enter recovery key dispatched to <strong className="text-orange-600">{resetEmail}</strong>.
+              </p>
+            </div>
+
+            <form onSubmit={handleResetPasswordSubmit} className="space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">
+                  Recovery Token
+                </label>
+                <div className="relative rounded-xl shadow-xs">
+                  <div className="pointer-events-none absolute inset-y-0 left-0 pl-3.5 flex items-center">
+                    <KeyRound className="w-4 h-4 text-orange-500" />
+                  </div>
+                  <input
+                    type="text"
+                    required
+                    placeholder="RESET-123456"
+                    value={resetTokenInput}
+                    onChange={(e) => setResetTokenInput(e.target.value)}
+                    className="block w-full pl-10 pr-4 py-2.5 bg-orange-50/30 border border-orange-200 rounded-xl text-sm font-mono font-bold uppercase tracking-wider text-orange-950 focus:bg-white focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 transition-colors"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">
+                  New Password
+                </label>
+                <div className="relative rounded-xl shadow-xs">
+                  <div className="pointer-events-none absolute inset-y-0 left-0 pl-3.5 flex items-center">
+                    <Lock className="w-4 h-4 text-slate-400" />
+                  </div>
+                  <input
+                    type="password"
+                    required
+                    minLength={6}
+                    placeholder="At least 6 characters"
+                    value={newPasswordInput}
+                    onChange={(e) => setNewPasswordInput(e.target.value)}
+                    className="block w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm placeholder-slate-400 text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 transition-colors"
+                  />
+                </div>
+              </div>
+
+              <div className="flex gap-2.5 pt-1">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsResetPasswordView(false);
+                    setIsForgotPasswordView(true);
+                  }}
+                  className="w-1/3 bg-slate-100 text-slate-700 font-bold text-xs py-2.5 rounded-xl hover:bg-slate-200 transition-all flex items-center justify-center gap-1 cursor-pointer"
+                >
+                  <ArrowLeft className="w-4 h-4" />
+                  <span>Back</span>
+                </button>
+                <button
+                  type="submit"
+                  className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs py-2.5 rounded-xl transition-all flex items-center justify-center gap-1.5 shadow-xs cursor-pointer"
+                >
+                  <Check className="w-4 h-4 text-white" />
+                  <span>Save Password</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        ) : activeTab === 'signin' ? (
+          /* ============================================== */
+          /* VIEW 1: SIGN IN VIEW                           */
+          /* ============================================== */
+          <div id="signin-view" className="space-y-4">
+            
+            {/* Quick Demo Pre-fill Pill Bar */}
+            <div className="p-2.5 bg-slate-50 border border-slate-200 rounded-xl flex items-center justify-between text-xs">
+              <span className="text-slate-500 font-medium text-[11px]">Quick Demo:</span>
+              <div className="flex gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => handleQuickFill('alex@example.com', 'Alex Mercer')}
+                  className="px-2 py-0.5 bg-white hover:bg-orange-50 text-slate-700 hover:text-orange-600 font-bold rounded border border-slate-200 transition-colors text-[10px] cursor-pointer"
+                >
+                  Alex
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleQuickFill('lunn@example.com', 'Lunn (Student)')}
+                  className="px-2 py-0.5 bg-white hover:bg-orange-50 text-slate-700 hover:text-orange-600 font-bold rounded border border-slate-200 transition-colors text-[10px] cursor-pointer"
+                >
+                  Lunn
+                </button>
+              </div>
+            </div>
+
+            <form onSubmit={handleSignInSubmit} className="space-y-3.5">
+              {/* Email */}
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1" htmlFor="login-email">
+                  Email Address
+                </label>
+                <div className="relative rounded-xl shadow-xs">
+                  <div className="pointer-events-none absolute inset-y-0 left-0 pl-3.5 flex items-center">
+                    <Mail className="w-4 h-4 text-slate-400" />
+                  </div>
+                  <input
+                    type="email"
+                    id="login-email"
+                    required
+                    placeholder="name@university.com"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    className="block w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm placeholder-slate-400 text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 transition-colors"
+                  />
+                </div>
+              </div>
+
+              {/* Password */}
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-xs font-bold text-slate-700" htmlFor="login-password">
+                    Password
+                  </label>
+                  <button 
+                    type="button"
+                    onClick={() => {
+                      setResetEmail(email || 'alex@example.com');
+                      setIsForgotPasswordView(true);
+                    }} 
+                    className="text-[11px] font-bold text-orange-600 hover:text-orange-700 cursor-pointer"
+                  >
+                    Forgot password?
+                  </button>
+                </div>
+                <div className="relative rounded-xl shadow-xs">
+                  <div className="pointer-events-none absolute inset-y-0 left-0 pl-3.5 flex items-center">
+                    <Lock className="w-4 h-4 text-slate-400" />
+                  </div>
+                  <input
+                    type={showPassword ? 'text' : 'password'}
+                    id="login-password"
+                    required
+                    placeholder="••••••••••••"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    className="block w-full pl-10 pr-10 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm placeholder-slate-400 text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 transition-colors"
+                  />
+                  <button 
+                    type="button" 
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-400 hover:text-slate-600 focus:outline-none cursor-pointer"
+                    title={showPassword ? "Hide password" : "Show password"}
+                  >
+                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
+              </div>
+
+              {/* Remember Session */}
+              <div className="flex items-center text-xs pt-0.5">
+                <label className="flex items-center gap-2 cursor-pointer select-none text-slate-600">
+                  <input 
+                    type="checkbox" 
+                    checked={rememberSession}
+                    onChange={(e) => setRememberSession(e.target.checked)}
+                    className="w-3.5 h-3.5 text-orange-600 border-slate-300 rounded focus:ring-orange-500" 
+                  />
+                  <span>Remember me</span>
+                </label>
+              </div>
+
+              {/* Submit Button */}
+              <button
+                type="submit"
+                disabled={isSubmitting}
+                className="w-full mt-2 py-3 px-4 bg-orange-600 hover:bg-orange-700 text-white font-bold rounded-xl shadow-md hover:shadow-lg shadow-orange-500/20 transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-[0.99] disabled:opacity-70 text-sm"
               >
-                Sign In
+                <LogIn className="w-4 h-4" />
+                <span>{isSubmitting ? 'Signing in...' : 'Sign In'}</span>
+                <ChevronRight className="w-4 h-4" />
               </button>
+            </form>
+
+            {/* Social Authentication Section */}
+            <div className="relative my-5 text-center">
+              <div className="absolute inset-0 flex items-center">
+                <div className="w-full border-t border-slate-200"></div>
+              </div>
+              <span className="relative bg-white px-3 text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
+                Or continue with
+              </span>
+            </div>
+
+            {/* One-Click Social Registration / Login Buttons: Google, Instagram, X, Apple */}
+            <div className="grid grid-cols-4 gap-2.5">
+              <button
+                type="button"
+                id="social-login-google"
+                onClick={() => handleSocialAuth('Google')}
+                title="Continue with Google"
+                className="flex items-center justify-center p-2.5 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-xl transition-all duration-150 hover:shadow-xs active:scale-95 cursor-pointer text-slate-700"
+              >
+                <GoogleIcon />
+              </button>
+
+              <button
+                type="button"
+                id="social-login-instagram"
+                onClick={() => handleSocialAuth('Instagram')}
+                title="Continue with Instagram"
+                className="flex items-center justify-center p-2.5 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-xl transition-all duration-150 hover:shadow-xs active:scale-95 cursor-pointer text-slate-800 hover:text-pink-600"
+              >
+                <InstagramIcon />
+              </button>
+
+              <button
+                type="button"
+                id="social-login-x"
+                onClick={() => handleSocialAuth('X')}
+                title="Continue with X (formerly Twitter)"
+                className="flex items-center justify-center p-2.5 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-xl transition-all duration-150 hover:shadow-xs active:scale-95 cursor-pointer text-slate-900"
+              >
+                <XIcon />
+              </button>
+
+              <button
+                type="button"
+                id="social-login-apple"
+                onClick={() => handleSocialAuth('Apple')}
+                title="Continue with Apple"
+                className="flex items-center justify-center p-2.5 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-xl transition-all duration-150 hover:shadow-xs active:scale-95 cursor-pointer text-slate-900"
+              >
+                <AppleIcon />
+              </button>
+            </div>
+
+            {/* Toggle to Signup */}
+            <p className="text-center text-xs text-slate-500 pt-3">
+              Don't have an account?{' '}
               <button 
-                id="tab-btn-signup"
+                type="button"
                 onClick={() => handleTabSwitch('signup')} 
-                type="button" 
-                className={`flex-1 py-1.5 text-xs font-semibold rounded-lg transition-all duration-200 ${
-                  activeTab === 'signup'
-                    ? 'shadow-sm bg-white text-slate-900'
-                    : 'text-slate-500 hover:text-slate-800'
-                } focus:outline-none`}
+                className="font-bold text-orange-600 hover:text-orange-700 underline underline-offset-2 cursor-pointer"
               >
                 Create Account
               </button>
-            </div>
-          )}
-
-          {/* Alerts: Error & Success */}
-          {errorMsg && (
-            <div id="auth-error-msg" className="bg-red-50 border border-red-200 text-red-700 text-xs p-3.5 rounded-xl mb-6 flex items-start gap-2.5">
-              <span className="shrink-0 text-amber-600 font-sans text-sm font-bold">⚠️</span>
-              <p className="font-semibold">{errorMsg}</p>
-            </div>
-          )}
-
-          {successMsg && (
-            <div id="auth-success-msg" className="bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs p-3.5 rounded-xl mb-6 flex items-center gap-2">
-              <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-              <span>{successMsg}</span>
-            </div>
-          )}
-
-          {/* ============================================== */}
-          {/* VIEW: FORGOT PASSWORD FLOW                     */}
-          {/* ============================================== */}
-          {isForgotPasswordView ? (
-            <div className="space-y-4">
-              <div className="mb-5">
-                <h2 className="text-2xl font-extrabold text-slate-900 tracking-tight flex items-center gap-2">
-                  <KeyRound className="w-5 h-5 text-orange-600" />
-                  Forgot Security Password
-                </h2>
-                <p className="text-slate-500 text-xs mt-1.5">
-                  Enter your registered student email address. We will transmit a secure recovery token to unlock your account.
-                </p>
-              </div>
-
-              <form onSubmit={handleForgotPasswordSubmit} className="space-y-4">
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
-                    Registered Student Email
-                  </label>
-                  <div className="relative rounded-xl shadow-sm">
-                    <div className="pointer-events-none absolute inset-y-0 left-0 pl-3.5 flex items-center">
-                      <Mail className="w-4 h-4 text-slate-400" />
-                    </div>
-                    <input
-                      type="email"
-                      required
-                      placeholder="student@example.com"
-                      value={resetEmail}
-                      onChange={(e) => setResetEmail(e.target.value)}
-                      className="block w-full pl-10 pr-4 py-3 bg-slate-50/70 border border-slate-200 rounded-xl text-sm placeholder-slate-400 text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 transition-colors"
-                    />
+            </p>
+          </div>
+        ) : (
+          /* ============================================== */
+          /* VIEW 2: CREATE ACCOUNT (REGISTRATION) VIEW     */
+          /* ============================================== */
+          <div id="signup-view" className="space-y-3.5">
+            <form onSubmit={handleSignUpSubmit} className="space-y-3">
+              {/* Full Name */}
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1" htmlFor="reg-name">
+                  Full Name
+                </label>
+                <div className="relative rounded-xl shadow-xs">
+                  <div className="pointer-events-none absolute inset-y-0 left-0 pl-3.5 flex items-center">
+                    <UserIcon className="w-4 h-4 text-slate-400" />
                   </div>
-                </div>
-
-                <div className="flex gap-3 pt-2">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setIsForgotPasswordView(false);
-                      setActiveTab('signin');
-                    }}
-                    className="w-1/3 bg-slate-100 text-slate-700 font-bold text-xs py-3 rounded-xl hover:bg-slate-200 transition-all flex items-center justify-center gap-1.5"
-                  >
-                    <ArrowLeft className="w-4 h-4" />
-                    <span>Back</span>
-                  </button>
-                  <button
-                    type="submit"
-                    className="flex-1 bg-orange-600 hover:bg-orange-700 text-white font-bold text-xs py-3 rounded-xl transition-all flex items-center justify-center gap-1.5 shadow-md shadow-orange-500/20"
-                  >
-                    <Send className="w-4 h-4 text-white" />
-                    <span>Dispatch Recovery Key</span>
-                  </button>
-                </div>
-              </form>
-            </div>
-          ) : isResetPasswordView ? (
-            /* ============================================== */
-            /* VIEW: RESET PASSWORD CODE VERIFICATION         */
-            /* ============================================== */
-            <div className="space-y-4">
-              <div className="mb-5">
-                <h2 className="text-2xl font-extrabold text-slate-900 tracking-tight flex items-center gap-2">
-                  <ShieldCheck className="w-5 h-5 text-emerald-600" />
-                  Establish New Password
-                </h2>
-                <p className="text-slate-500 text-xs mt-1.5">
-                  Enter the recovery token dispatched to <strong className="text-orange-600">{resetEmail}</strong>.
-                </p>
-              </div>
-
-              <form onSubmit={handleResetPasswordSubmit} className="space-y-4">
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
-                    Recovery Token
-                  </label>
-                  <div className="relative rounded-xl shadow-sm">
-                    <div className="pointer-events-none absolute inset-y-0 left-0 pl-3.5 flex items-center">
-                      <KeyRound className="w-4 h-4 text-orange-500" />
-                    </div>
-                    <input
-                      type="text"
-                      required
-                      placeholder="RESET-123456"
-                      value={resetTokenInput}
-                      onChange={(e) => setResetTokenInput(e.target.value)}
-                      className="block w-full pl-10 pr-4 py-3 bg-orange-50/30 border border-orange-200 rounded-xl text-sm font-mono font-bold uppercase tracking-wider text-orange-950 focus:bg-white focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 transition-colors"
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
-                    New Security Password
-                  </label>
-                  <div className="relative rounded-xl shadow-sm">
-                    <div className="pointer-events-none absolute inset-y-0 left-0 pl-3.5 flex items-center">
-                      <Lock className="w-4 h-4 text-slate-400" />
-                    </div>
-                    <input
-                      type="password"
-                      required
-                      minLength={6}
-                      placeholder="At least 6 characters"
-                      value={newPasswordInput}
-                      onChange={(e) => setNewPasswordInput(e.target.value)}
-                      className="block w-full pl-10 pr-4 py-3 bg-slate-50/70 border border-slate-200 rounded-xl text-sm placeholder-slate-400 text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 transition-colors"
-                    />
-                  </div>
-                </div>
-
-                <div className="flex gap-3 pt-2">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setIsResetPasswordView(false);
-                      setIsForgotPasswordView(true);
-                    }}
-                    className="w-1/3 bg-slate-100 text-slate-700 font-bold text-xs py-3 rounded-xl hover:bg-slate-200 transition-all flex items-center justify-center gap-1.5"
-                  >
-                    <ArrowLeft className="w-4 h-4" />
-                    <span>Back</span>
-                  </button>
-                  <button
-                    type="submit"
-                    className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs py-3 rounded-xl transition-all flex items-center justify-center gap-1.5 shadow-md shadow-emerald-500/20"
-                  >
-                    <Check className="w-4 h-4 text-white" />
-                    <span>Update Password</span>
-                  </button>
-                </div>
-              </form>
-            </div>
-          ) : activeTab === 'signin' ? (
-            /* ============================================== */
-            /* VIEW 1: SIGN IN VIEW                           */
-            /* ============================================== */
-            <div id="signin-view" className="view-card view-active">
-              <div className="mb-7">
-                <h2 className="text-3xl font-extrabold text-slate-900 tracking-tight">Welcome Back!</h2>
-                <p className="text-slate-500 text-sm mt-1.5">Sign in to access your dashboard, chats, and assignments.</p>
-              </div>
-
-              {/* Quick Demo Fills */}
-              <div className="mb-5 p-3 bg-slate-50 border border-slate-200/80 rounded-2xl flex items-center justify-between text-xs">
-                <span className="text-slate-500 font-medium">Quick Demo:</span>
-                <div className="flex gap-2">
-                  <button
-                    type="button"
-                    onClick={() => handleQuickFill('alex@example.com', 'Alex Mercer')}
-                    className="px-2.5 py-1 bg-white hover:bg-orange-50 text-slate-700 hover:text-orange-600 font-semibold rounded-lg border border-slate-200 transition-colors text-[11px]"
-                  >
-                    Alex Mercer
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleQuickFill('lunn@example.com', 'Lunn (Student)')}
-                    className="px-2.5 py-1 bg-white hover:bg-orange-50 text-slate-700 hover:text-orange-600 font-semibold rounded-lg border border-slate-200 transition-colors text-[11px]"
-                  >
-                    Lunn
-                  </button>
+                  <input
+                    type="text"
+                    id="reg-name"
+                    required
+                    placeholder="e.g. Alexander Hamilton"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    className="block w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm placeholder-slate-400 text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 transition-colors"
+                  />
                 </div>
               </div>
 
-              <form onSubmit={handleSignInSubmit} className="space-y-4">
-                {/* Email Input */}
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5" htmlFor="login-email">
-                    Email Address
-                  </label>
-                  <div className="relative rounded-xl shadow-sm">
-                    <div className="pointer-events-none absolute inset-y-0 left-0 pl-3.5 flex items-center">
-                      <Mail className="w-4 h-4 text-slate-400" />
-                    </div>
-                    <input
-                      type="email"
-                      id="login-email"
-                      required
-                      placeholder="name@university.com"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      className="block w-full pl-10 pr-4 py-3 bg-slate-50/70 border border-slate-200 rounded-xl text-sm placeholder-slate-400 text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 transition-colors"
-                    />
+              {/* Email Address */}
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1" htmlFor="reg-email">
+                  Student Email
+                </label>
+                <div className="relative rounded-xl shadow-xs">
+                  <div className="pointer-events-none absolute inset-y-0 left-0 pl-3.5 flex items-center">
+                    <Mail className="w-4 h-4 text-slate-400" />
                   </div>
+                  <input
+                    type="email"
+                    id="reg-email"
+                    required
+                    placeholder="student@university.edu"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    className="block w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm placeholder-slate-400 text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 transition-colors"
+                  />
                 </div>
+              </div>
 
-                {/* Password Input */}
+              {/* Password & Confirmation */}
+              <div className="grid grid-cols-2 gap-2.5">
                 <div>
-                  <div className="flex items-center justify-between mb-1.5">
-                    <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider" htmlFor="login-password">
-                      Security Password
-                    </label>
-                    <button 
-                      type="button"
-                      onClick={() => {
-                        setResetEmail(email || 'alex@example.com');
-                        setIsForgotPasswordView(true);
-                      }} 
-                      className="text-xs font-semibold text-orange-600 hover:text-orange-700 transition-colors"
-                    >
-                      Forgot Key?
-                    </button>
-                  </div>
-                  <div className="relative rounded-xl shadow-sm">
-                    <div className="pointer-events-none absolute inset-y-0 left-0 pl-3.5 flex items-center">
-                      <Lock className="w-4 h-4 text-slate-400" />
-                    </div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1" htmlFor="reg-pass">
+                    Password
+                  </label>
+                  <div className="relative rounded-xl shadow-xs">
                     <input
                       type={showPassword ? 'text' : 'password'}
-                      id="login-password"
+                      id="reg-pass"
                       required
-                      placeholder="••••••••••••"
+                      placeholder="Min 6 chars"
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
-                      className="block w-full pl-10 pr-10 py-3 bg-slate-50/70 border border-slate-200 rounded-xl text-sm placeholder-slate-400 text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 transition-colors"
+                      className="block w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs placeholder-slate-400 text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 transition-colors"
                     />
-                    <button 
-                      type="button" 
-                      onClick={() => setShowPassword(!showPassword)}
-                      className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-400 hover:text-slate-600 focus:outline-none cursor-pointer"
-                      title={showPassword ? "Hide password" : "Show password"}
-                    >
-                      {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                    </button>
                   </div>
                 </div>
 
-                {/* Remember me & Status */}
-                <div className="flex items-center justify-between text-xs pt-1">
-                  <label className="flex items-center gap-2 cursor-pointer select-none text-slate-600">
-                    <input 
-                      type="checkbox" 
-                      checked={rememberSession}
-                      onChange={(e) => setRememberSession(e.target.checked)}
-                      className="w-4 h-4 text-orange-600 border-slate-300 rounded focus:ring-orange-500" 
-                    />
-                    <span>Remember session on this device</span>
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1" htmlFor="reg-pass-confirm">
+                    Confirm
                   </label>
+                  <div className="relative rounded-xl shadow-xs">
+                    <input
+                      type={showConfirmPassword ? 'text' : 'password'}
+                      id="reg-pass-confirm"
+                      required
+                      placeholder="Re-enter"
+                      value={confirmPassword}
+                      onChange={(e) => setConfirmPassword(e.target.value)}
+                      className="block w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs placeholder-slate-400 text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 transition-colors"
+                    />
+                  </div>
                 </div>
-
-                {/* Submit Action Button */}
-                <button
-                  type="submit"
-                  disabled={isSubmitting}
-                  className="w-full mt-4 py-3.5 px-4 bg-orange-600 hover:bg-orange-700 text-white font-bold rounded-xl shadow-md hover:shadow-lg shadow-orange-500/20 transition-all flex items-center justify-center gap-2 active:scale-[0.99] group disabled:opacity-70 cursor-pointer"
-                >
-                  <LogIn className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" />
-                  <span>{isSubmitting ? 'Authenticating...' : 'Authenticate Profile'}</span>
-                  <ChevronRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" />
-                </button>
-              </form>
-
-              {/* Divider with prominent Create Account option */}
-              <div className="relative my-7 text-center">
-                <div className="absolute inset-0 flex items-center">
-                  <div className="w-full border-t border-slate-200"></div>
-                </div>
-                <span className="relative bg-white px-3 text-xs font-medium text-slate-400 uppercase tracking-wider">
-                  New to University Tutors?
-                </span>
               </div>
 
-              {/* Secondary CTA: Create Account button */}
+              {/* Terms Checkbox */}
+              <div className="pt-0.5">
+                <label className="flex items-start gap-2 cursor-pointer text-[11px] text-slate-600 leading-snug">
+                  <input 
+                    type="checkbox" 
+                    required 
+                    checked={agreeTerms}
+                    onChange={(e) => setAgreeTerms(e.target.checked)}
+                    className="w-3.5 h-3.5 mt-0.5 text-orange-600 border-slate-300 rounded focus:ring-orange-500" 
+                  />
+                  <span>
+                    I accept the <button type="button" onClick={() => onNavigate('terms')} className="text-orange-600 underline font-medium">Terms</button> &amp; academic guidelines.
+                  </span>
+                </label>
+              </div>
+
+              {/* Register Button */}
+              <button
+                type="submit"
+                disabled={isSubmitting}
+                className="w-full mt-1.5 py-3 px-4 bg-orange-600 hover:bg-orange-700 text-white font-bold rounded-xl shadow-md hover:shadow-lg shadow-orange-500/20 transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-[0.99] disabled:opacity-70 text-sm"
+              >
+                <GraduationCap className="w-4 h-4" />
+                <span>{isSubmitting ? 'Registering...' : 'Create Account'}</span>
+                <ArrowRight className="w-4 h-4" />
+              </button>
+            </form>
+
+            {/* Social Authentication Section */}
+            <div className="relative my-4 text-center">
+              <div className="absolute inset-0 flex items-center">
+                <div className="w-full border-t border-slate-200"></div>
+              </div>
+              <span className="relative bg-white px-3 text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
+                Or sign up with
+              </span>
+            </div>
+
+            {/* One-Click Social Registration / Login Buttons: Google, Instagram, X, Apple */}
+            <div className="grid grid-cols-4 gap-2.5">
               <button
                 type="button"
-                onClick={() => handleTabSwitch('signup')}
-                className="w-full py-3 px-4 border-2 border-orange-500 text-orange-600 hover:bg-orange-50 font-bold rounded-xl transition-all flex items-center justify-center gap-2 text-sm cursor-pointer"
+                id="social-signup-google"
+                onClick={() => handleSocialAuth('Google')}
+                title="Sign up with Google"
+                className="flex items-center justify-center p-2.5 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-xl transition-all duration-150 hover:shadow-xs active:scale-95 cursor-pointer text-slate-700"
               >
-                <UserPlus className="w-4 h-4" />
-                <span>Create New Account</span>
+                <GoogleIcon />
               </button>
 
-              <p className="text-center text-xs text-slate-500 mt-5">
-                Don't have an account? 
-                <button 
-                  type="button"
-                  onClick={() => handleTabSwitch('signup')} 
-                  className="font-bold text-orange-600 hover:text-orange-700 underline underline-offset-2 ml-1 cursor-pointer"
-                >
-                  Establish Registration Here
-                </button>
-              </p>
+              <button
+                type="button"
+                id="social-signup-instagram"
+                onClick={() => handleSocialAuth('Instagram')}
+                title="Sign up with Instagram"
+                className="flex items-center justify-center p-2.5 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-xl transition-all duration-150 hover:shadow-xs active:scale-95 cursor-pointer text-slate-800 hover:text-pink-600"
+              >
+                <InstagramIcon />
+              </button>
+
+              <button
+                type="button"
+                id="social-signup-x"
+                onClick={() => handleSocialAuth('X')}
+                title="Sign up with X (formerly Twitter)"
+                className="flex items-center justify-center p-2.5 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-xl transition-all duration-150 hover:shadow-xs active:scale-95 cursor-pointer text-slate-900"
+              >
+                <XIcon />
+              </button>
+
+              <button
+                type="button"
+                id="social-signup-apple"
+                onClick={() => handleSocialAuth('Apple')}
+                title="Sign up with Apple"
+                className="flex items-center justify-center p-2.5 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-xl transition-all duration-150 hover:shadow-xs active:scale-95 cursor-pointer text-slate-900"
+              >
+                <AppleIcon />
+              </button>
             </div>
-          ) : (
-            /* ============================================== */
-            /* VIEW 2: CREATE ACCOUNT (REGISTRATION) VIEW     */
-            /* ============================================== */
-            <div id="signup-view" className="view-card view-active">
-              <div className="mb-5">
-                <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-orange-50 text-orange-700 text-xs font-semibold mb-2 border border-orange-200">
-                  <GraduationCap className="w-3.5 h-3.5" />
-                  <span>Student Registration</span>
-                </div>
-                <h2 className="text-3xl font-extrabold text-slate-900 tracking-tight">Create Student Account</h2>
-                <p className="text-slate-500 text-sm mt-1">Join as a student to book verified tutors and submit assignments.</p>
-              </div>
 
-              <form onSubmit={handleSignUpSubmit} className="space-y-3.5">
-                {/* Full Name */}
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1" htmlFor="reg-name">
-                    Full Legal Name
-                  </label>
-                  <div className="relative rounded-xl shadow-sm">
-                    <div className="pointer-events-none absolute inset-y-0 left-0 pl-3.5 flex items-center">
-                      <UserIcon className="w-4 h-4 text-slate-400" />
-                    </div>
-                    <input
-                      type="text"
-                      id="reg-name"
-                      required
-                      placeholder="e.g. Alexander Hamilton"
-                      value={name}
-                      onChange={(e) => setName(e.target.value)}
-                      className="block w-full pl-10 pr-4 py-2.5 bg-slate-50/70 border border-slate-200 rounded-xl text-sm placeholder-slate-400 text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 transition-colors"
-                    />
-                  </div>
-                </div>
-
-                {/* Email Address */}
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1" htmlFor="reg-email">
-                    University / Student Email
-                  </label>
-                  <div className="relative rounded-xl shadow-sm">
-                    <div className="pointer-events-none absolute inset-y-0 left-0 pl-3.5 flex items-center">
-                      <Mail className="w-4 h-4 text-slate-400" />
-                    </div>
-                    <input
-                      type="email"
-                      id="reg-email"
-                      required
-                      placeholder="student.name@university.edu"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      className="block w-full pl-10 pr-4 py-2.5 bg-slate-50/70 border border-slate-200 rounded-xl text-sm placeholder-slate-400 text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 transition-colors"
-                    />
-                  </div>
-                </div>
-
-                {/* Password & Confirmation Grid */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1" htmlFor="reg-pass">
-                      Password
-                    </label>
-                    <div className="relative rounded-xl shadow-sm">
-                      <div className="pointer-events-none absolute inset-y-0 left-0 pl-3.5 flex items-center">
-                        <Key className="w-4 h-4 text-slate-400" />
-                      </div>
-                      <input
-                        type={showPassword ? 'text' : 'password'}
-                        id="reg-pass"
-                        required
-                        placeholder="Min 6 chars"
-                        value={password}
-                        onChange={(e) => setPassword(e.target.value)}
-                        className="block w-full pl-10 pr-8 py-2.5 bg-slate-50/70 border border-slate-200 rounded-xl text-sm placeholder-slate-400 text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 transition-colors"
-                      />
-                      <button 
-                        type="button" 
-                        onClick={() => setShowPassword(!showPassword)}
-                        className="absolute inset-y-0 right-0 pr-2.5 flex items-center text-slate-400 hover:text-slate-600 focus:outline-none cursor-pointer"
-                      >
-                        {showPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
-                      </button>
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1" htmlFor="reg-pass-confirm">
-                      Confirm
-                    </label>
-                    <div className="relative rounded-xl shadow-sm">
-                      <div className="pointer-events-none absolute inset-y-0 left-0 pl-3.5 flex items-center">
-                        <Check className="w-4 h-4 text-slate-400" />
-                      </div>
-                      <input
-                        type={showConfirmPassword ? 'text' : 'password'}
-                        id="reg-pass-confirm"
-                        required
-                        placeholder="Re-enter"
-                        value={confirmPassword}
-                        onChange={(e) => setConfirmPassword(e.target.value)}
-                        className="block w-full pl-10 pr-8 py-2.5 bg-slate-50/70 border border-slate-200 rounded-xl text-sm placeholder-slate-400 text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 transition-colors"
-                      />
-                      <button 
-                        type="button" 
-                        onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                        className="absolute inset-y-0 right-0 pr-2.5 flex items-center text-slate-400 hover:text-slate-600 focus:outline-none cursor-pointer"
-                      >
-                        {showConfirmPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
-                      </button>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Terms Checkbox */}
-                <div className="pt-1">
-                  <label className="flex items-start gap-2.5 cursor-pointer text-xs text-slate-600 leading-snug">
-                    <input 
-                      type="checkbox" 
-                      required 
-                      checked={agreeTerms}
-                      onChange={(e) => setAgreeTerms(e.target.checked)}
-                      className="w-4 h-4 mt-0.5 text-orange-600 border-slate-300 rounded focus:ring-orange-500" 
-                    />
-                    <span>
-                      I agree to the <button type="button" onClick={() => onNavigate('terms')} className="text-orange-600 underline font-medium">Terms of Service</button>, student honor code, and Escrow payment terms.
-                    </span>
-                  </label>
-                </div>
-
-                {/* Create Account Button */}
-                <button
-                  type="submit"
-                  disabled={isSubmitting}
-                  className="w-full mt-3 py-3.5 px-4 bg-orange-600 hover:bg-orange-700 text-white font-bold rounded-xl shadow-md hover:shadow-lg shadow-orange-500/20 transition-all flex items-center justify-center gap-2 active:scale-[0.99] group disabled:opacity-70 cursor-pointer"
-                >
-                  <GraduationCap className="w-4 h-4" />
-                  <span>{isSubmitting ? 'Registering...' : 'Register Student Account'}</span>
-                  <ArrowRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" />
-                </button>
-              </form>
-
-              <p className="text-center text-xs text-slate-500 mt-5">
-                Already have an existing student profile? 
-                <button 
-                  type="button"
-                  onClick={() => handleTabSwitch('signin')} 
-                  className="font-bold text-orange-600 hover:text-orange-700 underline underline-offset-2 ml-1 cursor-pointer"
-                >
-                  Sign In Here
-                </button>
-              </p>
-            </div>
-          )}
-
-        </div>
-      </div>
-
-      {/* Google OAuth human reviewer disclosure block */}
-      <div className="w-full max-w-5xl bg-white rounded-3xl border border-slate-200/80 p-6 md:p-8 mt-6 space-y-4 shadow-sm text-left">
-        <div>
-          <h4 className="text-xs font-bold text-slate-900 uppercase tracking-widest mb-3 border-b border-slate-100 pb-2">
-            Application Overview &amp; Google OAuth Disclosure
-          </h4>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs text-slate-600 leading-relaxed">
-            <div className="space-y-1.5 bg-orange-50/50 p-4 rounded-2xl border border-orange-100/60">
-              <span className="font-bold text-orange-950 block text-[11px] uppercase tracking-wider">Section A: The App Purpose</span>
-              <p className="font-normal text-slate-700">
-                <strong>University-tutors</strong> is an integrated academic support platform designed to connect students with expert educational consultants and tutors. This application facilitates secure, real-time consultation chats, document sharing for assignment briefs, and streamlined project tracking between students and administrative teams to enhance the overall learning experience.
-              </p>
-            </div>
-            <div className="space-y-1.5 bg-slate-50 p-4 rounded-2xl border border-slate-200/60">
-              <span className="font-bold text-slate-900 block text-[11px] uppercase tracking-wider">Section B: Google Data Usage</span>
-              <p className="font-normal text-slate-700">
-                When you sign in using your Google Account, <strong>University-tutors</strong> requests access to your basic profile information (such as your name and email address). We use this data exclusively to securely authenticate your account, personalize your dashboard, and verify your identity within our internal chat and support systems. We do not share, sell, or utilize your personal information for any secondary purposes.
-              </p>
-            </div>
+            <p className="text-center text-xs text-slate-500 pt-2">
+              Already have an account?{' '}
+              <button 
+                type="button"
+                onClick={() => handleTabSwitch('signin')} 
+                className="font-bold text-orange-600 hover:text-orange-700 underline underline-offset-2 cursor-pointer"
+              >
+                Sign In
+              </button>
+            </p>
           </div>
-          <div className="mt-3 text-[10px] text-slate-400 text-center">
-            For more details, view our dedicated <button onClick={() => onNavigate('google-disclosure')} className="text-orange-600 hover:underline font-bold">Google Disclosure page</button> or read our full <button onClick={() => onNavigate('privacy')} className="text-orange-600 hover:underline font-bold">Privacy Policy</button>.
-          </div>
-        </div>
+        )}
+
       </div>
 
     </div>

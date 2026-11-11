@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { 
   GraduationCap, 
   Mail, 
@@ -7,7 +7,8 @@ import {
   ExternalLink,
   ShieldAlert,
   ShieldCheck,
-  Globe2
+  ChevronDown,
+  Shield
 } from 'lucide-react';
 import FooterLocationsSubjects from './FooterLocationsSubjects';
 
@@ -17,6 +18,8 @@ interface FooterProps {
 }
 
 export default function Footer({ onNavigate, onOpenBecomeTutor }: FooterProps) {
+  const [isDisclosureOpen, setIsDisclosureOpen] = useState(false);
+
   // Compliant SEO keywords strictly aligned with Google Ads and Academic Integrity Policies
   const seoKeywords = [
     { text: 'find university tutors online', href: '#services' },
@@ -30,83 +33,9 @@ export default function Footer({ onNavigate, onOpenBecomeTutor }: FooterProps) {
     { text: 'math derivation step-by-step coaching', href: '#services' },
     { text: 'guided software project tutor', href: '#services' }
   ];
-
-  const countries = [
-    { code: 'GB', name: 'United Kingdom', slug: 'uk', flag: '🇬🇧', price: 'Custom Quote', regions: 'England, Scotland, Wales, NI' },
-    { code: 'US', name: 'United States', slug: 'usa', flag: '🇺🇸', price: 'Custom Quote', regions: 'Nationwide coverage' },
-    { code: 'CA', name: 'Canada', slug: 'canada', flag: '🇨🇦', price: 'Custom Quote', regions: 'Toronto, Vancouver, Montreal' },
-    { code: 'AU', name: 'Australia', slug: 'australia', flag: '🇦🇺', price: 'Custom Quote', regions: 'Sydney, Melbourne, Brisbane' },
-    { code: 'NZ', name: 'New Zealand', slug: 'new-zealand', flag: '🇳🇿', price: 'Custom Quote', regions: 'Auckland, Wellington' },
-    { code: 'IE', name: 'Ireland', slug: 'ireland', flag: '🇮🇪', price: 'Custom Quote', regions: 'Dublin, Cork, Galway' },
-    { code: 'AE', name: 'United Arab Emirates', slug: 'uae', flag: '🇦🇪', price: 'Custom Quote', regions: 'Dubai, Abu Dhabi, Sharjah' },
-    { code: 'SG', name: 'Singapore', slug: 'singapore', flag: '🇸🇬', price: 'Custom Quote', regions: 'National Syllabus, NUS, NTU' }
-  ];
-
   return (
     <footer className="bg-[#ffeedd] border-t-2 border-[#ffab85] text-[#542104] font-sans" id="main-footer">
-      {/* Top Footer Banner: Local Tutoring hubs with smooth left-to-right sliding marquee */}
-      <div className="bg-[#ffd9be] border-b border-[#ffab85] py-10 overflow-hidden relative">
-        <style dangerouslySetInnerHTML={{ __html: `
-          @keyframes marquee-scroll-right {
-            0% { transform: translateX(-50%); }
-            100% { transform: translateX(0%); }
-          }
-          .animate-marquee-scroll-right {
-            display: flex;
-            width: max-content;
-            animation: marquee-scroll-right 40s linear infinite;
-          }
-          .animate-marquee-scroll-right:hover {
-            animation-play-state: paused;
-          }
-        `}} />
 
-        {/* Soft edge fade masks */}
-        <div className="absolute left-0 top-0 h-full w-20 bg-gradient-to-r from-[#ffd9be] to-transparent z-10 pointer-events-none" />
-        <div className="absolute right-0 top-0 h-full w-20 bg-gradient-to-l from-[#ffd9be] to-transparent z-10 pointer-events-none" />
-
-        <div className="container mx-auto max-w-7xl px-4 md:px-8 mb-5">
-          <div className="flex items-center gap-2.5">
-            <Globe2 className="w-5 h-5 text-orange-600 animate-pulse" />
-            <span className="text-[#331301] font-display font-bold tracking-wider uppercase text-xs">Our Global Study Hubs &amp; Regional Curriculums</span>
-          </div>
-        </div>
-
-        {/* Sliding stream wrapper */}
-        <div className="w-full overflow-hidden flex">
-          <div className="animate-marquee-scroll-right flex gap-5 font-sans">
-            {[...countries, ...countries, ...countries, ...countries].map((c, idx) => (
-              <button 
-                key={`${c.code}-${idx}`}
-                id={`footer-marquee-country-${c.code}-${idx}`}
-                onClick={() => onNavigate(`online-tutoring-${c.slug}`)}
-                className="bg-[#fff8f2] p-4 rounded-2xl border border-[#ffab85]/55 hover:border-orange-500 hover:bg-[#ffebd6] transition-all duration-300 flex flex-col items-center text-center group shadow-xs hover:shadow-md shrink-0 w-52 sm:w-56 cursor-pointer text-left"
-              >
-                <div className="h-7 w-10 mb-2 flex items-center justify-center bg-white rounded border border-orange-200 overflow-hidden filter drop-shadow-sm group-hover:scale-110 transition-transform duration-300 shrink-0">
-                  <img 
-                    src={`https://flagcdn.com/w40/${c.code.toLowerCase()}.png`}
-                    alt={`${c.name} Flag`}
-                    className="w-full h-full object-cover"
-                    referrerPolicy="no-referrer"
-                    onError={(e) => {
-                      (e.currentTarget as HTMLImageElement).style.display = 'none';
-                    }}
-                  />
-                </div>
-                <span className="text-xs font-display font-bold text-[#331301] group-hover:text-orange-955 transition-colors">
-                  {c.name}
-                </span>
-                <span className="text-[10px] text-orange-800 font-bold mt-1 bg-orange-500/10 px-2.5 py-0.5 rounded-full border border-orange-500/20 font-mono">
-                  {c.price}
-                </span>
-                <span className="text-[9px] text-[#542104]/80 leading-tight mt-2 font-semibold">
-                  {c.regions}
-                </span>
-              </button>
-            ))}
-          </div>
-        </div>
-      </div>
 
       {/* Popular International Locations & Popular Online Subjects Section */}
       <FooterLocationsSubjects
@@ -260,46 +189,81 @@ export default function Footer({ onNavigate, onOpenBecomeTutor }: FooterProps) {
           </div>
 
 
-          {/* Application Overview & Google API Disclosure */}
-          <div className="mt-8 p-6 bg-[#fffbf7] border border-[#ffab85]/55 rounded-3xl space-y-4 text-left">
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 border-b border-[#ffab85]/35 pb-3">
-              <div className="space-y-1">
-                <span className="text-[10px] font-bold text-orange-600 uppercase tracking-widest block font-sans">
-                  Platform Identity &amp; Services
-                </span>
-                <h4 className="text-sm font-extrabold text-[#331301] tracking-tight font-display">
-                  Application Overview
-                </h4>
-              </div>
-              <span className="inline-flex items-center gap-1.5 text-[10px] bg-emerald-50 text-emerald-800 border border-emerald-200/60 px-2.5 py-1 rounded-full font-bold">
-                <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
-                Verified Google API &amp; Privacy Protocols
+          {/* Collapsible Disclosure Toggle Button */}
+          <div className="flex flex-col items-center justify-center mt-8 mb-3">
+            <button
+              id="toggleDisclosureBtn"
+              type="button"
+              onClick={() => setIsDisclosureOpen((prev) => !prev)}
+              aria-expanded={isDisclosureOpen}
+              aria-controls="footerDisclosurePanel"
+              className="group inline-flex items-center gap-2.5 px-5 py-2.5 rounded-full bg-white hover:bg-orange-50/80 border border-[#ffab85]/70 hover:border-orange-300 shadow-2xs hover:shadow-xs transition-all duration-200 text-xs sm:text-sm font-semibold text-[#542104] hover:text-orange-700 focus:outline-none focus:ring-2 focus:ring-orange-400 cursor-pointer"
+            >
+              <Shield className="w-4 h-4 text-orange-600 shrink-0" />
+              <span id="btnText">
+                {isDisclosureOpen
+                  ? 'Hide Platform Identity & Academic Integrity Disclosures'
+                  : 'View Platform Identity & Academic Integrity Disclosures'}
               </span>
-            </div>
-            <p className="text-xs text-[#542104]/90 leading-relaxed font-sans font-semibold">
-              <strong>University-tutors</strong> is an integrated academic support platform designed to connect students with expert educational consultants and tutors. This application facilitates secure, real-time consultation chats, document sharing for assignment briefs, and streamlined project tracking between students and administrative teams to enhance the overall learning experience.
-            </p>
-            <div className="pt-1 flex justify-end text-xs">
-              <button 
-                onClick={() => { onNavigate('google-disclosure'); window.scrollTo({ top: 0, behavior: 'smooth' }); }} 
-                className="text-orange-700 hover:text-orange-900 font-bold hover:underline inline-flex items-center gap-1 transition-all"
-              >
-                View Google OAuth Disclosure →
-              </button>
-            </div>
+              <ChevronDown
+                className={`w-4 h-4 text-stone-400 group-hover:text-orange-600 transition-transform duration-300 ${
+                  isDisclosureOpen ? 'rotate-180 text-orange-600' : ''
+                }`}
+              />
+            </button>
+            <span className="text-[11px] text-[#542104]/60 mt-1.5 select-none font-medium">
+              Click to {isDisclosureOpen ? 'close' : 'open'} legal, identity &amp; academic integrity disclosures
+            </span>
           </div>
 
-          {/* Core Academic Disclaimer near keywords */}
-          <div className="mt-6 p-4 bg-[#fff2e6]/80 border border-[#ffab85]/55 rounded-2xl space-y-2.5">
-            <p className="text-[11px] text-[#331301] leading-relaxed font-semibold">
-              🛡️ <strong>Academic Integrity Statement:</strong> University-Tutors provides ethical academic mentorship, tutoring, and editing consultation. We do not write essays, complete assignments, or take exams on behalf of students. All support is designed to help students learn and produce their own original work.
-            </p>
-            <p className="text-[10px] text-[#542104] leading-normal italic font-medium">
-              All services provided by universitytutors.com are meant to serve as references, explanatory outline models, or tutoring study guides. We do not condone, recommend, or support any form of plagiarism, exam cheating, academic dishonesty, ghostwriting, or contract cheating under university-mandated Honor Codes.
-            </p>
-            <p className="text-[10px] text-[#542104]/95 leading-normal font-sans font-medium">
-              💬 <strong>Quotation & Transparency Note:</strong> All pricing is negotiated on a case‑by‑case basis between the student and the tutor. University-Tutors.com does not set standard rates. You will always see the final price before making any payment. Price is finalized only after you and your tutor agree on the scope – no hidden fees. Any enquiries can be sent directly to <a href="mailto:support@universitytutors.com" className="underline font-bold text-orange-700 hover:text-orange-850">support@universitytutors.com</a>.
-            </p>
+          {/* Collapsible Disclosures Container */}
+          <div
+            id="footerDisclosurePanel"
+            className={`transition-all duration-400 ease-in-out overflow-hidden ${
+              isDisclosureOpen ? 'max-h-[1400px] opacity-100 mt-4 space-y-4' : 'max-h-0 opacity-0 pointer-events-none mt-0 space-y-0'
+            }`}
+          >
+            {/* Application Overview & Google API Disclosure */}
+            <div className="p-6 bg-[#fffbf7] border border-[#ffab85]/55 rounded-3xl space-y-4 text-left shadow-2xs">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 border-b border-[#ffab85]/35 pb-3">
+                <div className="space-y-1">
+                  <span className="text-[10px] font-bold text-orange-600 uppercase tracking-widest block font-sans">
+                    Platform Identity &amp; Services
+                  </span>
+                  <h4 className="text-sm font-extrabold text-[#331301] tracking-tight font-display">
+                    Application Overview
+                  </h4>
+                </div>
+                <span className="inline-flex items-center gap-1.5 text-[10px] bg-emerald-50 text-emerald-800 border border-emerald-200/60 px-2.5 py-1 rounded-full font-bold">
+                  <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
+                  Verified Google API &amp; Privacy Protocols
+                </span>
+              </div>
+              <p className="text-xs text-[#542104]/90 leading-relaxed font-sans font-semibold">
+                <strong>University-tutors</strong> is an integrated academic support platform designed to connect students with expert educational consultants and tutors. This application facilitates secure, real-time consultation chats, document sharing for assignment briefs, and streamlined project tracking between students and administrative teams to enhance the overall learning experience.
+              </p>
+              <div className="pt-1 flex justify-end text-xs">
+                <button 
+                  onClick={() => { onNavigate('google-disclosure'); window.scrollTo({ top: 0, behavior: 'smooth' }); }} 
+                  className="text-orange-700 hover:text-orange-900 font-bold hover:underline inline-flex items-center gap-1 transition-all"
+                >
+                  View Google OAuth Disclosure →
+                </button>
+              </div>
+            </div>
+
+            {/* Core Academic Disclaimer near keywords */}
+            <div className="p-4 bg-[#fff2e6]/80 border border-[#ffab85]/55 rounded-2xl space-y-2.5 text-left">
+              <p className="text-[11px] text-[#331301] leading-relaxed font-semibold">
+                🛡️ <strong>Academic Integrity Statement:</strong> University-Tutors provides ethical academic mentorship, tutoring, and editing consultation. We do not write essays, complete assignments, or take exams on behalf of students. All support is designed to help students learn and produce their own original work.
+              </p>
+              <p className="text-[10px] text-[#542104] leading-normal italic font-medium">
+                All services provided by universitytutors.com are meant to serve as references, explanatory outline models, or tutoring study guides. We do not condone, recommend, or support any form of plagiarism, exam cheating, academic dishonesty, ghostwriting, or contract cheating under university-mandated Honor Codes.
+              </p>
+              <p className="text-[10px] text-[#542104]/95 leading-normal font-sans font-medium">
+                💬 <strong>Quotation & Transparency Note:</strong> All pricing is negotiated on a case‑by‑case basis between the student and the tutor. University-Tutors.com does not set standard rates. You will always see the final price before making any payment. Price is finalized only after you and your tutor agree on the scope – no hidden fees. Any enquiries can be sent directly to <a href="mailto:support@universitytutors.com" className="underline font-bold text-orange-700 hover:text-orange-850">support@universitytutors.com</a>.
+              </p>
+            </div>
           </div>
         </div>
 

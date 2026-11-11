@@ -1230,7 +1230,15 @@ export default function DedicatedServicePages({
               {/* Mentor 1 (Evelyn) */}
               <div className="bg-white border rounded-2xl p-4 flex gap-4 hover:shadow-md transition-all">
                 <div className="relative shrink-0">
-                  <img src="https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=150&q=80" className="w-16 h-16 rounded-xl object-cover" alt="Dr. Evelyn Parker" referrerPolicy="no-referrer" />
+                  <img 
+                    src="https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=150&q=80" 
+                    className="w-16 h-16 rounded-xl object-cover bg-orange-100" 
+                    alt="Dr. Evelyn Parker" 
+                    referrerPolicy="no-referrer"
+                    onError={(e) => {
+                      (e.currentTarget as HTMLImageElement).src = "https://api.dicebear.com/7.x/initials/svg?seed=EP&backgroundColor=ea580c";
+                    }}
+                  />
                   <span className="absolute -bottom-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-orange-600 text-[10px] text-white font-bold border-2 border-white">★</span>
                 </div>
                 <div className="space-y-1 flex-1 min-w-0">
@@ -1250,7 +1258,15 @@ export default function DedicatedServicePages({
               {/* Mentor 2 (Marcus) */}
               <div className="bg-white border rounded-2xl p-4 flex gap-4 hover:shadow-md transition-all">
                 <div className="relative shrink-0">
-                  <img src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&q=80" className="w-16 h-16 rounded-xl object-cover" alt="Marcus Thompson" referrerPolicy="no-referrer" />
+                  <img 
+                    src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&q=80" 
+                    className="w-16 h-16 rounded-xl object-cover bg-orange-100" 
+                    alt="Marcus Thompson" 
+                    referrerPolicy="no-referrer"
+                    onError={(e) => {
+                      (e.currentTarget as HTMLImageElement).src = "https://api.dicebear.com/7.x/initials/svg?seed=MT&backgroundColor=ea580c";
+                    }}
+                  />
                   <span className="absolute -bottom-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-orange-600 text-[10px] text-white font-bold border-2 border-white">★</span>
                 </div>
                 <div className="space-y-1 flex-1 min-w-0">
@@ -1270,7 +1286,15 @@ export default function DedicatedServicePages({
               {/* Mentor 3 (Daniel) */}
               <div className="bg-white border rounded-2xl p-4 flex gap-4 hover:shadow-md transition-all">
                 <div className="relative shrink-0">
-                  <img src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&q=80" className="w-16 h-16 rounded-xl object-cover" alt="Daniel Reyes" referrerPolicy="no-referrer" />
+                  <img 
+                    src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&q=80" 
+                    className="w-16 h-16 rounded-xl object-cover bg-orange-100" 
+                    alt="Daniel Reyes" 
+                    referrerPolicy="no-referrer"
+                    onError={(e) => {
+                      (e.currentTarget as HTMLImageElement).src = "https://api.dicebear.com/7.x/initials/svg?seed=DR&backgroundColor=ea580c";
+                    }}
+                  />
                   <span className="absolute -bottom-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-orange-600 text-[10px] text-white font-bold border-2 border-white">★</span>
                 </div>
                 <div className="space-y-1 flex-1 min-w-0">
@@ -1290,7 +1314,15 @@ export default function DedicatedServicePages({
               {/* Mentor 4 (Sarah) */}
               <div className="bg-white border rounded-2xl p-4 flex gap-4 hover:shadow-md transition-all">
                 <div className="relative shrink-0">
-                  <img src="https://images.unsplash.com/photo-1567532939604-b6b5b0db2604?w=150&q=80" className="w-16 h-16 rounded-xl object-cover" alt="Dr. Sarah Jenkins" referrerPolicy="no-referrer" />
+                  <img 
+                    src="https://images.unsplash.com/photo-1567532939604-b6b5b0db2604?w=150&q=80" 
+                    className="w-16 h-16 rounded-xl object-cover bg-orange-100" 
+                    alt="Dr. Sarah Jenkins" 
+                    referrerPolicy="no-referrer"
+                    onError={(e) => {
+                      (e.currentTarget as HTMLImageElement).src = "https://api.dicebear.com/7.x/initials/svg?seed=SJ&backgroundColor=ea580c";
+                    }}
+                  />
                   <span className="absolute -bottom-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-orange-600 text-[10px] text-white font-bold border-2 border-white">★</span>
                 </div>
                 <div className="space-y-1 flex-1 min-w-0">

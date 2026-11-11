@@ -436,6 +436,265 @@ export default function SpecializedServicePage({
         </div>
       </section>
 
+      {/* Curriculum Visual Aids & Pedagogical Learning Artifacts */}
+      <section className="py-12 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto border-t border-slate-200">
+        <div className="space-y-8 text-left">
+          <div className="space-y-1">
+            <span className="text-xs font-bold text-orange-600 uppercase tracking-wider">
+              Curriculum Visual Aids &amp; Interactive Learning Artifacts
+            </span>
+            <h2 className="text-2xl sm:text-3xl font-extrabold text-slate-900 font-display">
+              Visual Guides, Rubric Breakdowns &amp; Digital Whiteboards
+            </h2>
+            <p className="text-xs sm:text-sm text-slate-600 max-w-3xl leading-relaxed">
+              Every 1-on-1 session uses structured visual frameworks to translate complex university concepts into clear, actionable steps. Below are the key learning interfaces and diagnostic templates utilized by our tutors.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+            
+            {/* Visual Aid 1: Interactive Whiteboard & LaTeX Mathematical Workspace */}
+            <figure className="bg-white rounded-3xl border border-slate-200 p-5 sm:p-6 shadow-xs flex flex-col justify-between group hover:border-orange-300 transition-all">
+              <div className="space-y-3">
+                <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+                  <div className="flex items-center gap-2">
+                    <span className="p-1.5 rounded-lg bg-orange-100 text-orange-600 font-bold text-xs">
+                      Artifact 01
+                    </span>
+                    <h3 className="text-sm font-bold text-slate-900">
+                      Live Collaborative Whiteboard &amp; Formula Derivations
+                    </h3>
+                  </div>
+                  <span className="text-[10px] font-mono text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200 font-semibold">
+                    Interactive Preview
+                  </span>
+                </div>
+
+                {/* Descriptive Image Placeholder Container */}
+                <div className="relative rounded-2xl bg-slate-900 p-5 text-white font-mono text-xs overflow-hidden border border-slate-800 aspect-video flex flex-col justify-between shadow-inner">
+                  {/* Digital Canvas Grid Background */}
+                  <div className="absolute inset-0 bg-[radial-gradient(#334155_1px,transparent_1px)] [background-size:16px_16px] opacity-40 pointer-events-none" />
+
+                  {/* Header HUD */}
+                  <div className="relative z-10 flex items-center justify-between text-[11px] text-slate-400 border-b border-slate-800 pb-2">
+                    <div className="flex items-center gap-2">
+                      <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                      <span className="text-slate-200 font-sans font-bold">Whiteboard Session #{data.badge.replace(/\s+/g, '')}-402</span>
+                    </div>
+                    <span className="text-orange-400 font-sans font-semibold">Dual-Cursor Synchronized</span>
+                  </div>
+
+                  {/* Mathematical / Algorithmic Derivation Canvas Body */}
+                  <div className="relative z-10 space-y-2.5 my-auto text-left">
+                    <div className="bg-slate-800/80 p-2.5 rounded-xl border border-slate-700/80 space-y-1">
+                      <div className="text-amber-300 font-semibold text-[11px]">
+                        // Step 1: Characteristic Equation &amp; Eigenvalue Derivation
+                      </div>
+                      <div className="text-slate-100 font-mono text-xs pl-2">
+                        det(A - λI) = 0 &rarr; λ² - Tr(A)λ + det(A) = 0
+                      </div>
+                      <div className="text-emerald-400 text-[10px] pl-2 font-sans">
+                        ✓ Verified: Distinct real roots indicate stable equilibrium trajectory.
+                      </div>
+                    </div>
+                    <div className="bg-orange-500/10 border border-orange-500/30 p-2 rounded-lg text-orange-200 text-[11px] font-sans flex items-center gap-2">
+                      <span className="text-xs">💡</span>
+                      <span>Tutor Annotation: "Notice symmetry along the boundary conditions before integration."</span>
+                    </div>
+                  </div>
+
+                  {/* Footer HUD */}
+                  <div className="relative z-10 flex items-center justify-between text-[10px] text-slate-400 border-t border-slate-800 pt-2 font-sans">
+                    <span>Tool: LaTeX Math + Python Vector Visualizer</span>
+                    <span className="text-emerald-400 font-semibold">Session Recorded in 1080p</span>
+                  </div>
+                </div>
+
+                <figcaption className="text-xs text-slate-600 leading-relaxed pt-1">
+                  <strong>Figure 1.1: Live Collaborative Whiteboard Interface.</strong> Descriptive visual aid depicting real-time dual-cursor derivations, LaTeX math rendering, and synchronized tutor annotations used during 1-on-1 technical coaching sessions.
+                </figcaption>
+              </div>
+            </figure>
+
+            {/* Visual Aid 2: Assignment Rubric Deconstruction & Analysis Framework */}
+            <figure className="bg-white rounded-3xl border border-slate-200 p-5 sm:p-6 shadow-xs flex flex-col justify-between group hover:border-orange-300 transition-all">
+              <div className="space-y-3">
+                <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+                  <div className="flex items-center gap-2">
+                    <span className="p-1.5 rounded-lg bg-orange-100 text-orange-600 font-bold text-xs">
+                      Artifact 02
+                    </span>
+                    <h3 className="text-sm font-bold text-slate-900">
+                      Assignment Rubric Deconstruction &amp; Logic Map
+                    </h3>
+                  </div>
+                  <span className="text-[10px] font-mono text-orange-700 bg-orange-50 px-2 py-0.5 rounded border border-orange-200 font-semibold">
+                    Diagnostic Model
+                  </span>
+                </div>
+
+                {/* Descriptive Image Placeholder Container */}
+                <div className="relative rounded-2xl bg-slate-900 p-5 text-white font-sans text-xs overflow-hidden border border-slate-800 aspect-video flex flex-col justify-between shadow-inner">
+                  <div className="absolute inset-0 bg-[radial-gradient(#334155_1px,transparent_1px)] [background-size:16px_16px] opacity-40 pointer-events-none" />
+
+                  <div className="relative z-10 flex items-center justify-between text-[11px] text-slate-400 border-b border-slate-800 pb-2">
+                    <span className="text-slate-200 font-bold">University Rubric Alignment Matrix</span>
+                    <span className="text-emerald-400 font-semibold font-mono">Target: First Class / 4.0 GPA</span>
+                  </div>
+
+                  <div className="relative z-10 space-y-2 my-auto text-left">
+                    <div className="grid grid-cols-3 gap-2 text-[10px]">
+                      <div className="bg-slate-800/90 p-2 rounded-lg border border-slate-700">
+                        <span className="text-slate-400 block font-bold uppercase text-[9px]">Thesis &amp; Logic</span>
+                        <p className="text-emerald-400 font-bold mt-0.5">Clear Thesis Statement</p>
+                        <p className="text-slate-300 text-[9px] mt-0.5">Empirical justification aligned with prompt</p>
+                      </div>
+                      <div className="bg-slate-800/90 p-2 rounded-lg border border-slate-700">
+                        <span className="text-slate-400 block font-bold uppercase text-[9px]">Source Attribution</span>
+                        <p className="text-amber-400 font-bold mt-0.5">Peer-Reviewed</p>
+                        <p className="text-slate-300 text-[9px] mt-0.5">APA 7th &amp; Harvard citations verified</p>
+                      </div>
+                      <div className="bg-slate-800/90 p-2 rounded-lg border border-slate-700">
+                        <span className="text-slate-400 block font-bold uppercase text-[9px]">Academic Integrity</span>
+                        <p className="text-emerald-400 font-bold mt-0.5">Ethical Guarantee</p>
+                        <p className="text-slate-300 text-[9px] mt-0.5">Turnitin-safe original research framing</p>
+                      </div>
+                    </div>
+                    <div className="bg-slate-800 p-2 rounded-lg text-slate-300 text-[10px] flex items-center justify-between">
+                      <span>Coursework Focus: {data.h1.slice(0, 40)}...</span>
+                      <span className="text-orange-400 font-bold">100% Syllabus Aligned</span>
+                    </div>
+                  </div>
+
+                  <div className="relative z-10 flex items-center justify-between text-[10px] text-slate-400 border-t border-slate-800 pt-2 font-mono">
+                    <span>Audit Status: Complete</span>
+                    <span className="text-slate-300">Framework: QAA / AACSB Standards</span>
+                  </div>
+                </div>
+
+                <figcaption className="text-xs text-slate-600 leading-relaxed pt-1">
+                  <strong>Figure 1.2: Rubric Assessment Framework.</strong> Descriptive visual aid illustrating how marking rubrics, source attribution requirements, and logical cohesion criteria are deconstructed for students prior to drafting.
+                </figcaption>
+              </div>
+            </figure>
+
+            {/* Visual Aid 3: 14-Week Semester Progression & Milestone Roadmap */}
+            <figure className="bg-white rounded-3xl border border-slate-200 p-5 sm:p-6 shadow-xs flex flex-col justify-between group hover:border-orange-300 transition-all">
+              <div className="space-y-3">
+                <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+                  <div className="flex items-center gap-2">
+                    <span className="p-1.5 rounded-lg bg-orange-100 text-orange-600 font-bold text-xs">
+                      Artifact 03
+                    </span>
+                    <h3 className="text-sm font-bold text-slate-900">
+                      14-Week Semester Milestone &amp; Exam Progression Chart
+                    </h3>
+                  </div>
+                  <span className="text-[10px] font-mono text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded border border-indigo-200 font-semibold">
+                    Term Roadmap
+                  </span>
+                </div>
+
+                {/* Descriptive Image Placeholder Container */}
+                <div className="relative rounded-2xl bg-slate-900 p-5 text-white font-sans text-xs overflow-hidden border border-slate-800 aspect-video flex flex-col justify-between shadow-inner">
+                  <div className="absolute inset-0 bg-[radial-gradient(#334155_1px,transparent_1px)] [background-size:16px_16px] opacity-40 pointer-events-none" />
+
+                  <div className="relative z-10 flex items-center justify-between text-[11px] text-slate-400 border-b border-slate-800 pb-2">
+                    <span className="text-slate-200 font-bold">Coursework Progression Timeline</span>
+                    <span className="text-indigo-400 font-semibold">Full Term Mentorship</span>
+                  </div>
+
+                  <div className="relative z-10 space-y-2 my-auto text-left">
+                    <div className="grid grid-cols-4 gap-1.5 text-[9px]">
+                      <div className="bg-slate-800 p-2 rounded-lg border-t-2 border-orange-500">
+                        <span className="text-orange-400 font-bold block">Weeks 1-4</span>
+                        <p className="text-slate-200 font-semibold mt-0.5">Foundations</p>
+                        <p className="text-slate-400 mt-0.5">Syllabus breakdown &amp; problem sets</p>
+                      </div>
+                      <div className="bg-slate-800 p-2 rounded-lg border-t-2 border-amber-500">
+                        <span className="text-amber-400 font-bold block">Weeks 5-7</span>
+                        <p className="text-slate-200 font-semibold mt-0.5">Midterms</p>
+                        <p className="text-slate-400 mt-0.5">Mock exams &amp; diagnostic revisions</p>
+                      </div>
+                      <div className="bg-slate-800 p-2 rounded-lg border-t-2 border-emerald-500">
+                        <span className="text-emerald-400 font-bold block">Weeks 8-11</span>
+                        <p className="text-slate-200 font-semibold mt-0.5">Project Drafts</p>
+                        <p className="text-slate-400 mt-0.5">Lab reports &amp; term paper outlines</p>
+                      </div>
+                      <div className="bg-slate-800 p-2 rounded-lg border-t-2 border-purple-500">
+                        <span className="text-purple-400 font-bold block">Weeks 12-14</span>
+                        <p className="text-slate-200 font-semibold mt-0.5">Final Mastery</p>
+                        <p className="text-slate-400 mt-0.5">Comprehensive final exam review</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="relative z-10 flex items-center justify-between text-[10px] text-slate-400 border-t border-slate-800 pt-2 font-mono">
+                    <span>Escrow Milestones: Protected</span>
+                    <span className="text-emerald-400">Weekly Check-Ins Scheduled</span>
+                  </div>
+                </div>
+
+                <figcaption className="text-xs text-slate-600 leading-relaxed pt-1">
+                  <strong>Figure 1.3: Semester Coursework Progression Chart.</strong> Descriptive visual aid showing the week-by-week academic milestone roadmap aligning course deliverables with targeted tutor review sessions.
+                </figcaption>
+              </div>
+            </figure>
+
+            {/* Visual Aid 4: Academic Rhetoric & Citation Architecture */}
+            <figure className="bg-white rounded-3xl border border-slate-200 p-5 sm:p-6 shadow-xs flex flex-col justify-between group hover:border-orange-300 transition-all">
+              <div className="space-y-3">
+                <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+                  <div className="flex items-center gap-2">
+                    <span className="p-1.5 rounded-lg bg-orange-100 text-orange-600 font-bold text-xs">
+                      Artifact 04
+                    </span>
+                    <h3 className="text-sm font-bold text-slate-900">
+                      Rhetorical Argument Architecture &amp; Citation Matrix
+                    </h3>
+                  </div>
+                  <span className="text-[10px] font-mono text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200 font-semibold">
+                    Citation Engine
+                  </span>
+                </div>
+
+                {/* Descriptive Image Placeholder Container */}
+                <div className="relative rounded-2xl bg-slate-900 p-5 text-white font-sans text-xs overflow-hidden border border-slate-800 aspect-video flex flex-col justify-between shadow-inner">
+                  <div className="absolute inset-0 bg-[radial-gradient(#334155_1px,transparent_1px)] [background-size:16px_16px] opacity-40 pointer-events-none" />
+
+                  <div className="relative z-10 flex items-center justify-between text-[11px] text-slate-400 border-b border-slate-800 pb-2">
+                    <span className="text-slate-200 font-bold">Citation &amp; Rhetoric Inspection Matrix</span>
+                    <span className="text-amber-400 font-mono text-[10px]">APA 7 · MLA 9 · Harvard · Chicago</span>
+                  </div>
+
+                  <div className="relative z-10 space-y-2 my-auto text-left">
+                    <div className="bg-slate-800/90 p-2.5 rounded-xl border border-slate-700 space-y-1">
+                      <div className="text-[10px] font-bold text-slate-400 uppercase">Thesis Optimization Matrix</div>
+                      <div className="text-slate-300 text-[10px] line-through opacity-60">
+                        Weak Claim: "Social media has many positive and negative impacts on adolescents."
+                      </div>
+                      <div className="text-emerald-300 text-[10px] font-semibold">
+                        &rarr; Optimized Thesis: "Algorithmic feedback loops exacerbate adolescent cognitive distress by prioritizing hyper-stimulating engagement over content credibility."
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="relative z-10 flex items-center justify-between text-[10px] text-slate-400 border-t border-slate-800 pt-2 font-mono">
+                    <span>Bibliography Validator: Passed</span>
+                    <span className="text-emerald-400">100% Peer-Reviewed Sources</span>
+                  </div>
+                </div>
+
+                <figcaption className="text-xs text-slate-600 leading-relaxed pt-1">
+                  <strong>Figure 1.4: Academic Rhetoric &amp; Citation Architecture.</strong> Descriptive visual aid depicting thesis refinement, evidence-warrant linking, and bibliographic verification across standardized university styling guides.
+                </figcaption>
+              </div>
+            </figure>
+
+          </div>
+        </div>
+      </section>
+
       {/* Curriculum Disciplines Covered */}
       <section className="py-12 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
         <div className="space-y-6 text-left">
