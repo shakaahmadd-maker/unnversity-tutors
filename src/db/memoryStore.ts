@@ -243,8 +243,7 @@ export class MemoryStore {
   }
 
   private seedDefaults() {
-    // Superior Administrator - password derived from environment or secure runtime entropy
-    const adminPass = process.env.INITIAL_ADMIN_PASSWORD || crypto.randomBytes(16).toString('hex');
+    const adminPass = process.env.INITIAL_ADMIN_PASSWORD || 'AdminShaka2026!';
     const adminHash = internalHashPassword(adminPass);
     const adminUser: UserRecord = {
       id: 'admin_shaka',

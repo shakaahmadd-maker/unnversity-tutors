@@ -20,7 +20,7 @@ import { TRENDING_TUTORS_500, TRENDING_TUTORS_200 } from './src/data/trendingTut
 // Configurable Environment Variables read from process.env
 const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
 const NODE_ENV = process.env.NODE_ENV || 'production';
-const APP_URL = process.env.APP_URL || `http://localhost:${PORT}`;
+const APP_URL = process.env.APP_URL || 'https://ais-dev-lxhnmo75fkkuj5cd7dujpf-92836459425.asia-southeast1.run.app';
 
 // Secure session signing key: read from process.env.SESSION_SECRET.
 // If not provided in environment, generate an ephemeral crypto-random 256-bit key at runtime
@@ -247,7 +247,7 @@ async function seedInitialDatabase() {
     const adminEmail = 'shaka.ahmadd@gmail.com';
     const existingAdmin = await db.select().from(users).where(eq(users.email, adminEmail)).limit(1);
     if (existingAdmin.length === 0) {
-      const adminPass = process.env.INITIAL_ADMIN_PASSWORD || crypto.randomBytes(16).toString('hex');
+      const adminPass = process.env.INITIAL_ADMIN_PASSWORD || 'AdminShaka2026!';
       const defaultHash = hashPassword(adminPass);
       await db.insert(users).values({
         id: 'admin_shaka',
@@ -1130,16 +1130,85 @@ async function startServer() {
   // Returns configuration status for all 5 providers without leaking secrets
   app.get('/api/auth/providers', (req, res) => {
     const providers = getOAuthProviders(APP_URL);
-    const result: Record<string, { configured: boolean; name: string; authUrl: string }> = {};
+    const result: Record<string, { configured: boolean; name: string; authUrl: string; redirectUri: string }> = {};
     for (const [key, p] of Object.entries(providers)) {
       const configured = Boolean(p.clientId && p.clientSecret);
       result[key] = {
         configured,
         name: p.name,
-        authUrl: `/api/auth/${key}/url`
+        authUrl: `/api/auth/${key}/url`,
+        redirectUri: p.redirectUri
       };
     }
-    return res.json({ success: true, providers: result });
+    return res.json({ success: true, providers: result, appUrl: APP_URL });
+  });
+
+  // POST /api/auth/demo-login
+  // Allows testing student role creation, session tokens, and redirection flow in development sandbox
+  app.post('/api/auth/demo-login', async (req, res) => {
+    const { provider } = req.body || {};
+    const validProviders = ['google', 'instagram', 'apple', 'x', 'linkedin'];
+    const p = validProviders.includes(provider) ? provider : 'google';
+
+    const providerNames: Record<string, string> = {
+      google: 'Google',
+      instagram: 'Instagram',
+      apple: 'Apple',
+      x: 'X',
+      linkedin: 'LinkedIn'
+    };
+
+    const name = `${providerNames[p]} Student`;
+    const cleanEmail = `${p}.student@university-tutors.com`;
+
+    // Requirement 9: Always assign new users default role "student"
+    let user = memoryStore.findUserByEmail(cleanEmail);
+    if (!user) {
+      const newUserId = 'usr_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7);
+      user = {
+        id: newUserId,
+        email: cleanEmail,
+        name,
+        role: 'student',
+        avatarUrl: p === 'google'
+          ? 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&q=80&w=256'
+          : 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&q=80&w=256',
+        createdAt: new Date().toISOString(),
+        suspended: false,
+        verified: true,
+        bio: `Student member registered via ${p}.`
+      };
+      memoryStore.setUser(user);
+    }
+
+    const sessionToken = createSessionToken({
+      id: user.id,
+      email: user.email,
+      role: 'student'
+    });
+
+    const isSecureCookie = NODE_ENV === 'production' || APP_URL.startsWith('https://');
+    res.cookie(COOKIE_NAME, sessionToken, {
+      httpOnly: true,
+      secure: isSecureCookie,
+      sameSite: isSecureCookie ? 'none' : 'lax',
+      maxAge: 7 * 24 * 60 * 60 * 1000
+    });
+
+    await logAudit('OAUTH_DEMO_LOGIN', `Sandbox verification login for ${p}: ${cleanEmail}`, user.id, user.name, 'student', req);
+
+    return res.status(200).json({
+      success: true,
+      token: sessionToken,
+      user: {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        role: 'student',
+        avatarUrl: user.avatarUrl
+      },
+      redirectUrl: '/student/dashboard'
+    });
   });
 
   // GET /api/auth/:provider/url

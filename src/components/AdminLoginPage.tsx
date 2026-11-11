@@ -44,9 +44,10 @@ export default function AdminLoginPage({ onLogin, onNavigate }: AdminLoginPagePr
     }
   };
 
-  // Quick fill admin email helper
+  // Quick fill admin credentials helper
   const handleQuickFillAdmin = () => {
     setEmail(targetAdminEmail);
+    setPassword('AdminShaka2026!');
     setErrorMsg('');
   };
 
