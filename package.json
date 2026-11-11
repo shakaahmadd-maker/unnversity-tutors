@@ -16,7 +16,8 @@
     "lint": "tsc --noEmit",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
-    "test:chat": "tsx test/chat-security.test.ts"
+    "test:chat": "tsx test/chat-security.test.ts",
+    "test:upload": "tsx test/image-upload-persistence.test.ts"
   },
   "dependencies": {
     "@google/genai": "^2.4.0",

@@ -5,6 +5,7 @@ interface TutorImageUploaderProps {
   currentImageUrl?: string;
   onImageChange: (url: string) => void;
   label?: string;
+  tutorId?: string;
 }
 
 const PRESET_AVATARS = [
@@ -19,7 +20,8 @@ const PRESET_AVATARS = [
 export default function TutorImageUploader({
   currentImageUrl,
   onImageChange,
-  label = "Profile Photo of the Tutor"
+  label = "Profile Photo of the Tutor",
+  tutorId
 }: TutorImageUploaderProps) {
   const [activeTab, setActiveTab] = useState<'upload' | 'preset' | 'url'>('upload');
   const [customUrlInput, setCustomUrlInput] = useState('');
@@ -59,26 +61,32 @@ export default function TutorImageUploader({
     try {
       const formData = new FormData();
       formData.append('image', file);
+      if (tutorId) {
+        formData.append('tutorId', tutorId);
+      }
+
+      const token = localStorage.getItem('auth_token');
+      const headers: Record<string, string> = {};
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
 
       const res = await fetch('/api/admin/tutors/upload-avatar', {
         method: 'POST',
+        credentials: 'include',
+        headers,
         body: formData,
       });
 
+      const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        const errData = await res.json().catch(() => ({}));
-        throw new Error(errData.error || `Upload failed with HTTP ${res.status}`);
+        throw new Error(data.error || `Upload failed with HTTP ${res.status}`);
       }
 
-      const data = await res.json();
-      if (!data.url && !data.relativeUrl) {
-        throw new Error('Server did not return a valid public image URL');
-      }
-
-      // Ensure cache-busting timestamp is appended
-      let permanentUrl = data.url || data.relativeUrl;
-      if (!permanentUrl.includes('?v=')) {
-        permanentUrl = `${permanentUrl}?v=${Date.now()}`;
+      // 1. After a successful upload, use the URL returned by the backend
+      const permanentUrl = data.relativeUrl || data.savedUrl || data.url;
+      if (!permanentUrl) {
+        throw new Error('Server did not return a valid persistent image URL');
       }
 
       // Propagate permanent URL to form state (never the blob URL)
@@ -86,6 +94,7 @@ export default function TutorImageUploader({
       setUploadError(null);
     } catch (err: any) {
       console.error('[Uploader] Image upload error:', err);
+      // 4. Display the backend error if the upload fails
       setUploadError(err.message || 'Failed to upload photo. Please try again.');
     } finally {
       setIsUploading(false);

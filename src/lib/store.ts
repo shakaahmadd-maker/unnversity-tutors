@@ -248,7 +248,12 @@ export class AppStore {
     }
 
     // Verify session with server
-    fetch('/api/auth/me')
+    const token = localStorage.getItem('auth_token');
+    fetch('/api/auth/me', {
+      headers: {
+        ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+      }
+    })
       .then(res => res.ok ? res.json() : null)
       .then(data => {
         if (data?.user) {
@@ -308,6 +313,21 @@ export class AppStore {
         }
       }).catch(() => {});
 
+      const tutorsPromise = fetch('/api/tutors?limit=1000').then(async (res) => {
+        if (res.ok) {
+          const tData = await res.json();
+          if (Array.isArray(tData.tutors)) {
+            for (const t of tData.tutors) {
+              const match = this.users.find(u => u.id === t.id);
+              if (match && t.avatarUrl) {
+                match.avatarUrl = t.avatarUrl;
+                (match as any).profileImageUrl = t.avatarUrl;
+              }
+            }
+          }
+        }
+      }).catch(() => {});
+
       const blogsPromise = fetch('/api/blogs').then(async (res) => {
         if (res.ok) {
           const bData = await res.json();
@@ -324,7 +344,7 @@ export class AppStore {
 
       // For public visitors who are not logged in, DO NOT make private dashboard requests
       if (!this.currentUser) {
-        await Promise.all([usersPromise, blogsPromise]);
+        await Promise.all([usersPromise, tutorsPromise, blogsPromise]);
         this.connectionStatus = 'connected';
         this.lastSyncTime = new Date().toLocaleTimeString();
         this.syncError = null;

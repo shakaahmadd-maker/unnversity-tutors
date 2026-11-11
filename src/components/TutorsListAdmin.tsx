@@ -28,6 +28,7 @@ import {
   AlertCircle
 } from 'lucide-react';
 import { User, UserRole } from '../types';
+import { store } from '../lib/store';
 import TutorImageUploader from './TutorImageUploader';
 import { getFallbackAvatar } from './TutorsDirectoryPage';
 
@@ -351,19 +352,32 @@ export default function TutorsListAdmin({
     };
 
     try {
-      // Direct call to PUT /api/admin/tutors/:id
-      await fetch(`/api/admin/tutors/${editingTutor.id}`, {
+      const token = localStorage.getItem('auth_token');
+      const res = await fetch(`/api/admin/tutors/${editingTutor.id}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+        },
         body: JSON.stringify(updatedData)
       });
-    } catch (e) {
-      console.warn('[Admin] Notice updating tutor via API:', e);
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(data.error || `Failed to update tutor profile (HTTP ${res.status})`);
+      }
+      if (data.tutor) {
+        Object.assign(updatedData, data.tutor);
+      }
+      // Refresh the tutor/profile data from backend after update
+      await store.fetchData();
+      onUpdateUserProfile(editingTutor.id, updatedData);
+      setEditingTutor(null);
+      showNotification(`Tutor profile for ${editForm.name} updated successfully!`);
+    } catch (e: any) {
+      console.error('[Admin] Error updating tutor via API:', e);
+      setModalError(e.message || 'Failed to update tutor profile on server');
     }
-
-    onUpdateUserProfile(editingTutor.id, updatedData);
-    setEditingTutor(null);
-    showNotification(`Tutor profile for ${editForm.name} updated successfully!`);
   };
 
   const handleSaveNewTutor = async (e: React.FormEvent) => {
@@ -1006,6 +1020,7 @@ export default function TutorsListAdmin({
 
             <form onSubmit={handleSaveEdit} className="space-y-4 max-h-[65vh] overflow-y-auto text-xs pr-1">
               <TutorImageUploader
+                tutorId={editingTutor.id}
                 currentImageUrl={editForm.avatarUrl}
                 onImageChange={(url) => setEditForm({ ...editForm, avatarUrl: url })}
                 label="Tutor Profile Headshot"
