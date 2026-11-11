@@ -512,9 +512,9 @@ export default function TutorsDirectoryPage({
                   ? 'Master Tutor'
                   : (rawTier ? rawTier.split('(')[0].trim().slice(0, 16) : 'Master Tutor');
 
-                // Keep primary subject clean and concise for single-row alignment
+                // Keep primary subject clean for single-row alignment
                 const rawSubject = (tutor as any).primarySubject || (subjectsList.length > 0 ? subjectsList[0] : 'Cybersecurity');
-                const primarySubjectDisplay = rawSubject.split(/&|,|\(/)[0].trim() || 'Cybersecurity';
+                const primarySubjectDisplay = rawSubject.split(/\(/)[0].trim() || 'Cybersecurity';
 
                 const rate = tutor.hourlyRate || 166;
                 const parsedEdu = parseEducationDetails(tutor.education);
@@ -556,7 +556,7 @@ export default function TutorsDirectoryPage({
                           </span>
                         </div>
 
-                        {/* Middle Info Column with Header (Name + Rate) and Badges Row */}
+                        {/* Middle Info Column with Header (Name + Rate) */}
                         <div className="flex-1 min-w-0 pt-0.5">
                           {/* Name + Direct Rate Row */}
                           <div className="flex items-start justify-between gap-1.5">
@@ -573,7 +573,7 @@ export default function TutorsDirectoryPage({
 
                               <div className="flex items-center gap-1 mt-0.5 text-xs text-slate-500 font-medium">
                                 <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                                <span className="truncate max-w-[95px]">{locationDisplay}</span>
+                                <span className="truncate max-w-[130px]">{locationDisplay}</span>
                                 <span className="text-slate-300">•</span>
                                 <span className="flex items-center gap-0.5 text-amber-500 font-semibold shrink-0">
                                   <Star className="w-3 h-3 fill-amber-500 text-amber-500" />
@@ -591,23 +591,23 @@ export default function TutorsDirectoryPage({
                               <div className="text-[10px] text-slate-400 font-medium mt-1">Direct Rate</div>
                             </div>
                           </div>
-
-                          {/* Yellow & Orange Badges in a clean single row (no slider, using full space) */}
-                          <div className="flex items-center gap-2 mt-2">
-                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-200 shadow-2xs whitespace-nowrap shrink-0">
-                              <Sparkles className="w-2.5 h-2.5 text-amber-600" />
-                              <span>{tutorTierDisplay}</span>
-                            </span>
-                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-orange-50 text-orange-700 border border-orange-200 whitespace-nowrap shrink-0">
-                              <ShieldCheck className="w-2.5 h-2.5 text-orange-600" />
-                              <span>{primarySubjectDisplay}</span>
-                            </span>
-                          </div>
                         </div>
                       </div>
 
+                      {/* Yellow & Orange Badges row - utilizing space under the tutor's picture with full width */}
+                      <div className="flex flex-wrap items-center gap-2 mt-4 pt-0.5">
+                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10.5px] font-bold bg-amber-50 text-amber-800 border border-amber-200/90 shadow-2xs shrink-0">
+                          <Sparkles className="w-3 h-3 text-amber-600 shrink-0" />
+                          <span>{tutorTierDisplay}</span>
+                        </span>
+                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10.5px] font-bold bg-orange-50 text-orange-700 border border-orange-200/90 shrink-0 max-w-full">
+                          <ShieldCheck className="w-3 h-3 text-orange-600 shrink-0" />
+                          <span className="truncate">{primarySubjectDisplay}</span>
+                        </span>
+                      </div>
+
                       {/* Verified Degree & Background Banner */}
-                      <div className="mt-3.5 flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-50/80 border border-emerald-200/70 text-emerald-800 text-[11px] font-semibold">
+                      <div className="mt-3 flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-50/80 border border-emerald-200/70 text-emerald-800 text-[11px] font-semibold">
                         <ShieldCheck className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
                         <span>Verified Degree &amp; Background</span>
                       </div>
