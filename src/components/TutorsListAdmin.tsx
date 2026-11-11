@@ -1116,7 +1116,6 @@ export default function TutorsListAdmin({
                     onChange={(e) => setEditForm({ ...editForm, verificationStatus: e.target.value })}
                     className="w-full p-2.5 bg-slate-50 border rounded-xl"
                   >
-                    <option value="Verified Degree & Background (Gold Tier - Master)">Verified Degree & Background (Gold Tier - Master)</option>
                     <option value="Verified Degree & Background">Verified Degree & Background</option>
                     <option value="Under Academic Review">Under Academic Review</option>
                   </select>
@@ -1394,7 +1393,6 @@ export default function TutorsListAdmin({
                     onChange={(e) => setAddForm({ ...addForm, verificationStatus: e.target.value })}
                     className="w-full p-2.5 bg-slate-50 border rounded-xl"
                   >
-                    <option value="Verified Degree & Background (Gold Tier - Master)">Verified Degree & Background (Gold Tier - Master)</option>
                     <option value="Verified Degree & Background">Verified Degree & Background</option>
                     <option value="Under Academic Review">Under Academic Review</option>
                   </select>

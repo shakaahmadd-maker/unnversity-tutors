@@ -750,7 +750,7 @@ export default function TutorsDirectoryPage({
                                 </span>
                                 <span>•</span>
                                 <span className="text-emerald-700 font-semibold bg-emerald-50 px-2 py-0.2 rounded-md">
-                                  {tutor.verificationStatus || 'Verified Degree & Background'}
+                                  {(tutor.verificationStatus || 'Verified Degree & Background').replace(/\s*\(Gold Tier[^)]*\)/i, '')}
                                 </span>
                               </div>
                             </div>

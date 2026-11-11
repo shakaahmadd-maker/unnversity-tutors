@@ -191,10 +191,13 @@ export default function TutorProfilePage({
                   {tutor.name}
                 </h2>
 
-                {/* Verification Tag */}
-                <div className="mt-1.5 inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200/80 text-[11px] font-semibold whitespace-nowrap">
+                {/* Verification Tag - Clean "Verified" badge for all tutors on mobile */}
+                <div 
+                  title="Verified Degree & Background"
+                  className="mt-1.5 inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200/80 text-[11px] font-semibold shrink-0"
+                >
                   <ShieldCheck className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                  <span>Verified Degree &amp; Background</span>
+                  <span>Verified</span>
                 </div>
 
                 {/* Location */}
