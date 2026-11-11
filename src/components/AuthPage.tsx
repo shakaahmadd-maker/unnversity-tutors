@@ -152,45 +152,95 @@ export default function AuthPage({ onLogin, onRegister, onNavigate }: AuthPagePr
       .catch(() => {});
   }, []);
 
-  // Listen for OAuth postMessage callbacks from popup
+  // Listen for OAuth postMessage callbacks, BroadcastChannel, and storage events
   useEffect(() => {
+    const applyOAuthSuccess = (data: { token?: string; user?: any; redirectUrl?: string }) => {
+      const { token, user, redirectUrl } = data;
+      if (token) {
+        localStorage.setItem('auth_token', token);
+      }
+      if (user) {
+        store.currentUser = user;
+        localStorage.setItem('ut_current_user', JSON.stringify(user));
+        store.notify();
+        store.fetchData().catch(() => {});
+      }
+      showToast(`Authenticated successfully as ${user?.name || 'Student'}!`);
+      setSuccessMsg(`Welcome, ${user?.name || 'Student'}! Redirecting to your dashboard...`);
+      setIsSubmitting(false);
+
+      setTimeout(() => {
+        if (redirectUrl) {
+          onNavigate(redirectUrl.replace(/^\//, ''));
+        } else {
+          onNavigate(user?.role === 'admin' ? 'admin' : 'student/dashboard');
+        }
+      }, 500);
+    };
+
     const handleOAuthMessage = (event: MessageEvent) => {
       // Validate origin if available
       const origin = event.origin;
-      if (origin && !origin.endsWith('.run.app') && !origin.includes('localhost') && !origin.includes('127.0.0.1')) {
+      const isAllowedOrigin = !origin ||
+        origin.endsWith('.run.app') ||
+        origin.includes('university-tutors.com') ||
+        origin.includes('localhost') ||
+        origin.includes('127.0.0.1') ||
+        origin === window.location.origin;
+
+      if (!isAllowedOrigin) {
         return;
       }
 
       if (event.data?.type === 'OAUTH_AUTH_SUCCESS') {
-        const { token, user, redirectUrl } = event.data;
-        if (token) {
-          localStorage.setItem('auth_token', token);
-        }
-        if (user) {
-          store.currentUser = user;
-          localStorage.setItem('ut_current_user', JSON.stringify(user));
-          store.notify();
-          store.fetchData().catch(() => {});
-        }
-        showToast(`Authenticated successfully as ${user?.name || 'Student'}!`);
-        setSuccessMsg(`Welcome, ${user?.name || 'Student'}! Redirecting to your dashboard...`);
-        setIsSubmitting(false);
-
-        setTimeout(() => {
-          if (redirectUrl) {
-            onNavigate(redirectUrl.replace(/^\//, ''));
-          } else {
-            onNavigate('dashboard');
-          }
-        }, 500);
+        applyOAuthSuccess(event.data);
       } else if (event.data?.type === 'OAUTH_AUTH_ERROR') {
         setErrorMsg(event.data.error || 'Social sign-in failed. Please try again.');
         setIsSubmitting(false);
       }
     };
 
+    // BroadcastChannel for cross-tab/cross-window notifications
+    let bc: BroadcastChannel | null = null;
+    try {
+      if (typeof BroadcastChannel !== 'undefined') {
+        bc = new BroadcastChannel('oauth_channel');
+        bc.onmessage = (event) => {
+          if (event.data?.type === 'OAUTH_AUTH_SUCCESS') {
+            applyOAuthSuccess(event.data);
+          } else if (event.data?.type === 'OAUTH_AUTH_ERROR') {
+            setErrorMsg(event.data.error || 'Social sign-in failed. Please try again.');
+            setIsSubmitting(false);
+          }
+        };
+      }
+    } catch (e) {}
+
+    // Storage event listener for same-origin tabs
+    const handleStorage = (event: StorageEvent) => {
+      if (event.key === 'ut_current_user' && event.newValue) {
+        try {
+          const user = JSON.parse(event.newValue);
+          if (user?.id) {
+            store.currentUser = user;
+            store.notify();
+            showToast(`Welcome, ${user.name}!`);
+            onNavigate(user.role === 'admin' ? 'admin' : 'student/dashboard');
+          }
+        } catch (e) {}
+      }
+    };
+
     window.addEventListener('message', handleOAuthMessage);
-    return () => window.removeEventListener('message', handleOAuthMessage);
+    window.addEventListener('storage', handleStorage);
+
+    return () => {
+      window.removeEventListener('message', handleOAuthMessage);
+      window.removeEventListener('storage', handleStorage);
+      if (bc) {
+        try { bc.close(); } catch (e) {}
+      }
+    };
   }, [onNavigate]);
 
   const showToast = (text: string) => {
@@ -408,14 +458,45 @@ export default function AuthPage({ onLogin, onRegister, onNavigate }: AuthPagePr
       }
 
       // 2. Open the OAuth PROVIDER's URL directly in a popup window
-      const popup = window.open(
-        data.url,
-        'oauth_popup',
-        'width=600,height=700,status=no,toolbar=no,menubar=no'
-      );
-      if (!popup) {
-        throw new Error('Popup was blocked by your browser. Please allow popups for this site to complete social sign-in.');
+      let popup: Window | null = null;
+      try {
+        popup = window.open(
+          data.url,
+          'oauth_popup',
+          'width=600,height=700,status=no,toolbar=no,menubar=no'
+        );
+      } catch (e) {
+        popup = null;
       }
+
+      if (!popup || popup.closed || typeof popup.closed === 'undefined') {
+        // Popup was blocked or disallowed in this environment; fallback to top-level redirect
+        window.location.href = data.url;
+        return;
+      }
+
+      // Poll popup in case cross-origin opener policies (COOP) prevented postMessage
+      const pollTimer = setInterval(async () => {
+        if (!popup || popup.closed) {
+          clearInterval(pollTimer);
+          try {
+            const meRes = await fetch('/api/auth/me', { credentials: 'include' });
+            if (meRes.ok) {
+              const meData = await meRes.json();
+              if (meData?.user) {
+                store.currentUser = meData.user;
+                localStorage.setItem('ut_current_user', JSON.stringify(meData.user));
+                store.notify();
+                showToast(`Welcome back, ${meData.user.name}!`);
+                setIsSubmitting(false);
+                onNavigate(meData.user.role === 'admin' ? 'admin' : 'student/dashboard');
+                return;
+              }
+            }
+          } catch (e) {}
+          setIsSubmitting(false);
+        }
+      }, 1000);
     } catch (err: any) {
       setErrorMsg(err.message || 'Social sign-in failed.');
       setIsSubmitting(false);

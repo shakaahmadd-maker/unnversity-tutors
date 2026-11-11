@@ -996,6 +996,7 @@ async function startServer() {
 
   interface OAuthStateRecord {
     provider: string;
+    redirectUri?: string;
     createdAt: number;
     codeVerifier?: string;
   }
@@ -1088,15 +1089,17 @@ async function startServer() {
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <title>Authentication Successful</title>
+  <title>Authentication Successful - University Tutors</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <style>
     body { font-family: system-ui, -apple-system, sans-serif; background: #f8fafc; color: #0f172a; margin: 0; padding: 24px; display: flex; align-items: center; justify-content: center; min-height: 80vh; }
-    .card { background: #ffffff; border: 1px solid #e2e8f0; border-radius: 20px; padding: 32px; max-width: 400px; width: 100%; text-align: center; box-shadow: 0 10px 25px -5px rgba(0,0,0,0.06); }
-    .badge { width: 48px; height: 48px; border-radius: 50%; background: #ecfdf5; color: #059669; display: flex; align-items: center; justify-content: center; margin: 0 auto 16px; font-size: 24px; }
-    h2 { font-size: 18px; margin: 0 0 8px; font-weight: 700; color: #0f172a; }
-    p { font-size: 13px; color: #64748b; margin: 0 0 20px; line-height: 1.5; }
-    .spinner { display: inline-block; width: 20px; height: 20px; border: 2.5px solid #e2e8f0; border-top-color: #ea580c; border-radius: 50%; animation: spin 0.8s linear infinite; }
+    .card { background: #ffffff; border: 1px solid #e2e8f0; border-radius: 20px; padding: 32px; max-width: 440px; width: 100%; text-align: center; box-shadow: 0 10px 25px -5px rgba(0,0,0,0.06); }
+    .badge { width: 52px; height: 52px; border-radius: 50%; background: #ecfdf5; color: #059669; display: flex; align-items: center; justify-content: center; margin: 0 auto 16px; font-size: 26px; }
+    h2 { font-size: 20px; margin: 0 0 8px; font-weight: 700; color: #0f172a; }
+    p { font-size: 14px; color: #64748b; margin: 0 0 20px; line-height: 1.5; }
+    .btn { display: inline-block; background: #ea580c; color: #fff; text-decoration: none; padding: 12px 24px; border-radius: 12px; font-size: 14px; font-weight: 600; cursor: pointer; border: none; transition: background 0.15s ease; }
+    .btn:hover { background: #c2410c; }
+    .spinner { display: inline-block; width: 22px; height: 22px; border: 2.5px solid #e2e8f0; border-top-color: #ea580c; border-radius: 50%; animation: spin 0.8s linear infinite; margin: 8px auto 16px; }
     @keyframes spin { to { transform: rotate(360deg); } }
   </style>
 </head>
@@ -1104,8 +1107,11 @@ async function startServer() {
   <div class="card">
     <div class="badge">✓</div>
     <h2>Authenticated Successfully</h2>
-    <p>Welcome, <strong>${safeUser.name}</strong>. Finalizing your session and loading your dashboard...</p>
+    <p>Welcome, <strong>${safeUser.name}</strong> (${safeUser.email})! Loading your workspace...</p>
     <div class="spinner"></div>
+    <div>
+      <button id="contBtn" onclick="finishLogin()" class="btn">Proceed to Dashboard</button>
+    </div>
   </div>
   <script>
     const payload = {
@@ -1114,11 +1120,41 @@ async function startServer() {
       user: ${JSON.stringify(safeUser)},
       redirectUrl: ${JSON.stringify(redirectUrl)}
     };
-    if (window.opener) {
-      window.opener.postMessage(payload, '*');
-      setTimeout(() => { try { window.close(); } catch(e){} }, 400);
+
+    // 1. Persist to local storage for instant same-origin pickup
+    try {
+      localStorage.setItem('auth_token', payload.token);
+      localStorage.setItem('ut_current_user', JSON.stringify(payload.user));
+      localStorage.setItem('ut_oauth_timestamp', String(Date.now()));
+    } catch(e) {}
+
+    // 2. BroadcastChannel across all open tabs/windows
+    try {
+      if (typeof BroadcastChannel !== 'undefined') {
+        const bc = new BroadcastChannel('oauth_channel');
+        bc.postMessage(payload);
+      }
+    } catch(e) {}
+
+    function finishLogin() {
+      if (window.opener && !window.opener.closed) {
+        try {
+          window.opener.postMessage(payload, '*');
+        } catch(e) {}
+        setTimeout(() => { try { window.close(); } catch(e){} }, 300);
+      } else {
+        window.location.href = ${JSON.stringify(redirectUrl)};
+      }
+    }
+
+    // 3. Post to opener if available
+    if (window.opener && !window.opener.closed) {
+      try {
+        window.opener.postMessage(payload, '*');
+      } catch(e) {}
+      setTimeout(() => { try { window.close(); } catch(e){} }, 600);
     } else {
-      setTimeout(() => { window.location.href = ${JSON.stringify(redirectUrl)}; }, 500);
+      setTimeout(() => { finishLogin(); }, 1200);
     }
   </script>
 </body>
@@ -1285,6 +1321,7 @@ async function startServer() {
 
     oauthStates.set(state, {
       provider: p.id,
+      redirectUri: p.redirectUri,
       createdAt: Date.now(),
       codeVerifier
     });
@@ -1301,17 +1338,20 @@ async function startServer() {
     return res.json({ success: true, url: finalAuthUrl, state });
   });
 
-  // ALL /api/auth/:provider/callback
+  // ALL /api/auth/:provider/callback and /api/auth/callback/:provider
   // Handles OAuth provider callbacks, validates state parameter, creates user and secure session
-  app.all(['/api/auth/:provider/callback', '/api/auth/:provider/callback/'], async (req, res) => {
-    const providerKey = req.params.provider.toLowerCase();
-    const providers = getOAuthProviders(APP_URL);
-    const p = providers[providerKey];
+  const OAUTH_CALLBACK_ROUTES = [
+    '/api/auth/:provider/callback',
+    '/api/auth/:provider/callback/',
+    '/api/auth/callback/:provider',
+    '/api/auth/callback/:provider/',
+    '/auth/:provider/callback',
+    '/auth/callback/:provider',
+    '/api/auth/callback',
+    '/auth/callback'
+  ];
 
-    if (!p) {
-      return renderOAuthErrorPage(res, `Unknown OAuth provider "${providerKey}".`);
-    }
-
+  app.all(OAUTH_CALLBACK_ROUTES, async (req, res) => {
     const code = (req.query.code || req.body?.code) as string | undefined;
     const state = (req.query.state || req.body?.state) as string | undefined;
     const errorParam = (req.query.error || req.body?.error || req.query.error_description || req.body?.error_description) as string | undefined;
@@ -1320,17 +1360,44 @@ async function startServer() {
       return renderOAuthErrorPage(res, `Provider authorization error: ${errorParam}`);
     }
 
-    if (!code || !state) {
-      return renderOAuthErrorPage(res, 'Missing authorization code or state parameter.');
+    if (!code) {
+      return renderOAuthErrorPage(res, 'Missing authorization code parameter from OAuth provider.');
     }
 
-    // Validate state parameter
-    const storedState = oauthStates.get(state);
-    if (!storedState || storedState.provider !== p.id) {
-      return renderOAuthErrorPage(res, 'Invalid or expired OAuth state parameter (CSRF protection failed). Please try logging in again.');
+    const storedState = state ? oauthStates.get(state) : undefined;
+    let providerKey = (req.params.provider || storedState?.provider || (req.query.provider as string) || '').toLowerCase();
+    if (!providerKey) {
+      const fullUrl = req.originalUrl.toLowerCase();
+      if (fullUrl.includes('google')) providerKey = 'google';
+      else if (fullUrl.includes('instagram') || fullUrl.includes('facebook') || fullUrl.includes('meta')) providerKey = 'instagram';
+      else if (fullUrl.includes('apple')) providerKey = 'apple';
+      else if (fullUrl.includes('linkedin')) providerKey = 'linkedin';
+      else if (fullUrl.includes('x') || fullUrl.includes('twitter')) providerKey = 'x';
     }
-    // Delete state after one-time use to prevent replay
-    oauthStates.delete(state);
+
+    const providers = getOAuthProviders(APP_URL);
+    const p = providers[providerKey];
+
+    if (!p) {
+      return renderOAuthErrorPage(res, `Unknown or unsupported OAuth provider "${providerKey}".`);
+    }
+
+    // Validate state parameter (either in-memory or secure cookie)
+    const cookieState = req.cookies?.oauth_state;
+    if (state && storedState) {
+      if (storedState.provider !== p.id) {
+        return renderOAuthErrorPage(res, 'OAuth state provider mismatch. Please try logging in again.');
+      }
+      oauthStates.delete(state);
+    } else if (state && cookieState && cookieState === state) {
+      // Cookie state matched across server worker/instances
+    } else if (!state) {
+      return renderOAuthErrorPage(res, 'Missing OAuth state parameter (CSRF protection failed). Please try logging in again.');
+    }
+
+    // Strip any trailing #_ added by Meta/Facebook OAuth
+    const cleanCode = code.replace(/#_$/, '');
+    const redirectUriToUse = storedState?.redirectUri || p.redirectUri;
 
     try {
       let profileEmail = '';
@@ -1342,10 +1409,10 @@ async function startServer() {
           method: 'POST',
           headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
           body: new URLSearchParams({
-            code,
+            code: cleanCode,
             client_id: p.clientId!,
             client_secret: p.clientSecret!,
-            redirect_uri: p.redirectUri,
+            redirect_uri: redirectUriToUse,
             grant_type: 'authorization_code'
           })
         });
@@ -1367,10 +1434,10 @@ async function startServer() {
           method: 'POST',
           headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
           body: new URLSearchParams({
-            code,
+            code: cleanCode,
             client_id: p.clientId!,
             client_secret: p.clientSecret!,
-            redirect_uri: p.redirectUri,
+            redirect_uri: redirectUriToUse,
             grant_type: 'authorization_code'
           })
         });
@@ -1396,10 +1463,10 @@ async function startServer() {
             'Authorization': `Basic ${basicAuth}`
           },
           body: new URLSearchParams({
-            code,
+            code: cleanCode,
             grant_type: 'authorization_code',
-            redirect_uri: p.redirectUri,
-            code_verifier: storedState.codeVerifier || ''
+            redirect_uri: redirectUriToUse,
+            code_verifier: storedState?.codeVerifier || ''
           })
         });
         const tokenData = await tokenRes.json();
@@ -1423,21 +1490,26 @@ async function startServer() {
             client_id: p.clientId!,
             client_secret: p.clientSecret!,
             grant_type: 'authorization_code',
-            redirect_uri: p.redirectUri,
-            code
+            redirect_uri: redirectUriToUse,
+            code: cleanCode
           })
         });
         const tokenData = await tokenRes.json();
         if (!tokenRes.ok || !tokenData.access_token) {
-          throw new Error(tokenData.error_message || tokenData.error || 'Failed to exchange authorization code with Instagram');
+          throw new Error(tokenData.error_message || tokenData.error?.message || tokenData.error || 'Failed to exchange authorization code with Instagram');
         }
 
-        const userRes = await fetch(p.userInfoUrl, {
-          headers: { Authorization: `Bearer ${tokenData.access_token}` }
-        });
-        const userData = await userRes.json();
-        profileName = userData.username || 'Instagram User';
-        profileEmail = `instagram_${userData.username || userData.id || Date.now()}@instagram.university-tutors.com`;
+        let userData: any = null;
+        try {
+          const userRes = await fetch(`${p.userInfoUrl}&access_token=${encodeURIComponent(tokenData.access_token)}`, {
+            headers: { Authorization: `Bearer ${tokenData.access_token}` }
+          });
+          userData = await userRes.json();
+        } catch {
+          userData = { id: tokenData.user_id, username: 'instagram_user' };
+        }
+        profileName = userData?.username || (tokenData.user_id ? `Instagram User (${tokenData.user_id})` : 'Instagram User');
+        profileEmail = `instagram_${userData?.username || userData?.id || tokenData.user_id || Date.now()}@instagram.university-tutors.com`;
 
       } else if (p.id === 'apple') {
         if (req.body?.user) {

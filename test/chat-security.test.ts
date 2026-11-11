@@ -80,10 +80,11 @@ async function runTests() {
   const tutorStranger = await registerTestUser('Tutor Stranger', 'tutor', `ts_${testRunId}`);
   
   // Use seeded admin or register subadmin
+  const adminPassword = process.env.ADMIN_PASSWORD || '5pt5yBWLBT@@uni';
   const adminLoginRes = await fetch(`${BASE_URL}/api/auth/login`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email: 'shaka.ahmadd@gmail.com', password: 'Admin@123456' }),
+    body: JSON.stringify({ email: 'shaka.ahmadd@gmail.com', password: adminPassword }),
   });
   const adminData = await adminLoginRes.json();
   const subadminToken = adminData.token;
