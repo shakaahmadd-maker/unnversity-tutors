@@ -1,7 +1,8 @@
 export enum UserRole {
   STUDENT = 'student',
   TUTOR = 'tutor',
-  ADMIN = 'admin'
+  ADMIN = 'admin',
+  SUBADMIN = 'subadmin'
 }
 
 export enum AssignmentStatus {

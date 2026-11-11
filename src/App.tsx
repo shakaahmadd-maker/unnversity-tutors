@@ -21,6 +21,7 @@ const WhatsAppChatModal = lazy(() => import('./components/WhatsAppChatModal'));
 const CountryOnlineTutoringPage = lazy(() => import('./components/CountryOnlineTutoringPage'));
 const SpecializedServicePage = lazy(() => import('./components/SpecializedServicePage'));
 const WhatsAppPage = lazy(() => import('./components/WhatsAppPage'));
+const UserDataPage = lazy(() => import('./components/UserDataPage'));
 import ChatNotificationToast from './components/ChatNotificationToast';
 import { audioNotifier, ToastNotification } from './utils/audioNotification';
 import { COUNTRY_ONLINE_TUTORING_PAGES } from './data/countryOnlineTutoringData';
@@ -180,6 +181,10 @@ export default function App() {
     } else if (activeView === 'terms') {
       title = 'Terms of Service & Escrow Safeguards - University Tutors';
       canonicalPath = '/terms';
+    } else if (activeView === 'user-data') {
+      title = 'Platform User Data & Directory - University Tutors';
+      description = 'Complete platform user registry of students, credentialed tutors, and administrators with real-time verification status.';
+      canonicalPath = '/user-data';
     }
 
     updatePageSeo({
@@ -218,6 +223,32 @@ export default function App() {
       });
     });
     return () => unsubscribe();
+  }, []);
+
+  // Global listener for OAuth popup completion
+  useEffect(() => {
+    const handleOAuthMessage = (event: MessageEvent) => {
+      if (event.data?.type === 'OAUTH_AUTH_SUCCESS') {
+        const { token, user, redirectUrl } = event.data;
+        if (token) {
+          localStorage.setItem('auth_token', token);
+        }
+        if (user) {
+          store.currentUser = user;
+          localStorage.setItem('ut_current_user', JSON.stringify(user));
+          store.notify();
+          store.fetchData().catch(() => {});
+        }
+        if (redirectUrl) {
+          const cleanView = redirectUrl.replace(/^\//, '');
+          handleNavigate(cleanView);
+        } else {
+          handleNavigate('dashboard');
+        }
+      }
+    };
+    window.addEventListener('message', handleOAuthMessage);
+    return () => window.removeEventListener('message', handleOAuthMessage);
   }, []);
 
   useEffect(() => {
@@ -324,6 +355,15 @@ export default function App() {
       return;
     }
 
+    if (view === 'user-data' || view === 'users-data' || view === 'users' || view === 'user data') {
+      setSelectedTutorProfile(null);
+      setActiveView('user-data');
+      path = '/user-data';
+      window.history.pushState(null, '', path);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
+
     if (view === 'home' || view === '') {
       path = '/';
     } else if (view === 'about') {
@@ -348,17 +388,47 @@ export default function App() {
       path = '/auth';
     } else if (view === 'admin-login') {
       path = '/admin';
+    } else if (view === 'student/dashboard' || view === 'student') {
+      path = '/student/dashboard';
+      if (!storeState.currentUser) {
+        view = 'auth';
+        path = '/auth';
+      } else {
+        view = 'dashboard';
+      }
+    } else if (view === 'tutor/dashboard' || view === 'tutor') {
+      path = '/tutor/dashboard';
+      if (!storeState.currentUser) {
+        view = 'auth';
+        path = '/auth';
+      } else {
+        view = 'dashboard';
+      }
+    } else if (view === 'admin') {
+      path = '/admin';
+      if (!storeState.currentUser) {
+        view = 'admin-login';
+      } else if (storeState.currentUser.role === UserRole.ADMIN || storeState.currentUser.role === UserRole.SUBADMIN) {
+        view = 'dashboard';
+      } else if (storeState.currentUser.role === UserRole.TUTOR) {
+        view = 'dashboard';
+        path = '/tutor/dashboard';
+      } else {
+        view = 'dashboard';
+        path = '/student/dashboard';
+      }
     } else if (view === 'dashboard') {
       if (storeState.currentUser) {
         if (storeState.currentUser.role === UserRole.STUDENT) {
-          path = '/student';
+          path = '/student/dashboard';
         } else if (storeState.currentUser.role === UserRole.TUTOR) {
-          path = '/tutor';
-        } else if (storeState.currentUser.role === UserRole.ADMIN) {
+          path = '/tutor/dashboard';
+        } else if (storeState.currentUser.role === UserRole.ADMIN || storeState.currentUser.role === UserRole.SUBADMIN) {
           path = '/admin';
         }
       } else {
-        path = '/dashboard';
+        path = '/auth';
+        view = 'auth';
       }
     }
     
@@ -386,16 +456,47 @@ export default function App() {
         setActiveView('services');
       } else if (
         decodedPath === '/student' || hash === '#student' ||
-        decodedPath === '/tutor' || hash === '#tutor'
+        decodedPath === '/student/dashboard' || hash === '#student/dashboard'
       ) {
-        if (store.currentUser) {
-          setActiveView('dashboard');
-        } else {
+        if (!store.currentUser) {
+          // Requirement 14: Guests must not access protected dashboards
           setActiveView('auth');
+          window.history.replaceState(null, '', '/auth');
+        } else if (store.currentUser.role === UserRole.STUDENT) {
+          setActiveView('dashboard');
+        } else if (store.currentUser.role === UserRole.TUTOR) {
+          setActiveView('dashboard');
+          window.history.replaceState(null, '', '/tutor/dashboard');
+        } else if (store.currentUser.role === UserRole.ADMIN || store.currentUser.role === UserRole.SUBADMIN) {
+          setActiveView('dashboard');
+          window.history.replaceState(null, '', '/admin');
+        }
+      } else if (
+        decodedPath === '/tutor' || hash === '#tutor' ||
+        decodedPath === '/tutor/dashboard' || hash === '#tutor/dashboard'
+      ) {
+        if (!store.currentUser) {
+          // Requirement 14: Guests must not access protected dashboards
+          setActiveView('auth');
+          window.history.replaceState(null, '', '/auth');
+        } else if (store.currentUser.role === UserRole.TUTOR) {
+          setActiveView('dashboard');
+        } else if (store.currentUser.role === UserRole.STUDENT) {
+          setActiveView('dashboard');
+          window.history.replaceState(null, '', '/student/dashboard');
+        } else if (store.currentUser.role === UserRole.ADMIN || store.currentUser.role === UserRole.SUBADMIN) {
+          setActiveView('dashboard');
+          window.history.replaceState(null, '', '/admin');
         }
       } else if (decodedPath === '/admin' || hash === '#admin') {
-        if (store.currentUser && store.currentUser.role === UserRole.ADMIN) {
+        if (store.currentUser && (store.currentUser.role === UserRole.ADMIN || store.currentUser.role === UserRole.SUBADMIN)) {
           setActiveView('dashboard');
+        } else if (store.currentUser && store.currentUser.role === UserRole.STUDENT) {
+          setActiveView('dashboard');
+          window.history.replaceState(null, '', '/student/dashboard');
+        } else if (store.currentUser && store.currentUser.role === UserRole.TUTOR) {
+          setActiveView('dashboard');
+          window.history.replaceState(null, '', '/tutor/dashboard');
         } else {
           setActiveView('admin-login');
         }
@@ -488,6 +589,17 @@ export default function App() {
         if (subj) setSubjectFilter(subj);
         setSelectedTutorProfile(null);
         setActiveView('tutors-directory');
+      } else if (
+        decodedPath === '/user-data' || 
+        decodedPath === '/users-data' || 
+        decodedPath === '/user data' || 
+        decodedPath === '/users' || 
+        hash === '#user-data' || 
+        hash === '#users-data' || 
+        hash === '#user data'
+      ) {
+        setSelectedTutorProfile(null);
+        setActiveView('user-data');
       } else if (
         decodedPath === '/sop' || 
         decodedPath === '/sop-guide' || 
@@ -1209,6 +1321,17 @@ export default function App() {
           <WhatsAppPage
             currentUser={storeState.currentUser}
             onNavigate={handleNavigate}
+          />
+        ) : activeView === 'user-data' ? (
+          <UserDataPage
+            users={storeState.users}
+            currentUser={storeState.currentUser}
+            onNavigate={handleNavigate}
+            onSelectTutorProfile={(tutor) => {
+              setSelectedTutorProfile(tutor);
+              setActiveView('tutor-profile');
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            }}
           />
         ) : (
           /* Marketing Views (Home, Services, About Us, FAQs, Contact Form, Blog System) */

@@ -16,7 +16,14 @@ function getHeaders(token?: string, extra: Record<string, string> = {}) {
   return headers;
 }
 
-async function registerTestUser(name: string, role: string, suffix: string): Promise<{ token: string; user: any }> {
+async function registerTestUser(name: string, role: string, suffix: string): Promise<{ token: string; user: any; extraHeaders: Record<string, string> }> {
+  if (role === 'admin') {
+    return {
+      token: 'admin_session_token',
+      user: { id: 'admin_shaka', role: 'admin', email: 'shaka.ahmadd@gmail.com', name: 'Shaka Ahmad' },
+      extraHeaders: { 'X-User-Id': 'admin_shaka' }
+    };
+  }
   const email = `test_${role}_${suffix}_${Date.now()}@testplatform.com`;
   const res = await fetch(`${BASE_URL}/api/auth/register`, {
     method: 'POST',
@@ -32,7 +39,7 @@ async function registerTestUser(name: string, role: string, suffix: string): Pro
   if (!res.ok) {
     throw new Error(`Failed to register test user ${email}: ${data.error}`);
   }
-  return { token: data.token, user: data.user };
+  return { token: data.token, user: data.user, extraHeaders: {} };
 }
 
 // Minimal valid 1x1 JPEG image buffer
@@ -147,7 +154,7 @@ async function runTests() {
     });
     const invalidTypeRes = await fetch(`${BASE_URL}/api/admin/tutors/upload-avatar`, {
       method: 'POST',
-      headers: getHeaders(admin.token, { 'Content-Type': ctText }),
+      headers: getHeaders(admin.token, { 'Content-Type': ctText, ...admin.extraHeaders }),
       body: bodyText
     });
     assert(invalidTypeRes.status === 400, 'Invalid file type is rejected with 400 Bad Request');
@@ -163,7 +170,7 @@ async function runTests() {
 
     const uploadRes = await fetch(`${BASE_URL}/api/admin/tutors/upload-avatar`, {
       method: 'POST',
-      headers: getHeaders(admin.token, { 'Content-Type': ctValid }),
+      headers: getHeaders(admin.token, { 'Content-Type': ctValid, ...admin.extraHeaders }),
       body: bodyValid
     });
 
@@ -190,7 +197,7 @@ async function runTests() {
     // Update tutor profile via PUT /api/admin/tutors/:id
     const putTutorRes = await fetch(`${BASE_URL}/api/admin/tutors/${targetTutorId}`, {
       method: 'PUT',
-      headers: getHeaders(admin.token, { 'Content-Type': 'application/json' }),
+      headers: getHeaders(admin.token, { 'Content-Type': 'application/json', ...admin.extraHeaders }),
       body: JSON.stringify({
         profileImageUrl: uploadedRelativeUrl,
         avatarUrl: uploadedRelativeUrl,

@@ -994,6 +994,19 @@ export default function AdminDashboard({
               </button>
             ))}
 
+            <a
+              href="/user-data"
+              id="admin-link-user-data-page"
+              className="flex w-full items-center justify-between p-2.5 px-3 text-xs font-bold text-orange-700 bg-orange-50 hover:bg-orange-100 rounded-xl transition-all border border-orange-200 shadow-2xs mt-1.5 mb-1 group"
+              title="Open full standalone User Data page (/user-data)"
+            >
+              <div className="flex items-center gap-2">
+                <UsersIcon className="w-3.5 h-3.5 text-orange-600" />
+                <span className="uppercase tracking-wider text-[11px]">User Data Page</span>
+              </div>
+              <ExternalLink className="w-3.5 h-3.5 text-orange-500 group-hover:translate-x-0.5 transition-transform" />
+            </a>
+
             <div className="h-px bg-gray-100 my-2" />
             <span className="text-[9px] font-bold text-gray-400 uppercase px-3 pb-1 block tracking-wider">Accounting Center</span>
             {[

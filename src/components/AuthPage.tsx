@@ -68,8 +68,21 @@ const AppleIcon = () => (
   </svg>
 );
 
+const LinkedInIcon = () => (
+  <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24" fill="#0A66C2">
+    <path d="M19 3a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h14m-.5 15.5v-5.3a3.26 3.26 0 0 0-3.26-3.26c-.85 0-1.84.52-2.28 1.3v-1.11h-2.79v8.37h2.79v-4.93c0-.77.62-1.4 1.39-1.4a1.4 1.4 0 0 1 1.4 1.4v4.93h2.75M6.46 10.9h2.77v8.37H6.46v-8.37M7.85 6.26c-.96 0-1.74.78-1.74 1.74s.78 1.74 1.74 1.74 1.74-.78 1.74-1.74-.78-1.74-1.74-1.74Z" />
+  </svg>
+);
+
 export default function AuthPage({ onLogin, onRegister, onNavigate }: AuthPageProps) {
   const [activeTab, setActiveTab] = useState<'signin' | 'signup'>('signin');
+  const [providers, setProviders] = useState<Record<string, { configured: boolean; name: string }>>({
+    google: { configured: false, name: 'Google' },
+    apple: { configured: false, name: 'Apple' },
+    instagram: { configured: false, name: 'Instagram' },
+    x: { configured: false, name: 'X' },
+    linkedin: { configured: false, name: 'LinkedIn' },
+  });
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -120,6 +133,59 @@ export default function AuthPage({ onLogin, onRegister, onNavigate }: AuthPagePr
   useEffect(() => {
     localStorage.setItem('ut_sim_emails', JSON.stringify(simEmails));
   }, [simEmails]);
+
+  // Fetch configured OAuth providers on mount
+  useEffect(() => {
+    fetch('/api/auth/providers')
+      .then(res => res.json())
+      .then(data => {
+        if (data?.providers) {
+          setProviders(data.providers);
+        }
+      })
+      .catch(() => {});
+  }, []);
+
+  // Listen for OAuth postMessage callbacks from popup
+  useEffect(() => {
+    const handleOAuthMessage = (event: MessageEvent) => {
+      // Validate origin if available
+      const origin = event.origin;
+      if (origin && !origin.endsWith('.run.app') && !origin.includes('localhost') && !origin.includes('127.0.0.1')) {
+        return;
+      }
+
+      if (event.data?.type === 'OAUTH_AUTH_SUCCESS') {
+        const { token, user, redirectUrl } = event.data;
+        if (token) {
+          localStorage.setItem('auth_token', token);
+        }
+        if (user) {
+          store.currentUser = user;
+          localStorage.setItem('ut_current_user', JSON.stringify(user));
+          store.notify();
+          store.fetchData().catch(() => {});
+        }
+        showToast(`Authenticated successfully as ${user?.name || 'Student'}!`);
+        setSuccessMsg(`Welcome, ${user?.name || 'Student'}! Redirecting to your dashboard...`);
+        setIsSubmitting(false);
+
+        setTimeout(() => {
+          if (redirectUrl) {
+            onNavigate(redirectUrl.replace(/^\//, ''));
+          } else {
+            onNavigate('dashboard');
+          }
+        }, 500);
+      } else if (event.data?.type === 'OAUTH_AUTH_ERROR') {
+        setErrorMsg(event.data.error || 'Social sign-in failed. Please try again.');
+        setIsSubmitting(false);
+      }
+    };
+
+    window.addEventListener('message', handleOAuthMessage);
+    return () => window.removeEventListener('message', handleOAuthMessage);
+  }, [onNavigate]);
 
   const showToast = (text: string) => {
     setToastText(text);
@@ -299,8 +365,8 @@ export default function AuthPage({ onLogin, onRegister, onNavigate }: AuthPagePr
         showToast('Account Created Successfully!');
         setTimeout(async () => {
           await onLogin(email.trim(), password);
-          onNavigate('dashboard');
-        }, 900);
+          onNavigate('student/dashboard');
+        }, 600);
       } else {
         setErrorMsg('Something went wrong establishing your student account.');
       }
@@ -311,46 +377,41 @@ export default function AuthPage({ onLogin, onRegister, onNavigate }: AuthPagePr
     }
   };
 
-  // One-Click Social Registration / Login Handler
-  const handleSocialAuth = async (provider: 'Google' | 'Instagram' | 'X' | 'Apple') => {
-    setIsSubmitting(true);
+  // Secure OAuth 2.0 Authorization Code Flow Handler
+  const handleSocialAuth = async (providerKey: 'google' | 'apple' | 'instagram' | 'x' | 'linkedin') => {
     setErrorMsg('');
     setSuccessMsg('');
 
-    const socialEmail = `student.${provider.toLowerCase()}@university-tutors.com`;
-    const socialName = `${provider} Student User`;
+    const p = providers[providerKey];
+    const providerName = p?.name || providerKey.toUpperCase();
 
+    // Requirement 3 & 4: If not configured, explain that environment variables are required
+    if (!p || !p.configured) {
+      setErrorMsg(`${providerName} authentication is not yet configured. Environment variables (${providerKey.toUpperCase()}_CLIENT_ID & ${providerKey.toUpperCase()}_CLIENT_SECRET) are required on the server.`);
+      showToast(`${providerName} login not configured`);
+      return;
+    }
+
+    setIsSubmitting(true);
     try {
-      const existingUser = store.users.find(u => u.email.toLowerCase() === socialEmail.toLowerCase());
-      if (!existingUser) {
-        await onRegister(
-          socialName,
-          socialEmail,
-          UserRole.STUDENT,
-          {
-            verified: true,
-            provider,
-            signupMethod: provider.toLowerCase(),
-            verifiedAt: new Date().toISOString()
-          }
-        );
+      // 1. Fetch the provider's authorization URL from the server
+      const res = await fetch(`/api/auth/${providerKey}/url`);
+      const data = await res.json();
+      if (!res.ok || !data.url) {
+        throw new Error(data.error || `Could not initiate ${providerName} login.`);
       }
 
-      const loggedIn = await onLogin(socialEmail, 'social-secure-pass');
-      if (loggedIn) {
-        showToast(`Authenticated with ${provider}!`);
-        setSuccessMsg(`Signed in with ${provider}. Redirecting to dashboard...`);
-        setTimeout(() => {
-          onNavigate('dashboard');
-        }, 700);
-      } else {
-        showToast(`Signed in with ${provider}!`);
-        onNavigate('dashboard');
+      // 2. Open the OAuth PROVIDER's URL directly in a popup window
+      const popup = window.open(
+        data.url,
+        'oauth_popup',
+        'width=600,height=700,status=no,toolbar=no,menubar=no'
+      );
+      if (!popup) {
+        throw new Error('Popup was blocked by your browser. Please allow popups for this site to complete social sign-in.');
       }
     } catch (err: any) {
-      showToast(`Signed in with ${provider}! Redirecting...`);
-      onNavigate('dashboard');
-    } finally {
+      setErrorMsg(err.message || 'Social sign-in failed.');
       setIsSubmitting(false);
     }
   };
@@ -689,24 +750,43 @@ export default function AuthPage({ onLogin, onRegister, onNavigate }: AuthPagePr
               </span>
             </div>
 
-            {/* One-Click Social Registration / Login Buttons: Google, Instagram, X, Apple */}
-            <div className="grid grid-cols-4 gap-2.5">
+            {/* Social Authentication: Google, Apple, Instagram, X, LinkedIn */}
+            <div className="grid grid-cols-5 gap-2">
               <button
                 type="button"
                 id="social-login-google"
-                onClick={() => handleSocialAuth('Google')}
-                title="Continue with Google"
-                className="flex items-center justify-center p-2.5 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-xl transition-all duration-150 hover:shadow-xs active:scale-95 cursor-pointer text-slate-700"
+                onClick={() => handleSocialAuth('google')}
+                title={providers.google?.configured ? "Continue with Google" : "Continue with Google (Configuration pending in environment variables)"}
+                aria-label="Continue with Google"
+                className={`flex items-center justify-center p-2.5 border rounded-xl transition-all duration-150 hover:shadow-xs active:scale-95 text-slate-700 ${
+                  providers.google?.configured ? 'bg-slate-50 hover:bg-slate-100 border-slate-200 cursor-pointer' : 'bg-slate-100/70 border-slate-200/60 opacity-60 cursor-not-allowed'
+                }`}
               >
                 <GoogleIcon />
               </button>
 
               <button
                 type="button"
+                id="social-login-apple"
+                onClick={() => handleSocialAuth('apple')}
+                title={providers.apple?.configured ? "Continue with Apple" : "Continue with Apple (Configuration pending in environment variables)"}
+                aria-label="Continue with Apple"
+                className={`flex items-center justify-center p-2.5 border rounded-xl transition-all duration-150 hover:shadow-xs active:scale-95 text-slate-900 ${
+                  providers.apple?.configured ? 'bg-slate-50 hover:bg-slate-100 border-slate-200 cursor-pointer' : 'bg-slate-100/70 border-slate-200/60 opacity-60 cursor-not-allowed'
+                }`}
+              >
+                <AppleIcon />
+              </button>
+
+              <button
+                type="button"
                 id="social-login-instagram"
-                onClick={() => handleSocialAuth('Instagram')}
-                title="Continue with Instagram"
-                className="flex items-center justify-center p-2.5 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-xl transition-all duration-150 hover:shadow-xs active:scale-95 cursor-pointer text-slate-800 hover:text-pink-600"
+                onClick={() => handleSocialAuth('instagram')}
+                title={providers.instagram?.configured ? "Continue with Instagram" : "Continue with Instagram (Configuration pending in environment variables)"}
+                aria-label="Continue with Instagram"
+                className={`flex items-center justify-center p-2.5 border rounded-xl transition-all duration-150 hover:shadow-xs active:scale-95 text-slate-800 hover:text-pink-600 ${
+                  providers.instagram?.configured ? 'bg-slate-50 hover:bg-slate-100 border-slate-200 cursor-pointer' : 'bg-slate-100/70 border-slate-200/60 opacity-60 cursor-not-allowed'
+                }`}
               >
                 <InstagramIcon />
               </button>
@@ -714,21 +794,27 @@ export default function AuthPage({ onLogin, onRegister, onNavigate }: AuthPagePr
               <button
                 type="button"
                 id="social-login-x"
-                onClick={() => handleSocialAuth('X')}
-                title="Continue with X (formerly Twitter)"
-                className="flex items-center justify-center p-2.5 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-xl transition-all duration-150 hover:shadow-xs active:scale-95 cursor-pointer text-slate-900"
+                onClick={() => handleSocialAuth('x')}
+                title={providers.x?.configured ? "Continue with X" : "Continue with X (Configuration pending in environment variables)"}
+                aria-label="Continue with X"
+                className={`flex items-center justify-center p-2.5 border rounded-xl transition-all duration-150 hover:shadow-xs active:scale-95 text-slate-900 ${
+                  providers.x?.configured ? 'bg-slate-50 hover:bg-slate-100 border-slate-200 cursor-pointer' : 'bg-slate-100/70 border-slate-200/60 opacity-60 cursor-not-allowed'
+                }`}
               >
                 <XIcon />
               </button>
 
               <button
                 type="button"
-                id="social-login-apple"
-                onClick={() => handleSocialAuth('Apple')}
-                title="Continue with Apple"
-                className="flex items-center justify-center p-2.5 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-xl transition-all duration-150 hover:shadow-xs active:scale-95 cursor-pointer text-slate-900"
+                id="social-login-linkedin"
+                onClick={() => handleSocialAuth('linkedin')}
+                title={providers.linkedin?.configured ? "Continue with LinkedIn" : "Continue with LinkedIn (Configuration pending in environment variables)"}
+                aria-label="Continue with LinkedIn"
+                className={`flex items-center justify-center p-2.5 border rounded-xl transition-all duration-150 hover:shadow-xs active:scale-95 text-blue-700 ${
+                  providers.linkedin?.configured ? 'bg-slate-50 hover:bg-slate-100 border-slate-200 cursor-pointer' : 'bg-slate-100/70 border-slate-200/60 opacity-60 cursor-not-allowed'
+                }`}
               >
-                <AppleIcon />
+                <LinkedInIcon />
               </button>
             </div>
 
@@ -867,24 +953,43 @@ export default function AuthPage({ onLogin, onRegister, onNavigate }: AuthPagePr
               </span>
             </div>
 
-            {/* One-Click Social Registration / Login Buttons: Google, Instagram, X, Apple */}
-            <div className="grid grid-cols-4 gap-2.5">
+            {/* Social Authentication: Google, Apple, Instagram, X, LinkedIn */}
+            <div className="grid grid-cols-5 gap-2">
               <button
                 type="button"
                 id="social-signup-google"
-                onClick={() => handleSocialAuth('Google')}
-                title="Sign up with Google"
-                className="flex items-center justify-center p-2.5 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-xl transition-all duration-150 hover:shadow-xs active:scale-95 cursor-pointer text-slate-700"
+                onClick={() => handleSocialAuth('google')}
+                title={providers.google?.configured ? "Continue with Google" : "Continue with Google (Configuration pending in environment variables)"}
+                aria-label="Continue with Google"
+                className={`flex items-center justify-center p-2.5 border rounded-xl transition-all duration-150 hover:shadow-xs active:scale-95 text-slate-700 ${
+                  providers.google?.configured ? 'bg-slate-50 hover:bg-slate-100 border-slate-200 cursor-pointer' : 'bg-slate-100/70 border-slate-200/60 opacity-60 cursor-not-allowed'
+                }`}
               >
                 <GoogleIcon />
               </button>
 
               <button
                 type="button"
+                id="social-signup-apple"
+                onClick={() => handleSocialAuth('apple')}
+                title={providers.apple?.configured ? "Continue with Apple" : "Continue with Apple (Configuration pending in environment variables)"}
+                aria-label="Continue with Apple"
+                className={`flex items-center justify-center p-2.5 border rounded-xl transition-all duration-150 hover:shadow-xs active:scale-95 text-slate-900 ${
+                  providers.apple?.configured ? 'bg-slate-50 hover:bg-slate-100 border-slate-200 cursor-pointer' : 'bg-slate-100/70 border-slate-200/60 opacity-60 cursor-not-allowed'
+                }`}
+              >
+                <AppleIcon />
+              </button>
+
+              <button
+                type="button"
                 id="social-signup-instagram"
-                onClick={() => handleSocialAuth('Instagram')}
-                title="Sign up with Instagram"
-                className="flex items-center justify-center p-2.5 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-xl transition-all duration-150 hover:shadow-xs active:scale-95 cursor-pointer text-slate-800 hover:text-pink-600"
+                onClick={() => handleSocialAuth('instagram')}
+                title={providers.instagram?.configured ? "Continue with Instagram" : "Continue with Instagram (Configuration pending in environment variables)"}
+                aria-label="Continue with Instagram"
+                className={`flex items-center justify-center p-2.5 border rounded-xl transition-all duration-150 hover:shadow-xs active:scale-95 text-slate-800 hover:text-pink-600 ${
+                  providers.instagram?.configured ? 'bg-slate-50 hover:bg-slate-100 border-slate-200 cursor-pointer' : 'bg-slate-100/70 border-slate-200/60 opacity-60 cursor-not-allowed'
+                }`}
               >
                 <InstagramIcon />
               </button>
@@ -892,21 +997,27 @@ export default function AuthPage({ onLogin, onRegister, onNavigate }: AuthPagePr
               <button
                 type="button"
                 id="social-signup-x"
-                onClick={() => handleSocialAuth('X')}
-                title="Sign up with X (formerly Twitter)"
-                className="flex items-center justify-center p-2.5 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-xl transition-all duration-150 hover:shadow-xs active:scale-95 cursor-pointer text-slate-900"
+                onClick={() => handleSocialAuth('x')}
+                title={providers.x?.configured ? "Continue with X" : "Continue with X (Configuration pending in environment variables)"}
+                aria-label="Continue with X"
+                className={`flex items-center justify-center p-2.5 border rounded-xl transition-all duration-150 hover:shadow-xs active:scale-95 text-slate-900 ${
+                  providers.x?.configured ? 'bg-slate-50 hover:bg-slate-100 border-slate-200 cursor-pointer' : 'bg-slate-100/70 border-slate-200/60 opacity-60 cursor-not-allowed'
+                }`}
               >
                 <XIcon />
               </button>
 
               <button
                 type="button"
-                id="social-signup-apple"
-                onClick={() => handleSocialAuth('Apple')}
-                title="Sign up with Apple"
-                className="flex items-center justify-center p-2.5 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-xl transition-all duration-150 hover:shadow-xs active:scale-95 cursor-pointer text-slate-900"
+                id="social-signup-linkedin"
+                onClick={() => handleSocialAuth('linkedin')}
+                title={providers.linkedin?.configured ? "Continue with LinkedIn" : "Continue with LinkedIn (Configuration pending in environment variables)"}
+                aria-label="Continue with LinkedIn"
+                className={`flex items-center justify-center p-2.5 border rounded-xl transition-all duration-150 hover:shadow-xs active:scale-95 text-blue-700 ${
+                  providers.linkedin?.configured ? 'bg-slate-50 hover:bg-slate-100 border-slate-200 cursor-pointer' : 'bg-slate-100/70 border-slate-200/60 opacity-60 cursor-not-allowed'
+                }`}
               >
-                <AppleIcon />
+                <LinkedInIcon />
               </button>
             </div>
 

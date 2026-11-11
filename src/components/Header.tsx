@@ -13,7 +13,8 @@ import {
   FileCheck,
   Compass,
   FileText,
-  MessageCircle
+  MessageCircle,
+  Users
 } from 'lucide-react';
 import { User, UserRole } from '../types';
 
@@ -44,6 +45,7 @@ export default function Header({
     { name: 'Home', view: 'home' },
     { name: 'Tutors', view: 'tutors' },
     { name: 'Get a Quote', view: 'get-a-quote' },
+    { name: 'User Data', view: 'user-data' },
     { name: 'About Us', view: 'about' },
     { name: 'FAQs', view: 'faqs' },
     { name: 'Contact', view: 'contact' },
@@ -91,14 +93,25 @@ export default function Header({
             </div>
           </div>
 
-          <button
-            id="header-whatsapp-fast-track-btn"
-            onClick={() => handleLinkClick('whatsapp')}
-            className="flex items-center gap-1.5 bg-emerald-950/80 hover:bg-emerald-900 text-emerald-300 hover:text-white px-2.5 py-0.5 rounded border border-emerald-700/60 transition-colors font-sans font-semibold text-[11px] cursor-pointer"
-          >
-            <MessageCircle className="w-3 h-3 text-emerald-400" />
-            <span>WhatsApp Desk (24/7)</span>
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              id="header-user-data-fast-track-btn"
+              onClick={() => handleLinkClick('user-data')}
+              className="flex items-center gap-1.5 bg-orange-950/80 hover:bg-orange-900 text-orange-200 hover:text-white px-2.5 py-0.5 rounded border border-orange-700/60 transition-colors font-sans font-semibold text-[11px] cursor-pointer"
+              title="Open Platform User Data Directory"
+            >
+              <Users className="w-3 h-3 text-orange-400" />
+              <span>User Data</span>
+            </button>
+            <button
+              id="header-whatsapp-fast-track-btn"
+              onClick={() => handleLinkClick('whatsapp')}
+              className="flex items-center gap-1.5 bg-emerald-950/80 hover:bg-emerald-900 text-emerald-300 hover:text-white px-2.5 py-0.5 rounded border border-emerald-700/60 transition-colors font-sans font-semibold text-[11px] cursor-pointer"
+            >
+              <MessageCircle className="w-3 h-3 text-emerald-400" />
+              <span>WhatsApp Desk (24/7)</span>
+            </button>
+          </div>
         </div>
       </div>
 

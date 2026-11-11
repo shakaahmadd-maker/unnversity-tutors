@@ -95,6 +95,7 @@ export default function Footer({ onNavigate, onOpenBecomeTutor }: FooterProps) {
             <ul className="text-xs space-y-3 font-semibold">
               {[
                 { name: 'University Subjects', view: 'services' },
+                { name: 'Platform User Data', view: 'user-data' },
                 { name: 'WhatsApp Academic Hotline', view: 'whatsapp' },
                 { name: '1-on-1 Online Mentorship', view: 'services' },
                 { name: 'Assignment Prep & Tutoring', view: 'services' },

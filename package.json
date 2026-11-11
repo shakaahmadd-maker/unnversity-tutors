@@ -17,7 +17,8 @@
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "test:chat": "tsx test/chat-security.test.ts",
-    "test:upload": "tsx test/image-upload-persistence.test.ts"
+    "test:upload": "tsx test/image-upload-persistence.test.ts",
+    "test:auth": "tsx test/oauth-auth-system.test.ts"
   },
   "dependencies": {
     "@google/genai": "^2.4.0",

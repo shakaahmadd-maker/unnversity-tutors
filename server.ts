@@ -460,6 +460,20 @@ async function startServer() {
     next();
   };
 
+  // Role authorization requirement helper - rejects users without proper permissions
+  const requireRole = (...allowedRoles: string[]) => {
+    return (req: express.Request, res: express.Response, next: express.NextFunction) => {
+      const user = (req as any).user;
+      if (!user) {
+        return res.status(401).json({ error: 'Unauthorized: Authentication required. Please log in.' });
+      }
+      if (!allowedRoles.includes(user.role)) {
+        return res.status(403).json({ error: `Forbidden: Access requires ${allowedRoles.join(' or ')} privileges.` });
+      }
+      next();
+    };
+  };
+
   // Helper to check chat room access authorization
   const canUserAccessRoom = async (userId: string, userRole: string, roomId: string): Promise<boolean> => {
     if (userRole === 'admin' || userRole === 'subadmin') return true;
@@ -700,7 +714,7 @@ async function startServer() {
   // POST /api/auth/register
   app.post('/api/auth/register', async (req, res) => {
     try {
-      const { name, email, password, role, extra } = req.body;
+      const { name, email, password, extra } = req.body;
 
       if (!name || !email || !password) {
         return res.status(400).json({ error: 'Missing required fields: name, email, password' });
@@ -711,7 +725,8 @@ async function startServer() {
       }
 
       const cleanEmail = email.toLowerCase().trim();
-      const userRole = role === 'tutor' ? 'tutor' : (role === 'admin' ? 'admin' : 'student');
+      // Requirement 10 & 12: Ignore user-supplied role. Public registration ALWAYS assigns role "student"!
+      const userRole = 'student';
 
       // Check for existing user with this email
       if (isDbConnected() && db) {
@@ -738,25 +753,25 @@ async function startServer() {
         name: name.trim(),
         email: cleanEmail,
         passwordHash: pHash,
-        avatarUrl: `https://images.unsplash.com/photo-${userRole === 'tutor' ? '1534528741775-53994a69daeb' : '1535713875002-d1d0cf377fde'}?w=150&auto=format&fit=crop&q=80`,
+        avatarUrl: `https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&auto=format&fit=crop&q=80`,
         createdAt: now,
         suspended: false,
         verified: true,
-        bio: extra?.bio || (userRole === 'tutor' ? 'Dedicated academic tutor and subject mentor.' : 'Active student member.'),
-        hourlyRate: extra?.hourlyRate ? Math.round(Number(extra.hourlyRate)) : (userRole === 'tutor' ? 45 : null),
-        rating: userRole === 'tutor' ? 5.0 : null,
-        reviewCount: userRole === 'tutor' ? 0 : null,
-        subjects: extra?.subjects ? JSON.stringify(extra.subjects) : (userRole === 'tutor' ? JSON.stringify(['General Academics']) : null),
+        bio: extra?.bio || 'Active student member.',
+        hourlyRate: null,
+        rating: null,
+        reviewCount: null,
+        subjects: null,
         country: extra?.country || 'US',
         location: extra?.location || null,
         phoneNumber: extra?.phoneNumber || null,
         education: extra?.education || null,
-        experience: extra?.experience || null,
-        subjectExpertise: extra?.subjectExpertise ? JSON.stringify(extra.subjectExpertise) : null,
-        availability: extra?.availability || null,
-        canMeet: extra?.canMeet || null,
-        hobbies: extra?.hobbies || null,
-        isApproved: userRole !== 'tutor', // students approved immediately
+        experience: null,
+        subjectExpertise: null,
+        availability: null,
+        canMeet: null,
+        hobbies: null,
+        isApproved: true, // students approved immediately
         status: 'active',
       };
 
@@ -771,20 +786,26 @@ async function startServer() {
         }
       }
 
-      // Create session token & set HTTP-only cookie
+      // Create session token & set HTTP-only cookie with SameSite protection
       const token = createSessionToken({ id: newUserId, email: cleanEmail, role: userRole });
+      const isSecureCookie = NODE_ENV === 'production' || APP_URL.startsWith('https://');
       res.cookie(COOKIE_NAME, token, {
         httpOnly: true,
-        secure: NODE_ENV === 'production',
-        sameSite: 'lax',
-        maxAge: 7 * 24 * 60 * 60 * 1000,
+        secure: isSecureCookie,
+        sameSite: isSecureCookie ? 'none' : 'lax',
+        maxAge: 30 * 24 * 60 * 60 * 1000,
       });
 
-      await logAudit('USER_REGISTER', `User registered: ${cleanEmail} (${userRole})`, newUserId, name, userRole, req);
+      await logAudit('USER_REGISTER', `User registered: ${cleanEmail} (student)`, newUserId, name, userRole, req);
 
       // Strip passwordHash before responding
       const { passwordHash: _, ...safeUser } = newUserRecord;
-      return res.status(201).json({ success: true, user: safeUser, token });
+      return res.status(201).json({
+        success: true,
+        user: safeUser,
+        token,
+        redirectUrl: '/student/dashboard'
+      });
     } catch (error: any) {
       console.error('[AUTH] Registration error:', error);
       return res.status(500).json({ error: error.message || 'Registration failed' });
@@ -854,17 +875,25 @@ async function startServer() {
 
       // Generate session token
       const token = createSessionToken({ id: foundUser.id, email: foundUser.email, role: foundUser.role });
+      const isSecureCookie = NODE_ENV === 'production' || APP_URL.startsWith('https://');
       res.cookie(COOKIE_NAME, token, {
         httpOnly: true,
-        secure: NODE_ENV === 'production',
-        sameSite: 'lax',
-        maxAge: 7 * 24 * 60 * 60 * 1000,
+        secure: isSecureCookie,
+        sameSite: isSecureCookie ? 'none' : 'lax',
+        maxAge: 30 * 24 * 60 * 60 * 1000,
       });
+
+      let redirectUrl = '/student/dashboard';
+      if (foundUser.role === 'admin' || foundUser.role === 'subadmin') {
+        redirectUrl = '/admin';
+      } else if (foundUser.role === 'tutor') {
+        redirectUrl = '/tutor/dashboard';
+      }
 
       await logAudit('USER_LOGIN', `User logged in: ${cleanEmail} (${foundUser.role})`, foundUser.id, foundUser.name, foundUser.role, req);
 
       const { passwordHash: _, ...safeUser } = foundUser;
-      return res.status(200).json({ success: true, user: safeUser, token });
+      return res.status(200).json({ success: true, user: safeUser, token, redirectUrl });
     } catch (error: any) {
       console.error('[AUTH] Login error:', error);
       return res.status(500).json({ error: error.message || 'Authentication failed' });
@@ -913,6 +942,524 @@ async function startServer() {
     } catch (err: any) {
       return res.status(500).json({ error: err.message });
     }
+  });
+
+  // =========================================================================
+  // OAUTH 2.0 AUTHORIZATION CODE FLOW ENDPOINTS
+  // Providers: Google, Apple, Instagram, X (Twitter), LinkedIn
+  // =========================================================================
+
+  interface OAuthProviderConfig {
+    id: string;
+    name: string;
+    clientId: string | undefined;
+    clientSecret: string | undefined;
+    redirectUri: string;
+    authUrl: string;
+    tokenUrl: string;
+    userInfoUrl: string;
+    scope: string;
+    extraAuthParams?: Record<string, string>;
+  }
+
+  interface OAuthStateRecord {
+    provider: string;
+    createdAt: number;
+    codeVerifier?: string;
+  }
+
+  const oauthStates = new Map<string, OAuthStateRecord>();
+
+  // Prune expired states (> 10 minutes)
+  setInterval(() => {
+    const now = Date.now();
+    for (const [st, rec] of oauthStates.entries()) {
+      if (now - rec.createdAt > 10 * 60 * 1000) {
+        oauthStates.delete(st);
+      }
+    }
+  }, 5 * 60 * 1000);
+
+  function getOAuthProviders(baseUrl: string): Record<string, OAuthProviderConfig> {
+    const cleanBase = baseUrl.replace(/\/$/, '');
+    return {
+      google: {
+        id: 'google',
+        name: 'Google',
+        clientId: process.env.GOOGLE_CLIENT_ID?.trim(),
+        clientSecret: process.env.GOOGLE_CLIENT_SECRET?.trim(),
+        redirectUri: process.env.GOOGLE_REDIRECT_URI?.trim() || `${cleanBase}/api/auth/google/callback`,
+        authUrl: 'https://accounts.google.com/o/oauth2/v2/auth',
+        tokenUrl: 'https://oauth2.googleapis.com/token',
+        userInfoUrl: 'https://www.googleapis.com/oauth2/v2/userinfo',
+        scope: 'openid email profile',
+        extraAuthParams: { access_type: 'offline', prompt: 'select_account' }
+      },
+      apple: {
+        id: 'apple',
+        name: 'Apple',
+        clientId: process.env.APPLE_CLIENT_ID?.trim(),
+        clientSecret: process.env.APPLE_PRIVATE_KEY?.trim() || process.env.APPLE_KEY_ID?.trim() || process.env.APPLE_TEAM_ID?.trim(),
+        redirectUri: process.env.APPLE_REDIRECT_URI?.trim() || `${cleanBase}/api/auth/apple/callback`,
+        authUrl: 'https://appleid.apple.com/auth/authorize',
+        tokenUrl: 'https://appleid.apple.com/auth/token',
+        userInfoUrl: '',
+        scope: 'name email',
+        extraAuthParams: { response_mode: 'form_post' }
+      },
+      instagram: {
+        id: 'instagram',
+        name: 'Instagram',
+        clientId: process.env.INSTAGRAM_CLIENT_ID?.trim(),
+        clientSecret: process.env.INSTAGRAM_CLIENT_SECRET?.trim(),
+        redirectUri: process.env.INSTAGRAM_REDIRECT_URI?.trim() || `${cleanBase}/api/auth/instagram/callback`,
+        authUrl: 'https://api.instagram.com/oauth/authorize',
+        tokenUrl: 'https://api.instagram.com/oauth/access_token',
+        userInfoUrl: 'https://graph.instagram.com/me?fields=id,username,account_type',
+        scope: 'user_profile,user_media'
+      },
+      x: {
+        id: 'x',
+        name: 'X',
+        clientId: process.env.X_CLIENT_ID?.trim(),
+        clientSecret: process.env.X_CLIENT_SECRET?.trim(),
+        redirectUri: process.env.X_REDIRECT_URI?.trim() || `${cleanBase}/api/auth/x/callback`,
+        authUrl: 'https://twitter.com/i/oauth2/authorize',
+        tokenUrl: 'https://api.twitter.com/2/oauth2/token',
+        userInfoUrl: 'https://api.twitter.com/2/users/me?user.fields=profile_image_url,name,username',
+        scope: 'tweet.read users.read'
+      },
+      linkedin: {
+        id: 'linkedin',
+        name: 'LinkedIn',
+        clientId: process.env.LINKEDIN_CLIENT_ID?.trim(),
+        clientSecret: process.env.LINKEDIN_CLIENT_SECRET?.trim(),
+        redirectUri: process.env.LINKEDIN_REDIRECT_URI?.trim() || `${cleanBase}/api/auth/linkedin/callback`,
+        authUrl: 'https://www.linkedin.com/oauth/v2/authorization',
+        tokenUrl: 'https://www.linkedin.com/oauth/v2/accessToken',
+        userInfoUrl: 'https://api.linkedin.com/v2/userinfo',
+        scope: 'openid profile email'
+      }
+    };
+  }
+
+  function renderOAuthSuccessPage(res: express.Response, sessionToken: string, user: any, redirectUrl: string) {
+    const safeUser = {
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      role: user.role,
+      avatarUrl: user.avatarUrl
+    };
+
+    return res.status(200).send(`<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Authentication Successful</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    body { font-family: system-ui, -apple-system, sans-serif; background: #f8fafc; color: #0f172a; margin: 0; padding: 24px; display: flex; align-items: center; justify-content: center; min-height: 80vh; }
+    .card { background: #ffffff; border: 1px solid #e2e8f0; border-radius: 20px; padding: 32px; max-width: 400px; width: 100%; text-align: center; box-shadow: 0 10px 25px -5px rgba(0,0,0,0.06); }
+    .badge { width: 48px; height: 48px; border-radius: 50%; background: #ecfdf5; color: #059669; display: flex; align-items: center; justify-content: center; margin: 0 auto 16px; font-size: 24px; }
+    h2 { font-size: 18px; margin: 0 0 8px; font-weight: 700; color: #0f172a; }
+    p { font-size: 13px; color: #64748b; margin: 0 0 20px; line-height: 1.5; }
+    .spinner { display: inline-block; width: 20px; height: 20px; border: 2.5px solid #e2e8f0; border-top-color: #ea580c; border-radius: 50%; animation: spin 0.8s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="badge">✓</div>
+    <h2>Authenticated Successfully</h2>
+    <p>Welcome, <strong>${safeUser.name}</strong>. Finalizing your session and loading your dashboard...</p>
+    <div class="spinner"></div>
+  </div>
+  <script>
+    const payload = {
+      type: 'OAUTH_AUTH_SUCCESS',
+      token: ${JSON.stringify(sessionToken)},
+      user: ${JSON.stringify(safeUser)},
+      redirectUrl: ${JSON.stringify(redirectUrl)}
+    };
+    if (window.opener) {
+      window.opener.postMessage(payload, '*');
+      setTimeout(() => { try { window.close(); } catch(e){} }, 400);
+    } else {
+      setTimeout(() => { window.location.href = ${JSON.stringify(redirectUrl)}; }, 500);
+    }
+  </script>
+</body>
+</html>`);
+  }
+
+  function renderOAuthErrorPage(res: express.Response, errorMsg: string) {
+    return res.status(400).send(`<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Authentication Error</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    body { font-family: system-ui, -apple-system, sans-serif; background: #f8fafc; color: #0f172a; margin: 0; padding: 24px; display: flex; align-items: center; justify-content: center; min-height: 80vh; }
+    .card { background: #ffffff; border: 1px solid #fee2e2; border-radius: 20px; padding: 32px; max-width: 400px; width: 100%; text-align: center; box-shadow: 0 10px 25px -5px rgba(0,0,0,0.06); }
+    .badge { width: 48px; height: 48px; border-radius: 50%; background: #fef2f2; color: #dc2626; display: flex; align-items: center; justify-content: center; margin: 0 auto 16px; font-size: 24px; font-weight: bold; }
+    h2 { font-size: 18px; margin: 0 0 8px; font-weight: 700; color: #991b1b; }
+    p { font-size: 13px; color: #64748b; margin: 0 0 24px; line-height: 1.5; }
+    button { background: #0f172a; color: #fff; border: 0; padding: 10px 20px; border-radius: 12px; font-size: 13px; font-weight: 600; cursor: pointer; }
+    button:hover { background: #1e293b; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="badge">✕</div>
+    <h2>Sign-In Could Not Complete</h2>
+    <p>${errorMsg}</p>
+    <button onclick="if(window.opener){window.opener.postMessage({type:'OAUTH_AUTH_ERROR',error:${JSON.stringify(errorMsg)}},'*');window.close();}else{window.location.href='/auth';}">Close Window</button>
+  </div>
+  <script>
+    if (window.opener) {
+      window.opener.postMessage({ type: 'OAUTH_AUTH_ERROR', error: ${JSON.stringify(errorMsg)} }, '*');
+    }
+  </script>
+</body>
+</html>`);
+  }
+
+  // GET /api/auth/providers
+  // Returns configuration status for all 5 providers without leaking secrets
+  app.get('/api/auth/providers', (req, res) => {
+    const providers = getOAuthProviders(APP_URL);
+    const result: Record<string, { configured: boolean; name: string; authUrl: string }> = {};
+    for (const [key, p] of Object.entries(providers)) {
+      const configured = Boolean(p.clientId && p.clientSecret);
+      result[key] = {
+        configured,
+        name: p.name,
+        authUrl: `/api/auth/${key}/url`
+      };
+    }
+    return res.json({ success: true, providers: result });
+  });
+
+  // GET /api/auth/:provider/url
+  // Initiates OAuth 2.0 flow, generates CSRF state, and returns provider authorization URL
+  app.get('/api/auth/:provider/url', (req, res) => {
+    const providerKey = req.params.provider.toLowerCase();
+    const providers = getOAuthProviders(APP_URL);
+    const p = providers[providerKey];
+    if (!p) {
+      return res.status(404).json({ error: `Unsupported provider: ${providerKey}` });
+    }
+
+    if (!p.clientId || !p.clientSecret) {
+      return res.status(400).json({
+        error: `${p.name} OAuth credentials are not configured on this server. Please set ${p.id.toUpperCase()}_CLIENT_ID and ${p.id.toUpperCase()}_CLIENT_SECRET in environment variables.`
+      });
+    }
+
+    const state = crypto.randomBytes(24).toString('hex');
+    let codeVerifier: string | undefined;
+
+    const params = new URLSearchParams({
+      client_id: p.clientId,
+      redirect_uri: p.redirectUri,
+      response_type: 'code',
+      scope: p.scope,
+      state: state,
+    });
+
+    if (p.id === 'x') {
+      codeVerifier = crypto.randomBytes(32).toString('base64url');
+      const codeChallenge = crypto.createHash('sha256').update(codeVerifier).digest('base64url');
+      params.set('code_challenge', codeChallenge);
+      params.set('code_challenge_method', 'S256');
+    }
+
+    if (p.extraAuthParams) {
+      for (const [k, v] of Object.entries(p.extraAuthParams)) {
+        params.set(k, v);
+      }
+    }
+
+    oauthStates.set(state, {
+      provider: p.id,
+      createdAt: Date.now(),
+      codeVerifier
+    });
+
+    const isSecureCookie = NODE_ENV === 'production' || APP_URL.startsWith('https://');
+    res.cookie('oauth_state', state, {
+      httpOnly: true,
+      secure: isSecureCookie,
+      sameSite: isSecureCookie ? 'none' : 'lax',
+      maxAge: 10 * 60 * 1000
+    });
+
+    const finalAuthUrl = `${p.authUrl}?${params.toString()}`;
+    return res.json({ success: true, url: finalAuthUrl, state });
+  });
+
+  // ALL /api/auth/:provider/callback
+  // Handles OAuth provider callbacks, validates state parameter, creates user and secure session
+  app.all(['/api/auth/:provider/callback', '/api/auth/:provider/callback/'], async (req, res) => {
+    const providerKey = req.params.provider.toLowerCase();
+    const providers = getOAuthProviders(APP_URL);
+    const p = providers[providerKey];
+
+    if (!p) {
+      return renderOAuthErrorPage(res, `Unknown OAuth provider "${providerKey}".`);
+    }
+
+    const code = (req.query.code || req.body?.code) as string | undefined;
+    const state = (req.query.state || req.body?.state) as string | undefined;
+    const errorParam = (req.query.error || req.body?.error || req.query.error_description || req.body?.error_description) as string | undefined;
+
+    if (errorParam) {
+      return renderOAuthErrorPage(res, `Provider authorization error: ${errorParam}`);
+    }
+
+    if (!code || !state) {
+      return renderOAuthErrorPage(res, 'Missing authorization code or state parameter.');
+    }
+
+    // Validate state parameter
+    const storedState = oauthStates.get(state);
+    if (!storedState || storedState.provider !== p.id) {
+      return renderOAuthErrorPage(res, 'Invalid or expired OAuth state parameter (CSRF protection failed). Please try logging in again.');
+    }
+    // Delete state after one-time use to prevent replay
+    oauthStates.delete(state);
+
+    try {
+      let profileEmail = '';
+      let profileName = `${p.name} Student`;
+      let profileAvatar = '';
+
+      if (p.id === 'google') {
+        const tokenRes = await fetch(p.tokenUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: new URLSearchParams({
+            code,
+            client_id: p.clientId!,
+            client_secret: p.clientSecret!,
+            redirect_uri: p.redirectUri,
+            grant_type: 'authorization_code'
+          })
+        });
+        const tokenData = await tokenRes.json();
+        if (!tokenRes.ok || !tokenData.access_token) {
+          throw new Error(tokenData.error_description || tokenData.error || 'Failed to exchange authorization code with Google');
+        }
+
+        const userRes = await fetch(p.userInfoUrl, {
+          headers: { Authorization: `Bearer ${tokenData.access_token}` }
+        });
+        const userData = await userRes.json();
+        profileEmail = userData.email;
+        profileName = userData.name || userData.email?.split('@')[0] || 'Google User';
+        profileAvatar = userData.picture || '';
+
+      } else if (p.id === 'linkedin') {
+        const tokenRes = await fetch(p.tokenUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: new URLSearchParams({
+            code,
+            client_id: p.clientId!,
+            client_secret: p.clientSecret!,
+            redirect_uri: p.redirectUri,
+            grant_type: 'authorization_code'
+          })
+        });
+        const tokenData = await tokenRes.json();
+        if (!tokenRes.ok || !tokenData.access_token) {
+          throw new Error(tokenData.error_description || tokenData.error || 'Failed to exchange authorization code with LinkedIn');
+        }
+
+        const userRes = await fetch(p.userInfoUrl, {
+          headers: { Authorization: `Bearer ${tokenData.access_token}` }
+        });
+        const userData = await userRes.json();
+        profileEmail = userData.email;
+        profileName = userData.name || `${userData.given_name || ''} ${userData.family_name || ''}`.trim() || 'LinkedIn User';
+        profileAvatar = userData.picture || '';
+
+      } else if (p.id === 'x') {
+        const basicAuth = Buffer.from(`${p.clientId}:${p.clientSecret}`).toString('base64');
+        const tokenRes = await fetch(p.tokenUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'Authorization': `Basic ${basicAuth}`
+          },
+          body: new URLSearchParams({
+            code,
+            grant_type: 'authorization_code',
+            redirect_uri: p.redirectUri,
+            code_verifier: storedState.codeVerifier || ''
+          })
+        });
+        const tokenData = await tokenRes.json();
+        if (!tokenRes.ok || !tokenData.access_token) {
+          throw new Error(tokenData.error_description || tokenData.error || 'Failed to exchange authorization code with X');
+        }
+
+        const userRes = await fetch(p.userInfoUrl, {
+          headers: { Authorization: `Bearer ${tokenData.access_token}` }
+        });
+        const userData = await userRes.json();
+        profileName = userData.data?.name || userData.data?.username || 'X User';
+        profileEmail = `x_${userData.data?.username || userData.data?.id || Date.now()}@x.university-tutors.com`;
+        profileAvatar = userData.data?.profile_image_url || '';
+
+      } else if (p.id === 'instagram') {
+        const tokenRes = await fetch(p.tokenUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: new URLSearchParams({
+            client_id: p.clientId!,
+            client_secret: p.clientSecret!,
+            grant_type: 'authorization_code',
+            redirect_uri: p.redirectUri,
+            code
+          })
+        });
+        const tokenData = await tokenRes.json();
+        if (!tokenRes.ok || !tokenData.access_token) {
+          throw new Error(tokenData.error_message || tokenData.error || 'Failed to exchange authorization code with Instagram');
+        }
+
+        const userRes = await fetch(p.userInfoUrl, {
+          headers: { Authorization: `Bearer ${tokenData.access_token}` }
+        });
+        const userData = await userRes.json();
+        profileName = userData.username || 'Instagram User';
+        profileEmail = `instagram_${userData.username || userData.id || Date.now()}@instagram.university-tutors.com`;
+
+      } else if (p.id === 'apple') {
+        if (req.body?.user) {
+          try {
+            const u = typeof req.body.user === 'string' ? JSON.parse(req.body.user) : req.body.user;
+            if (u.name) {
+              profileName = `${u.name.firstName || ''} ${u.name.lastName || ''}`.trim() || 'Apple User';
+            }
+          } catch {}
+        }
+        profileEmail = (req.body?.email || req.query.email || `apple_${Date.now()}@privaterelay.appleid.com`) as string;
+      }
+
+      const cleanEmail = (profileEmail || `${p.id}_${Date.now()}@university-tutors.com`).toLowerCase().trim();
+
+      // Requirement 9: Find or create user in PostgreSQL
+      let targetUser: any = null;
+      if (isDbConnected() && db) {
+        try {
+          const rows = await db.select().from(users).where(eq(users.email, cleanEmail)).limit(1);
+          if (rows.length > 0) {
+            targetUser = rows[0];
+          }
+        } catch (dbErr: any) {
+          console.warn('[OAUTH] DB search error:', dbErr.message);
+        }
+      }
+
+      if (!targetUser) {
+        targetUser = memoryStore.findUserByEmail(cleanEmail);
+      }
+
+      if (!targetUser) {
+        // Requirement 9: assign new users the default role "student"
+        const newUserId = 'usr_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7);
+        const newUserRecord = {
+          id: newUserId,
+          role: 'student', // Default role "student"
+          name: profileName || `${p.name} Student`,
+          email: cleanEmail,
+          passwordHash: null,
+          avatarUrl: profileAvatar || `https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&auto=format&fit=crop&q=80`,
+          createdAt: new Date().toISOString(),
+          suspended: false,
+          verified: true,
+          bio: `Student member registered via ${p.name}.`,
+          hourlyRate: null,
+          rating: null,
+          reviewCount: null,
+          subjects: null,
+          country: 'US',
+          location: null,
+          phoneNumber: null,
+          education: null,
+          experience: null,
+          subjectExpertise: null,
+          availability: null,
+          canMeet: null,
+          hobbies: null,
+          isApproved: true,
+          status: 'active',
+        };
+
+        memoryStore.setUser(newUserRecord);
+        if (isDbConnected() && db) {
+          try {
+            await db.insert(users).values(newUserRecord);
+          } catch (insertErr: any) {
+            console.warn('[OAUTH] DB insert error:', insertErr.message);
+          }
+        }
+        targetUser = newUserRecord;
+        await logAudit('OAUTH_REGISTER', `New user registered via ${p.name}: ${cleanEmail}`, newUserId, targetUser.name, 'student', req);
+      } else {
+        await logAudit('OAUTH_LOGIN', `User signed in via ${p.name}: ${cleanEmail} (${targetUser.role})`, targetUser.id, targetUser.name, targetUser.role, req);
+      }
+
+      // Requirement 9: Create secure session
+      const sessionToken = createSessionToken({
+        id: targetUser.id,
+        email: targetUser.email,
+        role: targetUser.role
+      });
+
+      const isSecureCookie = NODE_ENV === 'production' || APP_URL.startsWith('https://');
+      res.cookie(COOKIE_NAME, sessionToken, {
+        httpOnly: true,
+        secure: isSecureCookie,
+        sameSite: isSecureCookie ? 'none' : 'lax',
+        maxAge: 30 * 24 * 60 * 60 * 1000
+      });
+
+      // Requirement 9: Redirect rules:
+      // - students directly to /student/dashboard
+      // - tutors to /tutor/dashboard
+      // - admins and subadmins to /admin
+      let targetRedirectUrl = '/student/dashboard';
+      if (targetUser.role === 'admin' || targetUser.role === 'subadmin') {
+        targetRedirectUrl = '/admin';
+      } else if (targetUser.role === 'tutor') {
+        targetRedirectUrl = '/tutor/dashboard';
+      } else {
+        targetRedirectUrl = '/student/dashboard';
+      }
+
+      return renderOAuthSuccessPage(res, sessionToken, targetUser, targetRedirectUrl);
+    } catch (err: any) {
+      console.error(`[OAUTH] Callback error for ${p.name}:`, err.message);
+      return renderOAuthErrorPage(res, `Failed to authenticate with ${p.name}: ${err.message}`);
+    }
+  });
+
+  // Protected Dashboard Endpoints (Enforces Role-Based Access Control)
+  app.get('/api/student/dashboard', requireRole('student', 'admin', 'subadmin'), (req, res) => {
+    return res.status(200).json({ success: true, message: 'Student dashboard authorized', user: (req as any).user });
+  });
+
+  app.get('/api/tutor/dashboard', requireRole('tutor', 'admin', 'subadmin'), (req, res) => {
+    return res.status(200).json({ success: true, message: 'Tutor dashboard authorized', user: (req as any).user });
+  });
+
+  app.get('/api/admin/dashboard', requireRole('admin', 'subadmin'), (req, res) => {
+    return res.status(200).json({ success: true, message: 'Admin dashboard authorized', user: (req as any).user });
   });
 
   // ==========================================
