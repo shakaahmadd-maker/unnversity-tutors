@@ -91,6 +91,41 @@
     <title>University Tutors - Expert Academic Mentorship & Tutoring</title>
   </head>
   <body>
+    <!-- Facebook JavaScript SDK -->
+    <script>
+      window.fbAsyncInit = function() {
+        try {
+          var fbAppId = '{your-app-id}';
+          var initConfig = {
+            cookie     : true,
+            xfbml      : true,
+            version    : 'v21.0'
+          };
+
+          // Attach appId when user configures their actual Meta App ID
+          if (fbAppId && fbAppId !== '{your-app-id}' && !fbAppId.startsWith('{')) {
+            initConfig.appId = fbAppId;
+          }
+
+          FB.init(initConfig);
+
+          if (FB.AppEvents && typeof FB.AppEvents.logPageView === 'function') {
+            FB.AppEvents.logPageView();
+          }
+        } catch (e) {
+          console.warn('[Facebook SDK Init Notice]:', e);
+        }
+      };
+
+      (function(d, s, id){
+         var js, fjs = d.getElementsByTagName(s)[0];
+         if (d.getElementById(id)) {return;}
+         js = d.createElement(s); js.id = id;
+         js.src = "https://connect.facebook.net/en_US/sdk.js";
+         fjs.parentNode.insertBefore(js, fjs);
+       }(document, 'script', 'facebook-jssdk'));
+    </script>
+
     <div id="root">
       <!-- Semantic crawler fallback matching client-rendered H1 -->
       <header style="position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;">

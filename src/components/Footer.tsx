@@ -95,7 +95,6 @@ export default function Footer({ onNavigate, onOpenBecomeTutor }: FooterProps) {
             <ul className="text-xs space-y-3 font-semibold">
               {[
                 { name: 'University Subjects', view: 'services' },
-                { name: 'Platform User Data', view: 'user-data' },
                 { name: 'WhatsApp Academic Hotline', view: 'whatsapp' },
                 { name: '1-on-1 Online Mentorship', view: 'services' },
                 { name: 'Assignment Prep & Tutoring', view: 'services' },
@@ -130,6 +129,7 @@ export default function Footer({ onNavigate, onOpenBecomeTutor }: FooterProps) {
                 { name: 'Standard Operating Procedures (SOP)', view: 'sop' },
                 { name: 'Payments Escrow Guarantee', view: 'payments_info' },
                 { name: 'Privacy Policy & GDPR Disclosure', view: 'privacy' },
+                { name: 'User Data Deletion Instructions', view: 'data-deletion' },
                 { name: 'Terms of Service & Escrow Agreement', view: 'terms' },
                 { name: 'Google OAuth Disclosure', view: 'google-disclosure' },
                 { name: 'Frequently Asked Questions (FAQs)', view: 'faqs' },

@@ -22,6 +22,7 @@ const CountryOnlineTutoringPage = lazy(() => import('./components/CountryOnlineT
 const SpecializedServicePage = lazy(() => import('./components/SpecializedServicePage'));
 const WhatsAppPage = lazy(() => import('./components/WhatsAppPage'));
 const UserDataPage = lazy(() => import('./components/UserDataPage'));
+const DataDeletionPage = lazy(() => import('./components/DataDeletionPage'));
 import ChatNotificationToast from './components/ChatNotificationToast';
 import { audioNotifier, ToastNotification } from './utils/audioNotification';
 import { COUNTRY_ONLINE_TUTORING_PAGES } from './data/countryOnlineTutoringData';
@@ -185,6 +186,10 @@ export default function App() {
       title = 'Platform User Data & Directory - University Tutors';
       description = 'Complete platform user registry of students, credentialed tutors, and administrators with real-time verification status.';
       canonicalPath = '/user-data';
+    } else if (activeView === 'data-deletion') {
+      title = 'User Data Deletion Instructions - University Tutors';
+      description = 'Instructions on how to request the permanent deletion of your account and personal data from University Tutors, compliant with Meta, GDPR, and global standards.';
+      canonicalPath = '/data-deletion';
     }
 
     updatePageSeo({
@@ -355,10 +360,25 @@ export default function App() {
       return;
     }
 
-    if (view === 'user-data' || view === 'users-data' || view === 'users' || view === 'user data') {
+    if (view === 'user-data' || view === 'users-data' || view === 'user data') {
+      if (!storeState.currentUser || (storeState.currentUser.role !== UserRole.ADMIN && storeState.currentUser.role !== UserRole.SUBADMIN)) {
+        setActiveView('admin-login');
+        window.history.pushState(null, '', '/admin');
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+        return;
+      }
       setSelectedTutorProfile(null);
       setActiveView('user-data');
       path = '/user-data';
+      window.history.pushState(null, '', path);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
+
+    if (view === 'data-deletion' || view === 'data-deletion-instructions' || view === 'user-data-deletion' || view === 'data deletion') {
+      setSelectedTutorProfile(null);
+      setActiveView('data-deletion');
+      path = '/data-deletion';
       window.history.pushState(null, '', path);
       window.scrollTo({ top: 0, behavior: 'smooth' });
       return;
@@ -593,13 +613,29 @@ export default function App() {
         decodedPath === '/user-data' || 
         decodedPath === '/users-data' || 
         decodedPath === '/user data' || 
-        decodedPath === '/users' || 
         hash === '#user-data' || 
         hash === '#users-data' || 
         hash === '#user data'
       ) {
+        if (!store.currentUser || (store.currentUser.role !== UserRole.ADMIN && store.currentUser.role !== UserRole.SUBADMIN)) {
+          setActiveView('admin-login');
+          window.history.replaceState(null, '', '/admin');
+        } else {
+          setSelectedTutorProfile(null);
+          setActiveView('user-data');
+        }
+      } else if (
+        decodedPath === '/data-deletion' || 
+        decodedPath === '/data-deletion-instructions' || 
+        decodedPath === '/user-data-deletion' || 
+        decodedPath === '/data deletion' || 
+        decodedPath === '/datadeletion' ||
+        hash === '#data-deletion' || 
+        hash === '#data-deletion-instructions' || 
+        hash === '#user-data-deletion'
+      ) {
         setSelectedTutorProfile(null);
-        setActiveView('user-data');
+        setActiveView('data-deletion');
       } else if (
         decodedPath === '/sop' || 
         decodedPath === '/sop-guide' || 
@@ -1332,6 +1368,11 @@ export default function App() {
               setActiveView('tutor-profile');
               window.scrollTo({ top: 0, behavior: 'smooth' });
             }}
+          />
+        ) : activeView === 'data-deletion' ? (
+          <DataDeletionPage
+            currentUser={storeState.currentUser}
+            onNavigate={handleNavigate}
           />
         ) : (
           /* Marketing Views (Home, Services, About Us, FAQs, Contact Form, Blog System) */

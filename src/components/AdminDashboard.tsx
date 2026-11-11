@@ -48,6 +48,7 @@ import { audioNotifier } from '../utils/audioNotification';
 import TutorsListAdmin from './TutorsListAdmin';
 import StudentProfilesAdmin from './StudentProfilesAdmin';
 import AssignmentLedgerView from './AssignmentLedgerView';
+import UserDataPage from './UserDataPage';
 import { store } from '../lib/store';
 // Inline SVG Icon components to replace react-icons and ensure standalone compilation
 const IconFileText = () => (
@@ -298,7 +299,7 @@ export default function AdminDashboard({
   };
 
   const [activeTab, setActiveTab] = useState<
-    'student_profiles' | 'tutors_list' | 'users' | 'chats' | 'disputes' | 'faqs' | 'blogs' | 'subjects' |
+    'student_profiles' | 'tutors_list' | 'user_data' | 'users' | 'chats' | 'disputes' | 'faqs' | 'blogs' | 'subjects' |
     'assignments' | 'payments_ledger' | 'create_invoice' | 'activity_log' |
     'notifications' | 'feedback' | 'sops' | 'reports' | 'agreements' | 'trigger_emails'
   >('tutors_list');
@@ -974,6 +975,7 @@ export default function AdminDashboard({
             {[
               { id: 'student_profiles', label: 'Student Profiles Directory', icon: <GraduationCap className="w-4 h-4 text-orange-400" /> },
               { id: 'tutors_list', label: 'Tutors List', icon: <UserCheck className="w-4 h-4" /> },
+              { id: 'user_data', label: 'User Data Directory', icon: <UsersIcon className="w-4 h-4 text-orange-500" /> },
               { id: 'users', label: 'User Ledger List', icon: <UsersIcon className="w-4 h-4" /> },
               { id: 'assignments', label: 'New Assignment Ledger', icon: <BookOpen className="w-4 h-4" /> },
               { id: 'reports', label: 'Assignment Reports Desk', icon: <Settings className="w-4 h-4" /> },
@@ -1146,6 +1148,20 @@ export default function AdminDashboard({
                 }
               }}
             />
+          )}
+
+          {/* USER DATA DIRECTORY TAB */}
+          {activeTab === 'user_data' && (
+            <div className="space-y-4">
+              <UserDataPage
+                users={users}
+                currentUser={currentUser}
+                onNavigate={(v) => {
+                  if (v === 'tutors') setActiveTab('tutors_list');
+                  else if (v === 'admin') setActiveTab('users');
+                }}
+              />
+            </div>
           )}
 
           {/* USER LEDGER LIST */}
