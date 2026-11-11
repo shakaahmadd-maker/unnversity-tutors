@@ -243,8 +243,8 @@ export class MemoryStore {
   }
 
   private seedDefaults() {
-    const adminPass = process.env.INITIAL_ADMIN_PASSWORD || 'AdminShaka2026!';
-    const adminHash = internalHashPassword(adminPass);
+    const adminPass = (process.env.ADMIN_PASSWORD || process.env.INITIAL_ADMIN_PASSWORD)?.trim();
+    const adminHash = adminPass ? internalHashPassword(adminPass) : null;
     const adminUser: UserRecord = {
       id: 'admin_shaka',
       role: 'admin',

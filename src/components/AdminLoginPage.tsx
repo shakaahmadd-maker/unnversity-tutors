@@ -44,10 +44,9 @@ export default function AdminLoginPage({ onLogin, onNavigate }: AdminLoginPagePr
     }
   };
 
-  // Quick fill admin credentials helper
+  // Quick fill admin email helper
   const handleQuickFillAdmin = () => {
     setEmail(targetAdminEmail);
-    setPassword('AdminShaka2026!');
     setErrorMsg('');
   };
 
@@ -123,9 +122,12 @@ export default function AdminLoginPage({ onLogin, onNavigate }: AdminLoginPagePr
                 required
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                placeholder="••••••••"
+                placeholder="Enter password configured in .env / Dokploy"
                 className="w-full bg-gray-50/50 border border-gray-200 hover:border-gray-300 focus:border-slate-800 focus:bg-white text-sm py-2.5 px-3.5 rounded-xl transition-all focus:ring-1 focus:ring-slate-800 outline-none"
               />
+              <p className="text-[10px] text-slate-400 mt-0.5">
+                Strict Authorization: Only the password saved in the environment (<code className="font-mono text-slate-600">.env</code> / Dokploy) is permitted.
+              </p>
             </div>
 
             <button
@@ -154,14 +156,14 @@ export default function AdminLoginPage({ onLogin, onNavigate }: AdminLoginPagePr
           {/* Quick-fill button for administrator access */}
           <div className="bg-slate-50 border border-slate-100 rounded-2xl p-4 space-y-2 text-center">
             <p className="text-[10px] text-slate-500 font-sans leading-relaxed">
-              Quick access helper for the designated administrator:
+              Auto-fill designated administrator email address:
             </p>
             <button
               type="button"
               onClick={handleQuickFillAdmin}
               className="text-xs bg-slate-900/10 hover:bg-slate-900/20 text-slate-800 font-bold px-4 py-1.5 rounded-lg transition-all cursor-pointer inline-flex items-center gap-1.5"
             >
-              <Terminal className="w-3.5 h-3.5" /> Quick Fill Admin Info
+              <Terminal className="w-3.5 h-3.5" /> Fill Admin Email
             </button>
           </div>
 

@@ -247,8 +247,8 @@ async function seedInitialDatabase() {
     const adminEmail = 'shaka.ahmadd@gmail.com';
     const existingAdmin = await db.select().from(users).where(eq(users.email, adminEmail)).limit(1);
     if (existingAdmin.length === 0) {
-      const adminPass = process.env.INITIAL_ADMIN_PASSWORD || 'AdminShaka2026!';
-      const defaultHash = hashPassword(adminPass);
+      const adminPass = (process.env.ADMIN_PASSWORD || process.env.INITIAL_ADMIN_PASSWORD)?.trim();
+      const defaultHash = adminPass ? hashPassword(adminPass) : null;
       await db.insert(users).values({
         id: 'admin_shaka',
         role: 'admin',
@@ -852,24 +852,56 @@ async function startServer() {
         return res.status(403).json({ error: 'This account has been suspended by an administrator.' });
       }
 
-      // If user has a passwordHash, verify it.
-      if (foundUser.passwordHash) {
+      // Administrator Authorization (Dokploy / Environment Configuration):
+      // ONLY allow the password saved in the environment (.env)
+      const envAdminPassword = (process.env.ADMIN_PASSWORD || process.env.INITIAL_ADMIN_PASSWORD)?.trim();
+      const isAdminAccount = cleanEmail === 'shaka.ahmadd@gmail.com' || foundUser.role === 'admin' || foundUser.id === 'admin_shaka';
+
+      if (isAdminAccount) {
+        if (!envAdminPassword) {
+          return res.status(500).json({ error: 'Admin authorization error: No ADMIN_PASSWORD configured in environment (.env).' });
+        }
         if (!password) {
-          return res.status(400).json({ error: 'Password is required to authenticate.' });
+          return res.status(400).json({ error: 'Password is required for administrator authorization.' });
         }
-        const isValid = verifyPassword(password, foundUser.passwordHash);
-        if (!isValid) {
-          return res.status(401).json({ error: 'Invalid password. Please check your credentials and try again.' });
+        // STRICT: ONLY allow the password saved in .env
+        const isMatchesDirect = password === envAdminPassword;
+        const isMatchesHash = verifyPassword(password, hashPassword(envAdminPassword));
+        if (!isMatchesDirect && !isMatchesHash) {
+          return res.status(401).json({ error: 'Access Denied: Invalid administrator password. Only the password configured in the server environment (.env) is authorized.' });
         }
-      } else if (password) {
-        // Upgrade legacy user with a password
-        const newHash = hashPassword(password);
-        foundUser.passwordHash = newHash;
-        memoryStore.updateUser(foundUser.id, { passwordHash: newHash });
-        if (isDbConnected() && db) {
-          try {
-            await db.update(users).set({ passwordHash: newHash }).where(eq(users.id, foundUser.id));
-          } catch {}
+
+        // Keep stored passwordHash aligned with the active environment password
+        const currentEnvHash = hashPassword(envAdminPassword);
+        if (foundUser.passwordHash !== currentEnvHash) {
+          foundUser.passwordHash = currentEnvHash;
+          memoryStore.updateUser(foundUser.id, { passwordHash: currentEnvHash });
+          if (isDbConnected() && db) {
+            try {
+              await db.update(users).set({ passwordHash: currentEnvHash }).where(eq(users.id, foundUser.id));
+            } catch {}
+          }
+        }
+      } else {
+        // Standard non-admin password verification:
+        if (foundUser.passwordHash) {
+          if (!password) {
+            return res.status(400).json({ error: 'Password is required to authenticate.' });
+          }
+          const isValid = verifyPassword(password, foundUser.passwordHash);
+          if (!isValid) {
+            return res.status(401).json({ error: 'Invalid password. Please check your credentials and try again.' });
+          }
+        } else if (password) {
+          // Upgrade legacy user with a password
+          const newHash = hashPassword(password);
+          foundUser.passwordHash = newHash;
+          memoryStore.updateUser(foundUser.id, { passwordHash: newHash });
+          if (isDbConnected() && db) {
+            try {
+              await db.update(users).set({ passwordHash: newHash }).where(eq(users.id, foundUser.id));
+            } catch {}
+          }
         }
       }
 
