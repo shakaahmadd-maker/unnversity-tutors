@@ -752,6 +752,10 @@ export class AppStore {
     }
   }
 
+  async updateUser(userId: string, data: Partial<User>) {
+    return this.updateUserProfile(userId, data);
+  }
+
   // Password reset methods
   async requestPasswordReset(email: string): Promise<string | null> {
     const user = this.users.find(u => u.email.toLowerCase().trim() === email.toLowerCase().trim());

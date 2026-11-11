@@ -167,14 +167,15 @@ async function runTests() {
       body: bodyValid
     });
 
-    assert(uploadRes.status === 200, 'Admin image upload returns 200 OK');
+    assert(uploadRes.status === 201, 'Admin image upload returns 201 Created');
     const uploadData = await uploadRes.json();
     assert(uploadData.success === true, 'Upload API response indicates success: true');
+    assert(typeof uploadData.imageUrl === 'string' && uploadData.imageUrl.startsWith('/uploads/avatars/'), 'Returns saved imageUrl starting with /uploads/avatars/');
     assert(typeof uploadData.relativeUrl === 'string' && uploadData.relativeUrl.startsWith('/uploads/avatars/'), 'Returns stable relative URL starting with /uploads/avatars/');
     assert(typeof uploadData.filename === 'string', 'Returns saved file name on server');
 
     const uploadedFilename = uploadData.filename;
-    const uploadedRelativeUrl = uploadData.relativeUrl;
+    const uploadedRelativeUrl = uploadData.imageUrl || uploadData.relativeUrl;
 
     // 2c. Requirement 1 & 6: Verify file exists on disk in UPLOADS_DIR/avatars/
     const diskPath = path.join(UPLOADS_DIR, 'avatars', uploadedFilename);

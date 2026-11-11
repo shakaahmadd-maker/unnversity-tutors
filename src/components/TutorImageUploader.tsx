@@ -1,5 +1,6 @@
 import React, { useState, useRef } from 'react';
 import { Camera, Upload, Check, RefreshCw, X, Link as LinkIcon, User, Loader2, AlertCircle } from 'lucide-react';
+import { store } from '../lib/store';
 
 interface TutorImageUploaderProps {
   currentImageUrl?: string;
@@ -56,7 +57,14 @@ export default function TutorImageUploader({
     // Local temporary preview for instant visual feedback only (never persisted to DB)
     const tempPreview = URL.createObjectURL(file);
     setLocalPreviewUrl(tempPreview);
+    // Frontend requirement 1: Set uploading=true before the request
     setIsUploading(true);
+
+    // Frontend requirement 6: Add a 30-second request timeout
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => {
+      controller.abort();
+    }, 30000);
 
     try {
       const formData = new FormData();
@@ -66,9 +74,14 @@ export default function TutorImageUploader({
       }
 
       const token = localStorage.getItem('auth_token');
+      const currentUserId = store.currentUser?.id || localStorage.getItem('current_user_id');
       const headers: Record<string, string> = {};
       if (token) {
         headers['Authorization'] = `Bearer ${token}`;
+        headers['X-Auth-Token'] = token;
+      }
+      if (currentUserId) {
+        headers['X-User-Id'] = currentUserId;
       }
 
       const res = await fetch('/api/admin/tutors/upload-avatar', {
@@ -76,27 +89,42 @@ export default function TutorImageUploader({
         credentials: 'include',
         headers,
         body: formData,
+        signal: controller.signal,
       });
 
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
+        // Frontend requirement 2: Display backend error if request fails
         throw new Error(data.error || `Upload failed with HTTP ${res.status}`);
       }
 
-      // 1. After a successful upload, use the URL returned by the backend
-      const permanentUrl = data.relativeUrl || data.savedUrl || data.url;
+      // Frontend requirement 3: Read the returned imageUrl from the response
+      const permanentUrl = data.imageUrl || data.relativeUrl || data.url || data.savedUrl;
       if (!permanentUrl) {
         throw new Error('Server did not return a valid persistent image URL');
       }
 
-      // Propagate permanent URL to form state (never the blob URL)
+      // Frontend requirement 4: Update the tutor profile using the returned URL
       onImageChange(permanentUrl);
+
+      // Sync updated avatar into store if tutorId is known
+      if (tutorId) {
+        store.updateUser(tutorId, { avatarUrl: permanentUrl, profileImageUrl: permanentUrl } as any);
+        store.fetchData().catch(() => {});
+      }
+
       setUploadError(null);
     } catch (err: any) {
       console.error('[Uploader] Image upload error:', err);
-      // 4. Display the backend error if the upload fails
-      setUploadError(err.message || 'Failed to upload photo. Please try again.');
+      // Frontend requirement 2: Display backend or timeout error
+      if (err.name === 'AbortError') {
+        setUploadError('Upload timed out after 30 seconds. Please check your connection and try again.');
+      } else {
+        setUploadError(err.message || 'Failed to upload photo. Please try again.');
+      }
     } finally {
+      // Frontend requirement 5: Always set uploading=false inside a finally block
+      clearTimeout(timeoutId);
       setIsUploading(false);
       // Clean up object URL after upload finishes
       URL.revokeObjectURL(tempPreview);
