@@ -252,8 +252,96 @@ async function runAuthSystemTests() {
     testAssert(dupRes.status === 409, 'Duplicate email registration returns HTTP 409 Conflict');
     const dupData = await dupRes.json();
     testAssert(
-      typeof dupData.error === 'string' && dupData.error.includes('already exists'),
-      'Duplicate email registration returns clear safe message without leaking data'
+      dupData.error === 'An account with this email already exists.',
+      'Duplicate email registration returns exact safe message "An account with this email already exists."'
+    );
+
+    // Missing users table simulation -> HTTP 500
+    const missingTableRes = await fetch(`${BASE_URL}/api/auth/register`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Simulate-Missing-Users-Table': 'true',
+      },
+      body: JSON.stringify({
+        name: 'Missing Table User',
+        email: `missing_table_${crypto.randomBytes(4).toString('hex')}@test.com`,
+        password: 'ValidPassword123',
+        confirmPassword: 'ValidPassword123',
+        termsAccepted: true,
+      }),
+    });
+    testAssert(missingTableRes.status === 500, 'Registration with missing users table returns HTTP 500');
+    const missingTableData = await missingTableRes.json();
+    testAssert(
+      missingTableData.error === 'Unable to check account information.',
+      'Missing users table returns exact error "Unable to check account information."'
+    );
+
+    // Missing email column simulation -> HTTP 500
+    const missingColRes = await fetch(`${BASE_URL}/api/auth/register`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Simulate-Missing-Email-Column': 'true',
+      },
+      body: JSON.stringify({
+        name: 'Missing Col User',
+        email: `missing_col_${crypto.randomBytes(4).toString('hex')}@test.com`,
+        password: 'ValidPassword123',
+        confirmPassword: 'ValidPassword123',
+        termsAccepted: true,
+      }),
+    });
+    testAssert(missingColRes.status === 500, 'Registration with missing email column returns HTTP 500');
+    const missingColData = await missingColRes.json();
+    testAssert(
+      missingColData.error === 'Unable to check account information.',
+      'Missing email column returns exact error "Unable to check account information."'
+    );
+
+    // Database connection failure simulation -> HTTP 500
+    const connFailRes = await fetch(`${BASE_URL}/api/auth/register`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Simulate-Db-Connection-Failure': 'true',
+      },
+      body: JSON.stringify({
+        name: 'Conn Fail User',
+        email: `conn_fail_${crypto.randomBytes(4).toString('hex')}@test.com`,
+        password: 'ValidPassword123',
+        confirmPassword: 'ValidPassword123',
+        termsAccepted: true,
+      }),
+    });
+    testAssert(connFailRes.status === 500, 'Registration with database connection failure returns HTTP 500');
+    const connFailData = await connFailRes.json();
+    testAssert(
+      connFailData.error === 'Unable to check account information.',
+      'Database connection failure returns exact error "Unable to check account information."'
+    );
+
+    // Safe diagnostic endpoint verification
+    const diagRes = await fetch(`${BASE_URL}/api/auth/diagnostic/schema`);
+    testAssert(diagRes.status === 200, 'Safe diagnostic schema endpoint returns HTTP 200');
+    const diagData = await diagRes.json();
+    testAssert(
+      typeof diagData.usersTableExists === 'boolean' &&
+      typeof diagData.emailColumnExists === 'boolean' &&
+      Array.isArray(diagData.missingRequiredColumns),
+      'Safe diagnostic schema endpoint returns structured verification data'
+    );
+    const diagStr = JSON.stringify(diagData);
+    testAssert(
+      !diagStr.includes('postgres://') &&
+      !diagStr.includes('$2a$') &&
+      !diagStr.includes('$2b$') &&
+      !diagStr.includes('SESSION_SECRET') &&
+      !diagStr.includes('GOCSPX') &&
+      !(diagData as any).password &&
+      !(diagData as any).passwordHash,
+      'Safe diagnostic schema endpoint never reveals passwords, password hashes, connection strings, or secrets'
     );
 
     // Invalid email format -> HTTP 400

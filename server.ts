@@ -14,7 +14,7 @@ import { createServer as createViteServer } from 'vite';
 import { db, isDbConnected, checkDbConnection, hasDatabaseUrl } from './src/db/index';
 import { users, userProfiles, userSessions, orders, inquiries, messages, quotes, auditLogs, chatRooms, chatRoomMembers, blogs, tutors, passwordResetTokens as passwordResetTokensTable } from './src/db/schema';
 import { eq, desc, and, inArray, isNull } from 'drizzle-orm';
-import { runMigrations } from './src/db/migrate';
+import { runMigrations, verifyUsersTableSchema } from './src/db/migrate';
 import { memoryStore, PrivateFileRecord } from './src/db/memoryStore';
 import { DEFAULT_20_BLOGS } from './src/data/defaultBlogsData';
 import { TRENDING_TUTORS_500, TRENDING_TUTORS_200 } from './src/data/trendingTutors500Data';
@@ -79,6 +79,55 @@ export function logSafeAuthEvent(
     safePayload[k] = v;
   }
   console.info(`[AUTH] ${JSON.stringify(safePayload)}`);
+}
+
+export interface SafeDatabaseErrorInfo {
+  name: string;
+  code: string | undefined;
+  message: string;
+  table?: string;
+  column?: string;
+  constraint?: string;
+  detail?: string;
+}
+
+// Safe database error formatter: strictly logs and returns safe diagnostic metadata (never secrets or passwords)
+export function formatSafeDatabaseError(err: any): SafeDatabaseErrorInfo {
+  if (!err) {
+    return { name: 'UnknownError', code: undefined, message: 'Unknown database error' };
+  }
+  const root = err.cause || err;
+  const name = String(root.name || err.name || 'DatabaseError');
+  const code = (root.code || err.code) ? String(root.code || err.code) : undefined;
+  const rawMessage = String(root.message || err.message || 'Database operation failed');
+  const rawDetail = (root.detail || err.detail) ? String(root.detail || err.detail) : undefined;
+
+  // Redact passwords, secrets, connection URLs, tokens, session secrets
+  const redact = (str: string): string => {
+    return str
+      .replace(/postgres(ql)?:\/\/[^\s"']+/gi, 'postgres://[REDACTED]')
+      .replace(/password\s*=\s*[^\s;]+/gi, 'password=[REDACTED]')
+      .replace(/bearer\s+[a-zA-Z0-9._-]+/gi, 'Bearer [REDACTED]')
+      .replace(/[a-f0-9]{32,}/gi, '[REDACTED_HASH_OR_KEY]')
+      .replace(/(\$2[aby]?\$\d+\$[./A-Za-z0-9]{53})/g, '[REDACTED_BCRYPT]');
+  };
+
+  const safeMessage = redact(rawMessage);
+  const safeDetail = rawDetail ? redact(rawDetail) : undefined;
+
+  const table = root.table || err.table || undefined;
+  const column = root.column || err.column || undefined;
+  const constraint = root.constraint || err.constraint || undefined;
+
+  return {
+    name,
+    code,
+    message: safeMessage,
+    table,
+    column,
+    constraint,
+    detail: safeDetail,
+  };
 }
 
 // Secure session signing key: read strictly from runtime process.env.SESSION_SECRET.
@@ -1079,12 +1128,52 @@ export async function createApp(options: CreateAppOptions = {}) {
 
       logSafeAuthEvent('validation completed', { email: cleanEmail, status: 'valid' });
 
-      // 6. Duplicate email check -> HTTP 409
+      // 2. Query the users table by email
       logSafeAuthEvent('duplicate email check', { email: cleanEmail });
-      const existingUser = await resolveAuthoritativeUserByEmail(cleanEmail);
+      let existingUser: any = null;
+      try {
+        if (req.headers['x-simulate-email-lookup-failure'] === 'true' || req.headers['x-simulate-missing-users-table'] === 'true') {
+          const simErr: any = new Error('relation "users" does not exist');
+          simErr.code = '42P01';
+          throw simErr;
+        }
+        if (req.headers['x-simulate-missing-email-column'] === 'true') {
+          const simErr: any = new Error('column "email" does not exist');
+          simErr.code = '42703';
+          throw simErr;
+        }
+        if (req.headers['x-simulate-db-connection-failure'] === 'true') {
+          const simErr: any = new Error('connect ECONNREFUSED 127.0.0.1:5432');
+          simErr.code = 'ECONNREFUSED';
+          throw simErr;
+        }
+
+        if (options.oauthUserRepo?.findByEmail) {
+          existingUser = await options.oauthUserRepo.findByEmail(cleanEmail);
+        } else if (isDbConnected() && db) {
+          const rows = await db
+            .select({ id: users.id, email: users.email })
+            .from(users)
+            .where(eq(users.email, cleanEmail))
+            .limit(2);
+          if (rows.length > 0) {
+            existingUser = rows[0];
+          }
+        } else {
+          existingUser = await resolveAuthoritativeUserByEmail(cleanEmail);
+        }
+      } catch (lookupErr: any) {
+        const safeErr = formatSafeDatabaseError(lookupErr);
+        console.error('[AUTH DB Error] Email lookup failed:', safeErr);
+        return res.status(500).json({
+          error: 'Unable to check account information.',
+        });
+      }
+
+      // 3. If a matching user exists, return HTTP 409
       if (existingUser) {
         return res.status(409).json({
-          error: 'An account with this email address already exists. Please sign in or reset your password.'
+          error: 'An account with this email already exists.',
         });
       }
 
@@ -1177,8 +1266,11 @@ export async function createApp(options: CreateAppOptions = {}) {
 
       // 10. Save in PostgreSQL using atomic transaction (rolls back if any step fails)
       if (req.headers['x-simulate-db-failure'] === 'true') {
+        const simErr = new Error('Database error: simulated database failure.');
+        (simErr as any).code = 'DB_PERSISTENCE_FAILED';
+        console.error('[AUTH DB Error]', formatSafeDatabaseError(simErr));
         return res.status(500).json({
-          error: 'Database error: simulated database failure.',
+          error: 'Database error: unable to save user profile in PostgreSQL.',
           code: 'DB_PERSISTENCE_FAILED',
         });
       }
@@ -1196,38 +1288,33 @@ export async function createApp(options: CreateAppOptions = {}) {
             await tx.insert(userSessions).values(newSessionRecord);
           });
         } catch (dbErr: any) {
-          // Log only safe diagnostics: code, table, column, constraint (never secrets or passwords)
-          const safeDiagnostics = {
-            code: dbErr.code,
-            table: dbErr.table,
-            column: dbErr.column,
-            constraint: dbErr.constraint,
-          };
+          // Log only safe diagnostics: name, code, message, table, column, constraint, detail (never secrets or passwords)
+          const safeDiagnostics = formatSafeDatabaseError(dbErr);
           console.error('[AUTH DB Error]', safeDiagnostics);
 
           // Handle duplicate email unique constraint violations gracefully -> HTTP 409
-          if (dbErr.code === '23505' || dbErr.constraint?.includes('email')) {
+          if (dbErr.code === '23505' || dbErr.constraint?.includes('email') || safeDiagnostics.code === '23505') {
             return res.status(409).json({
-              error: 'An account with this email address already exists. Please sign in or reset your password.',
+              error: 'An account with this email already exists.',
               code: 'EMAIL_ALREADY_EXISTS',
-              constraint: dbErr.constraint || 'users_email_unique',
+              constraint: safeDiagnostics.constraint || 'users_email_unique',
             });
           }
 
           // Return structured JSON error with safe details
-          const safeMessage = dbErr.column && dbErr.table
-            ? `Database error: failed to persist ${dbErr.table} on column ${dbErr.column}.`
-            : dbErr.table
-            ? `Database error: failed to persist record in ${dbErr.table}.`
+          const safeMessage = safeDiagnostics.column && safeDiagnostics.table
+            ? `Database error: failed to persist ${safeDiagnostics.table} on column ${safeDiagnostics.column}.`
+            : safeDiagnostics.table
+            ? `Database error: failed to persist record in ${safeDiagnostics.table}.`
             : 'Database error: unable to save user profile in PostgreSQL.';
 
           return res.status(500).json({
             error: safeMessage,
             code: 'DB_PERSISTENCE_FAILED',
-            dbCode: dbErr.code || undefined,
-            table: dbErr.table || undefined,
-            column: dbErr.column || undefined,
-            constraint: dbErr.constraint || undefined,
+            dbCode: safeDiagnostics.code || undefined,
+            table: safeDiagnostics.table || undefined,
+            column: safeDiagnostics.column || undefined,
+            constraint: safeDiagnostics.constraint || undefined,
           });
         }
       }
@@ -1255,6 +1342,44 @@ export async function createApp(options: CreateAppOptions = {}) {
     } catch (error: any) {
       console.error('[AUTH] Registration error:', error.message);
       return res.status(500).json({ error: 'Registration failed due to an unexpected internal error.' });
+    }
+  });
+
+  // Safe diagnostic endpoint: verifies users table and email column exist without exposing data or secrets
+  app.get('/api/auth/diagnostic/schema', async (req, res) => {
+    try {
+      const verification = await verifyUsersTableSchema();
+      return res.status(200).json({
+        status: verification.connected && verification.usersTableExists && verification.emailColumnExists ? 'healthy' : 'degraded',
+        databaseConfigured: hasDatabaseUrl,
+        connected: verification.connected,
+        usersTableExists: verification.usersTableExists,
+        emailColumnExists: verification.emailColumnExists,
+        missingRequiredColumns: verification.missingColumns,
+      });
+    } catch (err: any) {
+      const safeErr = formatSafeDatabaseError(err);
+      console.error('[AUTH DB Error] Schema diagnostic check failed:', safeErr);
+      return res.status(500).json({
+        status: 'error',
+        error: 'Unable to check schema information.',
+      });
+    }
+  });
+
+  app.get('/api/auth/diagnostic', async (req, res) => {
+    try {
+      const verification = await verifyUsersTableSchema();
+      return res.status(200).json({
+        status: verification.connected && verification.usersTableExists && verification.emailColumnExists ? 'healthy' : 'degraded',
+        databaseConfigured: hasDatabaseUrl,
+        connected: verification.connected,
+        usersTableExists: verification.usersTableExists,
+        emailColumnExists: verification.emailColumnExists,
+        missingRequiredColumns: verification.missingColumns,
+      });
+    } catch (err: any) {
+      return res.status(500).json({ status: 'error', error: 'Diagnostic check failed.' });
     }
   });
 

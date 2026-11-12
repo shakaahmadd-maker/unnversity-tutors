@@ -3,6 +3,8 @@ ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "full_name" text;
 --> statement-breakpoint
 ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "updated_at" text;
 --> statement-breakpoint
+ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "searchable_keywords" text;
+--> statement-breakpoint
 UPDATE "users" SET "full_name" = "name" WHERE "full_name" IS NULL;
 --> statement-breakpoint
 UPDATE "users" SET "updated_at" = "created_at" WHERE "updated_at" IS NULL;

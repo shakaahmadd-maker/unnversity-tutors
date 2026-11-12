@@ -51,11 +51,94 @@ export async function runMigrations(): Promise<boolean> {
         }
       }
     }
+    // 3. Verify users table schema and ensure required columns exist
+    const schemaStatus = await verifyUsersTableSchema();
+    if (schemaStatus.usersTableExists) {
+      if (schemaStatus.missingColumns.includes('full_name')) {
+        await pool.query('ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "full_name" text;');
+        await pool.query('UPDATE "users" SET "full_name" = "name" WHERE "full_name" IS NULL AND "name" IS NOT NULL;');
+      }
+      if (schemaStatus.missingColumns.includes('updated_at')) {
+        await pool.query('ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "updated_at" text;');
+        await pool.query('UPDATE "users" SET "updated_at" = "created_at" WHERE "updated_at" IS NULL AND "created_at" IS NOT NULL;');
+      }
+      if (!schemaStatus.columns.includes('searchable_keywords')) {
+        await pool.query('ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "searchable_keywords" text;');
+      }
+      const verified = await verifyUsersTableSchema();
+      console.log(`[DB] Users table schema verified: tableExists=true, emailColumnExists=${verified.emailColumnExists}, missingColumns=${verified.missingColumns.length}`);
+    }
+
     console.log('[DB] PostgreSQL tables checked and verified successfully.');
     return true;
   } catch (err: any) {
     console.warn('[DB] Notice during PostgreSQL table migration check:', err.message);
     return false;
+  }
+}
+
+export interface SchemaVerificationResult {
+  connected: boolean;
+  usersTableExists: boolean;
+  emailColumnExists: boolean;
+  columns: string[];
+  missingColumns: string[];
+  error?: string;
+}
+
+export async function verifyUsersTableSchema(): Promise<SchemaVerificationResult> {
+  if (!isDbConnected() || !pool) {
+    return {
+      connected: false,
+      usersTableExists: false,
+      emailColumnExists: false,
+      columns: [],
+      missingColumns: ['id', 'email', 'password_hash', 'role', 'full_name', 'created_at', 'updated_at'],
+      error: 'Database is not connected',
+    };
+  }
+
+  try {
+    const tableRes = await pool.query(
+      `SELECT table_name FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'users';`
+    );
+    const usersTableExists = tableRes.rows.length > 0;
+
+    if (!usersTableExists) {
+      return {
+        connected: true,
+        usersTableExists: false,
+        emailColumnExists: false,
+        columns: [],
+        missingColumns: ['id', 'email', 'password_hash', 'role', 'full_name', 'created_at', 'updated_at'],
+      };
+    }
+
+    const colRes = await pool.query(
+      `SELECT column_name FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'users';`
+    );
+    const columns = colRes.rows.map((r: any) => r.column_name);
+    const emailColumnExists = columns.includes('email');
+
+    const requiredColumns = ['id', 'email', 'password_hash', 'role', 'full_name', 'created_at', 'updated_at'];
+    const missingColumns = requiredColumns.filter((col) => !columns.includes(col));
+
+    return {
+      connected: true,
+      usersTableExists: true,
+      emailColumnExists,
+      columns,
+      missingColumns,
+    };
+  } catch (err: any) {
+    return {
+      connected: false,
+      usersTableExists: false,
+      emailColumnExists: false,
+      columns: [],
+      missingColumns: [],
+      error: err.message,
+    };
   }
 }
 
