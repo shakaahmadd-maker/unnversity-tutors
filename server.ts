@@ -12,7 +12,7 @@ import bcrypt from 'bcryptjs';
 import nodemailer from 'nodemailer';
 import { createServer as createViteServer } from 'vite';
 import { db, isDbConnected, checkDbConnection, hasDatabaseUrl } from './src/db/index';
-import { users, userProfiles, userSessions, orders, inquiries, messages, quotes, auditLogs, chatRooms, chatRoomMembers, blogs, tutors, passwordResetTokens as passwordResetTokensTable } from './src/db/schema';
+import { users, userProfiles, userSessions, orders, inquiries, messages, quotes, auditLogs, chatRooms, chatRoomMembers, blogs, tutors, passwordResetTokens as passwordResetTokensTable, emailVerificationTokens as emailVerificationTokensTable } from './src/db/schema';
 import { eq, desc, and, inArray, isNull } from 'drizzle-orm';
 import { runMigrations, verifyUsersTableSchema } from './src/db/migrate';
 import { memoryStore, PrivateFileRecord } from './src/db/memoryStore';
@@ -664,6 +664,32 @@ export async function createApp(options: CreateAppOptions = {}) {
     }
   }
 
+  const PERSISTED_VERIFICATION_TOKENS_FILE = path.join(UPLOADS_DIR, 'persisted_verification_tokens.json');
+
+  function getPersistedVerificationTokens(): Record<string, any> {
+    try {
+      if (fs.existsSync(PERSISTED_VERIFICATION_TOKENS_FILE)) {
+        const raw = fs.readFileSync(PERSISTED_VERIFICATION_TOKENS_FILE, 'utf-8');
+        return JSON.parse(raw);
+      }
+    } catch (e: any) {
+      console.warn('[Storage] Notice reading persisted_verification_tokens.json:', e.message);
+    }
+    return {};
+  }
+
+  function savePersistedVerificationToken(tokenHash: string, data: Record<string, any>) {
+    try {
+      const dir = path.dirname(PERSISTED_VERIFICATION_TOKENS_FILE);
+      if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+      const current = getPersistedVerificationTokens();
+      current[tokenHash] = { ...(current[tokenHash] || {}), ...data };
+      fs.writeFileSync(PERSISTED_VERIFICATION_TOKENS_FILE, JSON.stringify(current, null, 2), 'utf-8');
+    } catch (e: any) {
+      console.warn('[Storage] Notice saving persisted_verification_tokens.json:', e.message);
+    }
+  }
+
   // Authoritative user lookup: ALWAYS queries PostgreSQL first so user roles and password hashes come from PostgreSQL.
   // Falls back to memoryStore + persisted disk updates ONLY when PostgreSQL is not configured.
   async function resolveAuthoritativeUserById(userId: string): Promise<any | null> {
@@ -1203,7 +1229,7 @@ export async function createApp(options: CreateAppOptions = {}) {
         createdAt: now,
         updatedAt: now,
         suspended: false,
-        verified: true,
+        verified: extra?.verified === true ? true : false,
         bio: (typeof extra?.bio === 'string' ? extra.bio : null) || 'Active student member.',
         hourlyRate: null,
         rating: null,
@@ -1264,7 +1290,22 @@ export async function createApp(options: CreateAppOptions = {}) {
         updatedAt: now,
       };
 
-      // 10. Save in PostgreSQL using atomic transaction (rolls back if any step fails)
+      // 10. Generate cryptographically secure email verification token
+      const rawVerificationToken = crypto.randomBytes(32).toString('hex');
+      const verificationTokenHash = crypto.createHash('sha256').update(rawVerificationToken).digest('hex');
+      const verificationExpiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+      const verificationTokenId = 'vtok_' + crypto.randomBytes(16).toString('hex');
+
+      const newVerificationRecord = {
+        id: verificationTokenId,
+        userId: newUserId,
+        email: cleanEmail,
+        tokenHash: verificationTokenHash,
+        expiresAt: verificationExpiresAt,
+        createdAt: now,
+      };
+
+      // 11. Save in PostgreSQL using atomic transaction (rolls back if any step fails)
       if (req.headers['x-simulate-db-failure'] === 'true') {
         const simErr = new Error('Database error: simulated database failure.');
         (simErr as any).code = 'DB_PERSISTENCE_FAILED';
@@ -1286,6 +1327,8 @@ export async function createApp(options: CreateAppOptions = {}) {
             await tx.insert(userProfiles).values(newProfileRecord);
             // Step 3: Session creation
             await tx.insert(userSessions).values(newSessionRecord);
+            // Step 4: Email verification token creation
+            await tx.insert(emailVerificationTokensTable).values(newVerificationRecord);
           });
         } catch (dbErr: any) {
           // Log only safe diagnostics: name, code, message, table, column, constraint, detail (never secrets or passwords)
@@ -1322,6 +1365,12 @@ export async function createApp(options: CreateAppOptions = {}) {
       // Memory store and disk fallback update for resilience
       memoryStore.setUser(newUserRecord);
       savePersistedUserUpdate(newUserId, newUserRecord);
+      savePersistedVerificationToken(verificationTokenHash, newVerificationRecord);
+
+      // Asynchronously deliver email verification
+      deliverEmailVerificationEmail(cleanEmail, rawVerificationToken, getRuntimeAppUrl()).catch((err: any) => {
+        console.warn('[AUTH] Notice sending email verification:', err.message);
+      });
 
       logSafeAuthEvent('user created', { userId: newUserId, role: userRole });
 
@@ -1331,13 +1380,15 @@ export async function createApp(options: CreateAppOptions = {}) {
 
       await logAudit('USER_REGISTER', `User registered: ${cleanEmail} (student)`, newUserId, cleanName, userRole, req);
 
-      // 11. Return HTTP 201 with safe user data only (never return passwordHash)
+      // Return HTTP 201 with safe user data only (never return passwordHash)
       const { passwordHash: _, ...safeUser } = newUserRecord;
       return res.status(201).json({
         success: true,
         user: safeUser,
         token: sessionToken,
-        redirectUrl: '/student/dashboard'
+        redirectUrl: '/student/dashboard',
+        verificationRequired: true,
+        message: 'Student account created successfully! Please check your email to verify your account.'
       });
     } catch (error: any) {
       console.error('[AUTH] Registration error:', error.message);
@@ -1564,6 +1615,65 @@ export async function createApp(options: CreateAppOptions = {}) {
     }
   }
 
+  async function deliverEmailVerificationEmail(toEmail: string, verificationToken: string, appUrl: string): Promise<boolean> {
+    const host = readRuntimeEnv('SMTP_HOST');
+    const portStr = readRuntimeEnv('SMTP_PORT');
+    const user = readRuntimeEnv('SMTP_USER');
+    const pass = readRuntimeEnv('SMTP_PASSWORD');
+    const from = readRuntimeEnv('SMTP_FROM') || 'noreply@university-tutors.com';
+    const port = portStr ? parseInt(portStr, 10) : 587;
+
+    if (!host || !user || !pass) {
+      console.warn('[AUTH] SMTP configuration missing: SMTP_HOST, SMTP_USER, and SMTP_PASSWORD are required to deliver email verification.');
+      return false;
+    }
+
+    try {
+      const transporter = nodemailer.createTransport({
+        host,
+        port,
+        secure: port === 465,
+        auth: {
+          user,
+          pass,
+        },
+      });
+
+      const liveDomain = appUrl || 'https://university-tutors.com';
+      const verificationUrl = `${liveDomain}/api/auth/verify-email?token=${encodeURIComponent(verificationToken)}&email=${encodeURIComponent(toEmail)}`;
+
+      await transporter.sendMail({
+        from,
+        to: toEmail,
+        subject: 'University Tutors - Verify Your Student Email Address',
+        text: `Welcome to University Tutors!\n\nPlease verify your email address to complete your registration.\n\nVerification Link:\n${verificationUrl}\n\nThis verification link expires in 24 hours. If you did not create this account, please ignore this email.`,
+        html: `<div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;max-width:520px;margin:auto;padding:32px 24px;border:1px solid #e2e8f0;border-radius:20px;background:#ffffff;">
+          <div style="text-align:center;margin-bottom:24px;">
+            <img src="${liveDomain}/logo.webp" alt="University Tutors" style="height:48px;max-width:200px;object-fit:contain;margin-bottom:12px;" />
+            <h2 style="color:#0f172a;margin:0 0 6px;font-size:22px;font-weight:800;">Verify Your Email Address</h2>
+            <p style="color:#64748b;font-size:13px;margin:0;">Student &amp; Academic Portal</p>
+          </div>
+          <div style="background:#f8fafc;padding:20px;border-radius:16px;border:1px solid #f1f5f9;margin-bottom:24px;">
+            <p style="color:#334155;font-size:14px;line-height:1.6;margin:0 0 16px;">
+              Thank you for signing up with University Tutors. Please confirm your email address (<strong>${toEmail}</strong>) to activate your account.
+            </p>
+            <div style="text-align:center;margin:24px 0 16px;">
+              <a href="${verificationUrl}" style="background:#ea580c;color:#ffffff;text-decoration:none;padding:12px 28px;border-radius:12px;font-size:13px;font-weight:bold;display:inline-block;">Confirm Email Address</a>
+            </div>
+            <p style="color:#64748b;font-size:11px;margin:0;text-align:center;">Or copy this link into your browser: <br/><a href="${verificationUrl}" style="color:#ea580c;word-break:break-all;">${verificationUrl}</a></p>
+          </div>
+          <p style="color:#94a3b8;font-size:11px;text-align:center;margin:0;">This verification link will expire in 24 hours.</p>
+        </div>`,
+      });
+
+      logSafeAuthEvent('verification email sent', { email: toEmail });
+      return true;
+    } catch (err: any) {
+      console.error('[AUTH] Failed to dispatch email verification via SMTP:', err.message);
+      return false;
+    }
+  }
+
   // POST /api/auth/forgot-password
   // Generates a 256-bit CSPRNG token, stores ONLY its SHA-256 hash with 15-min expiry,
   // enforces strict rate limiting, and NEVER logs or returns the plaintext token in HTTP responses.
@@ -1770,6 +1880,257 @@ export async function createApp(options: CreateAppOptions = {}) {
     } catch (err: any) {
       console.error('[AUTH] Reset password error:', err.message);
       return res.status(500).json({ error: 'Failed to update password' });
+    }
+  });
+
+  // GET /api/auth/verify-email
+  // Verifies the user's email address via link in email and redirects to the student dashboard
+  app.get('/api/auth/verify-email', async (req, res) => {
+    try {
+      const rawToken = typeof req.query.token === 'string' ? req.query.token.trim() : '';
+      if (!rawToken) {
+        return res.status(400).send(`
+          <!DOCTYPE html>
+          <html>
+            <head><title>Invalid Verification Link - University Tutors</title><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
+            <body style="font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:#f8fafc;padding:40px 20px;text-align:center;color:#0f172a;">
+              <div style="max-width:440px;margin:auto;background:#fff;padding:32px;border-radius:24px;border:1px solid #e2e8f0;box-shadow:0 4px 6px -1px rgba(0,0,0,0.05);">
+                <img src="/logo.webp" alt="University Tutors" style="height:48px;max-width:180px;object-fit:contain;margin-bottom:16px;" />
+                <h2 style="color:#e11d48;margin:0 0 8px;">Invalid Verification Link</h2>
+                <p style="color:#64748b;font-size:14px;line-height:1.5;">This email verification link is missing or invalid. Please check the link from your email.</p>
+                <div style="margin-top:24px;">
+                  <a href="/auth" style="background:#ea580c;color:#fff;text-decoration:none;padding:12px 24px;border-radius:12px;font-weight:bold;font-size:13px;display:inline-block;">Go to Login</a>
+                </div>
+              </div>
+            </body>
+          </html>
+        `);
+      }
+
+      const tokenHash = crypto.createHash('sha256').update(rawToken).digest('hex');
+      let tokenRecord: any = null;
+
+      if (isDbConnected() && db) {
+        try {
+          const rows = await db.select().from(emailVerificationTokensTable).where(eq(emailVerificationTokensTable.tokenHash, tokenHash)).limit(1);
+          if (rows.length > 0) tokenRecord = rows[0];
+        } catch (dbErr: any) {
+          console.warn('[AUTH] Notice querying verification token in DB:', dbErr.message);
+        }
+      }
+
+      if (!tokenRecord) {
+        const persisted = getPersistedVerificationTokens();
+        tokenRecord = persisted[tokenHash] || null;
+      }
+
+      if (!tokenRecord) {
+        return res.status(400).send(`
+          <!DOCTYPE html>
+          <html>
+            <head><title>Link Not Found - University Tutors</title><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
+            <body style="font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:#f8fafc;padding:40px 20px;text-align:center;color:#0f172a;">
+              <div style="max-width:440px;margin:auto;background:#fff;padding:32px;border-radius:24px;border:1px solid #e2e8f0;box-shadow:0 4px 6px -1px rgba(0,0,0,0.05);">
+                <img src="/logo.webp" alt="University Tutors" style="height:48px;max-width:180px;object-fit:contain;margin-bottom:16px;" />
+                <h2 style="color:#e11d48;margin:0 0 8px;">Invalid or Expired Link</h2>
+                <p style="color:#64748b;font-size:14px;line-height:1.5;">This email verification link does not exist or has already been consumed.</p>
+                <div style="margin-top:24px;">
+                  <a href="/auth" style="background:#ea580c;color:#fff;text-decoration:none;padding:12px 24px;border-radius:12px;font-weight:bold;font-size:13px;display:inline-block;">Sign In</a>
+                </div>
+              </div>
+            </body>
+          </html>
+        `);
+      }
+
+      const nowIso = new Date().toISOString();
+      if (tokenRecord.expiresAt && tokenRecord.expiresAt < nowIso) {
+        return res.status(400).send(`
+          <!DOCTYPE html>
+          <html>
+            <head><title>Link Expired - University Tutors</title><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
+            <body style="font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:#f8fafc;padding:40px 20px;text-align:center;color:#0f172a;">
+              <div style="max-width:440px;margin:auto;background:#fff;padding:32px;border-radius:24px;border:1px solid #e2e8f0;box-shadow:0 4px 6px -1px rgba(0,0,0,0.05);">
+                <img src="/logo.webp" alt="University Tutors" style="height:48px;max-width:180px;object-fit:contain;margin-bottom:16px;" />
+                <h2 style="color:#d97706;margin:0 0 8px;">Verification Link Expired</h2>
+                <p style="color:#64748b;font-size:14px;line-height:1.5;">This verification link has expired. Please log in to request a fresh verification link.</p>
+                <div style="margin-top:24px;">
+                  <a href="/auth" style="background:#ea580c;color:#fff;text-decoration:none;padding:12px 24px;border-radius:12px;font-weight:bold;font-size:13px;display:inline-block;">Sign In to Resend</a>
+                </div>
+              </div>
+            </body>
+          </html>
+        `);
+      }
+
+      if (tokenRecord.usedAt) {
+        return res.redirect('/student/dashboard?verified=true');
+      }
+
+      if (isDbConnected() && db) {
+        try {
+          await db.update(emailVerificationTokensTable).set({ usedAt: nowIso }).where(eq(emailVerificationTokensTable.tokenHash, tokenHash));
+          await db.update(users).set({ verified: true }).where(eq(users.id, tokenRecord.userId));
+        } catch (dbErr: any) {
+          console.warn('[AUTH] Error updating verification status in PostgreSQL:', dbErr.message);
+        }
+      }
+
+      tokenRecord.usedAt = nowIso;
+      savePersistedVerificationToken(tokenHash, tokenRecord);
+      savePersistedUserUpdate(tokenRecord.userId, { verified: true });
+      const memUser = memoryStore.findUserById(tokenRecord.userId);
+      if (memUser) memUser.verified = true;
+
+      logSafeAuthEvent('email verified', { userId: tokenRecord.userId, email: tokenRecord.email });
+
+      return res.redirect('/student/dashboard?verified=true');
+    } catch (err: any) {
+      console.error('[AUTH] Error during email verification:', err.message);
+      return res.status(500).send('Unable to complete email verification.');
+    }
+  });
+
+  // POST /api/auth/verify-email
+  // JSON endpoint to verify token
+  app.post('/api/auth/verify-email', async (req, res) => {
+    try {
+      const { token } = req.body || {};
+      const rawToken = typeof token === 'string' ? token.trim() : '';
+
+      if (!rawToken) {
+        return res.status(400).json({ error: 'Verification token is required.' });
+      }
+
+      const tokenHash = crypto.createHash('sha256').update(rawToken).digest('hex');
+      let tokenRecord: any = null;
+
+      if (isDbConnected() && db) {
+        try {
+          const rows = await db.select().from(emailVerificationTokensTable).where(eq(emailVerificationTokensTable.tokenHash, tokenHash)).limit(1);
+          if (rows.length > 0) tokenRecord = rows[0];
+        } catch (dbErr: any) {
+          console.warn('[AUTH] Notice querying verification token in DB:', dbErr.message);
+        }
+      }
+
+      if (!tokenRecord) {
+        const persisted = getPersistedVerificationTokens();
+        tokenRecord = persisted[tokenHash] || null;
+      }
+
+      if (!tokenRecord) {
+        return res.status(400).json({ error: 'Invalid or expired verification token.' });
+      }
+
+      const nowIso = new Date().toISOString();
+      if (tokenRecord.expiresAt && tokenRecord.expiresAt < nowIso) {
+        return res.status(400).json({ error: 'Verification token has expired. Please request a new one.' });
+      }
+
+      if (tokenRecord.usedAt) {
+        return res.status(200).json({ success: true, message: 'Email address has already been verified.', alreadyVerified: true });
+      }
+
+      if (isDbConnected() && db) {
+        try {
+          await db.update(emailVerificationTokensTable).set({ usedAt: nowIso }).where(eq(emailVerificationTokensTable.tokenHash, tokenHash));
+          await db.update(users).set({ verified: true }).where(eq(users.id, tokenRecord.userId));
+        } catch (dbErr: any) {
+          console.warn('[AUTH] Error updating verification status in DB:', dbErr.message);
+        }
+      }
+
+      tokenRecord.usedAt = nowIso;
+      savePersistedVerificationToken(tokenHash, tokenRecord);
+      savePersistedUserUpdate(tokenRecord.userId, { verified: true });
+      const memUser = memoryStore.findUserById(tokenRecord.userId);
+      if (memUser) memUser.verified = true;
+
+      logSafeAuthEvent('email verified', { userId: tokenRecord.userId, email: tokenRecord.email });
+
+      return res.status(200).json({
+        success: true,
+        message: 'Email address verified successfully!'
+      });
+    } catch (err: any) {
+      console.error('[AUTH] Error during JSON verification:', err.message);
+      return res.status(500).json({ error: 'Unable to process email verification.' });
+    }
+  });
+
+  // POST /api/auth/resend-verification
+  // Allows students to request a fresh verification link
+  app.post('/api/auth/resend-verification', async (req, res) => {
+    try {
+      const clientIp = getClientIp(req);
+      const sessionUser = (req as any).user;
+      const requestedEmail = typeof req.body?.email === 'string' ? req.body.email.trim().toLowerCase() : '';
+      const targetEmail = requestedEmail || sessionUser?.email;
+
+      if (!targetEmail) {
+        return res.status(400).json({ error: 'Please supply your registered email address or sign in.' });
+      }
+
+      logSafeAuthEvent('email verification requested', { email: targetEmail });
+
+      // Rate limit: max 3 per 15 min per email/IP
+      if (
+        isRateLimited(`resend_verif_email:${targetEmail}`, 3, 15 * 60 * 1000) ||
+        isRateLimited(`resend_verif_ip:${clientIp}`, 10, 15 * 60 * 1000)
+      ) {
+        return res.status(429).json({ error: 'Too many verification requests. Please wait 15 minutes before requesting again.' });
+      }
+
+      const user = await resolveAuthoritativeUserByEmail(targetEmail);
+      if (!user) {
+        return res.status(200).json({
+          success: true,
+          message: 'If an account is registered with this email, a verification link has been sent.'
+        });
+      }
+
+      if (user.verified) {
+        return res.status(200).json({
+          success: true,
+          message: 'Your email address is already verified.',
+          alreadyVerified: true,
+        });
+      }
+
+      const now = new Date().toISOString();
+      const rawToken = crypto.randomBytes(32).toString('hex');
+      const tokenHash = crypto.createHash('sha256').update(rawToken).digest('hex');
+      const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+
+      const newRecord = {
+        id: 'vtok_' + crypto.randomBytes(16).toString('hex'),
+        userId: user.id,
+        email: targetEmail,
+        tokenHash,
+        expiresAt,
+        createdAt: now,
+      };
+
+      if (isDbConnected() && db) {
+        try {
+          await db.insert(emailVerificationTokensTable).values(newRecord);
+        } catch (dbErr: any) {
+          console.warn('[AUTH] Notice inserting verification token in DB:', dbErr.message);
+        }
+      }
+
+      savePersistedVerificationToken(tokenHash, newRecord);
+
+      await deliverEmailVerificationEmail(targetEmail, rawToken, getRuntimeAppUrl());
+
+      return res.status(200).json({
+        success: true,
+        message: 'A fresh verification link has been dispatched to your email address.'
+      });
+    } catch (err: any) {
+      console.error('[AUTH] Resend verification error:', err.message);
+      return res.status(500).json({ error: 'Unable to send verification email. Please try again later.' });
     }
   });
 

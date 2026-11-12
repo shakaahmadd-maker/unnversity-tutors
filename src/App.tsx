@@ -266,6 +266,7 @@ export default function App() {
   // Unified navigation handler that updates the window URL path and changes state
   const handleNavigate = (view: string) => {
     let path = '/' + view;
+    const activeUser = store.currentUser || storeState.currentUser;
 
     if (view.startsWith('location:')) {
       const loc = view.replace('location:', '');
@@ -421,7 +422,7 @@ export default function App() {
       path = '/admin';
     } else if (view === 'student/dashboard' || view === 'student') {
       path = '/student/dashboard';
-      if (!storeState.currentUser) {
+      if (!activeUser) {
         view = 'auth';
         path = '/auth';
       } else {
@@ -429,7 +430,7 @@ export default function App() {
       }
     } else if (view === 'tutor/dashboard' || view === 'tutor') {
       path = '/tutor/dashboard';
-      if (!storeState.currentUser) {
+      if (!activeUser) {
         view = 'auth';
         path = '/auth';
       } else {
@@ -437,11 +438,11 @@ export default function App() {
       }
     } else if (view === 'admin') {
       path = '/admin';
-      if (!storeState.currentUser) {
+      if (!activeUser) {
         view = 'admin-login';
-      } else if (storeState.currentUser.role === UserRole.ADMIN || storeState.currentUser.role === UserRole.SUBADMIN) {
+      } else if (activeUser.role === UserRole.ADMIN || activeUser.role === UserRole.SUBADMIN) {
         view = 'dashboard';
-      } else if (storeState.currentUser.role === UserRole.TUTOR) {
+      } else if (activeUser.role === UserRole.TUTOR) {
         view = 'dashboard';
         path = '/tutor/dashboard';
       } else {
@@ -449,12 +450,12 @@ export default function App() {
         path = '/student/dashboard';
       }
     } else if (view === 'dashboard') {
-      if (storeState.currentUser) {
-        if (storeState.currentUser.role === UserRole.STUDENT) {
+      if (activeUser) {
+        if (activeUser.role === UserRole.STUDENT) {
           path = '/student/dashboard';
-        } else if (storeState.currentUser.role === UserRole.TUTOR) {
+        } else if (activeUser.role === UserRole.TUTOR) {
           path = '/tutor/dashboard';
-        } else if (storeState.currentUser.role === UserRole.ADMIN || storeState.currentUser.role === UserRole.SUBADMIN) {
+        } else if (activeUser.role === UserRole.ADMIN || activeUser.role === UserRole.SUBADMIN) {
           path = '/admin';
         }
       } else {
@@ -839,8 +840,9 @@ export default function App() {
     const success = await store.login(email, password);
     if (success) {
       const user = store.currentUser;
-      const rolePath = user?.role === UserRole.TUTOR ? '/tutor' : user?.role === UserRole.ADMIN ? '/admin' : '/student';
-      window.history.pushState(null, '', rolePath); // default to role-specific path after normal login
+      setStoreState(prev => ({ ...prev, currentUser: user, users: store.users }));
+      const rolePath = user?.role === UserRole.TUTOR ? '/tutor/dashboard' : user?.role === UserRole.ADMIN || user?.role === UserRole.SUBADMIN ? '/admin' : '/student/dashboard';
+      window.history.pushState(null, '', rolePath);
       setActiveView('dashboard');
     }
     return success;
@@ -849,14 +851,12 @@ export default function App() {
   const handleRegister = async (name: string, email: string, role: UserRole, extra?: any): Promise<boolean> => {
     const success = await store.register(name, email, role, extra);
     if (success) {
-      if (extra && extra.verified === false) {
-        window.history.pushState(null, '', '/auth');
-        setActiveView('auth');
-      } else {
-        const path = role === UserRole.STUDENT ? '/student' : role === UserRole.TUTOR ? '/tutor' : '/admin';
-        window.history.pushState(null, '', path);
-        setActiveView('dashboard');
-      }
+      const activeUser = store.currentUser;
+      setStoreState(prev => ({ ...prev, currentUser: activeUser, users: store.users }));
+      const path = (activeUser?.role || role) === UserRole.STUDENT ? '/student/dashboard' : (activeUser?.role || role) === UserRole.TUTOR ? '/tutor/dashboard' : '/admin';
+      window.history.pushState(null, '', path);
+      setActiveView('dashboard');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
     }
     return success;
   };
@@ -1153,133 +1153,132 @@ export default function App() {
             onNavigate={handleNavigate}
           />
         ) : activeView === 'dashboard' ? (
-          
-          storeState.currentUser ? (
-            
-            storeState.currentUser.role === UserRole.STUDENT ? (
-              <StudentDashboard 
-                currentUser={storeState.currentUser}
-                tutors={mentorsList}
-                students={studentsList}
-                assignments={storeState.assignments}
-                chats={storeState.chats}
-                messages={storeState.messages}
-                payments={storeState.payments}
-                supportTickets={storeState.supportTickets}
-                onSubmitAssignment={async (data) => {
-                  // Silently submit the assignment matched via wizard in the background
-                  await store.submitAssignment(data);
-                }}
-                onOpenChat={handleOpenChat}
-                onSelectChat={handleSelectChat}
-                onSendMessage={handleSendMessage}
-                onSubscribeToChatDetails={(chatId) => store.subscribeToChatDetails(chatId)}
-                onApproveWork={handleApproveWork}
-                onRaiseRevision={handleRaiseRevision}
-                onRaiseTicket={handleRaiseTicket}
-                onLogout={handleLogout}
-                onNavigate={handleNavigate}
-                assignmentReports={storeState.assignmentReports}
-                quotes={storeState.quotes}
-                onAcceptQuote={handleAcceptQuote}
-                appNotifications={storeState.appNotifications}
-                onMarkNotificationRead={(id) => store.markNotificationRead(id)}
-                onMarkAllNotificationsRead={(userId) => store.markAllNotificationsRead(userId)}
-                onUpdateProfile={(data) => store.updateUserProfile(storeState.currentUser!.id, data)}
-                invoices={storeState.invoices}
-                onRefreshData={() => store.fetchData()}
-                lastSyncTime={storeState.lastSyncTime}
-                onPayAdvance={(assignmentId, amount) => store.processAdvancePayment(assignmentId, amount)}
-                onPayBalance={(assignmentId, amount) => store.processBalancePayment(assignmentId, amount)}
-              />
-            ) : storeState.currentUser.role === UserRole.TUTOR ? (
-              <TutorDashboard 
-                currentUser={storeState.currentUser}
-                students={studentsList}
-                assignments={storeState.assignments}
-                chats={storeState.chats}
-                messages={storeState.messages}
-                payments={storeState.payments}
-                reviews={storeState.reviews}
-                onTutorDeliver={handleTutorDeliver}
-                onSelectChat={handleSelectChat}
-                assignmentReports={storeState.assignmentReports}
-                onCreateReport={store.createAssignmentReport.bind(store)}
-                onUpdateReportStatus={store.updateAssignmentReportStatus.bind(store)}
-              />
+          (() => {
+            const currentActiveUser = store.currentUser || storeState.currentUser;
+            return currentActiveUser ? (
+              currentActiveUser.role === UserRole.STUDENT ? (
+                <StudentDashboard 
+                  currentUser={currentActiveUser}
+                  tutors={mentorsList}
+                  students={studentsList}
+                  assignments={storeState.assignments}
+                  chats={storeState.chats}
+                  messages={storeState.messages}
+                  payments={storeState.payments}
+                  supportTickets={storeState.supportTickets}
+                  onSubmitAssignment={async (data) => {
+                    // Silently submit the assignment matched via wizard in the background
+                    await store.submitAssignment(data);
+                  }}
+                  onOpenChat={handleOpenChat}
+                  onSelectChat={handleSelectChat}
+                  onSendMessage={handleSendMessage}
+                  onSubscribeToChatDetails={(chatId) => store.subscribeToChatDetails(chatId)}
+                  onApproveWork={handleApproveWork}
+                  onRaiseRevision={handleRaiseRevision}
+                  onRaiseTicket={handleRaiseTicket}
+                  onLogout={handleLogout}
+                  onNavigate={handleNavigate}
+                  assignmentReports={storeState.assignmentReports}
+                  quotes={storeState.quotes}
+                  onAcceptQuote={handleAcceptQuote}
+                  appNotifications={storeState.appNotifications}
+                  onMarkNotificationRead={(id) => store.markNotificationRead(id)}
+                  onMarkAllNotificationsRead={(userId) => store.markAllNotificationsRead(userId)}
+                  onUpdateProfile={(data) => store.updateUserProfile(currentActiveUser.id, data)}
+                  invoices={storeState.invoices}
+                  onRefreshData={() => store.fetchData()}
+                  lastSyncTime={storeState.lastSyncTime}
+                  onPayAdvance={(assignmentId, amount) => store.processAdvancePayment(assignmentId, amount)}
+                  onPayBalance={(assignmentId, amount) => store.processBalancePayment(assignmentId, amount)}
+                />
+              ) : currentActiveUser.role === UserRole.TUTOR ? (
+                <TutorDashboard 
+                  currentUser={currentActiveUser}
+                  students={studentsList}
+                  assignments={storeState.assignments}
+                  chats={storeState.chats}
+                  messages={storeState.messages}
+                  payments={storeState.payments}
+                  reviews={storeState.reviews}
+                  onTutorDeliver={handleTutorDeliver}
+                  onSelectChat={handleSelectChat}
+                  assignmentReports={storeState.assignmentReports}
+                  onCreateReport={store.createAssignmentReport.bind(store)}
+                  onUpdateReportStatus={store.updateAssignmentReportStatus.bind(store)}
+                />
+              ) : (
+                <AdminDashboard 
+                  currentUser={currentActiveUser}
+                  users={storeState.users}
+                  blogs={storeState.blogs}
+                  faqs={storeState.faqs}
+                  assignments={storeState.assignments}
+                  payments={storeState.payments}
+                  supportTickets={storeState.supportTickets}
+                  chats={storeState.chats}
+                  messages={storeState.messages}
+                  invoices={storeState.invoices}
+                  activityLogs={storeState.activityLogs}
+                  appNotifications={storeState.appNotifications}
+                  sops={storeState.sops}
+                  assignmentReports={storeState.assignmentReports}
+                  agreements={storeState.agreements}
+                  onToggleUserStatus={handleToggleUserStatus}
+                  onChangeUserRole={handleChangeUserRole}
+                  onAddBlog={handleAddBlog}
+                  onDeleteBlog={handleDeleteBlog}
+                  onUpdateBlog={handleUpdateBlog}
+                  onSyncDefaultBlogs={handleSyncDefaultBlogs}
+                  onAddFaq={handleAddFaq}
+                  onDeleteFaq={handleDeleteFaq}
+                  onResolveDispute={handleResolveDispute}
+                  onGenerateProfile={handleGenerateProfile}
+                  onDeleteUser={handleDeleteUser}
+                  onUpdateUserProfile={handleUpdateUserProfile}
+                  onAddNewTutor={store.createTutorProfile.bind(store)}
+                  onDeleteChat={handleDeleteChat}
+                  onSelectChat={handleSelectChat}
+                  onSendMessage={handleSendMessage}
+                  onSubscribeToChatDetails={(chatId) => store.subscribeToChatDetails(chatId)}
+                  onGetOrCreateChat={store.getOrCreateChat.bind(store)}
+
+                  onAssignTutor={store.assignTutorToAssignment.bind(store)}
+                  onSetAssignmentPrice={store.setAssignmentPrice.bind(store)}
+                  onUpdateAssignmentStatus={store.updateAssignmentStatus.bind(store)}
+                  onUpdateAssignment={store.updateAssignment.bind(store)}
+                  onDeleteAssignment={store.deleteAssignment.bind(store)}
+                  onCreateAssignmentOrder={store.createAssignmentOrder.bind(store)}
+                  onReleaseEscrow={store.releaseEscrow.bind(store)}
+                  onRefreshData={store.fetchData.bind(store)}
+                  onSettleInvoice={store.settleInvoice.bind(store)}
+                  onCreateInvoice={store.createInvoice.bind(store)}
+                  onSendNotification={store.sendAppNotification.bind(store)}
+                  onSendMissingPaymentNotification={store.sendMissingPaymentNotification.bind(store)}
+                  onUpdateAssignmentReportStatus={store.updateAssignmentReportStatus.bind(store)}
+                  onCreateAgreement={store.createAgreement.bind(store)}
+                  emails={storeState.emails || []}
+                  onSendTriggerEmail={store.sendTriggerEmail.bind(store)}
+                  onSeedMockStudentData={store.seedMockStudentData.bind(store)}
+                  connectionStatus={storeState.connectionStatus}
+                  lastSyncTime={storeState.lastSyncTime}
+                  syncError={storeState.syncError}
+                />
+              )
             ) : (
-              <AdminDashboard 
-                currentUser={storeState.currentUser}
-                users={storeState.users}
-                blogs={storeState.blogs}
-                faqs={storeState.faqs}
-                assignments={storeState.assignments}
-                payments={storeState.payments}
-                supportTickets={storeState.supportTickets}
-                chats={storeState.chats}
-                messages={storeState.messages}
-                invoices={storeState.invoices}
-                activityLogs={storeState.activityLogs}
-                appNotifications={storeState.appNotifications}
-                sops={storeState.sops}
-                assignmentReports={storeState.assignmentReports}
-                agreements={storeState.agreements}
-                onToggleUserStatus={handleToggleUserStatus}
-                onChangeUserRole={handleChangeUserRole}
-                onAddBlog={handleAddBlog}
-                onDeleteBlog={handleDeleteBlog}
-                onUpdateBlog={handleUpdateBlog}
-                onSyncDefaultBlogs={handleSyncDefaultBlogs}
-                onAddFaq={handleAddFaq}
-                onDeleteFaq={handleDeleteFaq}
-                onResolveDispute={handleResolveDispute}
-                onGenerateProfile={handleGenerateProfile}
-                onDeleteUser={handleDeleteUser}
-                onUpdateUserProfile={handleUpdateUserProfile}
-                onAddNewTutor={store.createTutorProfile.bind(store)}
-                onDeleteChat={handleDeleteChat}
-                onSelectChat={handleSelectChat}
-                onSendMessage={handleSendMessage}
-                onSubscribeToChatDetails={(chatId) => store.subscribeToChatDetails(chatId)}
-                onGetOrCreateChat={store.getOrCreateChat.bind(store)}
-
-                onAssignTutor={store.assignTutorToAssignment.bind(store)}
-                onSetAssignmentPrice={store.setAssignmentPrice.bind(store)}
-                onUpdateAssignmentStatus={store.updateAssignmentStatus.bind(store)}
-                onUpdateAssignment={store.updateAssignment.bind(store)}
-                onDeleteAssignment={store.deleteAssignment.bind(store)}
-                onCreateAssignmentOrder={store.createAssignmentOrder.bind(store)}
-                onReleaseEscrow={store.releaseEscrow.bind(store)}
-                onRefreshData={store.fetchData.bind(store)}
-                onSettleInvoice={store.settleInvoice.bind(store)}
-                onCreateInvoice={store.createInvoice.bind(store)}
-                onSendNotification={store.sendAppNotification.bind(store)}
-                onSendMissingPaymentNotification={store.sendMissingPaymentNotification.bind(store)}
-                onUpdateAssignmentReportStatus={store.updateAssignmentReportStatus.bind(store)}
-                onCreateAgreement={store.createAgreement.bind(store)}
-                emails={storeState.emails || []}
-                onSendTriggerEmail={store.sendTriggerEmail.bind(store)}
-                onSeedMockStudentData={store.seedMockStudentData.bind(store)}
-                connectionStatus={storeState.connectionStatus}
-                lastSyncTime={storeState.lastSyncTime}
-                syncError={storeState.syncError}
-              />
-            )
-
-          ) : (
-            <div className="py-20 text-center bg-white m-8 rounded-3xl border shadow-xs max-w-sm mx-auto space-y-4">
-              <span className="text-4xl">🔒</span>
-              <h3 className="font-sans font-bold text-lg text-gray-950">Dashboard Locked</h3>
-              <p className="text-xs text-gray-500 px-6">Please sign in to access your dashboard.</p>
-              <button 
-                onClick={() => setActiveView('auth')} 
-                className="bg-orange-500 hover:bg-orange-650 text-white font-bold text-xs px-6 py-2.5 rounded-xl cursor-pointer"
-              >
-                Sign In
-              </button>
-            </div>
-          )
-
+              <div className="py-20 text-center bg-white m-8 rounded-3xl border shadow-xs max-w-sm mx-auto space-y-4">
+                <span className="text-4xl">🔒</span>
+                <h3 className="font-sans font-bold text-lg text-gray-950">Dashboard Locked</h3>
+                <p className="text-xs text-gray-500 px-6">Please sign in to access your dashboard.</p>
+                <button 
+                  onClick={() => setActiveView('auth')} 
+                  className="bg-orange-500 hover:bg-orange-650 text-white font-bold text-xs px-6 py-2.5 rounded-xl cursor-pointer"
+                >
+                  Sign In
+                </button>
+              </div>
+            );
+          })()
         ) : activeView === 'get-a-quote' ? (
           <GetQuotePage 
             currentUser={storeState.currentUser}

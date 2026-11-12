@@ -516,6 +516,43 @@ export default function StudentDashboard({
   } | null>(null);
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
   const [paymentSuccessToast, setPaymentSuccessToast] = useState<string | null>(null);
+  const [isResendingVerification, setIsResendingVerification] = useState(false);
+  const [verificationBannerMsg, setVerificationBannerMsg] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('verified') === 'true') {
+      currentUser.verified = true;
+      setVerificationBannerMsg('🎉 Your email address has been verified successfully!');
+      params.delete('verified');
+      const nextQuery = params.toString();
+      const nextUrl = `${window.location.pathname}${nextQuery ? `?${nextQuery}` : ''}${window.location.hash}`;
+      window.history.replaceState(null, '', nextUrl);
+    }
+  }, []);
+
+  const handleResendVerification = async () => {
+    setIsResendingVerification(true);
+    try {
+      const res = await fetch('/api/auth/resend-verification', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ email: currentUser.email }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok) {
+        setVerificationBannerMsg('✉️ Verification email sent! Please check your inbox and spam folder.');
+      } else {
+        setVerificationBannerMsg(data?.error || 'Failed to resend verification email.');
+      }
+    } catch {
+      setVerificationBannerMsg('Unable to send verification email. Please try again later.');
+    } finally {
+      setIsResendingVerification(false);
+    }
+  };
 
   interface AssignmentPaymentItem {
     id: string;
@@ -1391,6 +1428,39 @@ CONTACT EMAIL COMPASS: ${studentEmail}
           </div>
 
         </header>
+
+        {/* ============================================== */}
+        {/* EMAIL VERIFICATION BANNER                      */}
+        {/* ============================================== */}
+        {(!currentUser.verified || verificationBannerMsg) && (
+          <div 
+            id="email-verification-banner"
+            className={`px-6 py-3.5 border-b text-xs flex flex-wrap items-center justify-between gap-3 ${
+              currentUser.verified
+                ? 'bg-emerald-50 border-emerald-200/80 text-emerald-900'
+                : 'bg-amber-50 border-amber-200 text-amber-900'
+            }`}
+          >
+            <div className="flex items-center gap-2.5">
+              <span className="text-base shrink-0">{currentUser.verified ? '✅' : '✉️'}</span>
+              <p className="font-medium">
+                {verificationBannerMsg || (
+                  <>Your email <strong>{currentUser.email}</strong> is pending verification. Please check your inbox for your confirmation link.</>
+                )}
+              </p>
+            </div>
+            {!currentUser.verified && (
+              <button
+                type="button"
+                onClick={handleResendVerification}
+                disabled={isResendingVerification}
+                className="bg-amber-600 hover:bg-amber-700 disabled:opacity-50 text-white font-bold px-3.5 py-1.5 rounded-xl text-xs cursor-pointer transition-all shadow-3xs shrink-0"
+              >
+                {isResendingVerification ? 'Sending Link...' : 'Resend Verification Email'}
+              </button>
+            )}
+          </div>
+        )}
 
         {/* ============================================== */}
         {/* WORKSPACE AREA RENDERING VARIOUS VIEWS        */}

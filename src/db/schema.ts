@@ -247,3 +247,19 @@ export const userSessions = pgTable('user_sessions', {
   index('idx_user_sessions_user_id').on(table.userId),
 ]);
 
+// 12. Email Verification Tokens Table (Stores SHA-256 hash only, never plaintext tokens)
+export const emailVerificationTokens = pgTable('email_verification_tokens', {
+  id: text('id').primaryKey(),
+  userId: text('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  email: text('email').notNull(),
+  tokenHash: text('token_hash').notNull(),
+  expiresAt: text('expires_at').notNull(),
+  usedAt: text('used_at'),
+  createdAt: text('created_at').notNull(),
+}, (table) => [
+  uniqueIndex('idx_email_verification_token_hash').on(table.tokenHash),
+  index('idx_email_verification_user_id').on(table.userId),
+  index('idx_email_verification_email').on(table.email),
+]);
+
+

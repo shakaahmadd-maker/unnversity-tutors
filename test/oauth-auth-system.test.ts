@@ -236,6 +236,71 @@ async function runAuthSystemTests() {
       'Registration provides all required fields: id, email, role, fullName, createdAt, updatedAt'
     );
 
+    // Email registration creates unverified user
+    testAssert(
+      studentActor.user.verified === false,
+      'Email registration creates account in unverified status (verified: false)'
+    );
+
+    // Resend verification email endpoint
+    const resendRes = await fetch(`${BASE_URL}/api/auth/resend-verification`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: studentActor.email }),
+    });
+    testAssert(resendRes.status === 200, 'POST /api/auth/resend-verification returns HTTP 200');
+    const resendData = await resendRes.json();
+    testAssert(
+      resendData.success === true && typeof resendData.message === 'string',
+      'Resend verification returns success confirmation'
+    );
+
+    // Invalid verification token -> HTTP 400
+    const invalidVerifRes = await fetch(`${BASE_URL}/api/auth/verify-email`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token: 'invalid_verification_token_sample' }),
+    });
+    testAssert(invalidVerifRes.status === 400, 'Invalid verification token returns HTTP 400');
+
+    // Valid email verification flow
+    const testRawToken = crypto.randomBytes(32).toString('hex');
+    const testTokenHash = crypto.createHash('sha256').update(testRawToken).digest('hex');
+    const verifFile = path.join(UPLOADS_DIR, 'persisted_verification_tokens.json');
+    let verifData: Record<string, any> = {};
+    if (fs.existsSync(verifFile)) {
+      try { verifData = JSON.parse(fs.readFileSync(verifFile, 'utf-8')); } catch {}
+    }
+    verifData[testTokenHash] = {
+      id: 'vtok_test_' + Date.now(),
+      userId: studentActor.user.id,
+      email: studentActor.email,
+      tokenHash: testTokenHash,
+      expiresAt: new Date(Date.now() + 24 * 3600 * 1000).toISOString(),
+      createdAt: new Date().toISOString(),
+    };
+    fs.writeFileSync(verifFile, JSON.stringify(verifData, null, 2), 'utf-8');
+
+    const validVerifRes = await fetch(`${BASE_URL}/api/auth/verify-email`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token: testRawToken }),
+    });
+    testAssert(validVerifRes.status === 200, 'Valid verification token returns HTTP 200 and confirms email');
+    const validVerifData = await validVerifRes.json();
+    testAssert(
+      validVerifData.success === true,
+      'Email verification confirms successful verification'
+    );
+
+    // Duplicate verification token check (already verified)
+    const duplicateVerifRes = await fetch(`${BASE_URL}/api/auth/verify-email`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token: testRawToken }),
+    });
+    testAssert(duplicateVerifRes.status === 200, 'Re-verifying already verified email returns HTTP 200 gracefully');
+
     // Duplicate email registration -> HTTP 409
     const dupPass = generateRuntimePassword();
     const dupRes = await fetch(`${BASE_URL}/api/auth/register`, {

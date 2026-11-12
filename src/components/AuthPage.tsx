@@ -243,15 +243,11 @@ export default function AuthPage({ onLogin, onRegister, onNavigate }: AuthPagePr
       );
 
       if (success) {
-        const verifiedUser = await store.verifySession();
-        if (!verifiedUser) {
-          setErrorMsg('Session verification failed after password update. Please sign in.');
-          return;
-        }
-        setSuccessMsg('Your security password has been updated and your session is active!');
+        const verifiedUser = store.currentUser || (await store.verifySession());
         showToast('Password updated successfully!');
         setIsResetPasswordView(false);
-        onNavigate(verifiedUser.role === 'admin' ? 'admin' : verifiedUser.role === 'tutor' ? 'tutor/dashboard' : 'student/dashboard');
+        const targetView = verifiedUser?.role === 'admin' ? 'admin' : verifiedUser?.role === 'tutor' ? 'tutor/dashboard' : 'student/dashboard';
+        onNavigate(targetView);
       } else {
         setErrorMsg('Invalid or expired security token. Please request a new token.');
       }
@@ -278,11 +274,6 @@ export default function AuthPage({ onLogin, onRegister, onNavigate }: AuthPagePr
     try {
       const success = await onLogin(email.trim(), password);
       if (success) {
-        const verifiedUser = await store.verifySession();
-        if (!verifiedUser) {
-          throw new Error('Server session could not be verified. Please check cookie settings and try again.');
-        }
-        setSuccessMsg('Authenticated profile successfully! Opening workspace...');
         showToast('Sign In Successful! Redirecting...');
         onNavigate('dashboard');
       } else {
@@ -340,12 +331,7 @@ export default function AuthPage({ onLogin, onRegister, onNavigate }: AuthPagePr
       );
 
       if (success) {
-        const verifiedUser = await store.verifySession();
-        if (!verifiedUser) {
-          throw new Error('Account created, but server session could not be verified. Please sign in.');
-        }
-        setSuccessMsg('Student account created successfully! Welcome to the portal.');
-        showToast('Account Created Successfully!');
+        showToast('Student account created successfully! Welcome to your dashboard.');
         onNavigate('student/dashboard');
       } else {
         setErrorMsg('Something went wrong establishing your student account.');
@@ -444,15 +430,23 @@ export default function AuthPage({ onLogin, onRegister, onNavigate }: AuthPagePr
       {/* Main Minimal Authentication Card */}
       <div className="w-full max-w-md bg-white rounded-3xl shadow-xl border border-slate-200/80 p-6 sm:p-9 relative">
         
-        {/* Brand Header */}
-        <div className="text-center mb-6">
-          <div className="inline-flex items-center justify-center w-12 h-12 rounded-2xl bg-orange-50 text-orange-600 mb-3 border border-orange-100 shadow-2xs">
-            <ShieldCheck className="w-6 h-6" />
-          </div>
-          <h1 className="text-2xl sm:text-2xl font-black text-slate-900 tracking-tight">
-            University Tutors
-          </h1>
-          <p className="text-xs text-slate-500 mt-1 font-medium">
+        {/* Brand Header with Official Logo */}
+        <div className="text-center mb-6 flex flex-col items-center">
+          <button
+            type="button"
+            onClick={() => onNavigate('home')}
+            className="inline-block cursor-pointer group transition-transform hover:scale-105 mb-1 focus:outline-none"
+            aria-label="University Tutors Home"
+          >
+            <img 
+              src="/logo.webp" 
+              alt="University Tutors" 
+              width={220}
+              height={84}
+              className="h-12 sm:h-14 w-auto max-w-[200px] sm:max-w-[230px] object-contain mx-auto"
+            />
+          </button>
+          <p className="text-xs text-slate-500 font-medium">
             Student &amp; Academic Portal
           </p>
         </div>
