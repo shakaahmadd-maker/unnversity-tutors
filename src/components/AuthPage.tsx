@@ -67,7 +67,7 @@ type SocialProviderKey = 'google' | 'apple' | 'instagram' | 'x' | 'linkedin';
 export default function AuthPage({ onLogin, onRegister, onNavigate }: AuthPageProps) {
   const [activeTab, setActiveTab] = useState<'signin' | 'signup'>('signin');
   const [providersLoaded, setProvidersLoaded] = useState(false);
-  const [providers, setProviders] = useState<Record<SocialProviderKey, { configured: boolean; name: string; redirectUri?: string }>>({
+  const [providers, setProviders] = useState<Record<SocialProviderKey, { configured: boolean; name: string; redirectUri?: string; error?: string | null }>>({
     google: { configured: false, name: 'Google' },
     apple: { configured: false, name: 'Apple' },
     instagram: { configured: false, name: 'Instagram' },
@@ -350,7 +350,7 @@ export default function AuthPage({ onLogin, onRegister, onNavigate }: AuthPagePr
     }
   };
 
-  // Secure OAuth 2.0 Authorization Code Flow Handler (Backend-Configured Providers Only)
+  // Secure OAuth 2.0 Authorization Code Flow Handler (Backend-Verified Only — Zero Local/Offline Fallbacks)
   const handleSocialAuth = async (providerKey: SocialProviderKey) => {
     if (authRequestLockRef.current || isSubmitting) {
       return;
@@ -361,11 +361,6 @@ export default function AuthPage({ onLogin, onRegister, onNavigate }: AuthPagePr
 
     const p = providers[providerKey];
     const providerName = p?.name || providerKey.toUpperCase();
-
-    if (!providersLoaded || !p?.configured) {
-      setErrorMsg(`${providerName} login is not configured on this server.`);
-      return;
-    }
 
     authRequestLockRef.current = true;
     setIsSubmitting(true);
@@ -380,7 +375,7 @@ export default function AuthPage({ onLogin, onRegister, onNavigate }: AuthPagePr
       const data = await res.json().catch(() => ({}));
 
       if (!res.ok || typeof data?.url !== 'string' || !data.url) {
-        throw new Error(data?.error || `Could not initiate ${providerName} login.`);
+        throw new Error(data?.error || p?.error || `${providerName} login is not configured on this server.`);
       }
 
       // Redirect to OAuth provider; backend callback validates state, exchanges code,
@@ -394,9 +389,15 @@ export default function AuthPage({ onLogin, onRegister, onNavigate }: AuthPagePr
     }
   };
 
-  const configuredProviderKeys = (['google', 'apple', 'instagram', 'x', 'linkedin'] as SocialProviderKey[]).filter(
-    (key) => providersLoaded && providers[key]?.configured === true
-  );
+  // Primary Google & Instagram OAuth buttons are always rendered on the public login/signup page;
+  // secondary providers appear dynamically when configured on the backend.
+  const visibleProviderKeys: SocialProviderKey[] = [
+    'google',
+    'instagram',
+    ...(['apple', 'x', 'linkedin'] as SocialProviderKey[]).filter(
+      (key) => providersLoaded && providers[key]?.configured === true
+    ),
+  ];
 
   const renderSocialProviderIcon = (key: SocialProviderKey) => {
     switch (key) {
@@ -716,41 +717,37 @@ export default function AuthPage({ onLogin, onRegister, onNavigate }: AuthPagePr
               </button>
             </form>
 
-            {/* Social Authentication Section — Shown ONLY when backend reports provider(s) configured */}
-            {configuredProviderKeys.length > 0 && (
-              <>
-                <div className="relative my-5 text-center">
-                  <div className="absolute inset-0 flex items-center">
-                    <div className="w-full border-t border-slate-200"></div>
-                  </div>
-                  <span className="relative bg-white px-3 text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
-                    Or continue with
-                  </span>
-                </div>
+            {/* Social Authentication Section */}
+            <div className="relative my-5 text-center">
+              <div className="absolute inset-0 flex items-center">
+                <div className="w-full border-t border-slate-200"></div>
+              </div>
+              <span className="relative bg-white px-3 text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
+                Or continue with
+              </span>
+            </div>
 
-                <div className="flex flex-wrap items-center justify-center gap-2.5">
-                  {configuredProviderKeys.map((providerKey) => {
-                    const providerName = providers[providerKey]?.name || providerKey;
-                    const isLoadingThis = activeOAuthProvider === providerKey && isSubmitting;
-                    return (
-                      <button
-                        key={providerKey}
-                        type="button"
-                        id={`social-login-${providerKey}`}
-                        disabled={isSubmitting}
-                        onClick={() => handleSocialAuth(providerKey)}
-                        title={`Continue with ${providerName}`}
-                        aria-label={`Continue with ${providerName}`}
-                        className="flex-1 min-w-[130px] flex items-center justify-center gap-2 py-2.5 px-3.5 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-xl transition-all duration-150 hover:shadow-xs active:scale-95 text-slate-800 text-xs font-bold cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
-                      >
-                        {renderSocialProviderIcon(providerKey)}
-                        <span>{isLoadingThis ? 'Redirecting...' : `Continue with ${providerName}`}</span>
-                      </button>
-                    );
-                  })}
-                </div>
-              </>
-            )}
+            <div className="flex flex-wrap items-center justify-center gap-2.5">
+              {visibleProviderKeys.map((providerKey) => {
+                const providerName = providers[providerKey]?.name || providerKey;
+                const isLoadingThis = activeOAuthProvider === providerKey && isSubmitting;
+                return (
+                  <button
+                    key={providerKey}
+                    type="button"
+                    id={`social-login-${providerKey}`}
+                    disabled={isSubmitting}
+                    onClick={() => handleSocialAuth(providerKey)}
+                    title={`Continue with ${providerName}`}
+                    aria-label={`Continue with ${providerName}`}
+                    className="flex-1 min-w-[130px] flex items-center justify-center gap-2 py-2.5 px-3.5 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-xl transition-all duration-150 hover:shadow-xs active:scale-95 text-slate-800 text-xs font-bold cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
+                  >
+                    {renderSocialProviderIcon(providerKey)}
+                    <span>{isLoadingThis ? 'Redirecting...' : providerName}</span>
+                  </button>
+                );
+              })}
+            </div>
 
             {/* Toggle to Signup */}
             <p className="text-center text-xs text-slate-500 pt-3">
@@ -877,41 +874,37 @@ export default function AuthPage({ onLogin, onRegister, onNavigate }: AuthPagePr
               </button>
             </form>
 
-            {/* Social Authentication Section — Shown ONLY when backend reports provider(s) configured */}
-            {configuredProviderKeys.length > 0 && (
-              <>
-                <div className="relative my-4 text-center">
-                  <div className="absolute inset-0 flex items-center">
-                    <div className="w-full border-t border-slate-200"></div>
-                  </div>
-                  <span className="relative bg-white px-3 text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
-                    Or sign up with
-                  </span>
-                </div>
+            {/* Social Authentication Section */}
+            <div className="relative my-4 text-center">
+              <div className="absolute inset-0 flex items-center">
+                <div className="w-full border-t border-slate-200"></div>
+              </div>
+              <span className="relative bg-white px-3 text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
+                Or sign up with
+              </span>
+            </div>
 
-                <div className="flex flex-wrap items-center justify-center gap-2.5">
-                  {configuredProviderKeys.map((providerKey) => {
-                    const providerName = providers[providerKey]?.name || providerKey;
-                    const isLoadingThis = activeOAuthProvider === providerKey && isSubmitting;
-                    return (
-                      <button
-                        key={providerKey}
-                        type="button"
-                        id={`social-signup-${providerKey}`}
-                        disabled={isSubmitting}
-                        onClick={() => handleSocialAuth(providerKey)}
-                        title={`Continue with ${providerName}`}
-                        aria-label={`Continue with ${providerName}`}
-                        className="flex-1 min-w-[130px] flex items-center justify-center gap-2 py-2.5 px-3.5 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-xl transition-all duration-150 hover:shadow-xs active:scale-95 text-slate-800 text-xs font-bold cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
-                      >
-                        {renderSocialProviderIcon(providerKey)}
-                        <span>{isLoadingThis ? 'Redirecting...' : `Continue with ${providerName}`}</span>
-                      </button>
-                    );
-                  })}
-                </div>
-              </>
-            )}
+            <div className="flex flex-wrap items-center justify-center gap-2.5">
+              {visibleProviderKeys.map((providerKey) => {
+                const providerName = providers[providerKey]?.name || providerKey;
+                const isLoadingThis = activeOAuthProvider === providerKey && isSubmitting;
+                return (
+                  <button
+                    key={providerKey}
+                    type="button"
+                    id={`social-signup-${providerKey}`}
+                    disabled={isSubmitting}
+                    onClick={() => handleSocialAuth(providerKey)}
+                    title={`Continue with ${providerName}`}
+                    aria-label={`Continue with ${providerName}`}
+                    className="flex-1 min-w-[130px] flex items-center justify-center gap-2 py-2.5 px-3.5 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-xl transition-all duration-150 hover:shadow-xs active:scale-95 text-slate-800 text-xs font-bold cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
+                  >
+                    {renderSocialProviderIcon(providerKey)}
+                    <span>{isLoadingThis ? 'Redirecting...' : providerName}</span>
+                  </button>
+                );
+              })}
+            </div>
 
             <p className="text-center text-xs text-slate-500 pt-2">
               Already have an account?{' '}

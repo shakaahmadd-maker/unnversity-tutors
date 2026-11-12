@@ -742,7 +742,7 @@ async function runAuthSystemTests() {
       // ----------------------------------------------------------------------
       // Scenario 6.1: Missing OAuth Environment Variables
       // ----------------------------------------------------------------------
-      for (const missingVar of ['GOOGLE_CLIENT_ID', 'GOOGLE_CLIENT_SECRET', 'GOOGLE_REDIRECT_URI', 'APP_URL'] as const) {
+      for (const missingVar of ['GOOGLE_CLIENT_ID', 'GOOGLE_CLIENT_SECRET', 'GOOGLE_REDIRECT_URI'] as const) {
         setValidProdGoogleEnv();
         delete process.env[missingVar];
 
@@ -767,6 +767,17 @@ async function runAuthSystemTests() {
           `[6.1 Missing Env] /api/auth/callback/google rejects missing ${missingVar} with 400 missing_oauth_credentials`
         );
       }
+
+      // Confirm setting ONLY the 3 core variables (GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, GOOGLE_REDIRECT_URI) without APP_URL works cleanly
+      setValidProdGoogleEnv();
+      delete process.env.APP_URL;
+      const threeVarsProvRes = await fetch(`${OAUTH_TEST_BASE}/api/auth/providers`);
+      const threeVarsProvData = await threeVarsProvRes.json();
+      const threeVarsUrlRes = await fetch(`${OAUTH_TEST_BASE}/api/auth/google/url`);
+      testAssert(
+        threeVarsProvData.providers?.google?.configured === true && threeVarsUrlRes.status === 200,
+        '[6.1 Three Core Vars] Setting GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, and GOOGLE_REDIRECT_URI activates Google OAuth even when APP_URL is omitted'
+      );
 
       // ----------------------------------------------------------------------
       // Scenario 6.2: Invalid OAuth State (missing, malformed, forged, tampered cookie, replayed)
@@ -834,14 +845,14 @@ async function runAuthSystemTests() {
         );
       }
 
-      // Mismatched callback path in GOOGLE_REDIRECT_URI vs APP_URL
+      // Unsupported callback path in GOOGLE_REDIRECT_URI
       setValidProdGoogleEnv();
-      process.env.GOOGLE_REDIRECT_URI = `${prodDomain}/api/auth/google/callback`;
+      process.env.GOOGLE_REDIRECT_URI = `${prodDomain}/auth/google/callback`;
       const wrongPathRes = await fetch(`${OAUTH_TEST_BASE}/api/auth/google/url`);
       const wrongPathData = await wrongPathRes.json();
       testAssert(
         wrongPathRes.status === 400 && wrongPathData.code === 'redirect_uri_mismatch',
-        '[6.3 Redirect URI Mismatch] Rejects GOOGLE_REDIRECT_URI using wrong callback path with 400 redirect_uri_mismatch'
+        '[6.3 Redirect URI Mismatch] Rejects GOOGLE_REDIRECT_URI using invalid callback path with 400 redirect_uri_mismatch'
       );
 
       // Mismatched domain in GOOGLE_REDIRECT_URI vs APP_URL
@@ -854,13 +865,13 @@ async function runAuthSystemTests() {
         '[6.3 Redirect URI Mismatch] Rejects GOOGLE_REDIRECT_URI on different domain than APP_URL with 400 redirect_uri_mismatch'
       );
 
-      // Non-canonical route /api/auth/google/callback returns 400 redirect_uri_mismatch
+      // Hitting /api/auth/google/callback when GOOGLE_REDIRECT_URI is /api/auth/callback/google returns 400 redirect_uri_mismatch
       setValidProdGoogleEnv();
       const nonCanonicalRes = await fetch(`${OAUTH_TEST_BASE}/api/auth/google/callback?code=abc&state=${'b'.repeat(64)}`);
       const nonCanonicalData = await nonCanonicalRes.json();
       testAssert(
         nonCanonicalRes.status === 400 && nonCanonicalData.code === 'redirect_uri_mismatch',
-        '[6.3 Redirect URI Mismatch] Non-canonical /api/auth/google/callback returns 400 redirect_uri_mismatch'
+        '[6.3 Redirect URI Mismatch] Mismatched callback path (/api/auth/google/callback vs configured /api/auth/callback/google) returns 400 redirect_uri_mismatch'
       );
 
       // Google callback query ?error=redirect_uri_mismatch
