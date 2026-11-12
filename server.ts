@@ -9,7 +9,7 @@ import crypto from 'crypto';
 import cookieParser from 'cookie-parser';
 import multer from 'multer';
 import { createServer as createViteServer } from 'vite';
-import { db, isDbConnected, checkDbConnection } from './src/db/index';
+import { db, isDbConnected, checkDbConnection, hasDatabaseUrl } from './src/db/index';
 import { users, orders, inquiries, messages, quotes, auditLogs, chatRooms, chatRoomMembers, blogs, tutors, passwordResetTokens as passwordResetTokensTable } from './src/db/schema';
 import { eq, desc, and, inArray, isNull } from 'drizzle-orm';
 import { runMigrations } from './src/db/migrate';
@@ -20,42 +20,70 @@ import { TRENDING_TUTORS_500, TRENDING_TUTORS_200 } from './src/data/trendingTut
 // Configurable Environment Variables read strictly from process.env at runtime (zero hardcoded fallbacks)
 const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
 const NODE_ENV = process.env.NODE_ENV || 'production';
-const APP_URL = (process.env.APP_URL || '').trim().replace(/\/$/, '');
+
+export function getRuntimeAppUrl(): string {
+  return (process.env.APP_URL || '').trim().replace(/\/+$/, '');
+}
+
+export const GOOGLE_OAUTH_CALLBACK_PATH = '/api/auth/callback/google';
 
 // Secure session signing key: read strictly from process.env.SESSION_SECRET at runtime.
 // Never log SESSION_SECRET or DATABASE_URL.
-const SESSION_SECRET: string = (process.env.SESSION_SECRET && process.env.SESSION_SECRET.trim().length >= 16)
-  ? process.env.SESSION_SECRET.trim()
-  : crypto.randomBytes(32).toString('hex');
+function getSessionSecret(): string {
+  if (process.env.SESSION_SECRET && process.env.SESSION_SECRET.trim().length >= 16) {
+    return process.env.SESSION_SECRET.trim();
+  }
+  return EPHEMERAL_SESSION_SECRET;
+}
 
-if (!process.env.SESSION_SECRET) {
+const EPHEMERAL_SESSION_SECRET = crypto.randomBytes(32).toString('hex');
+
+if (!process.env.SESSION_SECRET && process.env.SKIP_AUTO_SERVER_START !== 'true') {
   console.warn('[AUTH] SESSION_SECRET is not configured in process.env. Generated an ephemeral runtime signing key.');
 }
 
 const COOKIE_NAME = 'auth_session';
 
-// Reject preview URLs, development URLs, localhost URLs, insecure HTTP, or internal container hostnames in production
+function isPrivateOrLoopbackIp(host: string): boolean {
+  if (host === '127.0.0.1' || host === '0.0.0.0' || host === '::1' || host === '[::1]') {
+    return true;
+  }
+  const ipv4Match = host.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
+  if (!ipv4Match) return false;
+  const [a, b] = [Number(ipv4Match[1]), Number(ipv4Match[2])];
+  if (a === 127 || a === 10 || a === 0) return true;
+  if (a === 192 && b === 168) return true;
+  if (a === 172 && b >= 16 && b <= 31) return true;
+  if (a === 169 && b === 254) return true;
+  return false;
+}
+
+// Reject preview URLs, development URLs, localhost URLs, insecure HTTP, or dynamic/internal container hostnames in production OAuth
 export function isForbiddenProductionUrl(urlStr: string): boolean {
   if (!urlStr || typeof urlStr !== 'string') return true;
   try {
     const parsed = new URL(urlStr);
+    if (parsed.protocol !== 'https:') {
+      return true;
+    }
     const host = parsed.hostname.toLowerCase();
     if (
       host === 'localhost' ||
-      host === '127.0.0.1' ||
-      host === '0.0.0.0' ||
-      host === '::1' ||
+      isPrivateOrLoopbackIp(host) ||
       host.endsWith('.localhost') ||
       host.endsWith('.local') ||
       host.endsWith('.internal') ||
+      host.endsWith('.docker') ||
+      host.endsWith('.container') ||
       host === 'host.docker.internal' ||
       !host.includes('.') ||
       host.startsWith('ais-dev-') ||
-      host.startsWith('ais-pre-')
+      host.startsWith('ais-pre-') ||
+      host.endsWith('.run.app') ||
+      host.endsWith('.nip.io') ||
+      host.endsWith('.sslip.io') ||
+      host.endsWith('.traefik.me')
     ) {
-      return true;
-    }
-    if (NODE_ENV === 'production' && parsed.protocol !== 'https:') {
       return true;
     }
     return false;
@@ -151,26 +179,64 @@ export function verifyPassword(password: string, combinedHash: string): boolean 
   }
 }
 
-// Secure JWT / Session Token using HMAC-SHA256
+// Revoked session registry to ensure logout immediately invalidates server sessions
+const revokedSessionRegistry = new Map<string, number>();
+
+export function revokeSessionToken(token: string | undefined): void {
+  if (!token || typeof token !== 'string') return;
+  const ttlExpiry = Date.now() + 8 * 24 * 60 * 60 * 1000;
+  const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+  revokedSessionRegistry.set(`tok:${tokenHash}`, ttlExpiry);
+  try {
+    const parts = token.split('.');
+    if (parts.length === 3) {
+      const parsed = JSON.parse(Buffer.from(parts[1], 'base64url').toString('utf8'));
+      if (parsed?.jti) {
+        revokedSessionRegistry.set(`jti:${parsed.jti}`, parsed.exp || ttlExpiry);
+      }
+    }
+  } catch {
+    // ignore malformed token during revocation
+  }
+}
+
+// Secure Session Token using HMAC-SHA256 with unique session ID (jti)
 export function createSessionToken(payload: { id: string; email: string; role: string }): string {
+  const secret = getSessionSecret();
+  const jti = crypto.randomBytes(16).toString('hex');
   const header = Buffer.from(JSON.stringify({ alg: 'HS256', typ: 'JWT' })).toString('base64url');
-  const data = Buffer.from(JSON.stringify({ ...payload, exp: Date.now() + 7 * 24 * 60 * 60 * 1000 })).toString('base64url');
-  const signature = crypto.createHmac('sha256', SESSION_SECRET).update(`${header}.${data}`).digest('base64url');
+  const data = Buffer.from(
+    JSON.stringify({
+      ...payload,
+      jti,
+      iat: Date.now(),
+      exp: Date.now() + 7 * 24 * 60 * 60 * 1000,
+    })
+  ).toString('base64url');
+  const signature = crypto.createHmac('sha256', secret).update(`${header}.${data}`).digest('base64url');
   return `${header}.${data}.${signature}`;
 }
 
-export function verifySessionToken(token: string): { id: string; email: string; role: string } | null {
+export function verifySessionToken(token: string): { id: string; email: string; role: string; jti?: string } | null {
   try {
+    const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+    if (revokedSessionRegistry.has(`tok:${tokenHash}`)) {
+      return null;
+    }
     const parts = token.split('.');
     if (parts.length !== 3) return null;
     const [header, data, signature] = parts;
-    const expectedSig = crypto.createHmac('sha256', SESSION_SECRET).update(`${header}.${data}`).digest('base64url');
+    const secret = getSessionSecret();
+    const expectedSig = crypto.createHmac('sha256', secret).update(`${header}.${data}`).digest('base64url');
     const sigBuf = Buffer.from(signature, 'utf8');
     const expectedBuf = Buffer.from(expectedSig, 'utf8');
     if (sigBuf.length !== expectedBuf.length || !crypto.timingSafeEqual(sigBuf, expectedBuf)) {
       return null;
     }
     const parsed = JSON.parse(Buffer.from(data, 'base64url').toString('utf8'));
+    if (parsed.jti && revokedSessionRegistry.has(`jti:${parsed.jti}`)) {
+      return null;
+    }
     if (parsed.exp && parsed.exp < Date.now()) return null;
     if (!parsed.id || !parsed.email || !parsed.role) return null;
     return parsed;
@@ -378,8 +444,22 @@ async function seedInitialDatabase() {
   }
 }
 
-async function startServer() {
+export interface OAuthUserRepositoryOverride {
+  findByEmail?: (email: string) => Promise<any | null>;
+  findById?: (id: string) => Promise<any | null>;
+  createUser?: (record: any) => Promise<any>;
+}
+
+export interface CreateAppOptions {
+  fetchImpl?: typeof fetch;
+  oauthUserRepo?: OAuthUserRepositoryOverride;
+  skipStaticAndVite?: boolean;
+}
+
+export async function createApp(options: CreateAppOptions = {}) {
+  const oauthFetch: typeof fetch = options.fetchImpl || fetch;
   const app = express();
+  app.set('trust proxy', 1);
 
   app.use(compression());
   app.use(express.json({ limit: '15mb' }));
@@ -388,12 +468,11 @@ async function startServer() {
 
   // Strict Production CORS & Origin Headers
   // Do not use wildcard Access-Control-Allow-Origin: * for authenticated cookie requests.
-  const normalizedAppUrl = APP_URL;
-
   app.use((req, res, next) => {
+    const normalizedAppUrl = getRuntimeAppUrl();
     const origin = req.headers.origin;
     if (origin) {
-      if (NODE_ENV !== 'production' || (normalizedAppUrl && origin === normalizedAppUrl)) {
+      if ((process.env.NODE_ENV || NODE_ENV) !== 'production' || (normalizedAppUrl && origin === normalizedAppUrl)) {
         res.setHeader('Access-Control-Allow-Origin', origin);
         res.setHeader('Access-Control-Allow-Credentials', 'true');
       }
@@ -469,9 +548,12 @@ async function startServer() {
   }
 
   // Authoritative user lookup: ALWAYS queries PostgreSQL first so user roles and password hashes come from PostgreSQL.
-  // Falls back to memoryStore + persisted disk updates ONLY when PostgreSQL is disconnected.
+  // Falls back to memoryStore + persisted disk updates ONLY when PostgreSQL is not configured.
   async function resolveAuthoritativeUserById(userId: string): Promise<any | null> {
     if (!userId) return null;
+    if (options.oauthUserRepo?.findById) {
+      return await options.oauthUserRepo.findById(userId);
+    }
     if (isDbConnected() && db) {
       try {
         const rows = await db.select().from(users).where(eq(users.id, userId)).limit(1);
@@ -496,6 +578,9 @@ async function startServer() {
   async function resolveAuthoritativeUserByEmail(email: string): Promise<any | null> {
     const cleanEmail = email.toLowerCase().trim();
     if (!cleanEmail) return null;
+    if (options.oauthUserRepo?.findByEmail) {
+      return await options.oauthUserRepo.findByEmail(cleanEmail);
+    }
     if (isDbConnected() && db) {
       try {
         const rows = await db.select().from(users).where(eq(users.email, cleanEmail)).limit(1);
@@ -523,12 +608,12 @@ async function startServer() {
     return null;
   }
 
-  // Check database connectivity
-  await checkDbConnection();
-
-  // Run database migration to ensure all tables exist if connected
-  await runMigrations();
-  await seedInitialDatabase();
+  // Check database connectivity and run migrations on normal server startup
+  if (!options.skipStaticAndVite) {
+    await checkDbConnection();
+    await runMigrations();
+    await seedInitialDatabase();
+  }
 
   // Helper middleware to extract user strictly from cryptographically verified session cookie/token
   // NEVER trusts X-User-Id, email, or role supplied by the frontend; resolves active role from PostgreSQL.
@@ -818,15 +903,37 @@ async function startServer() {
   // AUTHENTICATION ROUTES (Email & Password)
   // ==========================================
 
+  function isSecureCookieRequest(req: express.Request): boolean {
+    if (req.secure || req.headers['x-forwarded-proto'] === 'https') {
+      return true;
+    }
+    const host = (req.hostname || '').toLowerCase();
+    const isLocalHost = host === 'localhost' || host === '127.0.0.1' || host === '::1';
+    if (!isLocalHost && ((process.env.NODE_ENV || NODE_ENV) === 'production' || getRuntimeAppUrl().startsWith('https://'))) {
+      return true;
+    }
+    return false;
+  }
+
   // Helper to set secure HTTP-only session cookie consistently
   function setSecureSessionCookie(req: express.Request, res: express.Response, token: string, maxAgeMs: number = 7 * 24 * 60 * 60 * 1000) {
-    const isHttps = NODE_ENV === 'production' || APP_URL.startsWith('https://') || req.secure || req.headers['x-forwarded-proto'] === 'https';
+    const isHttps = isSecureCookieRequest(req);
     res.cookie(COOKIE_NAME, token, {
       httpOnly: true,
       secure: isHttps,
-      sameSite: isHttps ? 'none' : 'lax',
+      sameSite: 'lax',
       path: '/',
       maxAge: maxAgeMs,
+    });
+  }
+
+  function clearSecureSessionCookie(req: express.Request, res: express.Response) {
+    const isHttps = isSecureCookieRequest(req);
+    res.clearCookie(COOKIE_NAME, {
+      httpOnly: true,
+      secure: isHttps,
+      sameSite: 'lax',
+      path: '/',
     });
   }
 
@@ -990,11 +1097,21 @@ async function startServer() {
 
   // POST /api/auth/logout
   app.post('/api/auth/logout', async (req, res) => {
+    const cookieToken = req.cookies?.[COOKIE_NAME];
+    const bearerToken = req.headers.authorization?.startsWith('Bearer ')
+      ? req.headers.authorization.slice(7).trim()
+      : undefined;
+    const headerToken = typeof req.headers['x-auth-token'] === 'string' ? req.headers['x-auth-token'] : undefined;
+
+    revokeSessionToken(cookieToken);
+    revokeSessionToken(bearerToken);
+    revokeSessionToken(headerToken);
+
     const user = (req as any).user;
     if (user) {
       await logAudit('USER_LOGOUT', `User logged out: ${user.email}`, user.id, undefined, user.role, req);
     }
-    res.clearCookie(COOKIE_NAME, { path: '/' });
+    clearSecureSessionCookie(req, res);
     return res.status(200).json({ success: true, message: 'Logged out successfully.' });
   });
 
@@ -1008,7 +1125,7 @@ async function startServer() {
 
       const foundUser = await resolveAuthoritativeUserById(session.id);
       if (!foundUser || foundUser.suspended) {
-        res.clearCookie(COOKIE_NAME, { path: '/' });
+        clearSecureSessionCookie(req, res);
         return res.status(401).json({ user: null });
       }
 
@@ -1263,14 +1380,18 @@ async function startServer() {
 
   // Separate state stores per provider
   const googleOAuthStates = new Map<string, OAuthStateEntry>();
+  const consumedGoogleOAuthStates = new Map<string, number>();
   const instagramOAuthStates = new Map<string, OAuthStateEntry>();
   const otherOAuthStates = new Map<string, OAuthStateEntry & { provider: string }>();
 
-  setInterval(() => {
+  const stateCleanupTimer = setInterval(() => {
     const now = Date.now();
     const ttl = 10 * 60 * 1000;
     for (const [k, v] of googleOAuthStates.entries()) {
       if (now - v.createdAt > ttl) googleOAuthStates.delete(k);
+    }
+    for (const [k, ts] of consumedGoogleOAuthStates.entries()) {
+      if (now - ts > ttl) consumedGoogleOAuthStates.delete(k);
     }
     for (const [k, v] of instagramOAuthStates.entries()) {
       if (now - v.createdAt > ttl) instagramOAuthStates.delete(k);
@@ -1278,32 +1399,131 @@ async function startServer() {
     for (const [k, v] of otherOAuthStates.entries()) {
       if (now - v.createdAt > ttl) otherOAuthStates.delete(k);
     }
-  }, 5 * 60 * 1000);
-
-  function resolveProductionBaseUrl(): string {
-    if (!APP_URL) return '';
-    if (isForbiddenProductionUrl(APP_URL)) {
-      return '';
+    for (const [k, exp] of revokedSessionRegistry.entries()) {
+      if (exp < now) revokedSessionRegistry.delete(k);
     }
-    return APP_URL;
+  }, 5 * 60 * 1000);
+  if (typeof stateCleanupTimer.unref === 'function') {
+    stateCleanupTimer.unref();
   }
 
-  // 1. GOOGLE OAUTH CONFIGURATION (Reads exclusively from process.env at runtime)
+  function resolveProductionBaseUrl(): string {
+    const rawAppUrl = getRuntimeAppUrl();
+    if (!rawAppUrl) return '';
+    if (isForbiddenProductionUrl(rawAppUrl)) {
+      return '';
+    }
+    try {
+      const parsed = new URL(rawAppUrl);
+      if (parsed.pathname && parsed.pathname !== '/') {
+        return '';
+      }
+      return parsed.origin;
+    } catch {
+      return '';
+    }
+  }
+
+  // 1. GOOGLE OAUTH CONFIGURATION
+  // Reads ONLY GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, GOOGLE_REDIRECT_URI, and APP_URL from process.env at runtime.
+  // Never uses fallback credentials, preview container URLs, localhost URLs, or dynamic container hosts.
   function getGoogleOAuthConfig() {
-    const clientId = process.env.GOOGLE_CLIENT_ID?.trim() || undefined;
-    const clientSecret = process.env.GOOGLE_CLIENT_SECRET?.trim() || undefined;
+    const clientId = process.env.GOOGLE_CLIENT_ID?.trim() || '';
+    const clientSecret = process.env.GOOGLE_CLIENT_SECRET?.trim() || '';
+    const explicitRedirectUri = process.env.GOOGLE_REDIRECT_URI?.trim() || '';
+    const rawAppUrl = getRuntimeAppUrl();
+
+    const missingVars: string[] = [];
+    if (!clientId) missingVars.push('GOOGLE_CLIENT_ID');
+    if (!clientSecret) missingVars.push('GOOGLE_CLIENT_SECRET');
+    if (!explicitRedirectUri) missingVars.push('GOOGLE_REDIRECT_URI');
+    if (!rawAppUrl) missingVars.push('APP_URL');
+
+    if (missingVars.length > 0) {
+      return {
+        id: 'google' as const,
+        name: 'Google',
+        clientId: undefined,
+        clientSecret: undefined,
+        appUrl: '',
+        redirectUri: '',
+        configured: false,
+        errorCode: 'missing_oauth_credentials' as const,
+        error: `Missing Google OAuth credentials: Required environment variable(s) not set: ${missingVars.join(', ')}.`,
+        authUrl: 'https://accounts.google.com/o/oauth2/v2/auth',
+        tokenUrl: 'https://oauth2.googleapis.com/token',
+        userInfoUrl: 'https://www.googleapis.com/oauth2/v2/userinfo',
+        scope: 'openid email profile',
+      };
+    }
+
     const prodBase = resolveProductionBaseUrl();
-    const explicitRedirect = process.env.GOOGLE_REDIRECT_URI?.trim() || '';
-    const candidateRedirect = explicitRedirect || (prodBase ? `${prodBase}/api/auth/callback/google` : '');
-    const isRedirectValid = candidateRedirect.length > 0 && !isForbiddenProductionUrl(candidateRedirect);
+    if (!prodBase) {
+      return {
+        id: 'google' as const,
+        name: 'Google',
+        clientId: undefined,
+        clientSecret: undefined,
+        appUrl: '',
+        redirectUri: '',
+        configured: false,
+        errorCode: 'redirect_uri_mismatch' as const,
+        error: 'Google OAuth configuration error: APP_URL must be a valid HTTPS production domain (development, preview container, localhost, and dynamic container hosts are prohibited).',
+        authUrl: 'https://accounts.google.com/o/oauth2/v2/auth',
+        tokenUrl: 'https://oauth2.googleapis.com/token',
+        userInfoUrl: 'https://www.googleapis.com/oauth2/v2/userinfo',
+        scope: 'openid email profile',
+      };
+    }
+
+    const expectedRedirectUri = `${prodBase}${GOOGLE_OAUTH_CALLBACK_PATH}`;
+
+    if (isForbiddenProductionUrl(explicitRedirectUri)) {
+      return {
+        id: 'google' as const,
+        name: 'Google',
+        clientId: undefined,
+        clientSecret: undefined,
+        appUrl: prodBase,
+        redirectUri: '',
+        configured: false,
+        errorCode: 'redirect_uri_mismatch' as const,
+        error: `Redirect URI mismatch: GOOGLE_REDIRECT_URI must be a valid HTTPS production URL matching ${expectedRedirectUri} (development, preview container, localhost, and dynamic container hosts are prohibited).`,
+        authUrl: 'https://accounts.google.com/o/oauth2/v2/auth',
+        tokenUrl: 'https://oauth2.googleapis.com/token',
+        userInfoUrl: 'https://www.googleapis.com/oauth2/v2/userinfo',
+        scope: 'openid email profile',
+      };
+    }
+
+    if (explicitRedirectUri !== expectedRedirectUri) {
+      return {
+        id: 'google' as const,
+        name: 'Google',
+        clientId: undefined,
+        clientSecret: undefined,
+        appUrl: prodBase,
+        redirectUri: '',
+        configured: false,
+        errorCode: 'redirect_uri_mismatch' as const,
+        error: `Redirect URI mismatch: GOOGLE_REDIRECT_URI must exactly match the production callback URL ${expectedRedirectUri}.`,
+        authUrl: 'https://accounts.google.com/o/oauth2/v2/auth',
+        tokenUrl: 'https://oauth2.googleapis.com/token',
+        userInfoUrl: 'https://www.googleapis.com/oauth2/v2/userinfo',
+        scope: 'openid email profile',
+      };
+    }
 
     return {
       id: 'google' as const,
       name: 'Google',
       clientId,
       clientSecret,
-      redirectUri: isRedirectValid ? candidateRedirect : '',
-      configured: Boolean(clientId && clientSecret && isRedirectValid),
+      appUrl: prodBase,
+      redirectUri: expectedRedirectUri,
+      configured: true,
+      errorCode: null,
+      error: null,
       authUrl: 'https://accounts.google.com/o/oauth2/v2/auth',
       tokenUrl: 'https://oauth2.googleapis.com/token',
       userInfoUrl: 'https://www.googleapis.com/oauth2/v2/userinfo',
@@ -1320,7 +1540,6 @@ async function startServer() {
     const candidateRedirect = explicitRedirect || (prodBase ? `${prodBase}/api/auth/callback/instagram` : '');
     const isRedirectValid = candidateRedirect.length > 0 && !isForbiddenProductionUrl(candidateRedirect);
 
-    // Official Meta OAuth 2.0 flow for configured Meta / Instagram apps (supports Instagram Business override if configured)
     const useInstagramBusinessLogin = process.env.INSTAGRAM_OAUTH_FLOW?.trim() === 'instagram_business';
 
     return {
@@ -1408,9 +1627,10 @@ async function startServer() {
   }
 
   function signOAuthStateCookieValue(provider: string, state: string, redirectUri: string): string {
+    const secret = getSessionSecret();
     const payload = JSON.stringify({ provider, state, redirectUri, exp: Date.now() + 10 * 60 * 1000 });
     const encoded = Buffer.from(payload, 'utf8').toString('base64url');
-    const sig = crypto.createHmac('sha256', SESSION_SECRET).update(encoded).digest('base64url');
+    const sig = crypto.createHmac('sha256', secret).update(encoded).digest('base64url');
     return `${encoded}.${sig}`;
   }
 
@@ -1419,7 +1639,8 @@ async function startServer() {
     try {
       const [encoded, sig] = cookieVal.split('.');
       if (!encoded || !sig) return null;
-      const expectedSig = crypto.createHmac('sha256', SESSION_SECRET).update(encoded).digest('base64url');
+      const secret = getSessionSecret();
+      const expectedSig = crypto.createHmac('sha256', secret).update(encoded).digest('base64url');
       const sigBuf = Buffer.from(sig, 'utf8');
       const expBuf = Buffer.from(expectedSig, 'utf8');
       if (sigBuf.length !== expBuf.length || !crypto.timingSafeEqual(sigBuf, expBuf)) return null;
@@ -1432,6 +1653,144 @@ async function startServer() {
     }
   }
 
+  function sendOAuthErrorResponse(
+    req: express.Request,
+    res: express.Response,
+    statusCode: number,
+    errorCode: string,
+    errorMsg: string
+  ) {
+    const safeMsg = String(errorMsg || 'Authentication failed').replace(/[&<>]/g, '');
+    const acceptHeader = String(req.headers.accept || '');
+    const wantsHtml = acceptHeader.includes('text/html') && !acceptHeader.includes('application/json') && req.query.format !== 'json';
+
+    if (!wantsHtml) {
+      return res.status(statusCode).json({
+        success: false,
+        code: errorCode,
+        error: safeMsg,
+      });
+    }
+
+    const targetOrigin = resolveProductionBaseUrl() || '*';
+    const authReturnUrl = `/auth?oauth_error=${encodeURIComponent(safeMsg)}`;
+
+    return res.status(statusCode).send(`<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Authentication Error - University Tutors</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    body { font-family: system-ui, -apple-system, sans-serif; background: #f8fafc; color: #0f172a; margin: 0; padding: 24px; display: flex; align-items: center; justify-content: center; min-height: 80vh; }
+    .card { background: #ffffff; border: 1px solid #fee2e2; border-radius: 20px; padding: 32px; max-width: 440px; width: 100%; text-align: center; box-shadow: 0 10px 25px -5px rgba(0,0,0,0.06); }
+    .badge { width: 48px; height: 48px; border-radius: 50%; background: #fef2f2; color: #dc2626; display: flex; align-items: center; justify-content: center; margin: 0 auto 16px; font-size: 24px; font-weight: bold; }
+    h2 { font-size: 18px; margin: 0 0 8px; font-weight: 700; color: #991b1b; }
+    p { font-size: 13px; color: #64748b; margin: 0 0 24px; line-height: 1.5; }
+    a.btn { display: inline-block; background: #0f172a; color: #fff; text-decoration: none; padding: 10px 20px; border-radius: 12px; font-size: 13px; font-weight: 600; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="badge">✕</div>
+    <h2>Sign-In Could Not Complete</h2>
+    <p>${safeMsg}</p>
+    <a class="btn" href="${authReturnUrl}">Return to Sign In</a>
+  </div>
+  <script>
+    if (window.opener && !window.opener.closed) {
+      try {
+        window.opener.postMessage({ type: 'OAUTH_AUTH_ERROR', code: ${JSON.stringify(errorCode)}, error: ${JSON.stringify(safeMsg)} }, ${JSON.stringify(targetOrigin)});
+        window.close();
+      } catch (e) {}
+    }
+  </script>
+</body>
+</html>`);
+  }
+
+  function renderOAuthErrorPage(res: express.Response, errorMsg: string) {
+    return sendOAuthErrorResponse({ headers: { accept: 'text/html' }, query: {} } as any, res, 400, 'oauth_error', errorMsg);
+  }
+
+  async function findOrCreatePostgreSqlOAuthUser(
+    req: express.Request,
+    providerLabel: string,
+    verifiedEmail: string,
+    verifiedName: string,
+    verifiedAvatar: string
+  ): Promise<any> {
+    const cleanEmail = verifiedEmail.toLowerCase().trim();
+
+    const dbConfiguredAtRuntime = Boolean(process.env.DATABASE_URL && process.env.DATABASE_URL.trim() !== '') || hasDatabaseUrl;
+    let existingUser: any = null;
+    if (options.oauthUserRepo?.findByEmail) {
+      existingUser = await options.oauthUserRepo.findByEmail(cleanEmail);
+    } else if (dbConfiguredAtRuntime) {
+      if (!isDbConnected() || !db) {
+        throw new Error('PostgreSQL database connection is unavailable.');
+      }
+      const rows = await db.select().from(users).where(eq(users.email, cleanEmail)).limit(1);
+      existingUser = rows.length > 0 ? rows[0] : null;
+    } else {
+      existingUser = await resolveAuthoritativeUserByEmail(cleanEmail);
+    }
+
+    if (existingUser) {
+      return { user: existingUser, created: false };
+    }
+
+    const newUserId = 'usr_' + crypto.randomBytes(12).toString('hex');
+    const newUserRecord = {
+      id: newUserId,
+      role: 'student',
+      name: verifiedName || `${providerLabel} Student`,
+      email: cleanEmail,
+      passwordHash: null,
+      avatarUrl: verifiedAvatar || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&auto=format&fit=crop&q=80',
+      createdAt: new Date().toISOString(),
+      suspended: false,
+      verified: true,
+      bio: `Student member authenticated via ${providerLabel}.`,
+      hourlyRate: null,
+      rating: null,
+      reviewCount: null,
+      subjects: null,
+      country: 'US',
+      location: null,
+      phoneNumber: null,
+      education: null,
+      experience: null,
+      subjectExpertise: null,
+      availability: null,
+      canMeet: null,
+      hobbies: null,
+      isApproved: true,
+      status: 'active',
+    };
+
+    if (options.oauthUserRepo?.createUser) {
+      const createdRecord = await options.oauthUserRepo.createUser(newUserRecord);
+      memoryStore.setUser(createdRecord || newUserRecord);
+      return { user: createdRecord || newUserRecord, created: true };
+    }
+
+    if (dbConfiguredAtRuntime) {
+      if (!isDbConnected() || !db) {
+        throw new Error('PostgreSQL database connection is unavailable.');
+      }
+      await db.insert(users).values(newUserRecord);
+    } else if (isDbConnected() && db) {
+      await db.insert(users).values(newUserRecord);
+    }
+
+    memoryStore.setUser(newUserRecord);
+    savePersistedUserUpdate(newUserId, newUserRecord);
+    await logAudit('OAUTH_REGISTER', `New student account created via ${providerLabel}: ${cleanEmail}`, newUserId, newUserRecord.name, 'student', req);
+
+    return { user: newUserRecord, created: true };
+  }
+
   async function finalizeOAuthUserSession(
     req: express.Request,
     res: express.Response,
@@ -1440,52 +1799,48 @@ async function startServer() {
     verifiedName: string,
     verifiedAvatar: string
   ) {
-    const cleanEmail = verifiedEmail.toLowerCase().trim();
-    let targetUser = await resolveAuthoritativeUserByEmail(cleanEmail);
-
-    if (targetUser && targetUser.suspended) {
-      return renderOAuthErrorPage(res, 'This account has been suspended by an administrator.');
+    let userLookupResult: { user: any; created: boolean };
+    try {
+      userLookupResult = await findOrCreatePostgreSqlOAuthUser(
+        req,
+        providerLabel,
+        verifiedEmail,
+        verifiedName,
+        verifiedAvatar
+      );
+    } catch {
+      return sendOAuthErrorResponse(
+        req,
+        res,
+        500,
+        'user_creation_failed',
+        'Failed to create or retrieve user account in PostgreSQL.'
+      );
     }
 
-    if (!targetUser) {
-      const newUserId = 'usr_' + crypto.randomBytes(12).toString('hex');
-      const newUserRecord = {
-        id: newUserId,
-        role: 'student',
-        name: verifiedName || `${providerLabel} Student`,
-        email: cleanEmail,
-        passwordHash: null,
-        avatarUrl: verifiedAvatar || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&auto=format&fit=crop&q=80',
-        createdAt: new Date().toISOString(),
-        suspended: false,
-        verified: true,
-        bio: `Student member authenticated via ${providerLabel}.`,
-        hourlyRate: null,
-        rating: null,
-        reviewCount: null,
-        subjects: null,
-        country: 'US',
-        location: null,
-        phoneNumber: null,
-        education: null,
-        experience: null,
-        subjectExpertise: null,
-        availability: null,
-        canMeet: null,
-        hobbies: null,
-        isApproved: true,
-        status: 'active',
-      };
+    const targetUser = userLookupResult.user;
+    if (!targetUser || !targetUser.id) {
+      return sendOAuthErrorResponse(
+        req,
+        res,
+        500,
+        'user_creation_failed',
+        'Failed to create or retrieve user account in PostgreSQL.'
+      );
+    }
 
-      if (isDbConnected() && db) {
-        await db.insert(users).values(newUserRecord);
-      }
-      memoryStore.setUser(newUserRecord);
-      savePersistedUserUpdate(newUserId, newUserRecord);
-      targetUser = newUserRecord;
-      await logAudit('OAUTH_REGISTER', `New student account created via ${providerLabel}: ${cleanEmail}`, newUserId, targetUser.name, 'student', req);
-    } else {
-      await logAudit('OAUTH_LOGIN', `User signed in via ${providerLabel}: ${cleanEmail} (${targetUser.role})`, targetUser.id, targetUser.name, targetUser.role, req);
+    if (targetUser.suspended) {
+      return sendOAuthErrorResponse(
+        req,
+        res,
+        403,
+        'account_suspended',
+        'This account has been suspended by an administrator.'
+      );
+    }
+
+    if (!userLookupResult.created) {
+      await logAudit('OAUTH_LOGIN', `User signed in via ${providerLabel}: ${targetUser.email} (${targetUser.role})`, targetUser.id, targetUser.name, targetUser.role, req);
     }
 
     const sessionToken = createSessionToken({
@@ -1502,114 +1857,7 @@ async function startServer() {
       targetRedirectUrl = '/tutor/dashboard';
     }
 
-    return renderOAuthSuccessPage(res, sessionToken, targetUser, targetRedirectUrl);
-  }
-
-  function renderOAuthSuccessPage(res: express.Response, sessionToken: string, user: any, redirectUrl: string) {
-    const safeUser = {
-      id: user.id,
-      name: user.name,
-      email: user.email,
-      role: user.role,
-      avatarUrl: user.avatarUrl
-    };
-    const escapedName = String(safeUser.name || '').replace(/[&<>"']/g, '');
-    const escapedEmail = String(safeUser.email || '').replace(/[&<>"']/g, '');
-    const targetOrigin = resolveProductionBaseUrl() || '*';
-
-    return res.status(200).send(`<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="utf-8">
-  <title>Authentication Successful - University Tutors</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <style>
-    body { font-family: system-ui, -apple-system, sans-serif; background: #f8fafc; color: #0f172a; margin: 0; padding: 24px; display: flex; align-items: center; justify-content: center; min-height: 80vh; }
-    .card { background: #ffffff; border: 1px solid #e2e8f0; border-radius: 20px; padding: 32px; max-width: 440px; width: 100%; text-align: center; box-shadow: 0 10px 25px -5px rgba(0,0,0,0.06); }
-    .badge { width: 52px; height: 52px; border-radius: 50%; background: #ecfdf5; color: #059669; display: flex; align-items: center; justify-content: center; margin: 0 auto 16px; font-size: 26px; }
-    h2 { font-size: 20px; margin: 0 0 8px; font-weight: 700; color: #0f172a; }
-    p { font-size: 14px; color: #64748b; margin: 0 0 20px; line-height: 1.5; }
-    .btn { display: inline-block; background: #ea580c; color: #fff; text-decoration: none; padding: 12px 24px; border-radius: 12px; font-size: 14px; font-weight: 600; cursor: pointer; border: none; }
-    .spinner { display: inline-block; width: 22px; height: 22px; border: 2.5px solid #e2e8f0; border-top-color: #ea580c; border-radius: 50%; animation: spin 0.8s linear infinite; margin: 8px auto 16px; }
-    @keyframes spin { to { transform: rotate(360deg); } }
-  </style>
-</head>
-<body>
-  <div class="card">
-    <div class="badge">✓</div>
-    <h2>Authenticated Successfully</h2>
-    <p>Welcome, <strong>${escapedName}</strong> (${escapedEmail})! Loading your workspace...</p>
-    <div class="spinner"></div>
-    <div>
-      <button id="contBtn" onclick="finishLogin()" class="btn">Proceed to Dashboard</button>
-    </div>
-  </div>
-  <script>
-    const payload = {
-      type: 'OAUTH_AUTH_SUCCESS',
-      user: ${JSON.stringify(safeUser)},
-      redirectUrl: ${JSON.stringify(redirectUrl)}
-    };
-    try {
-      localStorage.setItem('ut_current_user', JSON.stringify(payload.user));
-    } catch(e) {}
-    try {
-      if (typeof BroadcastChannel !== 'undefined') {
-        const bc = new BroadcastChannel('oauth_channel');
-        bc.postMessage(payload);
-      }
-    } catch(e) {}
-    function finishLogin() {
-      if (window.opener && !window.opener.closed) {
-        try { window.opener.postMessage(payload, ${JSON.stringify(targetOrigin)}); } catch(e) {}
-        setTimeout(() => { try { window.close(); } catch(e){} }, 300);
-      } else {
-        window.location.href = ${JSON.stringify(redirectUrl)};
-      }
-    }
-    if (window.opener && !window.opener.closed) {
-      try { window.opener.postMessage(payload, ${JSON.stringify(targetOrigin)}); } catch(e) {}
-      setTimeout(() => { try { window.close(); } catch(e){} }, 600);
-    } else {
-      setTimeout(() => { finishLogin(); }, 900);
-    }
-  </script>
-</body>
-</html>`);
-  }
-
-  function renderOAuthErrorPage(res: express.Response, errorMsg: string) {
-    const safeMsg = String(errorMsg || 'Authentication failed').replace(/[&<>]/g, '');
-    const targetOrigin = resolveProductionBaseUrl() || '*';
-    return res.status(400).send(`<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="utf-8">
-  <title>Authentication Error</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <style>
-    body { font-family: system-ui, -apple-system, sans-serif; background: #f8fafc; color: #0f172a; margin: 0; padding: 24px; display: flex; align-items: center; justify-content: center; min-height: 80vh; }
-    .card { background: #ffffff; border: 1px solid #fee2e2; border-radius: 20px; padding: 32px; max-width: 400px; width: 100%; text-align: center; box-shadow: 0 10px 25px -5px rgba(0,0,0,0.06); }
-    .badge { width: 48px; height: 48px; border-radius: 50%; background: #fef2f2; color: #dc2626; display: flex; align-items: center; justify-content: center; margin: 0 auto 16px; font-size: 24px; font-weight: bold; }
-    h2 { font-size: 18px; margin: 0 0 8px; font-weight: 700; color: #991b1b; }
-    p { font-size: 13px; color: #64748b; margin: 0 0 24px; line-height: 1.5; }
-    button { background: #0f172a; color: #fff; border: 0; padding: 10px 20px; border-radius: 12px; font-size: 13px; font-weight: 600; cursor: pointer; }
-  </style>
-</head>
-<body>
-  <div class="card">
-    <div class="badge">✕</div>
-    <h2>Sign-In Could Not Complete</h2>
-    <p>${safeMsg}</p>
-    <button onclick="if(window.opener){window.opener.postMessage({type:'OAUTH_AUTH_ERROR',error:${JSON.stringify(safeMsg)}},${JSON.stringify(targetOrigin)});window.close();}else{window.location.href='/auth';}">Close Window</button>
-  </div>
-  <script>
-    if (window.opener) {
-      window.opener.postMessage({ type: 'OAUTH_AUTH_ERROR', error: ${JSON.stringify(safeMsg)} }, ${JSON.stringify(targetOrigin)});
-    }
-  </script>
-</body>
-</html>`);
+    return res.redirect(302, targetRedirectUrl);
   }
 
   // GET /api/auth/providers
@@ -1661,17 +1909,15 @@ async function startServer() {
 
   // -------------------------------------------------------------------------
   // DEDICATED GOOGLE OAUTH 2.0 INITIATION & CALLBACK HANDLERS
+  // Exact production callback route: /api/auth/callback/google
   // -------------------------------------------------------------------------
   app.get('/api/auth/google/url', (req, res) => {
     const cfg = getGoogleOAuthConfig();
-    if (!cfg.clientId || !cfg.clientSecret) {
+    if (!cfg.configured || !cfg.clientId || !cfg.clientSecret || !cfg.redirectUri) {
       return res.status(400).json({
-        error: 'Google OAuth is not configured on this server. Set GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET in runtime environment variables.'
-      });
-    }
-    if (!cfg.redirectUri) {
-      return res.status(400).json({
-        error: 'Google OAuth configuration error: A valid HTTPS production domain is required in GOOGLE_REDIRECT_URI or APP_URL (preview, localhost, development, and container URLs are prohibited).'
+        success: false,
+        code: cfg.errorCode || 'missing_oauth_credentials',
+        error: cfg.error || 'Google OAuth is not configured on this server.',
       });
     }
 
@@ -1681,11 +1927,11 @@ async function startServer() {
       createdAt: Date.now(),
     });
 
-    const isHttps = NODE_ENV === 'production' || cfg.redirectUri.startsWith('https://') || req.secure;
+    const isHttps = isSecureCookieRequest(req);
     res.cookie('oauth_state_google', signOAuthStateCookieValue('google', state, cfg.redirectUri), {
       httpOnly: true,
       secure: isHttps,
-      sameSite: isHttps ? 'none' : 'lax',
+      sameSite: 'lax',
       path: '/',
       maxAge: 10 * 60 * 1000,
     });
@@ -1696,95 +1942,241 @@ async function startServer() {
       response_type: 'code',
       scope: cfg.scope,
       state,
-      access_type: 'offline',
       prompt: 'select_account',
     });
 
-    return res.json({ success: true, url: `${cfg.authUrl}?${params.toString()}`, state });
+    return res.status(200).json({
+      success: true,
+      url: `${cfg.authUrl}?${params.toString()}`,
+    });
   });
 
   const handleGoogleOAuthCallback = async (req: express.Request, res: express.Response) => {
+    const cfg = getGoogleOAuthConfig();
+    const isHttps = isSecureCookieRequest(req);
+
+    // Always clear one-time state cookie on callback execution
+    const rawStateCookie = req.cookies?.oauth_state_google;
+    if (rawStateCookie) {
+      res.clearCookie('oauth_state_google', {
+        httpOnly: true,
+        secure: isHttps,
+        sameSite: 'lax',
+        path: '/',
+      });
+    }
+
+    if (!cfg.configured || !cfg.clientId || !cfg.clientSecret || !cfg.redirectUri) {
+      return sendOAuthErrorResponse(
+        req,
+        res,
+        400,
+        cfg.errorCode || 'missing_oauth_credentials',
+        cfg.error || 'Missing Google OAuth credentials on this server.'
+      );
+    }
+
     const errorParam = (req.query.error || req.query.error_description) as string | undefined;
     if (errorParam) {
-      return renderOAuthErrorPage(res, `Google authorization error: ${errorParam}`);
+      const normalizedErr = String(errorParam).toLowerCase();
+      if (normalizedErr.includes('redirect_uri_mismatch')) {
+        return sendOAuthErrorResponse(
+          req,
+          res,
+          400,
+          'redirect_uri_mismatch',
+          `Redirect URI mismatch: Google rejected the callback URL. Verify Google Cloud Console matches ${cfg.redirectUri}.`
+        );
+      }
+      return sendOAuthErrorResponse(
+        req,
+        res,
+        400,
+        'oauth_provider_error',
+        `Google authorization failed: ${String(errorParam)}`
+      );
     }
 
-    const code = req.query.code as string | undefined;
-    const state = req.query.state as string | undefined;
-
-    if (!state || typeof state !== 'string') {
-      return renderOAuthErrorPage(res, 'Missing OAuth state parameter (CSRF validation failed).');
+    const state = typeof req.query.state === 'string' ? req.query.state.trim() : '';
+    if (!state || !/^[a-f0-9]{64}$/.test(state)) {
+      return sendOAuthErrorResponse(
+        req,
+        res,
+        400,
+        'invalid_state',
+        'Invalid OAuth state: state parameter is missing or malformed.'
+      );
     }
 
-    const cfg = getGoogleOAuthConfig();
-    if (!cfg.configured || !cfg.clientId || !cfg.clientSecret) {
-      return renderOAuthErrorPage(res, 'Google OAuth is not configured on this server.');
+    if (consumedGoogleOAuthStates.has(state)) {
+      return sendOAuthErrorResponse(
+        req,
+        res,
+        400,
+        'invalid_state',
+        'Invalid OAuth state: state parameter has already been used.'
+      );
     }
 
-    // Strict CSRF state verification: must exist in server state store or match HMAC-signed cookie
     const memEntry = googleOAuthStates.get(state);
-    const cookieRedirect = verifyOAuthStateCookieValue(req.cookies?.oauth_state_google, 'google', state);
-    res.clearCookie('oauth_state_google', { path: '/' });
+    googleOAuthStates.delete(state);
+
+    const cookieRedirect = rawStateCookie
+      ? verifyOAuthStateCookieValue(rawStateCookie, 'google', state)
+      : null;
+
+    if (rawStateCookie && !cookieRedirect) {
+      return sendOAuthErrorResponse(
+        req,
+        res,
+        400,
+        'invalid_state',
+        'Invalid OAuth state: state cookie verification failed.'
+      );
+    }
 
     if (!memEntry && !cookieRedirect) {
-      return renderOAuthErrorPage(res, 'Invalid or expired OAuth state parameter (CSRF protection failed).');
-    }
-    if (memEntry) {
-      googleOAuthStates.delete(state);
-      if (Date.now() - memEntry.createdAt > 10 * 60 * 1000) {
-        return renderOAuthErrorPage(res, 'Expired OAuth state parameter. Please try signing in again.');
-      }
-    }
-
-    if (!code || typeof code !== 'string') {
-      return renderOAuthErrorPage(res, 'Missing authorization code from Google.');
+      return sendOAuthErrorResponse(
+        req,
+        res,
+        400,
+        'invalid_state',
+        'Invalid or expired OAuth state parameter.'
+      );
     }
 
-    const redirectUriToUse = memEntry?.redirectUri || cookieRedirect || cfg.redirectUri;
+    if (memEntry && Date.now() - memEntry.createdAt > 10 * 60 * 1000) {
+      return sendOAuthErrorResponse(
+        req,
+        res,
+        400,
+        'invalid_state',
+        'Expired OAuth state parameter. Please start Google sign-in again.'
+      );
+    }
 
+    consumedGoogleOAuthStates.set(state, Date.now());
+
+    const boundRedirectUri = memEntry?.redirectUri || cookieRedirect || '';
+    if (boundRedirectUri !== cfg.redirectUri) {
+      return sendOAuthErrorResponse(
+        req,
+        res,
+        400,
+        'redirect_uri_mismatch',
+        `Redirect URI mismatch: OAuth state redirect URI does not match ${cfg.redirectUri}.`
+      );
+    }
+
+    const code = typeof req.query.code === 'string' ? req.query.code.trim() : '';
+    if (!code) {
+      return sendOAuthErrorResponse(
+        req,
+        res,
+        400,
+        'token_exchange_failed',
+        'Google OAuth failed: missing authorization code.'
+      );
+    }
+
+    // Exchange authorization code strictly on the backend (never log secrets or tokens)
+    let accessToken = '';
     try {
-      const tokenRes = await fetch(cfg.tokenUrl, {
+      const tokenRes = await oauthFetch(cfg.tokenUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
         body: new URLSearchParams({
           code,
           client_id: cfg.clientId,
           client_secret: cfg.clientSecret,
-          redirect_uri: redirectUriToUse,
+          redirect_uri: cfg.redirectUri,
           grant_type: 'authorization_code',
         }),
       });
-      const tokenData = await tokenRes.json();
-      if (!tokenRes.ok || !tokenData.access_token) {
-        return renderOAuthErrorPage(res, 'Google token exchange failed. Please verify your OAuth configuration and try again.');
+
+      const tokenData: any = await tokenRes.json().catch(() => ({}));
+      if (tokenData?.error === 'redirect_uri_mismatch') {
+        return sendOAuthErrorResponse(
+          req,
+          res,
+          400,
+          'redirect_uri_mismatch',
+          `Redirect URI mismatch during Google token exchange. Expected ${cfg.redirectUri}.`
+        );
       }
 
-      const userRes = await fetch(cfg.userInfoUrl, {
-        headers: { Authorization: `Bearer ${tokenData.access_token}` },
-      });
-      const userData = await userRes.json();
-      if (!userRes.ok || !userData.email) {
-        return renderOAuthErrorPage(res, 'Google profile did not include a verified email address.');
+      if (!tokenRes.ok || typeof tokenData?.access_token !== 'string' || !tokenData.access_token) {
+        return sendOAuthErrorResponse(
+          req,
+          res,
+          tokenRes.status >= 400 && tokenRes.status < 500 ? 400 : 502,
+          'token_exchange_failed',
+          'Failed to exchange Google authorization code for access token.'
+        );
       }
 
-      const profileEmail = String(userData.email).toLowerCase().trim();
-      const profileName = userData.name || profileEmail.split('@')[0] || 'Google Student';
-      const profileAvatar = userData.picture || '';
-
-      return await finalizeOAuthUserSession(req, res, 'Google', profileEmail, profileName, profileAvatar);
+      accessToken = tokenData.access_token;
     } catch {
-      return renderOAuthErrorPage(res, 'Failed to complete Google authentication.');
+      return sendOAuthErrorResponse(
+        req,
+        res,
+        502,
+        'token_exchange_failed',
+        'Failed to exchange Google authorization code due to upstream network error.'
+      );
     }
+
+    // Request Google user profile using backend access token (never log access token)
+    let profileEmail = '';
+    let profileName = '';
+    let profileAvatar = '';
+    try {
+      const userRes = await oauthFetch(cfg.userInfoUrl, {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
+      const userData: any = await userRes.json().catch(() => ({}));
+      const isEmailVerified = userData?.verified_email !== false && userData?.email_verified !== false;
+
+      if (!userRes.ok || typeof userData?.email !== 'string' || !userData.email.includes('@') || !isEmailVerified) {
+        return sendOAuthErrorResponse(
+          req,
+          res,
+          502,
+          'profile_request_failed',
+          'Failed to retrieve a verified Google user profile and email address.'
+        );
+      }
+
+      profileEmail = userData.email.toLowerCase().trim();
+      profileName = typeof userData.name === 'string' && userData.name.trim()
+        ? userData.name.trim()
+        : profileEmail.split('@')[0] || 'Google Student';
+      profileAvatar = typeof userData.picture === 'string' ? userData.picture : '';
+    } catch {
+      return sendOAuthErrorResponse(
+        req,
+        res,
+        502,
+        'profile_request_failed',
+        'Failed to retrieve Google user profile from Google UserInfo API.'
+      );
+    }
+
+    return await finalizeOAuthUserSession(req, res, 'Google', profileEmail, profileName, profileAvatar);
   };
 
-  app.all([
-    '/api/auth/callback/google',
-    '/api/auth/callback/google/',
-    '/api/auth/google/callback',
-    '/api/auth/google/callback/',
-    '/auth/google/callback',
-    '/auth/callback/google',
-  ], handleGoogleOAuthCallback);
+  app.get(GOOGLE_OAUTH_CALLBACK_PATH, handleGoogleOAuthCallback);
+
+  // Explicit redirect URI mismatch diagnostic for non-canonical Google callback paths
+  app.get(['/api/auth/google/callback', '/auth/google/callback', '/auth/callback/google'], (req, res) => {
+    return sendOAuthErrorResponse(
+      req,
+      res,
+      400,
+      'redirect_uri_mismatch',
+      `Redirect URI mismatch: Use the exact backend callback route ${GOOGLE_OAUTH_CALLBACK_PATH}.`
+    );
+  });
 
   // -------------------------------------------------------------------------
   // DEDICATED META / INSTAGRAM OAUTH 2.0 INITIATION & CALLBACK HANDLERS
@@ -1808,11 +2200,11 @@ async function startServer() {
       createdAt: Date.now(),
     });
 
-    const isHttps = NODE_ENV === 'production' || cfg.redirectUri.startsWith('https://') || req.secure;
+    const isHttps = isSecureCookieRequest(req);
     res.cookie('oauth_state_instagram', signOAuthStateCookieValue('instagram', state, cfg.redirectUri), {
       httpOnly: true,
       secure: isHttps,
-      sameSite: isHttps ? 'none' : 'lax',
+      sameSite: 'lax',
       path: '/',
       maxAge: 10 * 60 * 1000,
     });
@@ -1831,19 +2223,19 @@ async function startServer() {
   const handleInstagramOAuthCallback = async (req: express.Request, res: express.Response) => {
     const errorParam = (req.query.error_message || req.query.error_description || req.query.error) as string | undefined;
     if (errorParam) {
-      return renderOAuthErrorPage(res, `Meta/Instagram authorization error: ${errorParam}`);
+      return sendOAuthErrorResponse(req, res, 400, 'oauth_provider_error', `Meta/Instagram authorization error: ${errorParam}`);
     }
 
     const rawCode = req.query.code as string | undefined;
     const state = req.query.state as string | undefined;
 
     if (!state || typeof state !== 'string') {
-      return renderOAuthErrorPage(res, 'Missing OAuth state parameter (CSRF validation failed).');
+      return sendOAuthErrorResponse(req, res, 400, 'invalid_state', 'Missing OAuth state parameter (CSRF validation failed).');
     }
 
     const cfg = getInstagramOAuthConfig();
     if (!cfg.configured || !cfg.clientId || !cfg.clientSecret) {
-      return renderOAuthErrorPage(res, 'Meta/Instagram OAuth is not configured on this server.');
+      return sendOAuthErrorResponse(req, res, 400, 'missing_oauth_credentials', 'Meta/Instagram OAuth is not configured on this server.');
     }
 
     const memEntry = instagramOAuthStates.get(state);
@@ -1851,17 +2243,17 @@ async function startServer() {
     res.clearCookie('oauth_state_instagram', { path: '/' });
 
     if (!memEntry && !cookieRedirect) {
-      return renderOAuthErrorPage(res, 'Invalid or expired OAuth state parameter (CSRF protection failed).');
+      return sendOAuthErrorResponse(req, res, 400, 'invalid_state', 'Invalid or expired OAuth state parameter (CSRF protection failed).');
     }
     if (memEntry) {
       instagramOAuthStates.delete(state);
       if (Date.now() - memEntry.createdAt > 10 * 60 * 1000) {
-        return renderOAuthErrorPage(res, 'Expired OAuth state parameter. Please try signing in again.');
+        return sendOAuthErrorResponse(req, res, 400, 'invalid_state', 'Expired OAuth state parameter. Please try signing in again.');
       }
     }
 
     if (!rawCode || typeof rawCode !== 'string') {
-      return renderOAuthErrorPage(res, 'Missing authorization code from Meta/Instagram.');
+      return sendOAuthErrorResponse(req, res, 400, 'token_exchange_failed', 'Missing authorization code from Meta/Instagram.');
     }
 
     const cleanCode = rawCode.replace(/#_$/, '');
@@ -1872,7 +2264,7 @@ async function startServer() {
       let fallbackPlatformUserId = '';
 
       if (cfg.useInstagramBusinessLogin) {
-        const tokenRes = await fetch(cfg.tokenUrl, {
+        const tokenRes = await oauthFetch(cfg.tokenUrl, {
           method: 'POST',
           headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
           body: new URLSearchParams({
@@ -1885,7 +2277,7 @@ async function startServer() {
         });
         const tokenData = await tokenRes.json();
         if (!tokenRes.ok || !tokenData.access_token) {
-          return renderOAuthErrorPage(res, 'Instagram token exchange failed. Please verify your Meta app configuration.');
+          return sendOAuthErrorResponse(req, res, 502, 'token_exchange_failed', 'Instagram token exchange failed. Please verify your Meta app configuration.');
         }
         accessToken = tokenData.access_token;
         fallbackPlatformUserId = String(tokenData.user_id || '');
@@ -1896,22 +2288,22 @@ async function startServer() {
           redirect_uri: redirectUriToUse,
           code: cleanCode,
         });
-        const tokenRes = await fetch(`${cfg.tokenUrl}?${tokenParams.toString()}`, {
+        const tokenRes = await oauthFetch(`${cfg.tokenUrl}?${tokenParams.toString()}`, {
           method: 'GET',
         });
         const tokenData = await tokenRes.json();
         if (!tokenRes.ok || !tokenData.access_token) {
-          return renderOAuthErrorPage(res, 'Meta OAuth token exchange failed. Please verify your Meta App ID, Secret, and Valid OAuth Redirect URI.');
+          return sendOAuthErrorResponse(req, res, 502, 'token_exchange_failed', 'Meta OAuth token exchange failed. Please verify your Meta App ID, Secret, and Valid OAuth Redirect URI.');
         }
         accessToken = tokenData.access_token;
       }
 
-      const profileRes = await fetch(cfg.userInfoUrl, {
+      const profileRes = await oauthFetch(cfg.userInfoUrl, {
         headers: { Authorization: `Bearer ${accessToken}` },
       });
       const profileData = await profileRes.json();
       if (!profileRes.ok || (!profileData.id && !fallbackPlatformUserId)) {
-        return renderOAuthErrorPage(res, 'Failed to retrieve verified profile from Meta/Instagram.');
+        return sendOAuthErrorResponse(req, res, 502, 'profile_request_failed', 'Failed to retrieve verified profile from Meta/Instagram.');
       }
 
       const providerAccountId = String(profileData.id || fallbackPlatformUserId);
@@ -1923,7 +2315,7 @@ async function startServer() {
 
       return await finalizeOAuthUserSession(req, res, 'Instagram', profileEmail, profileName, profileAvatar);
     } catch {
-      return renderOAuthErrorPage(res, 'Failed to complete Meta/Instagram authentication.');
+      return sendOAuthErrorResponse(req, res, 502, 'token_exchange_failed', 'Failed to complete Meta/Instagram authentication.');
     }
   };
 
@@ -2653,7 +3045,7 @@ async function startServer() {
         return res.status(201).json({
           success: true,
           imageUrl: relativeUrl,
-          url: `${APP_URL}${relativeUrl}?v=${Date.now()}`,
+          url: `${resolveProductionBaseUrl()}${relativeUrl}?v=${Date.now()}`,
           relativeUrl,
           savedUrl: relativeUrl,
           filename,
@@ -2761,10 +3153,10 @@ async function startServer() {
       // Handle profile image: file upload > base64 > provided URL > fallback
       let finalImageUrl = profileImageUrl || avatarUrl || '';
       if (req.file) {
-        finalImageUrl = `${APP_URL}/uploads/avatars/${req.file.filename}?v=${Date.now()}`;
+        finalImageUrl = `${resolveProductionBaseUrl()}/uploads/avatars/${req.file.filename}?v=${Date.now()}`;
       } else if (finalImageUrl.startsWith('data:image/')) {
         const rel = saveBase64ImageToUploads(finalImageUrl, 'avatars', 'avatar');
-        finalImageUrl = rel.startsWith('http') ? rel : `${APP_URL}${rel}`;
+        finalImageUrl = rel.startsWith('http') ? rel : `${resolveProductionBaseUrl()}${rel}`;
       } else if (!finalImageUrl) {
         finalImageUrl = 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=256';
       }
@@ -2911,15 +3303,15 @@ async function startServer() {
 
       // Handle image upload / replacement
       if (req.file) {
-        updates.profileImageUrl = `${APP_URL}/uploads/avatars/${req.file.filename}?v=${Date.now()}`;
+        updates.profileImageUrl = `${resolveProductionBaseUrl()}/uploads/avatars/${req.file.filename}?v=${Date.now()}`;
         updates.avatarUrl = updates.profileImageUrl;
       } else if (updates.profileImageUrl && updates.profileImageUrl.startsWith('data:image/')) {
         const rel = saveBase64ImageToUploads(updates.profileImageUrl, 'avatars', `avatar_${id}`);
-        updates.profileImageUrl = rel.startsWith('http') ? rel : `${APP_URL}${rel}`;
+        updates.profileImageUrl = rel.startsWith('http') ? rel : `${resolveProductionBaseUrl()}${rel}`;
         updates.avatarUrl = updates.profileImageUrl;
       } else if (updates.avatarUrl && updates.avatarUrl.startsWith('data:image/')) {
         const rel = saveBase64ImageToUploads(updates.avatarUrl, 'avatars', `avatar_${id}`);
-        updates.avatarUrl = rel.startsWith('http') ? rel : `${APP_URL}${rel}`;
+        updates.avatarUrl = rel.startsWith('http') ? rel : `${resolveProductionBaseUrl()}${rel}`;
         updates.profileImageUrl = updates.avatarUrl;
       }
 
@@ -4985,53 +5377,62 @@ async function startServer() {
   // STATIC ASSETS & VITE INTEGRATION
   // ==========================================
 
-  if (NODE_ENV !== 'production') {
-    const vite = await createViteServer({
-      server: { middlewareMode: true },
-      appType: 'spa',
-    });
-    app.use(vite.middlewares);
-  } else {
-    const possibleDistPaths = [
-      path.join(process.cwd(), 'dist'),
-      path.resolve(__dirname, 'dist'),
-      path.resolve(__dirname),
-      process.cwd(),
-    ];
-    const distPath =
-      possibleDistPaths.find((p) => fs.existsSync(path.join(p, 'index.html'))) ||
-      path.join(process.cwd(), 'dist');
+  if (!options.skipStaticAndVite) {
+    if (NODE_ENV !== 'production') {
+      const vite = await createViteServer({
+        server: { middlewareMode: true },
+        appType: 'spa',
+      });
+      app.use(vite.middlewares);
+    } else {
+      const possibleDistPaths = [
+        path.join(process.cwd(), 'dist'),
+        path.resolve(__dirname, 'dist'),
+        path.resolve(__dirname),
+        process.cwd(),
+      ];
+      const distPath =
+        possibleDistPaths.find((p) => fs.existsSync(path.join(p, 'index.html'))) ||
+        path.join(process.cwd(), 'dist');
 
-    console.info(`[STATIC] Serving production assets from: ${distPath}`);
+      console.info(`[STATIC] Serving production assets from: ${distPath}`);
 
-    // Hashed assets (JS/CSS/media) from Vite build get 1 year immutable cache
-    const assetsDir = path.join(distPath, 'assets');
-    if (fs.existsSync(assetsDir)) {
-      app.use('/assets', express.static(assetsDir, {
-        maxAge: '1y',
-        immutable: true,
+      // Hashed assets (JS/CSS/media) from Vite build get 1 year immutable cache
+      const assetsDir = path.join(distPath, 'assets');
+      if (fs.existsSync(assetsDir)) {
+        app.use('/assets', express.static(assetsDir, {
+          maxAge: '1y',
+          immutable: true,
+        }));
+      }
+
+      // Other static files (favicon, logo, icons) get 1 day cache
+      app.use(express.static(distPath, {
+        maxAge: '1d',
+        setHeaders: (res, filePath) => {
+          if (filePath.endsWith('.html')) {
+            res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+          }
+        },
       }));
+
+      app.get('*', (_req, res) => {
+        res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+        res.sendFile(path.join(distPath, 'index.html'));
+      });
     }
-
-    // Other static files (favicon, logo, icons) get 1 day cache
-    app.use(express.static(distPath, {
-      maxAge: '1d',
-      setHeaders: (res, filePath) => {
-        if (filePath.endsWith('.html')) {
-          res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
-        }
-      },
-    }));
-
-    app.get('*', (_req, res) => {
-      res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
-      res.sendFile(path.join(distPath, 'index.html'));
-    });
   }
 
+  return app;
+}
+
+export async function startServer() {
+  const app = await createApp();
   app.listen(PORT, '0.0.0.0', () => {
     console.log(`[FULLSTACK] Server running on http://0.0.0.0:${PORT} in ${NODE_ENV} mode.`);
   });
 }
 
-startServer();
+if (process.env.SKIP_AUTO_SERVER_START !== 'true') {
+  startServer();
+}

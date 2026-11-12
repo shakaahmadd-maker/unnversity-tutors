@@ -229,40 +229,53 @@ export class AppStore {
 
   private listeners: (() => void)[] = [];
   private pollTimer: any = null;
+  public isSessionInitialized: boolean = false;
+  public sessionReadyPromise: Promise<User | null>;
 
   constructor() {
     this.startLiveStudentCounter();
-    this.initSession();
+    this.sessionReadyPromise = this.verifySession();
     this.fetchData();
     this.startPolling();
   }
 
-  private initSession() {
-    const cachedUser = localStorage.getItem('ut_current_user');
-    if (cachedUser) {
-      try {
-        this.currentUser = JSON.parse(cachedUser);
-      } catch (e) {
-        console.error("Local user profile parse error:", e);
-      }
+  public async verifySession(): Promise<User | null> {
+    if (typeof window === 'undefined') {
+      this.isSessionInitialized = true;
+      return null;
     }
-
-    // Verify session with server
-    const token = localStorage.getItem('auth_token');
-    fetch('/api/auth/me', {
-      headers: {
-        ...(token ? { 'Authorization': `Bearer ${token}` } : {})
-      }
-    })
-      .then(res => res.ok ? res.json() : null)
-      .then(data => {
-        if (data?.user) {
+    try {
+      const token = localStorage.getItem('auth_token');
+      const res = await fetch('/api/auth/me', {
+        credentials: 'include',
+        headers: {
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data?.user?.id) {
           this.currentUser = data.user;
-          localStorage.setItem('ut_current_user', JSON.stringify(data.user));
+          this.isSessionInitialized = true;
           this.notify();
+          this.fetchData().catch(() => {});
+          return data.user;
         }
-      })
-      .catch(() => {});
+      }
+      this.currentUser = null;
+      localStorage.removeItem('ut_current_user');
+      localStorage.removeItem('auth_token');
+      this.isSessionInitialized = true;
+      this.notify();
+      return null;
+    } catch {
+      this.currentUser = null;
+      localStorage.removeItem('ut_current_user');
+      localStorage.removeItem('auth_token');
+      this.isSessionInitialized = true;
+      this.notify();
+      return null;
+    }
   }
 
   private startPolling() {
@@ -550,12 +563,12 @@ export class AppStore {
         throw new Error(data.error || 'Authentication rejected');
       }
 
-      this.currentUser = data.user;
-      localStorage.setItem('ut_current_user', JSON.stringify(data.user));
-      if (data.token) {
-        localStorage.setItem('auth_token', data.token);
+      if (!data?.user?.id) {
+        throw new Error('Backend session could not be established.');
       }
 
+      this.currentUser = data.user;
+      this.isSessionInitialized = true;
       this.fetchData();
       this.notify();
       return true;
@@ -593,13 +606,12 @@ export class AppStore {
       if (!res.ok) {
         throw new Error(data.error || 'Registration failed');
       }
-
-      this.currentUser = data.user;
-      localStorage.setItem('ut_current_user', JSON.stringify(data.user));
-      if (data.token) {
-        localStorage.setItem('auth_token', data.token);
+      if (!data?.user?.id) {
+        throw new Error('Backend session could not be established.');
       }
 
+      this.currentUser = data.user;
+      this.isSessionInitialized = true;
       this.users.push(data.user);
       this.notify();
       return true;
@@ -609,9 +621,21 @@ export class AppStore {
     }
   }
 
-  logout() {
-    fetch('/api/auth/logout', { method: 'POST', credentials: 'include' }).catch(() => {});
+  async logout(): Promise<void> {
+    try {
+      await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' });
+    } catch {
+      // ignore network failure while clearing client state
+    }
     this.currentUser = null;
+    this.assignments = [];
+    this.chats = [];
+    this.chatRooms = [];
+    this.messages = [];
+    this.quotes = [];
+    this.payments = [];
+    this.invoices = [];
+    this.appNotifications = [];
     localStorage.removeItem('ut_current_user');
     localStorage.removeItem('auth_token');
     this.notify();

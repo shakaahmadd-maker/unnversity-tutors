@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Mail,
   Lock,
@@ -9,19 +9,13 @@ import {
   ShieldCheck,
   Eye,
   EyeOff,
-  UserPlus,
   GraduationCap,
-  Key,
   Check,
   ArrowRight,
   ArrowLeft,
   Send,
   KeyRound,
   Info,
-  Copy,
-  ExternalLink,
-  AlertCircle,
-  X
 } from 'lucide-react';
 import { UserRole } from '../types';
 import { store } from '../lib/store';
@@ -68,17 +62,18 @@ const LinkedInIcon = () => (
   </svg>
 );
 
+type SocialProviderKey = 'google' | 'apple' | 'instagram' | 'x' | 'linkedin';
+
 export default function AuthPage({ onLogin, onRegister, onNavigate }: AuthPageProps) {
   const [activeTab, setActiveTab] = useState<'signin' | 'signup'>('signin');
-  const [providers, setProviders] = useState<Record<string, { configured: boolean; name: string; redirectUri?: string }>>({
+  const [providersLoaded, setProvidersLoaded] = useState(false);
+  const [providers, setProviders] = useState<Record<SocialProviderKey, { configured: boolean; name: string; redirectUri?: string }>>({
     google: { configured: false, name: 'Google' },
     apple: { configured: false, name: 'Apple' },
     instagram: { configured: false, name: 'Instagram' },
     x: { configured: false, name: 'X' },
     linkedin: { configured: false, name: 'LinkedIn' },
   });
-  const [oauthModalProvider, setOauthModalProvider] = useState<'google' | 'apple' | 'instagram' | 'x' | 'linkedin' | null>(null);
-  const [copiedUri, setCopiedUri] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -96,6 +91,8 @@ export default function AuthPage({ onLogin, onRegister, onNavigate }: AuthPagePr
   const [toastText, setToastText] = useState('');
   const [toastVisible, setToastVisible] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [activeOAuthProvider, setActiveOAuthProvider] = useState<SocialProviderKey | null>(null);
+  const authRequestLockRef = useRef<boolean>(false);
 
   // Forgot password & reset password state
   const [isForgotPasswordView, setIsForgotPasswordView] = useState(false);
@@ -104,107 +101,79 @@ export default function AuthPage({ onLogin, onRegister, onNavigate }: AuthPagePr
   const [resetTokenInput, setResetTokenInput] = useState('');
   const [newPasswordInput, setNewPasswordInput] = useState('');
 
-  // Fetch configured OAuth providers on mount
+  // Read any server OAuth callback error returned via query string (?oauth_error=...)
   useEffect(() => {
-    fetch('/api/auth/providers')
-      .then(res => res.json())
-      .then(data => {
-        if (data?.providers) {
-          setProviders(data.providers);
-        }
-      })
-      .catch(() => {});
+    if (typeof window === 'undefined') return;
+    const params = new URLSearchParams(window.location.search);
+    const oauthErr = params.get('oauth_error');
+    if (oauthErr) {
+      setErrorMsg(oauthErr);
+      params.delete('oauth_error');
+      const nextQuery = params.toString();
+      const nextUrl = `${window.location.pathname}${nextQuery ? `?${nextQuery}` : ''}${window.location.hash}`;
+      window.history.replaceState(null, '', nextUrl);
+    }
   }, []);
 
-  // Listen for OAuth postMessage callbacks, BroadcastChannel, and storage events
+  // Fetch configured OAuth providers from backend on mount
   useEffect(() => {
-    const applyOAuthSuccess = (data: { token?: string; user?: any; redirectUrl?: string }) => {
-      const { token, user, redirectUrl } = data;
-      if (token) {
-        localStorage.setItem('auth_token', token);
-      }
-      if (user) {
-        store.currentUser = user;
-        localStorage.setItem('ut_current_user', JSON.stringify(user));
-        store.notify();
-        store.fetchData().catch(() => {});
-      }
-      showToast(`Authenticated successfully as ${user?.name || 'Student'}!`);
-      setSuccessMsg(`Welcome, ${user?.name || 'Student'}! Redirecting to your dashboard...`);
-      setIsSubmitting(false);
-
-      setTimeout(() => {
-        if (redirectUrl) {
-          onNavigate(redirectUrl.replace(/^\//, ''));
-        } else {
-          onNavigate(user?.role === 'admin' ? 'admin' : 'student/dashboard');
+    let cancelled = false;
+    fetch('/api/auth/providers', { credentials: 'include' })
+      .then(res => (res.ok ? res.json() : null))
+      .then(data => {
+        if (!cancelled && data?.providers) {
+          setProviders(prev => ({ ...prev, ...data.providers }));
         }
-      }, 500);
+      })
+      .catch(() => {})
+      .finally(() => {
+        if (!cancelled) {
+          setProvidersLoaded(true);
+        }
+      });
+    return () => {
+      cancelled = true;
     };
+  }, []);
 
-    const handleOAuthMessage = (event: MessageEvent) => {
-      // Validate origin if available
-      const origin = event.origin;
-      const isAllowedOrigin = !origin ||
-        origin.endsWith('.run.app') ||
-        origin.includes('university-tutors.com') ||
-        origin.includes('localhost') ||
-        origin.includes('127.0.0.1') ||
-        origin === window.location.origin;
-
-      if (!isAllowedOrigin) {
+  // Listen for OAuth postMessage events (if initiated in popup) and verify backend session before redirecting
+  useEffect(() => {
+    const handleOAuthMessage = async (event: MessageEvent) => {
+      if (event.origin && event.origin !== window.location.origin) {
         return;
       }
 
       if (event.data?.type === 'OAUTH_AUTH_SUCCESS') {
-        applyOAuthSuccess(event.data);
-      } else if (event.data?.type === 'OAUTH_AUTH_ERROR') {
-        setErrorMsg(event.data.error || 'Social sign-in failed. Please try again.');
+        const verifiedUser = await store.verifySession();
+        if (!verifiedUser) {
+          authRequestLockRef.current = false;
+          setActiveOAuthProvider(null);
+          setIsSubmitting(false);
+          setErrorMsg('Unable to verify server session after authentication. Please try signing in again.');
+          return;
+        }
+        showToast(`Authenticated successfully as ${verifiedUser.name || 'Student'}!`);
+        setSuccessMsg(`Welcome, ${verifiedUser.name || 'Student'}! Redirecting to your dashboard...`);
+        authRequestLockRef.current = false;
+        setActiveOAuthProvider(null);
         setIsSubmitting(false);
-      }
-    };
 
-    // BroadcastChannel for cross-tab/cross-window notifications
-    let bc: BroadcastChannel | null = null;
-    try {
-      if (typeof BroadcastChannel !== 'undefined') {
-        bc = new BroadcastChannel('oauth_channel');
-        bc.onmessage = (event) => {
-          if (event.data?.type === 'OAUTH_AUTH_SUCCESS') {
-            applyOAuthSuccess(event.data);
-          } else if (event.data?.type === 'OAUTH_AUTH_ERROR') {
-            setErrorMsg(event.data.error || 'Social sign-in failed. Please try again.');
-            setIsSubmitting(false);
-          }
-        };
-      }
-    } catch (e) {}
-
-    // Storage event listener for same-origin tabs
-    const handleStorage = (event: StorageEvent) => {
-      if (event.key === 'ut_current_user' && event.newValue) {
-        try {
-          const user = JSON.parse(event.newValue);
-          if (user?.id) {
-            store.currentUser = user;
-            store.notify();
-            showToast(`Welcome, ${user.name}!`);
-            onNavigate(user.role === 'admin' ? 'admin' : 'student/dashboard');
-          }
-        } catch (e) {}
+        const redirectUrl = typeof event.data.redirectUrl === 'string' ? event.data.redirectUrl : '';
+        if (redirectUrl) {
+          onNavigate(redirectUrl.replace(/^\//, ''));
+        } else {
+          onNavigate(verifiedUser.role === 'admin' ? 'admin' : verifiedUser.role === 'tutor' ? 'tutor/dashboard' : 'student/dashboard');
+        }
+      } else if (event.data?.type === 'OAUTH_AUTH_ERROR') {
+        authRequestLockRef.current = false;
+        setActiveOAuthProvider(null);
+        setIsSubmitting(false);
+        setErrorMsg(event.data.error || 'Authentication failed. Please try again.');
       }
     };
 
     window.addEventListener('message', handleOAuthMessage);
-    window.addEventListener('storage', handleStorage);
-
-    return () => {
-      window.removeEventListener('message', handleOAuthMessage);
-      window.removeEventListener('storage', handleStorage);
-      if (bc) {
-        try { bc.close(); } catch (e) {}
-      }
-    };
+    return () => window.removeEventListener('message', handleOAuthMessage);
   }, [onNavigate]);
 
   const showToast = (text: string) => {
@@ -268,13 +237,15 @@ export default function AuthPage({ onLogin, onRegister, onNavigate }: AuthPagePr
       );
 
       if (success) {
-        setSuccessMsg('Your security password has been updated and you are now authenticated!');
+        const verifiedUser = await store.verifySession();
+        if (!verifiedUser) {
+          setErrorMsg('Session verification failed after password update. Please sign in.');
+          return;
+        }
+        setSuccessMsg('Your security password has been updated and your session is active!');
         showToast('Password updated successfully!');
-        setTimeout(() => {
-          setIsResetPasswordView(false);
-          const current = store.currentUser;
-          onNavigate(current?.role === 'admin' ? 'admin' : 'student/dashboard');
-        }, 800);
+        setIsResetPasswordView(false);
+        onNavigate(verifiedUser.role === 'admin' ? 'admin' : verifiedUser.role === 'tutor' ? 'tutor/dashboard' : 'student/dashboard');
       } else {
         setErrorMsg('Invalid or expired security token. Please request a new token.');
       }
@@ -285,6 +256,9 @@ export default function AuthPage({ onLogin, onRegister, onNavigate }: AuthPagePr
 
   const handleSignInSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (authRequestLockRef.current || isSubmitting) {
+      return;
+    }
     setErrorMsg('');
     setSuccessMsg('');
 
@@ -293,27 +267,34 @@ export default function AuthPage({ onLogin, onRegister, onNavigate }: AuthPagePr
       return;
     }
 
+    authRequestLockRef.current = true;
     setIsSubmitting(true);
     try {
       const success = await onLogin(email.trim(), password);
       if (success) {
-        setSuccessMsg('Authenticated profile successfully! Opening student workspace...');
+        const verifiedUser = await store.verifySession();
+        if (!verifiedUser) {
+          throw new Error('Server session could not be verified. Please check cookie settings and try again.');
+        }
+        setSuccessMsg('Authenticated profile successfully! Opening workspace...');
         showToast('Sign In Successful! Redirecting...');
-        setTimeout(() => {
-          onNavigate('dashboard');
-        }, 800);
+        onNavigate('dashboard');
       } else {
         setErrorMsg('Authentication failed: Invalid credentials or account not registered.');
       }
     } catch (err: any) {
       setErrorMsg(err.message || 'Authentication error. Please check credentials.');
     } finally {
+      authRequestLockRef.current = false;
       setIsSubmitting(false);
     }
   };
 
   const handleSignUpSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (authRequestLockRef.current || isSubmitting) {
+      return;
+    }
     setErrorMsg('');
     setSuccessMsg('');
 
@@ -337,12 +318,7 @@ export default function AuthPage({ onLogin, onRegister, onNavigate }: AuthPagePr
       return;
     }
 
-    const existingUser = store.users.find(u => u.email.toLowerCase().trim() === email.toLowerCase().trim());
-    if (existingUser) {
-      setErrorMsg('This student email is already registered. Please sign in instead.');
-      return;
-    }
-
+    authRequestLockRef.current = true;
     setIsSubmitting(true);
     try {
       const success = await onRegister(
@@ -356,88 +332,84 @@ export default function AuthPage({ onLogin, onRegister, onNavigate }: AuthPagePr
       );
 
       if (success) {
+        const verifiedUser = await store.verifySession();
+        if (!verifiedUser) {
+          throw new Error('Account created, but server session could not be verified. Please sign in.');
+        }
         setSuccessMsg('Student account created successfully! Welcome to the portal.');
         showToast('Account Created Successfully!');
-        setTimeout(() => {
-          onNavigate('student/dashboard');
-        }, 500);
+        onNavigate('student/dashboard');
       } else {
         setErrorMsg('Something went wrong establishing your student account.');
       }
     } catch (err: any) {
       setErrorMsg(err.message || 'Registration failed. Please try again.');
     } finally {
+      authRequestLockRef.current = false;
       setIsSubmitting(false);
     }
   };
 
-  // Secure OAuth 2.0 Authorization Code Flow Handler
-  const handleSocialAuth = async (providerKey: 'google' | 'apple' | 'instagram' | 'x' | 'linkedin') => {
+  // Secure OAuth 2.0 Authorization Code Flow Handler (Backend-Configured Providers Only)
+  const handleSocialAuth = async (providerKey: SocialProviderKey) => {
+    if (authRequestLockRef.current || isSubmitting) {
+      return;
+    }
+
     setErrorMsg('');
     setSuccessMsg('');
 
     const p = providers[providerKey];
     const providerName = p?.name || providerKey.toUpperCase();
 
-    // If provider is not yet configured with real API secrets, open helpful setup & diagnostic modal
-    if (!p || !p.configured) {
-      setErrorMsg(`${providerName} authentication credentials pending. Click to view configuration guide.`);
-      setOauthModalProvider(providerKey);
+    if (!providersLoaded || !p?.configured) {
+      setErrorMsg(`${providerName} login is not configured on this server.`);
       return;
     }
 
+    authRequestLockRef.current = true;
     setIsSubmitting(true);
+    setActiveOAuthProvider(providerKey);
+
     try {
-      // 1. Fetch the provider's authorization URL from the server
-      const res = await fetch(`/api/auth/${providerKey}/url`);
-      const data = await res.json();
-      if (!res.ok || !data.url) {
-        throw new Error(data.error || `Could not initiate ${providerName} login.`);
+      const res = await fetch(`/api/auth/${providerKey}/url`, {
+        method: 'GET',
+        credentials: 'include',
+        headers: { Accept: 'application/json' },
+      });
+      const data = await res.json().catch(() => ({}));
+
+      if (!res.ok || typeof data?.url !== 'string' || !data.url) {
+        throw new Error(data?.error || `Could not initiate ${providerName} login.`);
       }
 
-      // 2. Open the OAuth PROVIDER's URL directly in a popup window
-      let popup: Window | null = null;
-      try {
-        popup = window.open(
-          data.url,
-          'oauth_popup',
-          'width=600,height=700,status=no,toolbar=no,menubar=no'
-        );
-      } catch (e) {
-        popup = null;
-      }
-
-      if (!popup || popup.closed || typeof popup.closed === 'undefined') {
-        // Popup was blocked or disallowed in this environment; fallback to top-level redirect
-        window.location.href = data.url;
-        return;
-      }
-
-      // Poll popup in case cross-origin opener policies (COOP) prevented postMessage
-      const pollTimer = setInterval(async () => {
-        if (!popup || popup.closed) {
-          clearInterval(pollTimer);
-          try {
-            const meRes = await fetch('/api/auth/me', { credentials: 'include' });
-            if (meRes.ok) {
-              const meData = await meRes.json();
-              if (meData?.user) {
-                store.currentUser = meData.user;
-                localStorage.setItem('ut_current_user', JSON.stringify(meData.user));
-                store.notify();
-                showToast(`Welcome back, ${meData.user.name}!`);
-                setIsSubmitting(false);
-                onNavigate(meData.user.role === 'admin' ? 'admin' : 'student/dashboard');
-                return;
-              }
-            }
-          } catch (e) {}
-          setIsSubmitting(false);
-        }
-      }, 1000);
+      // Redirect to OAuth provider; backend callback validates state, exchanges code,
+      // creates the HTTP-only session cookie, and redirects to /student/dashboard.
+      window.location.assign(data.url);
     } catch (err: any) {
-      setErrorMsg(err.message || 'Social sign-in failed.');
+      authRequestLockRef.current = false;
+      setActiveOAuthProvider(null);
       setIsSubmitting(false);
+      setErrorMsg(err?.message || `${providerName} sign-in failed.`);
+    }
+  };
+
+  const configuredProviderKeys = (['google', 'apple', 'instagram', 'x', 'linkedin'] as SocialProviderKey[]).filter(
+    (key) => providersLoaded && providers[key]?.configured === true
+  );
+
+  const renderSocialProviderIcon = (key: SocialProviderKey) => {
+    switch (key) {
+      case 'google':
+        return <GoogleIcon />;
+      case 'apple':
+        return <AppleIcon />;
+      case 'instagram':
+        return <InstagramIcon />;
+      case 'x':
+        return <XIcon />;
+      case 'linkedin':
+        return <LinkedInIcon />;
     }
   };
 
@@ -744,83 +716,41 @@ export default function AuthPage({ onLogin, onRegister, onNavigate }: AuthPagePr
               </button>
             </form>
 
-            {/* Social Authentication Section */}
-            <div className="relative my-5 text-center">
-              <div className="absolute inset-0 flex items-center">
-                <div className="w-full border-t border-slate-200"></div>
-              </div>
-              <span className="relative bg-white px-3 text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
-                Or continue with
-              </span>
-            </div>
+            {/* Social Authentication Section — Shown ONLY when backend reports provider(s) configured */}
+            {configuredProviderKeys.length > 0 && (
+              <>
+                <div className="relative my-5 text-center">
+                  <div className="absolute inset-0 flex items-center">
+                    <div className="w-full border-t border-slate-200"></div>
+                  </div>
+                  <span className="relative bg-white px-3 text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
+                    Or continue with
+                  </span>
+                </div>
 
-            {/* Social Authentication: Google, Apple, Instagram, X, LinkedIn */}
-            <div className="grid grid-cols-5 gap-2">
-              <button
-                type="button"
-                id="social-login-google"
-                onClick={() => handleSocialAuth('google')}
-                title={providers.google?.configured ? "Continue with Google" : "Continue with Google (Configuration pending in environment variables)"}
-                aria-label="Continue with Google"
-                className={`flex items-center justify-center p-2.5 border rounded-xl transition-all duration-150 hover:shadow-xs active:scale-95 text-slate-700 ${
-                  providers.google?.configured ? 'bg-slate-50 hover:bg-slate-100 border-slate-200 cursor-pointer' : 'bg-slate-100/70 border-slate-200/60 opacity-60 cursor-not-allowed'
-                }`}
-              >
-                <GoogleIcon />
-              </button>
-
-              <button
-                type="button"
-                id="social-login-apple"
-                onClick={() => handleSocialAuth('apple')}
-                title={providers.apple?.configured ? "Continue with Apple" : "Continue with Apple (Configuration pending in environment variables)"}
-                aria-label="Continue with Apple"
-                className={`flex items-center justify-center p-2.5 border rounded-xl transition-all duration-150 hover:shadow-xs active:scale-95 text-slate-900 ${
-                  providers.apple?.configured ? 'bg-slate-50 hover:bg-slate-100 border-slate-200 cursor-pointer' : 'bg-slate-100/70 border-slate-200/60 opacity-60 cursor-not-allowed'
-                }`}
-              >
-                <AppleIcon />
-              </button>
-
-              <button
-                type="button"
-                id="social-login-instagram"
-                onClick={() => handleSocialAuth('instagram')}
-                title={providers.instagram?.configured ? "Continue with Instagram" : "Continue with Instagram (Configuration pending in environment variables)"}
-                aria-label="Continue with Instagram"
-                className={`flex items-center justify-center p-2.5 border rounded-xl transition-all duration-150 hover:shadow-xs active:scale-95 text-slate-800 hover:text-pink-600 ${
-                  providers.instagram?.configured ? 'bg-slate-50 hover:bg-slate-100 border-slate-200 cursor-pointer' : 'bg-slate-100/70 border-slate-200/60 opacity-60 cursor-not-allowed'
-                }`}
-              >
-                <InstagramIcon />
-              </button>
-
-              <button
-                type="button"
-                id="social-login-x"
-                onClick={() => handleSocialAuth('x')}
-                title={providers.x?.configured ? "Continue with X" : "Continue with X (Configuration pending in environment variables)"}
-                aria-label="Continue with X"
-                className={`flex items-center justify-center p-2.5 border rounded-xl transition-all duration-150 hover:shadow-xs active:scale-95 text-slate-900 ${
-                  providers.x?.configured ? 'bg-slate-50 hover:bg-slate-100 border-slate-200 cursor-pointer' : 'bg-slate-100/70 border-slate-200/60 opacity-60 cursor-not-allowed'
-                }`}
-              >
-                <XIcon />
-              </button>
-
-              <button
-                type="button"
-                id="social-login-linkedin"
-                onClick={() => handleSocialAuth('linkedin')}
-                title={providers.linkedin?.configured ? "Continue with LinkedIn" : "Continue with LinkedIn (Configuration pending in environment variables)"}
-                aria-label="Continue with LinkedIn"
-                className={`flex items-center justify-center p-2.5 border rounded-xl transition-all duration-150 hover:shadow-xs active:scale-95 text-blue-700 ${
-                  providers.linkedin?.configured ? 'bg-slate-50 hover:bg-slate-100 border-slate-200 cursor-pointer' : 'bg-slate-100/70 border-slate-200/60 opacity-60 cursor-not-allowed'
-                }`}
-              >
-                <LinkedInIcon />
-              </button>
-            </div>
+                <div className="flex flex-wrap items-center justify-center gap-2.5">
+                  {configuredProviderKeys.map((providerKey) => {
+                    const providerName = providers[providerKey]?.name || providerKey;
+                    const isLoadingThis = activeOAuthProvider === providerKey && isSubmitting;
+                    return (
+                      <button
+                        key={providerKey}
+                        type="button"
+                        id={`social-login-${providerKey}`}
+                        disabled={isSubmitting}
+                        onClick={() => handleSocialAuth(providerKey)}
+                        title={`Continue with ${providerName}`}
+                        aria-label={`Continue with ${providerName}`}
+                        className="flex-1 min-w-[130px] flex items-center justify-center gap-2 py-2.5 px-3.5 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-xl transition-all duration-150 hover:shadow-xs active:scale-95 text-slate-800 text-xs font-bold cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
+                      >
+                        {renderSocialProviderIcon(providerKey)}
+                        <span>{isLoadingThis ? 'Redirecting...' : `Continue with ${providerName}`}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </>
+            )}
 
             {/* Toggle to Signup */}
             <p className="text-center text-xs text-slate-500 pt-3">
@@ -947,83 +877,41 @@ export default function AuthPage({ onLogin, onRegister, onNavigate }: AuthPagePr
               </button>
             </form>
 
-            {/* Social Authentication Section */}
-            <div className="relative my-4 text-center">
-              <div className="absolute inset-0 flex items-center">
-                <div className="w-full border-t border-slate-200"></div>
-              </div>
-              <span className="relative bg-white px-3 text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
-                Or sign up with
-              </span>
-            </div>
+            {/* Social Authentication Section — Shown ONLY when backend reports provider(s) configured */}
+            {configuredProviderKeys.length > 0 && (
+              <>
+                <div className="relative my-4 text-center">
+                  <div className="absolute inset-0 flex items-center">
+                    <div className="w-full border-t border-slate-200"></div>
+                  </div>
+                  <span className="relative bg-white px-3 text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
+                    Or sign up with
+                  </span>
+                </div>
 
-            {/* Social Authentication: Google, Apple, Instagram, X, LinkedIn */}
-            <div className="grid grid-cols-5 gap-2">
-              <button
-                type="button"
-                id="social-signup-google"
-                onClick={() => handleSocialAuth('google')}
-                title={providers.google?.configured ? "Continue with Google" : "Continue with Google (Configuration pending in environment variables)"}
-                aria-label="Continue with Google"
-                className={`flex items-center justify-center p-2.5 border rounded-xl transition-all duration-150 hover:shadow-xs active:scale-95 text-slate-700 ${
-                  providers.google?.configured ? 'bg-slate-50 hover:bg-slate-100 border-slate-200 cursor-pointer' : 'bg-slate-100/70 border-slate-200/60 opacity-60 cursor-not-allowed'
-                }`}
-              >
-                <GoogleIcon />
-              </button>
-
-              <button
-                type="button"
-                id="social-signup-apple"
-                onClick={() => handleSocialAuth('apple')}
-                title={providers.apple?.configured ? "Continue with Apple" : "Continue with Apple (Configuration pending in environment variables)"}
-                aria-label="Continue with Apple"
-                className={`flex items-center justify-center p-2.5 border rounded-xl transition-all duration-150 hover:shadow-xs active:scale-95 text-slate-900 ${
-                  providers.apple?.configured ? 'bg-slate-50 hover:bg-slate-100 border-slate-200 cursor-pointer' : 'bg-slate-100/70 border-slate-200/60 opacity-60 cursor-not-allowed'
-                }`}
-              >
-                <AppleIcon />
-              </button>
-
-              <button
-                type="button"
-                id="social-signup-instagram"
-                onClick={() => handleSocialAuth('instagram')}
-                title={providers.instagram?.configured ? "Continue with Instagram" : "Continue with Instagram (Configuration pending in environment variables)"}
-                aria-label="Continue with Instagram"
-                className={`flex items-center justify-center p-2.5 border rounded-xl transition-all duration-150 hover:shadow-xs active:scale-95 text-slate-800 hover:text-pink-600 ${
-                  providers.instagram?.configured ? 'bg-slate-50 hover:bg-slate-100 border-slate-200 cursor-pointer' : 'bg-slate-100/70 border-slate-200/60 opacity-60 cursor-not-allowed'
-                }`}
-              >
-                <InstagramIcon />
-              </button>
-
-              <button
-                type="button"
-                id="social-signup-x"
-                onClick={() => handleSocialAuth('x')}
-                title={providers.x?.configured ? "Continue with X" : "Continue with X (Configuration pending in environment variables)"}
-                aria-label="Continue with X"
-                className={`flex items-center justify-center p-2.5 border rounded-xl transition-all duration-150 hover:shadow-xs active:scale-95 text-slate-900 ${
-                  providers.x?.configured ? 'bg-slate-50 hover:bg-slate-100 border-slate-200 cursor-pointer' : 'bg-slate-100/70 border-slate-200/60 opacity-60 cursor-not-allowed'
-                }`}
-              >
-                <XIcon />
-              </button>
-
-              <button
-                type="button"
-                id="social-signup-linkedin"
-                onClick={() => handleSocialAuth('linkedin')}
-                title={providers.linkedin?.configured ? "Continue with LinkedIn" : "Continue with LinkedIn (Configuration pending in environment variables)"}
-                aria-label="Continue with LinkedIn"
-                className={`flex items-center justify-center p-2.5 border rounded-xl transition-all duration-150 hover:shadow-xs active:scale-95 text-blue-700 ${
-                  providers.linkedin?.configured ? 'bg-slate-50 hover:bg-slate-100 border-slate-200 cursor-pointer' : 'bg-slate-100/70 border-slate-200/60 opacity-60 cursor-not-allowed'
-                }`}
-              >
-                <LinkedInIcon />
-              </button>
-            </div>
+                <div className="flex flex-wrap items-center justify-center gap-2.5">
+                  {configuredProviderKeys.map((providerKey) => {
+                    const providerName = providers[providerKey]?.name || providerKey;
+                    const isLoadingThis = activeOAuthProvider === providerKey && isSubmitting;
+                    return (
+                      <button
+                        key={providerKey}
+                        type="button"
+                        id={`social-signup-${providerKey}`}
+                        disabled={isSubmitting}
+                        onClick={() => handleSocialAuth(providerKey)}
+                        title={`Continue with ${providerName}`}
+                        aria-label={`Continue with ${providerName}`}
+                        className="flex-1 min-w-[130px] flex items-center justify-center gap-2 py-2.5 px-3.5 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-xl transition-all duration-150 hover:shadow-xs active:scale-95 text-slate-800 text-xs font-bold cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
+                      >
+                        {renderSocialProviderIcon(providerKey)}
+                        <span>{isLoadingThis ? 'Redirecting...' : `Continue with ${providerName}`}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </>
+            )}
 
             <p className="text-center text-xs text-slate-500 pt-2">
               Already have an account?{' '}
@@ -1039,91 +927,6 @@ export default function AuthPage({ onLogin, onRegister, onNavigate }: AuthPagePr
         )}
 
       </div>
-
-      {/* OAuth Setup & Diagnostics Modal */}
-      {oauthModalProvider && (
-        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl max-w-lg w-full border border-slate-200 shadow-2xl p-6 relative animate-in fade-in zoom-in duration-200">
-            {/* Close Button */}
-            <button
-              type="button"
-              onClick={() => setOauthModalProvider(null)}
-              className="absolute top-4 right-4 w-8 h-8 rounded-full flex items-center justify-center text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer"
-            >
-              <X className="w-4 h-4" />
-            </button>
-
-            {/* Modal Header */}
-            <div className="flex items-center gap-3 mb-4">
-              <div className="w-10 h-10 rounded-xl bg-orange-100 text-orange-600 flex items-center justify-center shrink-0">
-                <KeyRound className="w-5 h-5" />
-              </div>
-              <div>
-                <h3 className="text-base font-bold text-slate-900">
-                  {providers[oauthModalProvider]?.name || oauthModalProvider.toUpperCase()} OAuth Setup
-                </h3>
-                <p className="text-xs text-slate-500">
-                  Why social authorization requires developer credentials
-                </p>
-              </div>
-            </div>
-
-            {/* Diagnostic Details */}
-            <div className="space-y-3.5 text-xs text-slate-600">
-              <div className="p-3 bg-amber-50/80 border border-amber-200/80 rounded-xl">
-                <p className="font-semibold text-amber-900 mb-1 flex items-center gap-1.5">
-                  <AlertCircle className="w-3.5 h-3.5 text-amber-600 shrink-0" />
-                  Credentials Missing in Environment (.env)
-                </p>
-                <p className="text-amber-800 leading-relaxed text-[11px]">
-                  Real OAuth 2.0 security requires registering an application with <strong>{providers[oauthModalProvider]?.name || oauthModalProvider}</strong> to receive a Client ID and Client Secret. Fake or unauthenticated logins are strictly rejected by the server.
-                </p>
-              </div>
-
-              {/* Exact Callback URI for Copying */}
-              <div>
-                <label className="block text-[11px] font-bold text-slate-700 uppercase tracking-wider mb-1">
-                  Required Callback / Redirect URI
-                </label>
-                <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-lg p-2 font-mono text-[11px] text-slate-800">
-                  <span className="truncate flex-1 select-all">
-                    {providers[oauthModalProvider]?.redirectUri || `${typeof window !== 'undefined' ? window.location.origin : ''}/api/auth/${oauthModalProvider}/callback`}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const uri = providers[oauthModalProvider]?.redirectUri || `${window.location.origin}/api/auth/${oauthModalProvider}/callback`;
-                      navigator.clipboard.writeText(uri);
-                      setCopiedUri(true);
-                      setTimeout(() => setCopiedUri(false), 2000);
-                    }}
-                    className="px-2 py-1 bg-white hover:bg-slate-100 border border-slate-300 rounded text-slate-700 font-sans font-semibold text-[10px] flex items-center gap-1 shrink-0 cursor-pointer shadow-2xs"
-                  >
-                    {copiedUri ? <Check className="w-3 h-3 text-emerald-600" /> : <Copy className="w-3 h-3" />}
-                    <span>{copiedUri ? 'Copied' : 'Copy'}</span>
-                  </button>
-                </div>
-                <p className="text-[10px] text-slate-400 mt-1">
-                  Add this exact URL to your {providers[oauthModalProvider]?.name} Developer Console under <em>Authorized redirect URIs</em>.
-                </p>
-              </div>
-
-              {/* Environment Variables to Set */}
-              <div>
-                <label className="block text-[11px] font-bold text-slate-700 uppercase tracking-wider mb-1">
-                  Configure in Dokploy Runtime Environment:
-                </label>
-                <pre className="p-2.5 bg-slate-900 text-emerald-400 rounded-lg font-mono text-[11px] overflow-x-auto">
-{`${oauthModalProvider.toUpperCase()}_CLIENT_ID=<provider_client_id>
-${oauthModalProvider.toUpperCase()}_CLIENT_SECRET=<provider_client_secret>
-${oauthModalProvider.toUpperCase()}_REDIRECT_URI=<production_https_callback_url>`}
-                </pre>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
     </div>
   );
 }

@@ -236,20 +236,15 @@ export default function App() {
     return () => unsubscribe();
   }, []);
 
-  // Global listener for OAuth popup completion
+  // Global listener for OAuth popup completion — verifies backend session before redirecting
   useEffect(() => {
-    const handleOAuthMessage = (event: MessageEvent) => {
+    const handleOAuthMessage = async (event: MessageEvent) => {
       if (event.data?.type === 'OAUTH_AUTH_SUCCESS') {
-        const { token, user, redirectUrl } = event.data;
-        if (token) {
-          localStorage.setItem('auth_token', token);
+        const verifiedUser = await store.verifySession();
+        if (!verifiedUser) {
+          return;
         }
-        if (user) {
-          store.currentUser = user;
-          localStorage.setItem('ut_current_user', JSON.stringify(user));
-          store.notify();
-          store.fetchData().catch(() => {});
-        }
+        const redirectUrl = typeof event.data.redirectUrl === 'string' ? event.data.redirectUrl : '';
         if (redirectUrl) {
           const cleanView = redirectUrl.replace(/^\//, '');
           handleNavigate(cleanView);
@@ -475,7 +470,7 @@ export default function App() {
 
   // URL routing and relative links handler with case-insensitive and spacing normalization
   useEffect(() => {
-    const handleUrlChange = () => {
+    const handleUrlChange = async () => {
       const rawPath = window.location.pathname;
       const decodedPath = decodeURIComponent(rawPath).toLowerCase().trim().replace(/\/+$/, '');
       const hash = window.location.hash.toLowerCase().trim();
@@ -499,8 +494,10 @@ export default function App() {
         decodedPath === '/student' || hash === '#student' ||
         decodedPath === '/student/dashboard' || hash === '#student/dashboard'
       ) {
+        if (!store.isSessionInitialized) {
+          await store.sessionReadyPromise;
+        }
         if (!store.currentUser) {
-          // Requirement 14: Guests must not access protected dashboards
           setActiveView('auth');
           window.history.replaceState(null, '', '/auth');
         } else if (store.currentUser.role === UserRole.STUDENT) {
@@ -516,8 +513,10 @@ export default function App() {
         decodedPath === '/tutor' || hash === '#tutor' ||
         decodedPath === '/tutor/dashboard' || hash === '#tutor/dashboard'
       ) {
+        if (!store.isSessionInitialized) {
+          await store.sessionReadyPromise;
+        }
         if (!store.currentUser) {
-          // Requirement 14: Guests must not access protected dashboards
           setActiveView('auth');
           window.history.replaceState(null, '', '/auth');
         } else if (store.currentUser.role === UserRole.TUTOR) {
@@ -530,6 +529,9 @@ export default function App() {
           window.history.replaceState(null, '', '/admin');
         }
       } else if (decodedPath === '/admin' || hash === '#admin') {
+        if (!store.isSessionInitialized) {
+          await store.sessionReadyPromise;
+        }
         if (store.currentUser && (store.currentUser.role === UserRole.ADMIN || store.currentUser.role === UserRole.SUBADMIN)) {
           setActiveView('dashboard');
         } else if (store.currentUser && store.currentUser.role === UserRole.STUDENT) {
@@ -638,6 +640,9 @@ export default function App() {
         hash === '#users-data' || 
         hash === '#user data'
       ) {
+        if (!store.isSessionInitialized) {
+          await store.sessionReadyPromise;
+        }
         if (!store.currentUser || (store.currentUser.role !== UserRole.ADMIN && store.currentUser.role !== UserRole.SUBADMIN)) {
           setActiveView('admin-login');
           window.history.replaceState(null, '', '/admin');
@@ -856,8 +861,8 @@ export default function App() {
     return success;
   };
 
-  const handleLogout = () => {
-    store.logout();
+  const handleLogout = async () => {
+    await store.logout();
     setActiveChat(null);
     handleNavigate('home');
   };

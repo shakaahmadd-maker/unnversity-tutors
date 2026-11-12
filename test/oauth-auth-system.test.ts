@@ -1,9 +1,12 @@
 import crypto from 'crypto';
 import fs from 'fs';
+import http from 'http';
 import path from 'path';
 import { db, isDbConnected, checkDbConnection } from '../src/db/index';
 import { users, passwordResetTokens as passwordResetTokensTable } from '../src/db/schema';
 import { eq } from 'drizzle-orm';
+
+process.env.SKIP_AUTO_SERVER_START = 'true';
 
 const BASE_URL = process.env.TEST_APP_URL || 'http://localhost:3000';
 const UPLOADS_DIR = process.env.UPLOADS_DIR || '/app/uploads';
@@ -12,6 +15,20 @@ const PERSISTED_RESET_TOKENS_FILE = path.join(UPLOADS_DIR, 'persisted_reset_toke
 
 function generateRuntimePassword(): string {
   return `${crypto.randomBytes(16).toString('base64url')}!9Aa`;
+}
+
+function getSetCookieList(res: Response): string[] {
+  const anyHeaders = res.headers as any;
+  if (typeof anyHeaders.getSetCookie === 'function') {
+    return anyHeaders.getSetCookie();
+  }
+  const combined = res.headers.get('set-cookie');
+  return combined ? [combined] : [];
+}
+
+function findSetCookieHeader(res: Response, cookieName: string): string | undefined {
+  const prefix = `${cookieName}=`;
+  return getSetCookieList(res).find((c) => c.trim().startsWith(prefix));
 }
 
 function updatePersistedUserRecord(userId: string, patch: Record<string, any>) {
@@ -45,7 +62,7 @@ async function createActorWithRole(role: 'student' | 'tutor' | 'subadmin' | 'adm
   }
 
   if (role === 'student') {
-    const cookieHeader = regRes.headers.get('set-cookie') || '';
+    const cookieHeader = findSetCookieHeader(regRes, 'auth_session') || regRes.headers.get('set-cookie') || '';
     return { user: regData.user, token: regData.token, cookieHeader, password, email, regData };
   }
 
@@ -64,7 +81,7 @@ async function createActorWithRole(role: 'student' | 'tutor' | 'subadmin' | 'adm
   if (loginRes.status !== 200) {
     throw new Error(`Role login failed for ${email}: ${JSON.stringify(loginData)}`);
   }
-  const cookieHeader = loginRes.headers.get('set-cookie') || '';
+  const cookieHeader = findSetCookieHeader(loginRes, 'auth_session') || loginRes.headers.get('set-cookie') || '';
   return { user: loginData.user, token: loginData.token, cookieHeader, password, email, regData };
 }
 
@@ -115,8 +132,6 @@ async function runAuthSystemTests() {
       );
     }
 
-    // Missing credentials must return HTTP 400 config error (never a fake login);
-    // runtime-configured providers must return a real authorization URL with CSPRNG state (never a fake login).
     if (!provData.providers?.google?.configured) {
       const googleInitRes = await fetch(`${BASE_URL}/api/auth/google/url`);
       testAssert(googleInitRes.status === 400, 'Missing Google OAuth credentials return HTTP 400 configuration error');
@@ -167,7 +182,7 @@ async function runAuthSystemTests() {
       body: JSON.stringify({ provider: 'google' }),
     });
     testAssert(
-      demoLoginRes.status === 404 || !demoLoginRes.headers.get('set-cookie'),
+      demoLoginRes.status === 404 || !findSetCookieHeader(demoLoginRes, 'auth_session'),
       `Removed fake /api/auth/demo-login endpoint does not issue any session (status: ${demoLoginRes.status})`
     );
 
@@ -177,14 +192,14 @@ async function runAuthSystemTests() {
     console.log('\n--- 2. Testing Separate Google & Meta/Instagram OAuth State Validation ---');
     const googleTampered = await fetch(`${BASE_URL}/api/auth/callback/google?code=test_code&state=forged_state_token`);
     testAssert(googleTampered.status === 400, 'Google callback (/api/auth/callback/google) rejects forged state with HTTP 400');
-    testAssert(!googleTampered.headers.get('set-cookie')?.includes('auth_session='), 'Google callback with forged state sets no session cookie');
+    testAssert(!findSetCookieHeader(googleTampered, 'auth_session'), 'Google callback with forged state sets no session cookie');
 
-    const googleMissingState = await fetch(`${BASE_URL}/api/auth/google/callback?code=test_code`);
-    testAssert(googleMissingState.status === 400, 'Google callback (/api/auth/google/callback) rejects missing state with HTTP 400');
+    const googleNonCanonical = await fetch(`${BASE_URL}/api/auth/google/callback?code=test_code`);
+    testAssert(googleNonCanonical.status === 400, 'Non-canonical /api/auth/google/callback rejects request with HTTP 400');
 
     const instaTampered = await fetch(`${BASE_URL}/api/auth/callback/instagram?code=test_code&state=forged_state_token`);
     testAssert(instaTampered.status === 400, 'Instagram callback (/api/auth/callback/instagram) rejects forged state with HTTP 400');
-    testAssert(!instaTampered.headers.get('set-cookie')?.includes('auth_session='), 'Instagram callback with forged state sets no session cookie');
+    testAssert(!findSetCookieHeader(instaTampered, 'auth_session'), 'Instagram callback with forged state sets no session cookie');
 
     const instaMissingState = await fetch(`${BASE_URL}/api/auth/instagram/callback?code=test_code`);
     testAssert(instaMissingState.status === 400, 'Instagram callback (/api/auth/instagram/callback) rejects missing state with HTTP 400');
@@ -280,7 +295,6 @@ async function runAuthSystemTests() {
       'POST /api/auth/forgot-password NEVER returns the plaintext reset token in JSON'
     );
 
-    // Confirm stored token is a 64-character SHA-256 hex digest
     if (isDbConnected() && db) {
       const dbTokens = await db
         .select()
@@ -299,7 +313,6 @@ async function runAuthSystemTests() {
       );
     }
 
-    // Invalid token rejected
     const invalidResetRes = await fetch(`${BASE_URL}/api/auth/reset-password`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'X-Forwarded-For': '198.51.100.11' },
@@ -311,7 +324,6 @@ async function runAuthSystemTests() {
     });
     testAssert(invalidResetRes.status === 400, 'Invalid password reset token is rejected with HTTP 400');
 
-    // Expired token rejected
     const expiredRaw = crypto.randomBytes(32).toString('hex');
     const expiredHash = crypto.createHash('sha256').update(expiredRaw).digest('hex');
     const expiredRec = {
@@ -343,7 +355,6 @@ async function runAuthSystemTests() {
     });
     testAssert(expiredResetRes.status === 400, 'Expired password reset token is rejected with HTTP 400');
 
-    // Valid token updates passwordHash, creates HttpOnly session, and invalidates token against reuse
     const validRaw = crypto.randomBytes(32).toString('hex');
     const validHash = crypto.createHash('sha256').update(validRaw).digest('hex');
     const validRec = {
@@ -375,13 +386,12 @@ async function runAuthSystemTests() {
       }),
     });
     testAssert(validResetRes.status === 200, 'Valid hashed reset token resets password with HTTP 200');
-    const resetSetCookie = validResetRes.headers.get('set-cookie') || '';
+    const resetSetCookie = findSetCookieHeader(validResetRes, 'auth_session') || '';
     testAssert(
       resetSetCookie.includes('auth_session=') && resetSetCookie.toLowerCase().includes('httponly'),
       'Password reset creates a secure HttpOnly session cookie after success'
     );
 
-    // Old password must now fail with 401, new password must succeed with 200
     const oldPassCheck = await fetch(`${BASE_URL}/api/auth/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -396,7 +406,6 @@ async function runAuthSystemTests() {
     });
     testAssert(newPassCheck.status === 200, 'Updated password hash allows login with HTTP 200');
 
-    // Reusing consumed token must fail with 400
     const reuseRes = await fetch(`${BASE_URL}/api/auth/reset-password`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'X-Forwarded-For': '198.51.100.14' },
@@ -408,7 +417,6 @@ async function runAuthSystemTests() {
     });
     testAssert(reuseRes.status === 400, 'Consumed password reset token cannot be reused (HTTP 400)');
 
-    // Rate-limit check on forgot-password (>3 requests per 15 min per email -> HTTP 429)
     const rateLimitEmail = `ratelimit_${crypto.randomBytes(5).toString('hex')}@universitytutors.test`;
     let saw429 = false;
     for (let i = 0; i < 5; i++) {
@@ -430,7 +438,6 @@ async function runAuthSystemTests() {
     const subadminActor = await createActorWithRole('subadmin', 'gamma');
     const adminActor = await createActorWithRole('admin', 'delta');
 
-    // 5a. Frontend header spoofing (X-User-Id) MUST be rejected with 401
     const spoofAdminHeaderRes = await fetch(`${BASE_URL}/api/admin/dashboard`, {
       headers: { 'X-User-Id': 'admin_shaka' },
     });
@@ -439,7 +446,6 @@ async function runAuthSystemTests() {
       'Frontend-supplied X-User-Id header is ignored and rejected with HTTP 401'
     );
 
-    // 5b. Logged-out guest -> 401 on all protected endpoints
     const guestMe = await fetch(`${BASE_URL}/api/auth/me`);
     const guestStudentDash = await fetch(`${BASE_URL}/api/student/dashboard`);
     const guestTutorDash = await fetch(`${BASE_URL}/api/tutor/dashboard`);
@@ -458,7 +464,6 @@ async function runAuthSystemTests() {
       'Logged-out guest receives HTTP 401 across /api/auth/me, student, tutor, and admin routes'
     );
 
-    // 5c. Student permissions: 200 on student dashboard; 403 on tutor and admin routes
     const stuDash = await fetch(`${BASE_URL}/api/student/dashboard`, {
       headers: cookieAuthHeaders(studentActor.cookieHeader),
     });
@@ -491,7 +496,6 @@ async function runAuthSystemTests() {
       'Student cannot escalate their own role via PUT /api/users/:id'
     );
 
-    // 5d. Tutor permissions: 200 on tutor dashboard; 403 on student and admin routes
     const tutTutorDash = await fetch(`${BASE_URL}/api/tutor/dashboard`, {
       headers: cookieAuthHeaders(tutorActor.cookieHeader),
     });
@@ -516,7 +520,6 @@ async function runAuthSystemTests() {
     testAssert(tutEditTutor.status === 403, 'Tutor CANNOT edit tutors via /api/admin/tutors/:id (HTTP 403)');
     testAssert(tutAuditLogs.status === 403, 'Tutor CANNOT access /api/audit-logs (HTTP 403)');
 
-    // 5e. Subadmin permissions: 200 on admin dashboard & tutor edit; 403 on admin-only create-privileged-user
     const subDash = await fetch(`${BASE_URL}/api/admin/dashboard`, {
       headers: cookieAuthHeaders(subadminActor.cookieHeader),
     });
@@ -540,7 +543,6 @@ async function runAuthSystemTests() {
     testAssert(subEditTutor.status === 200, 'Subadmin can edit tutors via HttpOnly cookie session (HTTP 200)');
     testAssert(subCreateAdmin.status === 403, 'Subadmin CANNOT create admin accounts via /api/create-privileged-user (HTTP 403)');
 
-    // 5f. Admin permissions: 200 on admin dashboard, tutor edit, audit logs, and privileged user creation
     const admDash = await fetch(`${BASE_URL}/api/admin/dashboard`, {
       headers: cookieAuthHeaders(adminActor.cookieHeader),
     });
@@ -567,6 +569,540 @@ async function runAuthSystemTests() {
     testAssert(admAudit.status === 200, 'Admin can access /api/audit-logs (HTTP 200)');
     testAssert(admEditTutor.status === 200, 'Admin can edit tutors via HttpOnly cookie session (HTTP 200)');
     testAssert(admCreatePriv.status === 200, 'Admin can create privileged hashed accounts via /api/create-privileged-user (HTTP 200)');
+
+    // ------------------------------------------------------------------------
+    // 6. Comprehensive Google OAuth Production Security End-to-End Suite
+    //    Covers all 8 required Google OAuth test scenarios with zero hardcoded secrets
+    // ------------------------------------------------------------------------
+    console.log('\n--- 6. Testing Google OAuth Production Login Flow (All 8 Required Scenarios) ---');
+
+    const { createApp, GOOGLE_OAUTH_CALLBACK_PATH } = await import('../server');
+    testAssert(
+      GOOGLE_OAUTH_CALLBACK_PATH === '/api/auth/callback/google',
+      'Exact backend Google OAuth callback route is /api/auth/callback/google'
+    );
+
+    const savedEnv = {
+      GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID,
+      GOOGLE_CLIENT_SECRET: process.env.GOOGLE_CLIENT_SECRET,
+      GOOGLE_REDIRECT_URI: process.env.GOOGLE_REDIRECT_URI,
+      APP_URL: process.env.APP_URL,
+      SESSION_SECRET: process.env.SESSION_SECRET,
+    };
+
+    // Runtime-generated ephemeral test values (zero hardcoded secrets)
+    const runtimeTestClientId = `test_cid_${crypto.randomBytes(12).toString('hex')}`;
+    const runtimeTestClientSecret = `test_csec_${crypto.randomBytes(18).toString('hex')}`;
+    const runtimeTestSessionSecret = crypto.randomBytes(32).toString('hex');
+    const prodDomain = 'https://university-tutors.com';
+    const prodCallbackUri = `${prodDomain}/api/auth/callback/google`;
+
+    // Simulated PostgreSQL user repository to test user lookup, student role assignment, existing login, and DB failure
+    const pgSimulatedUsers = new Map<string, any>();
+    let simulatePgUserCreationFailure = false;
+
+    // Mock Google OAuth HTTP behavior controller
+    type MockGoogleMode =
+      | 'success_new_student'
+      | 'success_existing_user'
+      | 'token_exchange_error'
+      | 'token_redirect_uri_mismatch'
+      | 'profile_request_error';
+    let mockGoogleMode: MockGoogleMode = 'success_new_student';
+    let lastTokenRequestParams: URLSearchParams | null = null;
+    const newGoogleStudentEmail = `google_new_${crypto.randomBytes(6).toString('hex')}@universitytutors.test`;
+    const existingGoogleUserEmail = `google_existing_${crypto.randomBytes(6).toString('hex')}@universitytutors.test`;
+
+    // Seed an existing PostgreSQL user before OAuth login to test Scenario 7
+    const preExistingUserId = `usr_existing_${crypto.randomBytes(8).toString('hex')}`;
+    const preExistingUserRecord = {
+      id: preExistingUserId,
+      role: 'student',
+      name: 'Existing University Student',
+      email: existingGoogleUserEmail,
+      passwordHash: null,
+      avatarUrl: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150',
+      createdAt: new Date(Date.now() - 86_400_000).toISOString(),
+      suspended: false,
+      verified: true,
+      isApproved: true,
+      status: 'active',
+    };
+    pgSimulatedUsers.set(existingGoogleUserEmail, preExistingUserRecord);
+
+    const mockGoogleFetch: typeof fetch = async (input: any, init?: RequestInit) => {
+      const targetUrl = typeof input === 'string' ? input : input.toString();
+
+      if (targetUrl === 'https://oauth2.googleapis.com/token') {
+        const rawBody = init?.body ? init.body.toString() : '';
+        lastTokenRequestParams = new URLSearchParams(rawBody);
+
+        if (mockGoogleMode === 'token_redirect_uri_mismatch') {
+          return new Response(
+            JSON.stringify({ error: 'redirect_uri_mismatch', error_description: 'Bad redirect_uri' }),
+            { status: 400, headers: { 'Content-Type': 'application/json' } }
+          );
+        }
+        if (mockGoogleMode === 'token_exchange_error') {
+          return new Response(
+            JSON.stringify({ error: 'invalid_grant', error_description: 'Invalid authorization code' }),
+            { status: 400, headers: { 'Content-Type': 'application/json' } }
+          );
+        }
+
+        const ephemeralAccessToken = `tok_${crypto.randomBytes(16).toString('hex')}`;
+        return new Response(
+          JSON.stringify({
+            access_token: ephemeralAccessToken,
+            expires_in: 3600,
+            token_type: 'Bearer',
+            scope: 'openid email profile',
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } }
+        );
+      }
+
+      if (targetUrl === 'https://www.googleapis.com/oauth2/v2/userinfo') {
+        if (mockGoogleMode === 'profile_request_error') {
+          return new Response(
+            JSON.stringify({ error: { code: 500, message: 'Upstream profile error' } }),
+            { status: 502, headers: { 'Content-Type': 'application/json' } }
+          );
+        }
+
+        const activeEmail =
+          mockGoogleMode === 'success_existing_user' ? existingGoogleUserEmail : newGoogleStudentEmail;
+        return new Response(
+          JSON.stringify({
+            id: crypto.randomBytes(10).toString('hex'),
+            email: activeEmail,
+            verified_email: true,
+            name: mockGoogleMode === 'success_existing_user' ? 'Existing University Student' : 'New Google Student',
+            picture: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150',
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } }
+        );
+      }
+
+      throw new Error(`Unexpected external fetch in Google OAuth test: ${targetUrl}`);
+    };
+
+    const isolatedApp = await createApp({
+      skipStaticAndVite: true,
+      fetchImpl: mockGoogleFetch,
+      oauthUserRepo: {
+        findByEmail: async (email: string) => {
+          if (simulatePgUserCreationFailure) {
+            throw new Error('Simulated PostgreSQL connection failure');
+          }
+          return pgSimulatedUsers.get(email.toLowerCase().trim()) || null;
+        },
+        findById: async (id: string) => {
+          for (const u of pgSimulatedUsers.values()) {
+            if (u.id === id) return u;
+          }
+          return null;
+        },
+        createUser: async (record: any) => {
+          if (simulatePgUserCreationFailure) {
+            throw new Error('Simulated PostgreSQL INSERT failure');
+          }
+          pgSimulatedUsers.set(record.email.toLowerCase().trim(), record);
+          return record;
+        },
+      },
+    });
+
+    const isolatedServer = http.createServer(isolatedApp);
+    await new Promise<void>((resolve) => isolatedServer.listen(0, '127.0.0.1', () => resolve()));
+    const addr = isolatedServer.address() as { port: number };
+    const OAUTH_TEST_BASE = `http://127.0.0.1:${addr.port}`;
+
+    function setValidProdGoogleEnv() {
+      process.env.SESSION_SECRET = runtimeTestSessionSecret;
+      process.env.APP_URL = prodDomain;
+      process.env.GOOGLE_CLIENT_ID = runtimeTestClientId;
+      process.env.GOOGLE_CLIENT_SECRET = runtimeTestClientSecret;
+      process.env.GOOGLE_REDIRECT_URI = prodCallbackUri;
+    }
+
+    async function initiateValidGoogleFlow(): Promise<{ state: string; stateCookiePair: string; authUrl: string }> {
+      const initRes = await fetch(`${OAUTH_TEST_BASE}/api/auth/google/url`, {
+        headers: { 'X-Forwarded-Proto': 'https' },
+      });
+      const initJson = await initRes.json();
+      const parsedUrl = new URL(initJson.url);
+      const state = parsedUrl.searchParams.get('state') || '';
+      const rawStateCookie = findSetCookieHeader(initRes, 'oauth_state_google') || '';
+      const stateCookiePair = rawStateCookie.split(';')[0];
+      return { state, stateCookiePair, authUrl: initJson.url };
+    }
+
+    try {
+      // ----------------------------------------------------------------------
+      // Scenario 6.1: Missing OAuth Environment Variables
+      // ----------------------------------------------------------------------
+      for (const missingVar of ['GOOGLE_CLIENT_ID', 'GOOGLE_CLIENT_SECRET', 'GOOGLE_REDIRECT_URI', 'APP_URL'] as const) {
+        setValidProdGoogleEnv();
+        delete process.env[missingVar];
+
+        const pRes = await fetch(`${OAUTH_TEST_BASE}/api/auth/providers`);
+        const pData = await pRes.json();
+        testAssert(
+          pData.providers?.google?.configured === false,
+          `[6.1 Missing Env] providers.google.configured is false when ${missingVar} is missing`
+        );
+
+        const uRes = await fetch(`${OAUTH_TEST_BASE}/api/auth/google/url`);
+        const uData = await uRes.json();
+        testAssert(
+          uRes.status === 400 && uData.code === 'missing_oauth_credentials' && String(uData.error).includes(missingVar),
+          `[6.1 Missing Env] /api/auth/google/url rejects missing ${missingVar} with 400 missing_oauth_credentials`
+        );
+
+        const cbRes = await fetch(`${OAUTH_TEST_BASE}/api/auth/callback/google?code=abc&state=${'a'.repeat(64)}`);
+        const cbData = await cbRes.json();
+        testAssert(
+          cbRes.status === 400 && cbData.code === 'missing_oauth_credentials' && !findSetCookieHeader(cbRes, 'auth_session'),
+          `[6.1 Missing Env] /api/auth/callback/google rejects missing ${missingVar} with 400 missing_oauth_credentials`
+        );
+      }
+
+      // ----------------------------------------------------------------------
+      // Scenario 6.2: Invalid OAuth State (missing, malformed, forged, tampered cookie, replayed)
+      // ----------------------------------------------------------------------
+      setValidProdGoogleEnv();
+
+      const missingStateRes = await fetch(`${OAUTH_TEST_BASE}/api/auth/callback/google?code=valid_code`);
+      const missingStateData = await missingStateRes.json();
+      testAssert(
+        missingStateRes.status === 400 && missingStateData.code === 'invalid_state',
+        '[6.2 Invalid State] Missing state parameter returns HTTP 400 invalid_state'
+      );
+
+      const malformedStateRes = await fetch(`${OAUTH_TEST_BASE}/api/auth/callback/google?code=valid_code&state=not_64_hex`);
+      const malformedStateData = await malformedStateRes.json();
+      testAssert(
+        malformedStateRes.status === 400 && malformedStateData.code === 'invalid_state',
+        '[6.2 Invalid State] Malformed non-hex state parameter returns HTTP 400 invalid_state'
+      );
+
+      const forgedHexState = crypto.randomBytes(32).toString('hex');
+      const forgedStateRes = await fetch(`${OAUTH_TEST_BASE}/api/auth/callback/google?code=valid_code&state=${forgedHexState}`);
+      const forgedStateData = await forgedStateRes.json();
+      testAssert(
+        forgedStateRes.status === 400 &&
+          forgedStateData.code === 'invalid_state' &&
+          !findSetCookieHeader(forgedStateRes, 'auth_session'),
+        '[6.2 Invalid State] Forged unissued 64-hex state returns HTTP 400 invalid_state and sets no session'
+      );
+
+      const flowForTamper = await initiateValidGoogleFlow();
+      const tamperedCookieRes = await fetch(
+        `${OAUTH_TEST_BASE}/api/auth/callback/google?code=valid_code&state=${flowForTamper.state}`,
+        {
+          headers: { Cookie: 'oauth_state_google=tampered.payload_signature' },
+        }
+      );
+      const tamperedCookieData = await tamperedCookieRes.json();
+      testAssert(
+        tamperedCookieRes.status === 400 && tamperedCookieData.code === 'invalid_state',
+        '[6.2 Invalid State] Tampered oauth_state_google cookie signature returns HTTP 400 invalid_state'
+      );
+
+      // ----------------------------------------------------------------------
+      // Scenario 6.3: Redirect URI Mismatch (localhost, preview container URLs, domain/path mismatch, provider mismatch)
+      // ----------------------------------------------------------------------
+      const forbiddenUrls = [
+        'http://localhost:3000',
+        'https://localhost:3000',
+        'https://ais-dev-preview-12345.us-west1.run.app',
+        'https://ais-pre-preview-12345.us-west1.run.app',
+        'http://university-tutors.com',
+        'https://127.0.0.1:3000',
+      ];
+
+      for (const badAppUrl of forbiddenUrls) {
+        setValidProdGoogleEnv();
+        process.env.APP_URL = badAppUrl;
+        process.env.GOOGLE_REDIRECT_URI = `${badAppUrl}/api/auth/callback/google`;
+        const badRes = await fetch(`${OAUTH_TEST_BASE}/api/auth/google/url`);
+        const badData = await badRes.json();
+        testAssert(
+          badRes.status === 400 && badData.code === 'redirect_uri_mismatch',
+          `[6.3 Redirect URI Mismatch] Rejects non-production APP_URL (${badAppUrl}) with 400 redirect_uri_mismatch`
+        );
+      }
+
+      // Mismatched callback path in GOOGLE_REDIRECT_URI vs APP_URL
+      setValidProdGoogleEnv();
+      process.env.GOOGLE_REDIRECT_URI = `${prodDomain}/api/auth/google/callback`;
+      const wrongPathRes = await fetch(`${OAUTH_TEST_BASE}/api/auth/google/url`);
+      const wrongPathData = await wrongPathRes.json();
+      testAssert(
+        wrongPathRes.status === 400 && wrongPathData.code === 'redirect_uri_mismatch',
+        '[6.3 Redirect URI Mismatch] Rejects GOOGLE_REDIRECT_URI using wrong callback path with 400 redirect_uri_mismatch'
+      );
+
+      // Mismatched domain in GOOGLE_REDIRECT_URI vs APP_URL
+      setValidProdGoogleEnv();
+      process.env.GOOGLE_REDIRECT_URI = 'https://other-domain.example.com/api/auth/callback/google';
+      const wrongDomainRes = await fetch(`${OAUTH_TEST_BASE}/api/auth/google/url`);
+      const wrongDomainData = await wrongDomainRes.json();
+      testAssert(
+        wrongDomainRes.status === 400 && wrongDomainData.code === 'redirect_uri_mismatch',
+        '[6.3 Redirect URI Mismatch] Rejects GOOGLE_REDIRECT_URI on different domain than APP_URL with 400 redirect_uri_mismatch'
+      );
+
+      // Non-canonical route /api/auth/google/callback returns 400 redirect_uri_mismatch
+      setValidProdGoogleEnv();
+      const nonCanonicalRes = await fetch(`${OAUTH_TEST_BASE}/api/auth/google/callback?code=abc&state=${'b'.repeat(64)}`);
+      const nonCanonicalData = await nonCanonicalRes.json();
+      testAssert(
+        nonCanonicalRes.status === 400 && nonCanonicalData.code === 'redirect_uri_mismatch',
+        '[6.3 Redirect URI Mismatch] Non-canonical /api/auth/google/callback returns 400 redirect_uri_mismatch'
+      );
+
+      // Google callback query ?error=redirect_uri_mismatch
+      const providerMismatchRes = await fetch(
+        `${OAUTH_TEST_BASE}/api/auth/callback/google?error=redirect_uri_mismatch`
+      );
+      const providerMismatchData = await providerMismatchRes.json();
+      testAssert(
+        providerMismatchRes.status === 400 && providerMismatchData.code === 'redirect_uri_mismatch',
+        '[6.3 Redirect URI Mismatch] Google callback error=redirect_uri_mismatch returns 400 redirect_uri_mismatch'
+      );
+
+      // Google token endpoint returning redirect_uri_mismatch
+      mockGoogleMode = 'token_redirect_uri_mismatch';
+      const flowTokenMismatch = await initiateValidGoogleFlow();
+      const tokenMismatchRes = await fetch(
+        `${OAUTH_TEST_BASE}/api/auth/callback/google?code=auth_code_1&state=${flowTokenMismatch.state}`,
+        { headers: { Cookie: flowTokenMismatch.stateCookiePair } }
+      );
+      const tokenMismatchData = await tokenMismatchRes.json();
+      testAssert(
+        tokenMismatchRes.status === 400 && tokenMismatchData.code === 'redirect_uri_mismatch',
+        '[6.3 Redirect URI Mismatch] Token exchange redirect_uri_mismatch returns 400 redirect_uri_mismatch'
+      );
+
+      // ----------------------------------------------------------------------
+      // Scenario 6.4: Failed Token Exchange, Failed Profile Request & Failed PostgreSQL User Creation
+      // ----------------------------------------------------------------------
+      mockGoogleMode = 'token_exchange_error';
+      const flowFailedToken = await initiateValidGoogleFlow();
+      const failedTokenRes = await fetch(
+        `${OAUTH_TEST_BASE}/api/auth/callback/google?code=expired_code&state=${flowFailedToken.state}`,
+        { headers: { Cookie: flowFailedToken.stateCookiePair } }
+      );
+      const failedTokenData = await failedTokenRes.json();
+      const failedTokenRaw = JSON.stringify(failedTokenData);
+      testAssert(
+        failedTokenRes.status === 400 &&
+          failedTokenData.code === 'token_exchange_failed' &&
+          !failedTokenRaw.includes(runtimeTestClientSecret) &&
+          !findSetCookieHeader(failedTokenRes, 'auth_session'),
+        '[6.4 Failed Token Exchange] Returns HTTP 400 token_exchange_failed without leaking secrets or setting session'
+      );
+
+      mockGoogleMode = 'profile_request_error';
+      const flowFailedProfile = await initiateValidGoogleFlow();
+      const failedProfileRes = await fetch(
+        `${OAUTH_TEST_BASE}/api/auth/callback/google?code=good_code&state=${flowFailedProfile.state}`,
+        { headers: { Cookie: flowFailedProfile.stateCookiePair } }
+      );
+      const failedProfileData = await failedProfileRes.json();
+      testAssert(
+        failedProfileRes.status === 502 &&
+          failedProfileData.code === 'profile_request_failed' &&
+          !findSetCookieHeader(failedProfileRes, 'auth_session'),
+        '[6.4 Failed Profile Request] Returns HTTP 502 profile_request_failed without setting session'
+      );
+
+      mockGoogleMode = 'success_new_student';
+      simulatePgUserCreationFailure = true;
+      const flowFailedDb = await initiateValidGoogleFlow();
+      const failedDbRes = await fetch(
+        `${OAUTH_TEST_BASE}/api/auth/callback/google?code=good_code&state=${flowFailedDb.state}`,
+        { headers: { Cookie: flowFailedDb.stateCookiePair } }
+      );
+      const failedDbData = await failedDbRes.json();
+      simulatePgUserCreationFailure = false;
+      testAssert(
+        failedDbRes.status === 500 &&
+          failedDbData.code === 'user_creation_failed' &&
+          !findSetCookieHeader(failedDbRes, 'auth_session'),
+        '[6.4 Failed PostgreSQL User Creation] Returns HTTP 500 user_creation_failed without setting session'
+      );
+
+      // ----------------------------------------------------------------------
+      // Scenarios 6.5 & 6.6: Successful Google Login + New Google User Receives "student" Role
+      // ----------------------------------------------------------------------
+      mockGoogleMode = 'success_new_student';
+      lastTokenRequestParams = null;
+
+      const prodDiscoveryRes = await fetch(`${OAUTH_TEST_BASE}/api/auth/providers`);
+      const prodDiscoveryData = await prodDiscoveryRes.json();
+      testAssert(
+        prodDiscoveryData.providers?.google?.configured === true &&
+          prodDiscoveryData.providers?.google?.redirectUri === prodCallbackUri &&
+          !JSON.stringify(prodDiscoveryData).includes(runtimeTestClientSecret) &&
+          !JSON.stringify(prodDiscoveryData).includes(runtimeTestClientId),
+        '[6.5 Successful Login] /api/auth/providers reports Google configured with production callback URL and zero leaked credentials'
+      );
+
+      const validFlow = await initiateValidGoogleFlow();
+      const parsedAuthUrl = new URL(validFlow.authUrl);
+      testAssert(
+        parsedAuthUrl.origin === 'https://accounts.google.com' &&
+          parsedAuthUrl.searchParams.get('redirect_uri') === prodCallbackUri &&
+          parsedAuthUrl.searchParams.get('response_type') === 'code' &&
+          /^[a-f0-9]{64}$/.test(validFlow.state),
+        '[6.5 Successful Login] Authorization URL uses APP_URL production callback (/api/auth/callback/google) and 64-hex CSPRNG state'
+      );
+
+      const authCode = `code_${crypto.randomBytes(12).toString('hex')}`;
+      const successCallbackRes = await fetch(
+        `${OAUTH_TEST_BASE}/api/auth/callback/google?code=${authCode}&state=${validFlow.state}`,
+        {
+          redirect: 'manual',
+          headers: {
+            Cookie: validFlow.stateCookiePair,
+            'X-Forwarded-Proto': 'https',
+          },
+        }
+      );
+
+      testAssert(
+        lastTokenRequestParams !== null &&
+          lastTokenRequestParams.get('code') === authCode &&
+          lastTokenRequestParams.get('redirect_uri') === prodCallbackUri &&
+          lastTokenRequestParams.get('grant_type') === 'authorization_code',
+        '[6.5 Successful Login] Backend exchanges authorization code directly with Google token endpoint'
+      );
+
+      const newSessionCookie = findSetCookieHeader(successCallbackRes, 'auth_session') || '';
+      testAssert(
+        successCallbackRes.status === 302 &&
+          successCallbackRes.headers.get('location') === '/student/dashboard',
+        '[6.5 Successful Login] Redirects authenticated Google student (HTTP 302) to /student/dashboard'
+      );
+      testAssert(
+        newSessionCookie.includes('auth_session=') &&
+          newSessionCookie.toLowerCase().includes('httponly') &&
+          newSessionCookie.toLowerCase().includes('secure') &&
+          newSessionCookie.toLowerCase().includes('samesite=lax'),
+        '[6.5 Successful Login] Issues secure HttpOnly SameSite=Lax auth_session cookie'
+      );
+
+      // Replaying the exact same valid state a second time MUST fail with 400 invalid_state
+      const replayStateRes = await fetch(
+        `${OAUTH_TEST_BASE}/api/auth/callback/google?code=${authCode}&state=${validFlow.state}`,
+        { headers: { Cookie: validFlow.stateCookiePair } }
+      );
+      const replayStateData = await replayStateRes.json();
+      testAssert(
+        replayStateRes.status === 400 && replayStateData.code === 'invalid_state',
+        '[6.2 Single-Use State] Replaying a consumed OAuth state is rejected with HTTP 400 invalid_state'
+      );
+
+      // Verify Scenario 6.6: New Google user received default role "student" in PostgreSQL & session
+      const createdPgUser = pgSimulatedUsers.get(newGoogleStudentEmail);
+      testAssert(
+        Boolean(createdPgUser && createdPgUser.role === 'student' && createdPgUser.passwordHash === null),
+        '[6.6 Default Student Role] New Google user is persisted with default role "student" and null passwordHash'
+      );
+
+      const meNewStudentRes = await fetch(`${OAUTH_TEST_BASE}/api/auth/me`, {
+        headers: cookieAuthHeaders(newSessionCookie),
+      });
+      const meNewStudentData = await meNewStudentRes.json();
+      testAssert(
+        meNewStudentRes.status === 200 &&
+          meNewStudentData.user?.email === newGoogleStudentEmail &&
+          meNewStudentData.user?.role === 'student',
+        '[6.6 Default Student Role] GET /api/auth/me confirms authenticated Google user with role "student"'
+      );
+
+      const newStudentDashRes = await fetch(`${OAUTH_TEST_BASE}/api/student/dashboard`, {
+        headers: cookieAuthHeaders(newSessionCookie),
+      });
+      const newStudentAdminRes = await fetch(`${OAUTH_TEST_BASE}/api/admin/dashboard`, {
+        headers: cookieAuthHeaders(newSessionCookie),
+      });
+      testAssert(
+        newStudentDashRes.status === 200 && newStudentAdminRes.status === 403,
+        '[6.6 Default Student Role] New Google student can access /api/student/dashboard (200) and is blocked from /api/admin/dashboard (403)'
+      );
+
+      // ----------------------------------------------------------------------
+      // Scenario 6.7: Existing PostgreSQL User Can Log In via Google OAuth
+      // ----------------------------------------------------------------------
+      mockGoogleMode = 'success_existing_user';
+      const userCountBeforeExistingLogin = pgSimulatedUsers.size;
+      const existingFlow = await initiateValidGoogleFlow();
+      const existingCallbackRes = await fetch(
+        `${OAUTH_TEST_BASE}/api/auth/callback/google?code=existing_code_123&state=${existingFlow.state}`,
+        {
+          redirect: 'manual',
+          headers: {
+            Cookie: existingFlow.stateCookiePair,
+            'X-Forwarded-Proto': 'https',
+          },
+        }
+      );
+      const existingSessionCookie = findSetCookieHeader(existingCallbackRes, 'auth_session') || '';
+      const existingMeRes = await fetch(`${OAUTH_TEST_BASE}/api/auth/me`, {
+        headers: cookieAuthHeaders(existingSessionCookie),
+      });
+      const existingMeData = await existingMeRes.json();
+
+      testAssert(
+        existingCallbackRes.status === 302 &&
+          existingCallbackRes.headers.get('location') === '/student/dashboard' &&
+          pgSimulatedUsers.size === userCountBeforeExistingLogin &&
+          existingMeRes.status === 200 &&
+          existingMeData.user?.id === preExistingUserId &&
+          existingMeData.user?.email === existingGoogleUserEmail,
+        '[6.7 Existing User Login] Existing PostgreSQL user logs in via Google without duplicate creation and preserves user ID'
+      );
+
+      // ----------------------------------------------------------------------
+      // Scenario 6.8: Logout Removes the Session (Clears Cookie & Revokes Server Token)
+      // ----------------------------------------------------------------------
+      const logoutRes = await fetch(`${OAUTH_TEST_BASE}/api/auth/logout`, {
+        method: 'POST',
+        headers: cookieAuthHeaders(newSessionCookie, { 'X-Forwarded-Proto': 'https' }),
+      });
+      const clearedCookieHeader = findSetCookieHeader(logoutRes, 'auth_session') || '';
+      testAssert(
+        logoutRes.status === 200 &&
+          (clearedCookieHeader.startsWith('auth_session=;') ||
+            clearedCookieHeader.toLowerCase().includes('expires=thu, 01 jan 1970')),
+        '[6.8 Logout Removes Session] POST /api/auth/logout clears HttpOnly auth_session cookie'
+      );
+
+      // Replaying the pre-logout session cookie must now return 401 Unauthorized
+      const meAfterLogoutRes = await fetch(`${OAUTH_TEST_BASE}/api/auth/me`, {
+        headers: cookieAuthHeaders(newSessionCookie),
+      });
+      const studentDashAfterLogoutRes = await fetch(`${OAUTH_TEST_BASE}/api/student/dashboard`, {
+        headers: cookieAuthHeaders(newSessionCookie),
+      });
+      testAssert(
+        meAfterLogoutRes.status === 401 && studentDashAfterLogoutRes.status === 401,
+        '[6.8 Logout Removes Session] Revoked session cookie is rejected with HTTP 401 on /api/auth/me and /api/student/dashboard'
+      );
+    } finally {
+      await new Promise<void>((resolve) => isolatedServer.close(() => resolve()));
+      for (const [key, val] of Object.entries(savedEnv)) {
+        if (val === undefined) {
+          delete process.env[key];
+        } else {
+          process.env[key] = val;
+        }
+      }
+    }
 
     console.log(`\n========================================`);
     console.log(`SUMMARY: ${passed} / ${total} security & authentication tests passed!`);
