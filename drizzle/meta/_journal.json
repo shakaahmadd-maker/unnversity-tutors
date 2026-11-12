@@ -22,6 +22,34 @@
       "when": 1793287037608,
       "tag": "0002_opposite_wendell_vaughn",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1793300000000,
+      "tag": "0003_create_blogs_table",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1793400000000,
+      "tag": "0004_create_tutors_table",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1793500000000,
+      "tag": "0005_create_password_reset_tokens",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1793600000000,
+      "tag": "0006_user_profiles_and_sessions",
+      "breakpoints": true
     }
   ]
 }

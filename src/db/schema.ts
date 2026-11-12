@@ -5,10 +5,12 @@ export const users = pgTable('users', {
   id: text('id').primaryKey(),
   role: text('role').notNull(), // 'student', 'tutor', 'admin'
   name: text('name').notNull(),
+  fullName: text('full_name'),
   email: text('email').notNull().unique(),
   passwordHash: text('password_hash'),
   avatarUrl: text('avatar_url').notNull(),
   createdAt: text('created_at').notNull(),
+  updatedAt: text('updated_at'),
   suspended: boolean('suspended').default(false),
   verified: boolean('verified').default(false),
   bio: text('bio'),
@@ -210,3 +212,38 @@ export const passwordResetTokens = pgTable('password_reset_tokens', {
   uniqueIndex('idx_password_reset_token_hash').on(table.tokenHash),
   index('idx_password_reset_user_id').on(table.userId),
 ]);
+
+// 10. User Profiles Table (Student & Academic Details)
+export const userProfiles = pgTable('user_profiles', {
+  id: text('id').primaryKey(),
+  userId: text('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  fullName: text('full_name').notNull(),
+  email: text('email').notNull(),
+  role: text('role').notNull().default('student'),
+  avatarUrl: text('avatar_url'),
+  bio: text('bio'),
+  country: text('country').default('US'),
+  location: text('location'),
+  phoneNumber: text('phone_number'),
+  education: text('education'),
+  createdAt: text('created_at').notNull(),
+  updatedAt: text('updated_at').notNull(),
+}, (table) => [
+  uniqueIndex('idx_user_profiles_user_id').on(table.userId),
+  index('idx_user_profiles_email').on(table.email),
+]);
+
+// 11. User Sessions Table (Database Session Tracking)
+export const userSessions = pgTable('user_sessions', {
+  id: text('id').primaryKey(),
+  userId: text('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  sessionTokenHash: text('session_token_hash'),
+  ipAddress: text('ip_address'),
+  userAgent: text('user_agent'),
+  expiresAt: text('expires_at').notNull(),
+  createdAt: text('created_at').notNull(),
+  updatedAt: text('updated_at').notNull(),
+}, (table) => [
+  index('idx_user_sessions_user_id').on(table.userId),
+]);
+

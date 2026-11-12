@@ -12,7 +12,7 @@ import bcrypt from 'bcryptjs';
 import nodemailer from 'nodemailer';
 import { createServer as createViteServer } from 'vite';
 import { db, isDbConnected, checkDbConnection, hasDatabaseUrl } from './src/db/index';
-import { users, orders, inquiries, messages, quotes, auditLogs, chatRooms, chatRoomMembers, blogs, tutors, passwordResetTokens as passwordResetTokensTable } from './src/db/schema';
+import { users, userProfiles, userSessions, orders, inquiries, messages, quotes, auditLogs, chatRooms, chatRoomMembers, blogs, tutors, passwordResetTokens as passwordResetTokensTable } from './src/db/schema';
 import { eq, desc, and, inArray, isNull } from 'drizzle-orm';
 import { runMigrations } from './src/db/migrate';
 import { memoryStore, PrivateFileRecord } from './src/db/memoryStore';
@@ -1102,14 +1102,17 @@ export async function createApp(options: CreateAppOptions = {}) {
       const newUserId = 'usr_' + crypto.randomBytes(12).toString('hex');
       const now = new Date().toISOString();
 
+      // Required fields confirmed: id, email, passwordHash, role, fullName, createdAt, updatedAt
       const newUserRecord = {
         id: newUserId,
         role: userRole,
         name: cleanName,
+        fullName: cleanName,
         email: cleanEmail,
         passwordHash: pHash,
         avatarUrl: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&auto=format&fit=crop&q=80',
         createdAt: now,
+        updatedAt: now,
         suspended: false,
         verified: true,
         bio: (typeof extra?.bio === 'string' ? extra.bio : null) || 'Active student member.',
@@ -1130,36 +1133,114 @@ export async function createApp(options: CreateAppOptions = {}) {
         status: 'active',
       };
 
-      // 9. Save in PostgreSQL
+      const newProfileRecord = {
+        id: 'prof_' + newUserId,
+        userId: newUserId,
+        fullName: cleanName,
+        email: cleanEmail,
+        role: userRole,
+        avatarUrl: newUserRecord.avatarUrl,
+        bio: newUserRecord.bio,
+        country: newUserRecord.country,
+        location: newUserRecord.location,
+        phoneNumber: newUserRecord.phoneNumber,
+        education: newUserRecord.education,
+        createdAt: now,
+        updatedAt: now,
+      };
+
+      // 9. Session token generation & database session record
+      let sessionToken: string;
+      try {
+        sessionToken = createSessionToken({ id: newUserId, email: cleanEmail, role: userRole });
+      } catch (sessionErr: any) {
+        console.error('[AUTH] Session token failure:', sessionErr.message);
+        return res.status(500).json({ error: 'Session creation failed.' });
+      }
+
+      const sessionId = 'sess_' + crypto.randomBytes(16).toString('hex');
+      const sessionTokenHash = crypto.createHash('sha256').update(sessionToken).digest('hex');
+      const sessionExpiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+      const rawUserAgent = req.headers['user-agent'];
+      const sanitizedUserAgent = typeof rawUserAgent === 'string' ? rawUserAgent.slice(0, 500) : null;
+
+      const newSessionRecord = {
+        id: sessionId,
+        userId: newUserId,
+        sessionTokenHash,
+        ipAddress: clientIp,
+        userAgent: sanitizedUserAgent,
+        expiresAt: sessionExpiresAt,
+        createdAt: now,
+        updatedAt: now,
+      };
+
+      // 10. Save in PostgreSQL using atomic transaction (rolls back if any step fails)
       if (req.headers['x-simulate-db-failure'] === 'true') {
-        return res.status(500).json({ error: 'Database error: simulated database failure.' });
+        return res.status(500).json({
+          error: 'Database error: simulated database failure.',
+          code: 'DB_PERSISTENCE_FAILED',
+        });
       }
 
       if (options.oauthUserRepo?.createUser) {
         await options.oauthUserRepo.createUser(newUserRecord);
       } else if (isDbConnected() && db) {
         try {
-          await db.insert(users).values(newUserRecord);
+          await db.transaction(async (tx) => {
+            // Step 1: User creation
+            await tx.insert(users).values(newUserRecord);
+            // Step 2: User profile creation
+            await tx.insert(userProfiles).values(newProfileRecord);
+            // Step 3: Session creation
+            await tx.insert(userSessions).values(newSessionRecord);
+          });
         } catch (dbErr: any) {
-          console.error('[AUTH] Database error persisting user:', dbErr.message);
-          return res.status(500).json({ error: 'Database error: unable to save user profile in PostgreSQL.' });
+          // Log only safe diagnostics: code, table, column, constraint (never secrets or passwords)
+          const safeDiagnostics = {
+            code: dbErr.code,
+            table: dbErr.table,
+            column: dbErr.column,
+            constraint: dbErr.constraint,
+          };
+          console.error('[AUTH DB Error]', safeDiagnostics);
+
+          // Handle duplicate email unique constraint violations gracefully -> HTTP 409
+          if (dbErr.code === '23505' || dbErr.constraint?.includes('email')) {
+            return res.status(409).json({
+              error: 'An account with this email address already exists. Please sign in or reset your password.',
+              code: 'EMAIL_ALREADY_EXISTS',
+              constraint: dbErr.constraint || 'users_email_unique',
+            });
+          }
+
+          // Return structured JSON error with safe details
+          const safeMessage = dbErr.column && dbErr.table
+            ? `Database error: failed to persist ${dbErr.table} on column ${dbErr.column}.`
+            : dbErr.table
+            ? `Database error: failed to persist record in ${dbErr.table}.`
+            : 'Database error: unable to save user profile in PostgreSQL.';
+
+          return res.status(500).json({
+            error: safeMessage,
+            code: 'DB_PERSISTENCE_FAILED',
+            dbCode: dbErr.code || undefined,
+            table: dbErr.table || undefined,
+            column: dbErr.column || undefined,
+            constraint: dbErr.constraint || undefined,
+          });
         }
       }
+
+      // Memory store and disk fallback update for resilience
       memoryStore.setUser(newUserRecord);
       savePersistedUserUpdate(newUserId, newUserRecord);
 
       logSafeAuthEvent('user created', { userId: newUserId, role: userRole });
 
-      // 10. Create secure HTTP-only session
-      let sessionToken: string;
-      try {
-        sessionToken = createSessionToken({ id: newUserId, email: cleanEmail, role: userRole });
-        setSecureSessionCookie(req, res, sessionToken);
-        logSafeAuthEvent('session created', { userId: newUserId, role: userRole });
-      } catch (sessionErr: any) {
-        console.error('[AUTH] Session token failure:', sessionErr.message);
-        return res.status(500).json({ error: 'Session creation failed.' });
-      }
+      // Set secure HTTP-only session cookie
+      setSecureSessionCookie(req, res, sessionToken);
+      logSafeAuthEvent('session created', { userId: newUserId, role: userRole });
 
       await logAudit('USER_REGISTER', `User registered: ${cleanEmail} (student)`, newUserId, cleanName, userRole, req);
 
@@ -1968,15 +2049,18 @@ export async function createApp(options: CreateAppOptions = {}) {
       return { user: existingUser, created: false };
     }
 
+    const now = new Date().toISOString();
     const newUserId = 'usr_' + crypto.randomBytes(12).toString('hex');
     const newUserRecord = {
       id: newUserId,
       role: 'student',
       name: verifiedName || `${providerLabel} Student`,
+      fullName: verifiedName || `${providerLabel} Student`,
       email: cleanEmail,
       passwordHash: null,
       avatarUrl: verifiedAvatar || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&auto=format&fit=crop&q=80',
-      createdAt: new Date().toISOString(),
+      createdAt: now,
+      updatedAt: now,
       suspended: false,
       verified: true,
       bio: `Student member authenticated via ${providerLabel}.`,
@@ -1997,6 +2081,22 @@ export async function createApp(options: CreateAppOptions = {}) {
       status: 'active',
     };
 
+    const newProfileRecord = {
+      id: 'prof_' + newUserId,
+      userId: newUserId,
+      fullName: newUserRecord.name,
+      email: cleanEmail,
+      role: 'student',
+      avatarUrl: newUserRecord.avatarUrl,
+      bio: newUserRecord.bio,
+      country: 'US',
+      location: null,
+      phoneNumber: null,
+      education: null,
+      createdAt: now,
+      updatedAt: now,
+    };
+
     if (options.oauthUserRepo?.createUser) {
       const createdRecord = await options.oauthUserRepo.createUser(newUserRecord);
       const resolvedCreated = createdRecord || newUserRecord;
@@ -2014,9 +2114,15 @@ export async function createApp(options: CreateAppOptions = {}) {
       if (!isDbConnected() || !db) {
         throw new Error('PostgreSQL database connection is unavailable.');
       }
-      await db.insert(users).values(newUserRecord);
+      await db.transaction(async (tx) => {
+        await tx.insert(users).values(newUserRecord);
+        await tx.insert(userProfiles).values(newProfileRecord);
+      });
     } else if (isDbConnected() && db) {
-      await db.insert(users).values(newUserRecord);
+      await db.transaction(async (tx) => {
+        await tx.insert(users).values(newUserRecord);
+        await tx.insert(userProfiles).values(newProfileRecord);
+      });
     }
 
     memoryStore.setUser(newUserRecord);

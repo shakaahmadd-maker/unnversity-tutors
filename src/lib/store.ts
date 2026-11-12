@@ -607,9 +607,9 @@ export class AppStore {
         })
       });
 
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        throw new Error(data.error || 'Registration failed');
+        throw new Error(data?.error || data?.message || 'Registration failed');
       }
       if (!data?.user?.id) {
         throw new Error('Backend session could not be established.');

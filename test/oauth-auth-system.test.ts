@@ -224,6 +224,17 @@ async function runAuthSystemTests() {
       studentActor.regData?.redirectUrl === '/student/dashboard',
       'Successful registration returns HTTP 201 with safe user data and redirects to /student/dashboard'
     );
+    testAssert(
+      Boolean(
+        studentActor.user?.id &&
+        studentActor.user?.email &&
+        studentActor.user?.role === 'student' &&
+        studentActor.user?.fullName &&
+        studentActor.user?.createdAt &&
+        studentActor.user?.updatedAt
+      ),
+      'Registration provides all required fields: id, email, role, fullName, createdAt, updatedAt'
+    );
 
     // Duplicate email registration -> HTTP 409
     const dupPass = generateRuntimePassword();
@@ -331,6 +342,11 @@ async function runAuthSystemTests() {
       }),
     });
     testAssert(dbFailRes.status === 500, 'Database failure during registration returns HTTP 500');
+    const dbFailData = await dbFailRes.json();
+    testAssert(
+      dbFailData.code === 'DB_PERSISTENCE_FAILED' && typeof dbFailData.error === 'string',
+      'Database failure returns structured JSON with error and code without exposing secrets'
+    );
 
     // Successful login with registered user credentials
     const validLoginRes = await fetch(`${BASE_URL}/api/auth/login`, {
