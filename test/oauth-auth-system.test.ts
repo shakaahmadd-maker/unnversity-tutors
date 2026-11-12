@@ -53,6 +53,8 @@ async function createActorWithRole(role: 'student' | 'tutor' | 'subadmin' | 'adm
       name: `Test ${role.toUpperCase()} ${label}`,
       email,
       password,
+      confirmPassword: password,
+      termsAccepted: true,
       role: 'admin', // Intentionally send admin to confirm backend ignores frontend role
     }),
   });
@@ -217,6 +219,131 @@ async function runAuthSystemTests() {
       studentActor.cookieHeader.includes('auth_session=') && studentActor.cookieHeader.toLowerCase().includes('httponly'),
       'Registration starts a secure HttpOnly server session cookie'
     );
+    testAssert(
+      studentActor.regData?.user?.passwordHash === undefined &&
+      studentActor.regData?.redirectUrl === '/student/dashboard',
+      'Successful registration returns HTTP 201 with safe user data and redirects to /student/dashboard'
+    );
+
+    // Duplicate email registration -> HTTP 409
+    const dupPass = generateRuntimePassword();
+    const dupRes = await fetch(`${BASE_URL}/api/auth/register`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name: 'Duplicate Student',
+        email: studentActor.email,
+        password: dupPass,
+        confirmPassword: dupPass,
+        termsAccepted: true,
+      }),
+    });
+    testAssert(dupRes.status === 409, 'Duplicate email registration returns HTTP 409 Conflict');
+    const dupData = await dupRes.json();
+    testAssert(
+      typeof dupData.error === 'string' && dupData.error.includes('already exists'),
+      'Duplicate email registration returns clear safe message without leaking data'
+    );
+
+    // Invalid email format -> HTTP 400
+    const invalidEmailRes = await fetch(`${BASE_URL}/api/auth/register`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name: 'Invalid Email User',
+        email: 'invalid-email-format',
+        password: 'Password123!',
+        confirmPassword: 'Password123!',
+        termsAccepted: true,
+      }),
+    });
+    testAssert(invalidEmailRes.status === 400, 'Invalid email format registration is rejected with HTTP 400');
+
+    // Weak password (<8 chars) -> HTTP 400
+    const weakPassRes = await fetch(`${BASE_URL}/api/auth/register`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name: 'Weak Pass User',
+        email: `weak_${crypto.randomBytes(4).toString('hex')}@test.com`,
+        password: 'short',
+        confirmPassword: 'short',
+        termsAccepted: true,
+      }),
+    });
+    testAssert(weakPassRes.status === 400, 'Weak password (<8 chars) registration is rejected with HTTP 400');
+
+    // Password missing numbers -> HTTP 400
+    const noNumPassRes = await fetch(`${BASE_URL}/api/auth/register`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name: 'No Number Pass User',
+        email: `nonum_${crypto.randomBytes(4).toString('hex')}@test.com`,
+        password: 'onlylettershere',
+        confirmPassword: 'onlylettershere',
+        termsAccepted: true,
+      }),
+    });
+    testAssert(noNumPassRes.status === 400, 'Password without numbers registration is rejected with HTTP 400');
+
+    // Mismatched passwords -> HTTP 400
+    const mismatchPassRes = await fetch(`${BASE_URL}/api/auth/register`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name: 'Mismatch Pass User',
+        email: `mismatch_${crypto.randomBytes(4).toString('hex')}@test.com`,
+        password: 'ValidPassword123',
+        confirmPassword: 'DifferentPassword456',
+        termsAccepted: true,
+      }),
+    });
+    testAssert(mismatchPassRes.status === 400, 'Mismatched passwords registration is rejected with HTTP 400');
+
+    // Terms not accepted -> HTTP 400
+    const noTermsRes = await fetch(`${BASE_URL}/api/auth/register`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name: 'No Terms User',
+        email: `noterms_${crypto.randomBytes(4).toString('hex')}@test.com`,
+        password: 'ValidPassword123',
+        confirmPassword: 'ValidPassword123',
+        termsAccepted: false,
+      }),
+    });
+    testAssert(noTermsRes.status === 400, 'Registration without terms acceptance is rejected with HTTP 400');
+
+    // Database failure during registration -> HTTP 500
+    const dbFailRes = await fetch(`${BASE_URL}/api/auth/register`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Simulate-Db-Failure': 'true',
+      },
+      body: JSON.stringify({
+        name: 'DB Fail User',
+        email: `dbfail_${crypto.randomBytes(4).toString('hex')}@test.com`,
+        password: 'ValidPassword123',
+        confirmPassword: 'ValidPassword123',
+        termsAccepted: true,
+      }),
+    });
+    testAssert(dbFailRes.status === 500, 'Database failure during registration returns HTTP 500');
+
+    // Successful login with registered user credentials
+    const validLoginRes = await fetch(`${BASE_URL}/api/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: studentActor.email, password: studentActor.password }),
+    });
+    testAssert(validLoginRes.status === 200, 'Successful login with registered credentials returns HTTP 200');
+    const loginCookie = findSetCookieHeader(validLoginRes, 'auth_session') || '';
+    testAssert(
+      loginCookie.includes('auth_session=') && loginCookie.toLowerCase().includes('httponly'),
+      'Successful login sets secure HttpOnly session cookie'
+    );
 
     // Invalid password -> HTTP 401
     const wrongPassRes = await fetch(`${BASE_URL}/api/auth/login`, {
@@ -293,6 +420,22 @@ async function runAuthSystemTests() {
     testAssert(
       forgotData.token === undefined,
       'POST /api/auth/forgot-password NEVER returns the plaintext reset token in JSON'
+    );
+
+    // Anti-account enumeration test: non-existent email returns same 200 response
+    const nonExistentForgotRes = await fetch(`${BASE_URL}/api/auth/forgot-password`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Forwarded-For': '198.51.100.99',
+      },
+      body: JSON.stringify({ email: `nonexistent_${Date.now()}@universitytutors.test` }),
+    });
+    testAssert(nonExistentForgotRes.status === 200, 'Forgot-password request for non-existent email returns HTTP 200');
+    const nonExistentData = await nonExistentForgotRes.json();
+    testAssert(
+      nonExistentData.message === forgotData.message,
+      'Forgot-password returns identical message for existent and non-existent email (prevents account discovery)'
     );
 
     if (isDbConnected() && db) {
@@ -405,6 +548,12 @@ async function runAuthSystemTests() {
       body: JSON.stringify({ email: resetTarget.email, password: updatedPassword }),
     });
     testAssert(newPassCheck.status === 200, 'Updated password hash allows login with HTTP 200');
+
+    // Pre-reset session invalidation check
+    const oldSessionCheck = await fetch(`${BASE_URL}/api/student/dashboard`, {
+      headers: cookieAuthHeaders(resetTarget.cookieHeader),
+    });
+    testAssert(oldSessionCheck.status === 401, 'Sessions issued prior to password reset are revoked with HTTP 401');
 
     const reuseRes = await fetch(`${BASE_URL}/api/auth/reset-password`, {
       method: 'POST',

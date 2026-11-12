@@ -582,20 +582,21 @@ export class AppStore {
     }
   }
 
-  async register(name: string, email: string, _role: UserRole, extra?: Partial<User>): Promise<boolean> {
+  async register(name: string, email: string, _role: UserRole, extra?: any): Promise<boolean> {
     const cleanEmail = email.toLowerCase().trim();
     if (!extra?.password || typeof extra.password !== 'string') {
       throw new Error('Password is required to register an account.');
     }
     try {
-      const res = await fetch('/api/auth/register', {
+      const res = await apiFetch('/api/auth/register', {
         method: 'POST',
-        credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           name: name.trim(),
           email: cleanEmail,
           password: extra.password,
+          confirmPassword: extra.confirmPassword || extra.passwordConfirmation || extra.password,
+          termsAccepted: extra.termsAccepted ?? extra.agreeTerms ?? true,
           extra: {
             bio: extra.bio,
             country: extra.country,
@@ -767,12 +768,12 @@ export class AppStore {
     return true;
   }
 
-  async resetPassword(email: string, token: string, newPassword: string): Promise<boolean> {
+  async resetPassword(email: string, token: string, newPassword: string, confirmPassword?: string): Promise<boolean> {
     const cleanEmail = email.toLowerCase().trim();
     const res = await apiFetch('/api/auth/reset-password', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: cleanEmail, token, newPassword })
+      body: JSON.stringify({ email: cleanEmail, token, newPassword, confirmPassword: confirmPassword || newPassword })
     });
     const data = await res.json();
     if (!res.ok) {

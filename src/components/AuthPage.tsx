@@ -229,8 +229,8 @@ export default function AuthPage({ onLogin, onRegister, onNavigate }: AuthPagePr
       return;
     }
 
-    if (newPasswordInput.length < 6) {
-      setErrorMsg('New password must contain at least 6 characters.');
+    if (newPasswordInput.length < 8 || !/[A-Za-z]/.test(newPasswordInput) || !/[0-9]/.test(newPasswordInput)) {
+      setErrorMsg('New password must contain at least 8 characters and include both letters and numbers.');
       return;
     }
 
@@ -238,6 +238,7 @@ export default function AuthPage({ onLogin, onRegister, onNavigate }: AuthPagePr
       const success = await store.resetPassword(
         resetEmail.trim(),
         resetTokenInput.trim(),
+        newPasswordInput,
         newPasswordInput
       );
 
@@ -313,8 +314,8 @@ export default function AuthPage({ onLogin, onRegister, onNavigate }: AuthPagePr
       return;
     }
 
-    if (password.length < 6) {
-      setErrorMsg('Security password must contain at least 6 characters.');
+    if (password.length < 8 || !/[A-Za-z]/.test(password) || !/[0-9]/.test(password)) {
+      setErrorMsg('Security password must contain at least 8 characters and include both letters and numbers.');
       return;
     }
 
@@ -332,6 +333,8 @@ export default function AuthPage({ onLogin, onRegister, onNavigate }: AuthPagePr
         UserRole.STUDENT,
         {
           password: password,
+          confirmPassword: confirmPassword,
+          termsAccepted: agreeTerms,
           signupMethod: 'email',
         }
       );
@@ -602,8 +605,8 @@ export default function AuthPage({ onLogin, onRegister, onNavigate }: AuthPagePr
                   <input
                     type="password"
                     required
-                    minLength={6}
-                    placeholder="At least 6 characters"
+                    minLength={8}
+                    placeholder="At least 8 chars (letters & numbers)"
                     value={newPasswordInput}
                     onChange={(e) => setNewPasswordInput(e.target.value)}
                     className="block w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm placeholder-slate-400 text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 transition-colors"
@@ -669,6 +672,7 @@ export default function AuthPage({ onLogin, onRegister, onNavigate }: AuthPagePr
                   </label>
                   <button 
                     type="button"
+                    id="forgot-password-link"
                     onClick={() => {
                       setResetEmail(email || '');
                       setIsForgotPasswordView(true);
@@ -841,7 +845,8 @@ export default function AuthPage({ onLogin, onRegister, onNavigate }: AuthPagePr
                       type={showPassword ? 'text' : 'password'}
                       id="reg-pass"
                       required
-                      placeholder="Min 6 chars"
+                      minLength={8}
+                      placeholder="Min 8 chars (letters+numbers)"
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
                       className="block w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs placeholder-slate-400 text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 transition-colors"

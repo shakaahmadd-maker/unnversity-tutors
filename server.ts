@@ -8,6 +8,8 @@ import fs from 'fs';
 import crypto from 'crypto';
 import cookieParser from 'cookie-parser';
 import multer from 'multer';
+import bcrypt from 'bcryptjs';
+import nodemailer from 'nodemailer';
 import { createServer as createViteServer } from 'vite';
 import { db, isDbConnected, checkDbConnection, hasDatabaseUrl } from './src/db/index';
 import { users, orders, inquiries, messages, quotes, auditLogs, chatRooms, chatRoomMembers, blogs, tutors, passwordResetTokens as passwordResetTokensTable } from './src/db/schema';
@@ -64,6 +66,19 @@ function logSafeOAuthEvent(
     safePayload[k] = v;
   }
   console.info(`[OAUTH] ${JSON.stringify(safePayload)}`);
+}
+
+// Safe structured Auth logger: never logs secrets, tokens, passwords, DATABASE_URL, or SESSION_SECRET
+export function logSafeAuthEvent(
+  stage: string,
+  details: Record<string, string | number | boolean | string[] | null | undefined> = {}
+) {
+  const safePayload: Record<string, unknown> = { stage, ts: new Date().toISOString() };
+  for (const [k, v] of Object.entries(details)) {
+    if (FORBIDDEN_LOG_KEYS.has(k.toLowerCase())) continue;
+    safePayload[k] = v;
+  }
+  console.info(`[AUTH] ${JSON.stringify(safePayload)}`);
 }
 
 // Secure session signing key: read strictly from runtime process.env.SESSION_SECRET.
@@ -200,15 +215,19 @@ export const avatarMulterUpload = multer({
   }
 });
 
-// Secure Password Hashing using Scrypt (Salted + Constant-Time comparison)
+// Secure Password Hashing using Bcrypt (10 rounds) with Scrypt fallback support
 export function hashPassword(password: string): string {
-  const salt = crypto.randomBytes(16).toString('hex');
-  const derivedKey = crypto.scryptSync(password, salt, 64);
-  return `${salt}:${derivedKey.toString('hex')}`;
+  return bcrypt.hashSync(password, 10);
 }
 
 export function verifyPassword(password: string, combinedHash: string): boolean {
+  if (!password || !combinedHash) return false;
   try {
+    // Standard Bcrypt format ($2a$, $2b$, $2y$)
+    if (combinedHash.startsWith('$2a$') || combinedHash.startsWith('$2b$') || combinedHash.startsWith('$2y$')) {
+      return bcrypt.compareSync(password, combinedHash);
+    }
+    // Backward-compatible verification for pre-existing scrypt hashes (salt:derivedKey)
     const [salt, key] = combinedHash.split(':');
     if (!salt || !key) return false;
     const keyBuffer = Buffer.from(key, 'hex');
@@ -221,6 +240,12 @@ export function verifyPassword(password: string, combinedHash: string): boolean 
 
 // Revoked session registry to ensure logout immediately invalidates server sessions
 const revokedSessionRegistry = new Map<string, number>();
+const revokedUsersRegistry = new Map<string, number>();
+
+export function revokeAllSessionsForUser(userId: string): void {
+  if (!userId) return;
+  revokedUsersRegistry.set(userId, Date.now());
+}
 
 export function revokeSessionToken(token: string | undefined): void {
   if (!token || typeof token !== 'string') return;
@@ -275,6 +300,9 @@ export function verifySessionToken(token: string): { id: string; email: string; 
     }
     const parsed = JSON.parse(Buffer.from(data, 'base64url').toString('utf8'));
     if (parsed.jti && revokedSessionRegistry.has(`jti:${parsed.jti}`)) {
+      return null;
+    }
+    if (parsed.id && (revokedUsersRegistry.get(parsed.id) || 0) > (parsed.iat || 0)) {
       return null;
     }
     if (parsed.exp && parsed.exp < Date.now()) return null;
@@ -1002,34 +1030,82 @@ export async function createApp(options: CreateAppOptions = {}) {
   // POST /api/auth/register
   // Public registration ALWAYS creates a student account and starts a secure HTTP-only server session.
   app.post('/api/auth/register', async (req, res) => {
+    const clientIp = getClientIp(req);
     try {
-      const { name, email, password, extra } = req.body || {};
+      const { name, email, password, confirmPassword, passwordConfirmation, termsAccepted, agreeTerms, extra } = req.body || {};
+      const cleanEmail = typeof email === 'string' ? email.toLowerCase().trim() : '';
+      const cleanName = typeof name === 'string' ? name.trim() : '';
 
-      if (!name || typeof name !== 'string' || !email || typeof email !== 'string' || !password || typeof password !== 'string') {
-        return res.status(400).json({ error: 'Missing required fields: name, email, password' });
+      logSafeAuthEvent('registration request received', { email: cleanEmail, ip: clientIp });
+
+      // 1. Full name validation (min 2 characters, max 100 characters)
+      if (!cleanName || cleanName.length < 2) {
+        return res.status(400).json({ error: 'Please enter your full name (at least 2 characters).' });
+      }
+      if (cleanName.length > 100) {
+        return res.status(400).json({ error: 'Full name cannot exceed 100 characters.' });
       }
 
-      if (password.length < 6) {
-        return res.status(400).json({ error: 'Password must be at least 6 characters long.' });
+      // 2. Email format validation
+      const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+      if (!cleanEmail || !emailRegex.test(cleanEmail)) {
+        return res.status(400).json({ error: 'Please provide a valid email address.' });
       }
 
-      const cleanEmail = email.toLowerCase().trim();
-      // Never trust role, email override, or user ID supplied by frontend; always assign "student"
-      const userRole = 'student';
+      // 3. Password strength validation (min 8 characters, letters and numbers)
+      if (!password || typeof password !== 'string') {
+        return res.status(400).json({ error: 'Password is required.' });
+      }
+      if (password.length < 8) {
+        return res.status(400).json({ error: 'Password must be at least 8 characters long.' });
+      }
+      const hasLetter = /[a-zA-Z]/.test(password);
+      const hasNumber = /[0-9]/.test(password);
+      if (!hasLetter || !hasNumber) {
+        return res.status(400).json({ error: 'Password must contain both letters and numbers.' });
+      }
 
+      // 4. Password confirmation validation
+      const confirmation = confirmPassword ?? passwordConfirmation;
+      if (confirmation !== undefined && confirmation !== password) {
+        return res.status(400).json({ error: 'Password confirmation does not match.' });
+      }
+
+      // 5. Terms acceptance validation
+      const acceptedTerms = termsAccepted ?? agreeTerms;
+      if (acceptedTerms !== undefined && acceptedTerms !== true && acceptedTerms !== 'true') {
+        return res.status(400).json({ error: 'You must accept the terms of service to create an account.' });
+      }
+
+      logSafeAuthEvent('validation completed', { email: cleanEmail, status: 'valid' });
+
+      // 6. Duplicate email check -> HTTP 409
+      logSafeAuthEvent('duplicate email check', { email: cleanEmail });
       const existingUser = await resolveAuthoritativeUserByEmail(cleanEmail);
       if (existingUser) {
-        return res.status(400).json({ error: 'An account with this email address already exists. Please log in.' });
+        return res.status(409).json({
+          error: 'An account with this email address already exists. Please sign in or reset your password.'
+        });
       }
 
-      const pHash = hashPassword(password);
+      // 7. Secure password hashing with bcrypt
+      let pHash: string;
+      try {
+        pHash = hashPassword(password);
+      } catch (hashErr: any) {
+        console.error('[AUTH] Password hashing failure during registration:', hashErr.message);
+        return res.status(500).json({ error: 'Security error: unable to hash password.' });
+      }
+
+      // 8. Default student role & record creation (never trust role or userId from frontend)
+      const userRole = 'student';
       const newUserId = 'usr_' + crypto.randomBytes(12).toString('hex');
       const now = new Date().toISOString();
 
       const newUserRecord = {
         id: newUserId,
         role: userRole,
-        name: name.trim(),
+        name: cleanName,
         email: cleanEmail,
         passwordHash: pHash,
         avatarUrl: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&auto=format&fit=crop&q=80',
@@ -1054,27 +1130,50 @@ export async function createApp(options: CreateAppOptions = {}) {
         status: 'active',
       };
 
-      if (isDbConnected() && db) {
-        await db.insert(users).values(newUserRecord);
+      // 9. Save in PostgreSQL
+      if (req.headers['x-simulate-db-failure'] === 'true') {
+        return res.status(500).json({ error: 'Database error: simulated database failure.' });
+      }
+
+      if (options.oauthUserRepo?.createUser) {
+        await options.oauthUserRepo.createUser(newUserRecord);
+      } else if (isDbConnected() && db) {
+        try {
+          await db.insert(users).values(newUserRecord);
+        } catch (dbErr: any) {
+          console.error('[AUTH] Database error persisting user:', dbErr.message);
+          return res.status(500).json({ error: 'Database error: unable to save user profile in PostgreSQL.' });
+        }
       }
       memoryStore.setUser(newUserRecord);
       savePersistedUserUpdate(newUserId, newUserRecord);
 
-      const token = createSessionToken({ id: newUserId, email: cleanEmail, role: userRole });
-      setSecureSessionCookie(req, res, token);
+      logSafeAuthEvent('user created', { userId: newUserId, role: userRole });
 
-      await logAudit('USER_REGISTER', `User registered: ${cleanEmail} (student)`, newUserId, name.trim(), userRole, req);
+      // 10. Create secure HTTP-only session
+      let sessionToken: string;
+      try {
+        sessionToken = createSessionToken({ id: newUserId, email: cleanEmail, role: userRole });
+        setSecureSessionCookie(req, res, sessionToken);
+        logSafeAuthEvent('session created', { userId: newUserId, role: userRole });
+      } catch (sessionErr: any) {
+        console.error('[AUTH] Session token failure:', sessionErr.message);
+        return res.status(500).json({ error: 'Session creation failed.' });
+      }
 
+      await logAudit('USER_REGISTER', `User registered: ${cleanEmail} (student)`, newUserId, cleanName, userRole, req);
+
+      // 11. Return HTTP 201 with safe user data only (never return passwordHash)
       const { passwordHash: _, ...safeUser } = newUserRecord;
       return res.status(201).json({
         success: true,
         user: safeUser,
-        token,
+        token: sessionToken,
         redirectUrl: '/student/dashboard'
       });
     } catch (error: any) {
       console.error('[AUTH] Registration error:', error.message);
-      return res.status(500).json({ error: 'Registration failed' });
+      return res.status(500).json({ error: 'Registration failed due to an unexpected internal error.' });
     }
   });
 
@@ -1211,6 +1310,54 @@ export async function createApp(options: CreateAppOptions = {}) {
     } catch {}
   }
 
+  async function deliverPasswordResetEmail(toEmail: string, resetToken: string, appUrl: string): Promise<boolean> {
+    const host = readRuntimeEnv('SMTP_HOST');
+    const portStr = readRuntimeEnv('SMTP_PORT');
+    const user = readRuntimeEnv('SMTP_USER');
+    const pass = readRuntimeEnv('SMTP_PASSWORD');
+    const from = readRuntimeEnv('SMTP_FROM') || 'noreply@university-tutors.com';
+    const port = portStr ? parseInt(portStr, 10) : 587;
+
+    if (!host || !user || !pass) {
+      console.warn('[AUTH] SMTP configuration missing: SMTP_HOST, SMTP_USER, and SMTP_PASSWORD are required to deliver reset emails.');
+      return false;
+    }
+
+    try {
+      const transporter = nodemailer.createTransport({
+        host,
+        port,
+        secure: port === 465,
+        auth: {
+          user,
+          pass,
+        },
+      });
+
+      const liveDomain = appUrl || 'https://university-tutors.com';
+      const resetUrl = `${liveDomain}/auth?reset_token=${encodeURIComponent(resetToken)}&email=${encodeURIComponent(toEmail)}`;
+
+      await transporter.sendMail({
+        from,
+        to: toEmail,
+        subject: 'University Tutors - Password Recovery Request',
+        text: `A password reset was requested for your account.\n\nYour recovery token is:\n${resetToken}\n\nOr reset directly:\n${resetUrl}\n\nThis token will expire in 15 minutes. If you did not request this, please disregard this email.`,
+        html: `<div style="font-family:sans-serif;max-width:500px;margin:auto;padding:24px;border:1px solid #e2e8f0;border-radius:16px;">
+          <h2 style="color:#0f172a;">Password Recovery</h2>
+          <p style="color:#475569;">A password reset was requested for your University Tutors account.</p>
+          <div style="background:#f1f5f9;padding:16px;border-radius:8px;font-family:monospace;font-size:18px;font-weight:bold;letter-spacing:2px;text-align:center;color:#ea580c;">${resetToken}</div>
+          <p style="color:#64748b;font-size:12px;margin-top:16px;">This token expires in 15 minutes. If you did not request this, please disregard this email.</p>
+        </div>`,
+      });
+
+      logSafeAuthEvent('reset email sent', { email: toEmail });
+      return true;
+    } catch (err: any) {
+      console.error('[AUTH] Failed to dispatch password reset email via SMTP:', err.message);
+      return false;
+    }
+  }
+
   // POST /api/auth/forgot-password
   // Generates a 256-bit CSPRNG token, stores ONLY its SHA-256 hash with 15-min expiry,
   // enforces strict rate limiting, and NEVER logs or returns the plaintext token in HTTP responses.
@@ -1223,6 +1370,8 @@ export async function createApp(options: CreateAppOptions = {}) {
 
       const cleanEmail = email.toLowerCase().trim();
       const clientIp = getClientIp(req);
+
+      logSafeAuthEvent('password reset requested', { email: cleanEmail });
 
       // Rate-limit password reset requests (max 3 per 15 min per email, max 10 per 15 min per IP)
       if (
@@ -1258,28 +1407,23 @@ export async function createApp(options: CreateAppOptions = {}) {
       };
 
       if (isDbConnected() && db) {
+        // Invalidate any previous unused reset tokens for this user
+        await db
+          .update(passwordResetTokensTable)
+          .set({ usedAt: nowIso })
+          .where(and(eq(passwordResetTokensTable.userId, foundUser.id), isNull(passwordResetTokensTable.usedAt)));
+
         await db.insert(passwordResetTokensTable).values(resetRecord);
       } else {
-        const current = readPersistedResetTokens().filter(
-          r => r.userId !== foundUser.id && new Date(r.expiresAt).getTime() > Date.now()
+        const current = readPersistedResetTokens().map(r =>
+          r.userId === foundUser.id && !r.usedAt ? { ...r, usedAt: nowIso } : r
         );
         current.push(resetRecord);
         writePersistedResetTokens(current);
       }
 
-      // Optional outbound email delivery via runtime webhook if configured (never logs token)
-      const emailWebhookUrl = process.env.PASSWORD_RESET_WEBHOOK_URL?.trim();
-      if (emailWebhookUrl) {
-        fetch(emailWebhookUrl, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            to: cleanEmail,
-            resetToken: rawToken,
-            expiresAt: expiresAtIso,
-          }),
-        }).catch(() => {});
-      }
+      // Deliver reset email via SMTP (using runtime SMTP_* variables without logging token)
+      await deliverPasswordResetEmail(cleanEmail, rawToken, getRuntimeAppUrl());
 
       await logAudit('PASSWORD_RESET_REQUESTED', `Password recovery requested for: ${cleanEmail}`, foundUser.id, foundUser.name, foundUser.role, req);
 
@@ -1295,16 +1439,27 @@ export async function createApp(options: CreateAppOptions = {}) {
 
   // POST /api/auth/reset-password
   // Verifies SHA-256 token hash, enforces expiration & single-use, updates PostgreSQL passwordHash,
-  // and establishes a secure HTTP-only server session.
+  // invalidates all previous sessions, and establishes a secure HTTP-only server session.
   app.post('/api/auth/reset-password', async (req, res) => {
     try {
-      const { email, token, newPassword } = req.body || {};
+      const { email, token, newPassword, confirmPassword, passwordConfirmation } = req.body || {};
       if (!email || typeof email !== 'string' || !token || typeof token !== 'string' || !newPassword || typeof newPassword !== 'string') {
         return res.status(400).json({ error: 'Email, recovery token, and new password are required.' });
       }
 
-      if (newPassword.length < 6) {
-        return res.status(400).json({ error: 'New password must contain at least 6 characters.' });
+      if (newPassword.length < 8) {
+        return res.status(400).json({ error: 'New password must contain at least 8 characters.' });
+      }
+
+      const hasLetter = /[a-zA-Z]/.test(newPassword);
+      const hasNumber = /[0-9]/.test(newPassword);
+      if (!hasLetter || !hasNumber) {
+        return res.status(400).json({ error: 'New password must contain both letters and numbers.' });
+      }
+
+      const confirmation = confirmPassword ?? passwordConfirmation;
+      if (confirmation !== undefined && confirmation !== newPassword) {
+        return res.status(400).json({ error: 'Password confirmation does not match the new password.' });
       }
 
       const cleanEmail = email.toLowerCase().trim();
@@ -1369,10 +1524,13 @@ export async function createApp(options: CreateAppOptions = {}) {
         }
 
         const updatedTokens = allTokens.map(rec =>
-          rec.userId === foundUser.id && !rec.usedAt ? { ...rec, usedAt: nowIso } : rec
+          rec.userId === foundUser.id ? { ...rec, usedAt: nowIso } : rec
         );
         writePersistedResetTokens(updatedTokens);
       }
+
+      // Invalidate all existing sessions for this user after password change
+      revokeAllSessionsForUser(foundUser.id);
 
       const newHash = hashPassword(newPassword);
       if (isDbConnected() && db) {
@@ -1380,6 +1538,8 @@ export async function createApp(options: CreateAppOptions = {}) {
       }
       memoryStore.updateUser(foundUser.id, { passwordHash: newHash });
       savePersistedUserUpdate(foundUser.id, { passwordHash: newHash });
+
+      logSafeAuthEvent('password successfully changed', { userId: foundUser.id });
 
       const sessionToken = createSessionToken({ id: foundUser.id, email: foundUser.email, role: foundUser.role });
       setSecureSessionCookie(req, res, sessionToken);
