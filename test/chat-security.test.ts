@@ -1,4 +1,13 @@
+import crypto from 'crypto';
+import fs from 'fs';
+import path from 'path';
+import { db, isDbConnected, checkDbConnection } from '../src/db/index';
+import { users } from '../src/db/schema';
+import { eq } from 'drizzle-orm';
+
 const BASE_URL = process.env.TEST_APP_URL || 'http://localhost:3000';
+const UPLOADS_DIR = process.env.UPLOADS_DIR || '/app/uploads';
+const PERSISTED_UPDATES_FILE = path.join(UPLOADS_DIR, 'persisted_user_updates.json');
 
 function getHeaders(token?: string) {
   const headers: Record<string, string> = {
@@ -13,13 +22,14 @@ function getHeaders(token?: string) {
 
 async function registerTestUser(name: string, role: string, suffix: string): Promise<{ token: string; user: any }> {
   const email = `audit_${role}_${suffix}@testmail.com`;
+  const runtimePassword = `${crypto.randomBytes(16).toString('base64url')}!9Aa`;
   const res = await fetch(`${BASE_URL}/api/auth/register`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       name,
       email,
-      password: 'Password123!',
+      password: runtimePassword,
       role,
     }),
   });
@@ -27,11 +37,37 @@ async function registerTestUser(name: string, role: string, suffix: string): Pro
   if (!res.ok) {
     throw new Error(`Failed to register test user ${email}: ${data.error}`);
   }
-  return { token: data.token, user: data.user };
+
+  if (role === 'student') {
+    return { token: data.token, user: data.user };
+  }
+
+  if (isDbConnected() && db) {
+    await db.update(users).set({ role }).where(eq(users.id, data.user.id));
+  }
+  const dir = path.dirname(PERSISTED_UPDATES_FILE);
+  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+  const current = fs.existsSync(PERSISTED_UPDATES_FILE)
+    ? JSON.parse(fs.readFileSync(PERSISTED_UPDATES_FILE, 'utf-8'))
+    : {};
+  current[data.user.id] = { ...(current[data.user.id] || {}), role, updatedAt: new Date().toISOString() };
+  fs.writeFileSync(PERSISTED_UPDATES_FILE, JSON.stringify(current, null, 2), 'utf-8');
+
+  const loginRes = await fetch(`${BASE_URL}/api/auth/login`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email, password: runtimePassword }),
+  });
+  const loginData = await loginRes.json();
+  if (!loginRes.ok) {
+    throw new Error(`Failed to login elevated test user ${email}: ${loginData.error}`);
+  }
+  return { token: loginData.token, user: loginData.user };
 }
 
 async function runTests() {
   console.log('--- STARTING CHAT ROOM SECURITY AND INTEGRITY AUDIT TESTS ---\n');
+  await checkDbConnection();
   let passed = 0;
   let total = 0;
 
@@ -78,16 +114,8 @@ async function runTests() {
   const studentB = await registerTestUser('Student Beta', 'student', `b_${testRunId}`);
   const tutorMember = await registerTestUser('Tutor Member', 'tutor', `tm_${testRunId}`);
   const tutorStranger = await registerTestUser('Tutor Stranger', 'tutor', `ts_${testRunId}`);
-  
-  // Use seeded admin or register subadmin
-  const adminPassword = process.env.ADMIN_PASSWORD || '5pt5yBWLBT@@uni';
-  const adminLoginRes = await fetch(`${BASE_URL}/api/auth/login`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email: 'shaka.ahmadd@gmail.com', password: adminPassword }),
-  });
-  const adminData = await adminLoginRes.json();
-  const subadminToken = adminData.token;
+  const adminActor = await registerTestUser('Platform Admin', 'admin', `adm_${testRunId}`);
+  const subadminToken = adminActor.token;
 
   // -------------------------------------------------------------
   // TEST 2: Room creation & Room membership (403 for non-members)

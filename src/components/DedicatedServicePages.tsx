@@ -27,6 +27,11 @@ import hero1on1Img from '../assets/images/hero_1on1_tutoring_1787387369345.jpg';
 import heroAssignmentImg from '../assets/images/hero_assignment_guidance_1787387387028.jpg';
 import heroCourseworkImg from '../assets/images/hero_coursework_tracks_1787387403661.jpg';
 import heroEssayImg from '../assets/images/hero_essay_rhetoric_1787387419893.jpg';
+import {
+  DEDICATED_SERVICE_ROUTES,
+  getDedicatedServiceById,
+  isModifiedAnchorClick,
+} from '../data/dedicatedServiceRoutes';
 
 interface DedicatedServicePagesProps {
   selectedServiceId: string;
@@ -287,55 +292,84 @@ export default function DedicatedServicePages({
       {/* Top Breadcrumb Navigation */}
       <div className="flex flex-col gap-4 border-b border-gray-150 pb-6 focus:outline-none">
         <div className="flex flex-wrap items-center justify-between gap-4">
-          <button
-            onClick={onBackToHub}
+          <a
+            href="/services"
+            onClick={(e) => {
+              if (!isModifiedAnchorClick(e)) {
+                e.preventDefault();
+                onBackToHub();
+              }
+            }}
             className="group text-xs font-bold text-orange-600 hover:text-orange-850 flex items-center gap-1.5 cursor-pointer transition-all"
             id="back-to-services-hub-btn"
           >
             <ArrowLeft className="w-4 h-4 transition-transform group-hover:-translate-x-1" />
             <span>Back to All Services Hub</span>
-          </button>
+          </a>
           
           <span className="text-xs font-mono text-gray-400">
-            Services &gt;&nbsp;
+            <a
+              href="/services"
+              onClick={(e) => {
+                if (!isModifiedAnchorClick(e)) {
+                  e.preventDefault();
+                  onBackToHub();
+                }
+              }}
+              className="hover:text-orange-600 hover:underline transition-colors"
+            >
+              Services
+            </a>
+            &nbsp;&gt;&nbsp;
             <span className="text-orange-600 font-extrabold pb-0.5 border-b border-orange-200">
-              {selectedServiceId === '1on1' && '1-on-1 Online Tutoring'}
-              {selectedServiceId === 'assignment' && 'Assignment Guidance'}
-              {selectedServiceId === 'coursework' && 'Semester Coursework Tracks'}
-              {selectedServiceId === 'essay' && 'Essay Rhetoric & Citations'}
+              {getDedicatedServiceById(selectedServiceId)?.breadcrumbTitle || 'Academic Service'}
             </span>
           </span>
         </div>
 
-        {/* Horizontal Quick Jump Selector bar */}
-        <div className="flex flex-wrap gap-2 pt-2 bg-gray-50/70 p-2 rounded-2xl border border-gray-150">
-          {[
-            { id: '1on1', label: '1-on-1 Live Tutoring', icon: <Video className="w-3.5 h-3.5" /> },
-            { id: 'assignment', label: 'Assignment Guidance', icon: <FileText className="w-3.5 h-3.5" /> },
-            { id: 'coursework', label: 'Coursework Track', icon: <Calendar className="w-3.5 h-3.5" /> },
-            { id: 'essay', label: 'Essay & Reference Checks', icon: <BookOpen className="w-3.5 h-3.5" /> }
-          ].map((item) => (
-            <button
-              key={item.id}
-              onClick={() => {
-                onNavigate('services');
-                const element = document.getElementById('services-section');
-                if (element) element.scrollIntoView({ behavior: 'smooth' });
-                // Dispatch event to sync state in marketing pages parent
-                const mockEvent = new CustomEvent('change-dedicated-service', { detail: item.id });
-                window.dispatchEvent(mockEvent);
-              }}
-              className={`flex items-center gap-1.5 py-1.5 px-3.5 rounded-xl text-xs font-semibold cursor-pointer transition-all ${
-                selectedServiceId === item.id 
-                  ? 'bg-orange-500 text-white shadow-md shadow-orange-500/10 border-orange-500' 
-                  : 'bg-white text-gray-600 hover:bg-gray-100 border border-gray-150'
-              }`}
-            >
-              {item.icon}
-              <span>{item.label}</span>
-            </button>
-          ))}
-        </div>
+        {/* Horizontal Quick Jump Selector bar with individual page URLs */}
+        <nav
+          aria-label="Individual Academic Services"
+          className="flex flex-wrap gap-2 pt-2 bg-gray-50/70 p-2 rounded-2xl border border-gray-150"
+        >
+          {DEDICATED_SERVICE_ROUTES.map((route) => {
+            const icon =
+              route.id === '1on1' ? (
+                <Video className="w-3.5 h-3.5" />
+              ) : route.id === 'assignment' ? (
+                <FileText className="w-3.5 h-3.5" />
+              ) : route.id === 'coursework' ? (
+                <Calendar className="w-3.5 h-3.5" />
+              ) : (
+                <BookOpen className="w-3.5 h-3.5" />
+              );
+
+            const isActive = selectedServiceId === route.id;
+
+            return (
+              <a
+                key={route.id}
+                id={`dedicated-service-link-${route.id}`}
+                href={route.path}
+                aria-current={isActive ? 'page' : undefined}
+                onClick={(e) => {
+                  if (!isModifiedAnchorClick(e)) {
+                    e.preventDefault();
+                    onNavigate(route.view);
+                  }
+                }}
+                className={`flex items-center gap-1.5 py-1.5 px-3.5 rounded-xl text-xs font-semibold cursor-pointer transition-all whitespace-nowrap shrink-0 ${
+                  isActive
+                    ? 'bg-orange-500 text-white shadow-md shadow-orange-500/10 border border-orange-500'
+                    : 'bg-white text-gray-600 hover:bg-gray-100 border border-gray-150 hover:text-gray-900'
+                }`}
+              >
+                {icon}
+                <span>{route.label}</span>
+              </a>
+            );
+          })}
+        </nav>
       </div>
 
       {/* ====================================================================== */}
@@ -1709,14 +1743,45 @@ export default function DedicatedServicePages({
       </div>
 
       {/* Footer All Services Navigation Section */}
-      <div className="pt-10 border-t flex flex-wrap justify-between items-center text-xs text-left text-gray-400 border-gray-200">
-        <span className="font-bold text-gray-900">Want to explore premium plans for other university subject categories?</span>
-        <button
-          onClick={onBackToHub}
-          className="bg-orange-500 hover:bg-orange-600 text-white font-bold text-xs px-5 py-2.5 rounded-xl cursor-pointer transition-all mt-2 sm:mt-0"
-        >
-          View All Core Services Hub
-        </button>
+      <div className="pt-10 border-t border-gray-200 space-y-5 text-left">
+        <div className="flex flex-wrap items-center justify-between gap-4 text-xs">
+          <span className="font-bold text-gray-900">
+            Explore other dedicated university tutoring services:
+          </span>
+          <div className="flex flex-wrap items-center gap-3">
+            {DEDICATED_SERVICE_ROUTES.filter((r) => r.id !== selectedServiceId).map((route) => (
+              <a
+                key={route.id}
+                href={route.path}
+                onClick={(e) => {
+                  if (!isModifiedAnchorClick(e)) {
+                    e.preventDefault();
+                    onNavigate(route.view);
+                  }
+                }}
+                className="text-orange-600 hover:text-orange-800 font-bold hover:underline cursor-pointer transition-colors whitespace-nowrap"
+              >
+                {route.label} &rarr;
+              </a>
+            ))}
+          </div>
+        </div>
+
+        <div className="flex flex-wrap justify-between items-center gap-3 text-xs text-gray-500 pt-2">
+          <span>Want to compare all core academic mentorship tracks side by side?</span>
+          <a
+            href="/services"
+            onClick={(e) => {
+              if (!isModifiedAnchorClick(e)) {
+                e.preventDefault();
+                onBackToHub();
+              }
+            }}
+            className="bg-orange-500 hover:bg-orange-600 text-white font-bold text-xs px-5 py-2.5 rounded-xl cursor-pointer transition-all whitespace-nowrap shrink-0"
+          >
+            View All Core Services Hub
+          </a>
+        </div>
       </div>
 
     </div>

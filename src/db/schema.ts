@@ -198,4 +198,15 @@ export const tutors = pgTable('tutors', {
   index('idx_tutors_city_location').on(table.cityLocation),
 ]);
 
-
+// 9. Password Reset Tokens Table (Stores SHA-256 hash only, never plaintext tokens)
+export const passwordResetTokens = pgTable('password_reset_tokens', {
+  id: text('id').primaryKey(),
+  userId: text('user_id').notNull().references(() => users.id),
+  tokenHash: text('token_hash').notNull(),
+  expiresAt: text('expires_at').notNull(),
+  usedAt: text('used_at'),
+  createdAt: text('created_at').notNull(),
+}, (table) => [
+  uniqueIndex('idx_password_reset_token_hash').on(table.tokenHash),
+  index('idx_password_reset_user_id').on(table.userId),
+]);

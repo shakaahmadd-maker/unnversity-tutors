@@ -163,12 +163,6 @@ export interface AuditLogRecord {
   createdAt: string;
 }
 
-function internalHashPassword(password: string): string {
-  const salt = crypto.randomBytes(16).toString('hex');
-  const derivedKey = crypto.scryptSync(password, salt, 64);
-  return `${salt}:${derivedKey.toString('hex')}`;
-}
-
 export interface NotificationRecord {
   id: string;
   userId: string;
@@ -243,14 +237,12 @@ export class MemoryStore {
   }
 
   private seedDefaults() {
-    const adminPass = (process.env.ADMIN_PASSWORD || process.env.INITIAL_ADMIN_PASSWORD)?.trim();
-    const adminHash = adminPass ? internalHashPassword(adminPass) : null;
     const adminUser: UserRecord = {
       id: 'admin_shaka',
       role: 'admin',
       name: 'Shaka Ahmad',
       email: 'shaka.ahmadd@gmail.com',
-      passwordHash: adminHash,
+      passwordHash: null,
       avatarUrl: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150&auto=format&fit=crop&q=80',
       createdAt: new Date().toISOString(),
       verified: true,
@@ -262,16 +254,14 @@ export class MemoryStore {
     };
     this.users.set(adminUser.id, adminUser);
 
-    // Initial Certified Tutors - password derived from environment or secure runtime entropy
-    const tutorPass = process.env.INITIAL_TUTOR_PASSWORD || crypto.randomBytes(16).toString('hex');
-    const tutorHash = internalHashPassword(tutorPass);
+    // Initial Certified Tutors (individual password hashes must be established via admin provisioning or password reset)
     const initialTutors: UserRecord[] = [
       {
         id: 'tutor_clara',
         role: 'tutor',
         name: 'Dr. Clara Stirling',
         email: 'clara@example.com',
-        passwordHash: tutorHash,
+        passwordHash: null,
         avatarUrl: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=150&auto=format&fit=crop&q=80',
         createdAt: new Date(Date.now() - 100 * 24 * 3600 * 1000).toISOString(),
         bio: 'Former Oxford Senior Lecturer with 12+ years of experience helping undergraduate and postgraduate students structure complex academic essays and dissertation prose.',
@@ -292,7 +282,7 @@ export class MemoryStore {
         role: 'tutor',
         name: 'Liam Kennedy, M.Sc.',
         email: 'liam@example.com',
-        passwordHash: tutorHash,
+        passwordHash: null,
         avatarUrl: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80',
         createdAt: new Date(Date.now() - 80 * 24 * 3600 * 1000).toISOString(),
         bio: 'MIT graduate specializing in Advanced Calculus, Statistics, Linear Algebra and Mechanical Engineering.',
@@ -313,7 +303,7 @@ export class MemoryStore {
         role: 'tutor',
         name: 'Chloe Tremblay',
         email: 'chloe@example.com',
-        passwordHash: tutorHash,
+        passwordHash: null,
         avatarUrl: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=150&auto=format&fit=crop&q=80',
         createdAt: new Date(Date.now() - 50 * 24 * 3600 * 1000).toISOString(),
         bio: 'Specialist in Cognitive Psychology and Business Administration. Focuses on coursework mentorship and dissertation planning.',
@@ -334,7 +324,7 @@ export class MemoryStore {
         role: 'tutor',
         name: 'Dr. Marcus Vance',
         email: 'marcus.vance@universitytutors.com',
-        passwordHash: tutorHash,
+        passwordHash: null,
         avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=300&auto=format&fit=crop&q=80',
         createdAt: '2025-01-10T00:00:00.000Z',
         location: 'Atlanta, GA',
@@ -355,7 +345,7 @@ export class MemoryStore {
         role: 'tutor',
         name: 'James Cook',
         email: 'james@example.com',
-        passwordHash: tutorHash,
+        passwordHash: null,
         avatarUrl: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150&auto=format&fit=crop&q=80',
         createdAt: new Date(Date.now() - 150 * 24 * 3600 * 1000).toISOString(),
         bio: 'Fullstack Developer and Algorithms Engineer. Academic advisor for Computer Science students across AU and NZ. Specialized in Python, Java, C++, and database architecture.',

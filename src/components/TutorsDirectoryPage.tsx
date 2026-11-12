@@ -182,18 +182,9 @@ export default function TutorsDirectoryPage({
     return Array.from(set).sort();
   }, [unifiedTutors]);
 
-  // Filter list based on country, subject, maxPrice, and search query
+  // Filter list based on country/city, subject, maxPrice, and search query
   const filteredTutors = useMemo(() => {
-    return unifiedTutors.filter(t => {
-      // 1. Country Filter
-      if (selectedCountry !== 'all') {
-        const cCode = (t.country || '').toLowerCase();
-        const cName = ((t as any).countryName || (t as any).countryFull || t.location || '').toLowerCase();
-        const target = selectedCountry.toLowerCase();
-        const matchesCountry = cCode === target || cName.includes(target);
-        if (!matchesCountry) return false;
-      }
-
+    const matchesBaseFilters = (t: User) => {
       // 2. Subject Filter (checks primarySubject first, then subjectExpertise and subjects)
       if (selectedSubject !== 'All Subjects') {
         const targetSub = selectedSubject.toLowerCase();
@@ -234,7 +225,61 @@ export default function TutorsDirectoryPage({
       }
 
       return true;
+    };
+
+    const basePool = unifiedTutors.filter(matchesBaseFilters);
+    if (selectedCountry === 'all' || !selectedCountry.trim()) {
+      return basePool;
+    }
+
+    const targetRaw = selectedCountry.toLowerCase().trim();
+    const parts = targetRaw.split(',').map(p => p.trim()).filter(Boolean);
+    const primaryTarget = parts[0] || targetRaw;
+
+    const getTutorLocationSpace = (t: User) =>
+      [
+        t.country || '',
+        (t as any).countryName || '',
+        (t as any).countryFull || '',
+        t.location || '',
+        (t as any).cityLocation || '',
+        t.city || '',
+      ]
+        .join(' ')
+        .toLowerCase();
+
+    // Exact country or city match first
+    const directMatches = basePool.filter(t => {
+      const cCode = (t.country || '').toLowerCase();
+      const locSpace = getTutorLocationSpace(t);
+      return cCode === targetRaw || locSpace.includes(targetRaw) || locSpace.includes(primaryTarget);
     });
+
+    if (directMatches.length > 0) {
+      return directMatches;
+    }
+
+    // Regional country fallback for cities in countries/regions served online
+    const countryHint = parts[parts.length - 1] || '';
+    const mappedRegion =
+      countryHint === 'malaysia'
+        ? 'singapore'
+        : countryHint === 'ksa'
+          ? 'uae'
+          : countryHint;
+
+    if (mappedRegion && mappedRegion !== primaryTarget) {
+      const regionalMatches = basePool.filter(t => {
+        const cCode = (t.country || '').toLowerCase();
+        const locSpace = getTutorLocationSpace(t);
+        return cCode === mappedRegion || locSpace.includes(mappedRegion);
+      });
+      if (regionalMatches.length > 0) {
+        return regionalMatches;
+      }
+    }
+
+    return basePool;
   }, [unifiedTutors, selectedCountry, selectedSubject, maxPrice, searchTerm]);
 
   // Sort list
@@ -263,11 +308,15 @@ export default function TutorsDirectoryPage({
     setSearchTerm('');
     setSelectedCountry('all');
     setSelectedSubject('All Subjects');
-    setMaxPrice(120);
+    setMaxPrice(180);
     setCurrentPage(1);
   };
 
-  const activeCountryObj = COUNTRY_OPTIONS.find(c => c.value === selectedCountry) || COUNTRY_OPTIONS[0];
+  const activeCountryObj =
+    COUNTRY_OPTIONS.find(c => c.value === selectedCountry) ||
+    (selectedCountry && selectedCountry !== 'all'
+      ? { label: selectedCountry.split(',')[0].trim(), value: selectedCountry, count: sortedTutors.length, flag: '📍' }
+      : COUNTRY_OPTIONS[0]);
 
   return (
     <div className="bg-[#FAF9F6] min-h-screen py-10 px-4 sm:px-6 lg:px-8 font-sans text-slate-800">

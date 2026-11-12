@@ -112,3 +112,24 @@
     transform: translateY(-6px);
   }
 }
+
+/* Auto-Scrolling University Marquee (Mobile Home Page) */
+@keyframes autoScrollLeft {
+  0% {
+    transform: translateX(0);
+  }
+  100% {
+    transform: translateX(-50%);
+  }
+}
+
+.animate-marquee {
+  display: flex;
+  width: max-content;
+  animation: autoScrollLeft 16s linear infinite;
+}
+
+.animate-marquee:hover {
+  animation-play-state: paused;
+}
+

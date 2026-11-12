@@ -10,30 +10,59 @@ import cookieParser from 'cookie-parser';
 import multer from 'multer';
 import { createServer as createViteServer } from 'vite';
 import { db, isDbConnected, checkDbConnection } from './src/db/index';
-import { users, orders, inquiries, messages, quotes, auditLogs, chatRooms, chatRoomMembers, blogs, tutors } from './src/db/schema';
-import { eq, desc, and, inArray } from 'drizzle-orm';
+import { users, orders, inquiries, messages, quotes, auditLogs, chatRooms, chatRoomMembers, blogs, tutors, passwordResetTokens as passwordResetTokensTable } from './src/db/schema';
+import { eq, desc, and, inArray, isNull } from 'drizzle-orm';
 import { runMigrations } from './src/db/migrate';
 import { memoryStore, PrivateFileRecord } from './src/db/memoryStore';
 import { DEFAULT_20_BLOGS } from './src/data/defaultBlogsData';
 import { TRENDING_TUTORS_500, TRENDING_TUTORS_200 } from './src/data/trendingTutors500Data';
 
-// Configurable Environment Variables read from process.env
+// Configurable Environment Variables read strictly from process.env at runtime (zero hardcoded fallbacks)
 const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
 const NODE_ENV = process.env.NODE_ENV || 'production';
-const APP_URL = process.env.APP_URL || 'https://ais-dev-lxhnmo75fkkuj5cd7dujpf-92836459425.asia-southeast1.run.app';
+const APP_URL = (process.env.APP_URL || '').trim().replace(/\/$/, '');
 
-// Secure session signing key: read from process.env.SESSION_SECRET.
-// If not provided in environment, generate an ephemeral crypto-random 256-bit key at runtime
-// to avoid any hardcoded secret values in the codebase.
-const SESSION_SECRET: string = (process.env.SESSION_SECRET && process.env.SESSION_SECRET.trim().length > 0)
+// Secure session signing key: read strictly from process.env.SESSION_SECRET at runtime.
+// Never log SESSION_SECRET or DATABASE_URL.
+const SESSION_SECRET: string = (process.env.SESSION_SECRET && process.env.SESSION_SECRET.trim().length >= 16)
   ? process.env.SESSION_SECRET.trim()
   : crypto.randomBytes(32).toString('hex');
 
 if (!process.env.SESSION_SECRET) {
-  console.info('[AUTH] Notice: SESSION_SECRET is not set in process.env. Using dynamically generated runtime key.');
+  console.warn('[AUTH] SESSION_SECRET is not configured in process.env. Generated an ephemeral runtime signing key.');
 }
 
 const COOKIE_NAME = 'auth_session';
+
+// Reject preview URLs, development URLs, localhost URLs, insecure HTTP, or internal container hostnames in production
+export function isForbiddenProductionUrl(urlStr: string): boolean {
+  if (!urlStr || typeof urlStr !== 'string') return true;
+  try {
+    const parsed = new URL(urlStr);
+    const host = parsed.hostname.toLowerCase();
+    if (
+      host === 'localhost' ||
+      host === '127.0.0.1' ||
+      host === '0.0.0.0' ||
+      host === '::1' ||
+      host.endsWith('.localhost') ||
+      host.endsWith('.local') ||
+      host.endsWith('.internal') ||
+      host === 'host.docker.internal' ||
+      !host.includes('.') ||
+      host.startsWith('ais-dev-') ||
+      host.startsWith('ais-pre-')
+    ) {
+      return true;
+    }
+    if (NODE_ENV === 'production' && parsed.protocol !== 'https:') {
+      return true;
+    }
+    return false;
+  } catch {
+    return true;
+  }
+}
 
 // Persistent Uploads Directory (Docker persistent volume or VPS path)
 export const UPLOADS_DIR = process.env.UPLOADS_DIR
@@ -136,9 +165,14 @@ export function verifySessionToken(token: string): { id: string; email: string; 
     if (parts.length !== 3) return null;
     const [header, data, signature] = parts;
     const expectedSig = crypto.createHmac('sha256', SESSION_SECRET).update(`${header}.${data}`).digest('base64url');
-    if (signature !== expectedSig) return null;
+    const sigBuf = Buffer.from(signature, 'utf8');
+    const expectedBuf = Buffer.from(expectedSig, 'utf8');
+    if (sigBuf.length !== expectedBuf.length || !crypto.timingSafeEqual(sigBuf, expectedBuf)) {
+      return null;
+    }
     const parsed = JSON.parse(Buffer.from(data, 'base64url').toString('utf8'));
     if (parsed.exp && parsed.exp < Date.now()) return null;
+    if (!parsed.id || !parsed.email || !parsed.role) return null;
     return parsed;
   } catch {
     return null;
@@ -243,18 +277,16 @@ const SEED_TUTORS = [
 async function seedInitialDatabase() {
   if (!isDbConnected() || !db) return;
   try {
-    // Check if superior admin exists
+    // Seed default Superior Admin record without any shared or hardcoded password
     const adminEmail = 'shaka.ahmadd@gmail.com';
     const existingAdmin = await db.select().from(users).where(eq(users.email, adminEmail)).limit(1);
     if (existingAdmin.length === 0) {
-      const adminPass = (process.env.ADMIN_PASSWORD || process.env.INITIAL_ADMIN_PASSWORD)?.trim();
-      const defaultHash = adminPass ? hashPassword(adminPass) : null;
       await db.insert(users).values({
         id: 'admin_shaka',
         role: 'admin',
         name: 'Shaka Ahmad',
         email: adminEmail,
-        passwordHash: defaultHash,
+        passwordHash: null,
         avatarUrl: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150&auto=format&fit=crop&q=80',
         createdAt: new Date().toISOString(),
         verified: true,
@@ -264,19 +296,17 @@ async function seedInitialDatabase() {
         isApproved: true,
         status: 'approved',
       }).onConflictDoNothing();
-      console.log(`[SEED] Created default Superior Admin account: ${adminEmail}`);
+      console.log(`[SEED] Ensured Superior Admin account record exists: ${adminEmail}`);
     }
 
-    // Seed each certified initial tutor individually if not yet in DB
-    const tutorPass = process.env.INITIAL_TUTOR_PASSWORD || crypto.randomBytes(16).toString('hex');
-    const defaultTutorHash = hashPassword(tutorPass);
+    // Seed each certified initial tutor individually without shared fallback passwords
     for (const t of SEED_TUTORS) {
       try {
         const existing = await db.select().from(users).where(eq(users.id, t.id)).limit(1);
         if (existing.length === 0) {
           await db.insert(users).values({
             ...t,
-            passwordHash: defaultTutorHash,
+            passwordHash: null,
             verified: true,
             suspended: false,
           }).onConflictDoNothing();
@@ -358,30 +388,22 @@ async function startServer() {
 
   // Strict Production CORS & Origin Headers
   // Do not use wildcard Access-Control-Allow-Origin: * for authenticated cookie requests.
-  // Instead, strictly use APP_URL as the allowed origin (with localhost loopback allowed in dev).
-  const normalizedAppUrl = APP_URL.replace(/\/$/, '');
-  const allowedOrigins = new Set([
-    normalizedAppUrl,
-    `http://localhost:${PORT}`,
-    `http://127.0.0.1:${PORT}`,
-    `http://localhost:3000`,
-    `http://localhost:5173`,
-  ]);
+  const normalizedAppUrl = APP_URL;
 
   app.use((req, res, next) => {
     const origin = req.headers.origin;
     if (origin) {
-      // Do not use wildcard Access-Control-Allow-Origin: * for authenticated cookie requests.
-      // Echo the requesting origin to satisfy cross-origin requests with credentials in Cloud Run / preview.
-      res.setHeader('Access-Control-Allow-Origin', origin);
-      res.setHeader('Access-Control-Allow-Credentials', 'true');
-    } else {
+      if (NODE_ENV !== 'production' || (normalizedAppUrl && origin === normalizedAppUrl)) {
+        res.setHeader('Access-Control-Allow-Origin', origin);
+        res.setHeader('Access-Control-Allow-Credentials', 'true');
+      }
+    } else if (normalizedAppUrl) {
       res.setHeader('Access-Control-Allow-Origin', normalizedAppUrl);
       res.setHeader('Access-Control-Allow-Credentials', 'true');
     }
 
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, X-User-Id, X-Auth-Token');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, X-Auth-Token');
     res.setHeader('Vary', 'Origin');
 
     if (req.method === 'OPTIONS') {
@@ -418,6 +440,89 @@ async function startServer() {
     index: false,
   }));
 
+  // Persistent disk helpers for fallback mode when PostgreSQL is not provisioned
+  const PERSISTED_UPDATES_FILE = path.join(UPLOADS_DIR, 'persisted_user_updates.json');
+  const PERSISTED_RESET_TOKENS_FILE = path.join(UPLOADS_DIR, 'persisted_reset_tokens.json');
+
+  function getPersistedUserUpdates(): Record<string, any> {
+    try {
+      if (fs.existsSync(PERSISTED_UPDATES_FILE)) {
+        const raw = fs.readFileSync(PERSISTED_UPDATES_FILE, 'utf-8');
+        return JSON.parse(raw);
+      }
+    } catch (e: any) {
+      console.warn('[Storage] Notice reading persisted_user_updates.json:', e.message);
+    }
+    return {};
+  }
+
+  function savePersistedUserUpdate(userId: string, data: Record<string, any>) {
+    try {
+      const dir = path.dirname(PERSISTED_UPDATES_FILE);
+      if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+      const current = getPersistedUserUpdates();
+      current[userId] = { ...(current[userId] || {}), ...data, updatedAt: new Date().toISOString() };
+      fs.writeFileSync(PERSISTED_UPDATES_FILE, JSON.stringify(current, null, 2), 'utf-8');
+    } catch (e: any) {
+      console.warn('[Storage] Notice saving persisted_user_updates.json:', e.message);
+    }
+  }
+
+  // Authoritative user lookup: ALWAYS queries PostgreSQL first so user roles and password hashes come from PostgreSQL.
+  // Falls back to memoryStore + persisted disk updates ONLY when PostgreSQL is disconnected.
+  async function resolveAuthoritativeUserById(userId: string): Promise<any | null> {
+    if (!userId) return null;
+    if (isDbConnected() && db) {
+      try {
+        const rows = await db.select().from(users).where(eq(users.id, userId)).limit(1);
+        if (rows.length > 0) {
+          return rows[0];
+        }
+        return null;
+      } catch (dbErr: any) {
+        console.warn('[AUTH] Notice querying user by ID in PostgreSQL:', dbErr.message);
+      }
+    }
+    const memUser = memoryStore.findUserById(userId);
+    const persisted = getPersistedUserUpdates()[userId];
+    if (!memUser && !persisted) return null;
+    const merged = { ...(memUser || {}), ...(persisted || {}), id: userId };
+    if (memUser && persisted) {
+      memoryStore.updateUser(userId, persisted);
+    }
+    return merged;
+  }
+
+  async function resolveAuthoritativeUserByEmail(email: string): Promise<any | null> {
+    const cleanEmail = email.toLowerCase().trim();
+    if (!cleanEmail) return null;
+    if (isDbConnected() && db) {
+      try {
+        const rows = await db.select().from(users).where(eq(users.email, cleanEmail)).limit(1);
+        if (rows.length > 0) {
+          return rows[0];
+        }
+        return null;
+      } catch (dbErr: any) {
+        console.warn('[AUTH] Notice querying user by email in PostgreSQL:', dbErr.message);
+      }
+    }
+    const memUser = memoryStore.findUserByEmail(cleanEmail);
+    const persistedMap = getPersistedUserUpdates();
+    if (memUser) {
+      const persisted = persistedMap[memUser.id];
+      const merged = persisted ? { ...memUser, ...persisted } : memUser;
+      if (persisted) memoryStore.updateUser(memUser.id, persisted);
+      return merged;
+    }
+    for (const [uid, record] of Object.entries(persistedMap)) {
+      if (record && typeof record.email === 'string' && record.email.toLowerCase().trim() === cleanEmail) {
+        return { ...record, id: uid };
+      }
+    }
+    return null;
+  }
+
   // Check database connectivity
   await checkDbConnection();
 
@@ -425,26 +530,28 @@ async function startServer() {
   await runMigrations();
   await seedInitialDatabase();
 
-  // Helper middleware to extract user from session
+  // Helper middleware to extract user strictly from cryptographically verified session cookie/token
+  // NEVER trusts X-User-Id, email, or role supplied by the frontend; resolves active role from PostgreSQL.
   const extractUser = async (req: express.Request, res: express.Response, next: express.NextFunction) => {
     let token = req.cookies?.[COOKIE_NAME];
     if (!token && req.headers.authorization?.startsWith('Bearer ')) {
       token = req.headers.authorization.split('Bearer ')[1];
     }
-    if (!token && req.headers['x-auth-token']) {
-      token = req.headers['x-auth-token'] as string;
+    if (!token && typeof req.headers['x-auth-token'] === 'string') {
+      token = req.headers['x-auth-token'];
     }
     if (token) {
       const session = verifySessionToken(token);
-      if (session) {
-        (req as any).user = session;
-      }
-    }
-    if (!(req as any).user && req.headers['x-user-id']) {
-      const userId = req.headers['x-user-id'] as string;
-      const memUser = memoryStore.getUser(userId) || (SEED_TUTORS as any[]).find(u => u.id === userId);
-      if (memUser && (memUser.role === 'admin' || memUser.role === 'subadmin' || memUser.email === 'shaka.ahmadd@gmail.com')) {
-        (req as any).user = { id: memUser.id, email: memUser.email, role: memUser.role || 'admin' };
+      if (session && session.id) {
+        const authoritativeUser = await resolveAuthoritativeUserById(session.id);
+        if (authoritativeUser && !authoritativeUser.suspended) {
+          (req as any).user = {
+            id: authoritativeUser.id,
+            email: authoritativeUser.email,
+            role: authoritativeUser.role,
+            name: authoritativeUser.name,
+          };
+        }
       }
     }
     next();
@@ -452,7 +559,7 @@ async function startServer() {
 
   app.use(extractUser);
 
-  // Authentication requirement helper - rejects unauthenticated requests
+  // Authentication requirement helper - rejects unauthenticated requests with HTTP 401
   const requireAuth = (req: express.Request, res: express.Response, next: express.NextFunction) => {
     if (!(req as any).user) {
       return res.status(401).json({ error: 'Unauthorized: Authentication required. Please log in.' });
@@ -460,7 +567,7 @@ async function startServer() {
     next();
   };
 
-  // Role authorization requirement helper - rejects users without proper permissions
+  // Role authorization requirement helper - returns HTTP 401 if unauthenticated, HTTP 403 if lacking role
   const requireRole = (...allowedRoles: string[]) => {
     return (req: express.Request, res: express.Response, next: express.NextFunction) => {
       const user = (req as any).user;
@@ -711,12 +818,47 @@ async function startServer() {
   // AUTHENTICATION ROUTES (Email & Password)
   // ==========================================
 
+  // Helper to set secure HTTP-only session cookie consistently
+  function setSecureSessionCookie(req: express.Request, res: express.Response, token: string, maxAgeMs: number = 7 * 24 * 60 * 60 * 1000) {
+    const isHttps = NODE_ENV === 'production' || APP_URL.startsWith('https://') || req.secure || req.headers['x-forwarded-proto'] === 'https';
+    res.cookie(COOKIE_NAME, token, {
+      httpOnly: true,
+      secure: isHttps,
+      sameSite: isHttps ? 'none' : 'lax',
+      path: '/',
+      maxAge: maxAgeMs,
+    });
+  }
+
+  // Sliding-window rate limiter helper (in-memory)
+  const rateLimitBuckets = new Map<string, number[]>();
+  function isRateLimited(bucketKey: string, maxRequests: number, windowMs: number): boolean {
+    const now = Date.now();
+    const history = (rateLimitBuckets.get(bucketKey) || []).filter(ts => now - ts < windowMs);
+    if (history.length >= maxRequests) {
+      rateLimitBuckets.set(bucketKey, history);
+      return true;
+    }
+    history.push(now);
+    rateLimitBuckets.set(bucketKey, history);
+    return false;
+  }
+
+  function getClientIp(req: express.Request): string {
+    const xff = req.headers['x-forwarded-for'];
+    if (typeof xff === 'string' && xff.trim()) {
+      return xff.split(',')[0].trim();
+    }
+    return req.socket?.remoteAddress || 'unknown';
+  }
+
   // POST /api/auth/register
+  // Public registration ALWAYS creates a student account and starts a secure HTTP-only server session.
   app.post('/api/auth/register', async (req, res) => {
     try {
-      const { name, email, password, extra } = req.body;
+      const { name, email, password, extra } = req.body || {};
 
-      if (!name || !email || !password) {
+      if (!name || typeof name !== 'string' || !email || typeof email !== 'string' || !password || typeof password !== 'string') {
         return res.status(400).json({ error: 'Missing required fields: name, email, password' });
       }
 
@@ -725,26 +867,16 @@ async function startServer() {
       }
 
       const cleanEmail = email.toLowerCase().trim();
-      // Requirement 10 & 12: Ignore user-supplied role. Public registration ALWAYS assigns role "student"!
+      // Never trust role, email override, or user ID supplied by frontend; always assign "student"
       const userRole = 'student';
 
-      // Check for existing user with this email
-      if (isDbConnected() && db) {
-        try {
-          const existing = await db.select().from(users).where(eq(users.email, cleanEmail)).limit(1);
-          if (existing.length > 0) {
-            return res.status(400).json({ error: 'An account with this email address already exists. Please log in.' });
-          }
-        } catch {}
-      } else {
-        const memExisting = memoryStore.findUserByEmail(cleanEmail);
-        if (memExisting) {
-          return res.status(400).json({ error: 'An account with this email address already exists. Please log in.' });
-        }
+      const existingUser = await resolveAuthoritativeUserByEmail(cleanEmail);
+      if (existingUser) {
+        return res.status(400).json({ error: 'An account with this email address already exists. Please log in.' });
       }
 
       const pHash = hashPassword(password);
-      const newUserId = 'usr_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7);
+      const newUserId = 'usr_' + crypto.randomBytes(12).toString('hex');
       const now = new Date().toISOString();
 
       const newUserRecord = {
@@ -753,52 +885,39 @@ async function startServer() {
         name: name.trim(),
         email: cleanEmail,
         passwordHash: pHash,
-        avatarUrl: `https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&auto=format&fit=crop&q=80`,
+        avatarUrl: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&auto=format&fit=crop&q=80',
         createdAt: now,
         suspended: false,
         verified: true,
-        bio: extra?.bio || 'Active student member.',
+        bio: (typeof extra?.bio === 'string' ? extra.bio : null) || 'Active student member.',
         hourlyRate: null,
         rating: null,
         reviewCount: null,
         subjects: null,
-        country: extra?.country || 'US',
-        location: extra?.location || null,
-        phoneNumber: extra?.phoneNumber || null,
-        education: extra?.education || null,
+        country: (typeof extra?.country === 'string' ? extra.country : null) || 'US',
+        location: typeof extra?.location === 'string' ? extra.location : null,
+        phoneNumber: typeof extra?.phoneNumber === 'string' ? extra.phoneNumber : null,
+        education: typeof extra?.education === 'string' ? extra.education : null,
         experience: null,
         subjectExpertise: null,
         availability: null,
         canMeet: null,
         hobbies: null,
-        isApproved: true, // students approved immediately
+        isApproved: true,
         status: 'active',
       };
 
-      // Always save to memory store
-      memoryStore.setUser(newUserRecord);
-
       if (isDbConnected() && db) {
-        try {
-          await db.insert(users).values(newUserRecord);
-        } catch (dbErr: any) {
-          console.warn('[AUTH] Notice inserting user to DB:', dbErr.message);
-        }
+        await db.insert(users).values(newUserRecord);
       }
+      memoryStore.setUser(newUserRecord);
+      savePersistedUserUpdate(newUserId, newUserRecord);
 
-      // Create session token & set HTTP-only cookie with SameSite protection
       const token = createSessionToken({ id: newUserId, email: cleanEmail, role: userRole });
-      const isSecureCookie = NODE_ENV === 'production' || APP_URL.startsWith('https://');
-      res.cookie(COOKIE_NAME, token, {
-        httpOnly: true,
-        secure: isSecureCookie,
-        sameSite: isSecureCookie ? 'none' : 'lax',
-        maxAge: 30 * 24 * 60 * 60 * 1000,
-      });
+      setSecureSessionCookie(req, res, token);
 
-      await logAudit('USER_REGISTER', `User registered: ${cleanEmail} (student)`, newUserId, name, userRole, req);
+      await logAudit('USER_REGISTER', `User registered: ${cleanEmail} (student)`, newUserId, name.trim(), userRole, req);
 
-      // Strip passwordHash before responding
       const { passwordHash: _, ...safeUser } = newUserRecord;
       return res.status(201).json({
         success: true,
@@ -807,113 +926,50 @@ async function startServer() {
         redirectUrl: '/student/dashboard'
       });
     } catch (error: any) {
-      console.error('[AUTH] Registration error:', error);
-      return res.status(500).json({ error: error.message || 'Registration failed' });
+      console.error('[AUTH] Registration error:', error.message);
+      return res.status(500).json({ error: 'Registration failed' });
     }
   });
 
   // POST /api/auth/login
+  // Authenticates against PostgreSQL hashed passwords for ALL roles (including admins).
+  // Invalid or missing passwords, or social accounts without passwordHash, ALWAYS return HTTP 401.
   app.post('/api/auth/login', async (req, res) => {
     try {
-      const { email, password } = req.body;
-      if (!email) {
-        return res.status(400).json({ error: 'Email address is required.' });
+      const { email, password } = req.body || {};
+      if (!email || typeof email !== 'string' || !password || typeof password !== 'string') {
+        return res.status(401).json({ error: 'Invalid email or password.' });
       }
 
       const cleanEmail = email.toLowerCase().trim();
-      let foundUser: any = null;
-
-      if (isDbConnected() && db) {
-        try {
-          const rows = await db.select().from(users).where(eq(users.email, cleanEmail)).limit(1);
-          if (rows.length > 0) {
-            foundUser = rows[0];
-          }
-        } catch (dbErr: any) {
-          console.warn('[AUTH] DB select failed during login, checking memory store:', dbErr.message);
-        }
+      const clientIp = getClientIp(req);
+      if (isRateLimited(`login:${clientIp}:${cleanEmail}`, 15, 15 * 60 * 1000)) {
+        return res.status(429).json({ error: 'Too many failed login attempts. Please wait and try again.' });
       }
 
-      // Fallback to memory store if not found in DB
+      const foundUser = await resolveAuthoritativeUserByEmail(cleanEmail);
       if (!foundUser) {
-        foundUser = memoryStore.findUserByEmail(cleanEmail);
-      }
-
-      // Superior admin fallback
-      if (!foundUser && cleanEmail === 'shaka.ahmadd@gmail.com') {
-        foundUser = memoryStore.findUserById('admin_shaka');
-      }
-
-      if (!foundUser) {
-        return res.status(401).json({ error: 'No account registered with this email address.' });
+        return res.status(401).json({ error: 'Invalid email or password.' });
       }
 
       if (foundUser.suspended) {
         return res.status(403).json({ error: 'This account has been suspended by an administrator.' });
       }
 
-      // Administrator Authorization (Dokploy / Environment Configuration):
-      // ONLY allow the password saved in the environment (.env)
-      const envAdminPassword = (process.env.ADMIN_PASSWORD || process.env.INITIAL_ADMIN_PASSWORD)?.trim();
-      const isAdminAccount = cleanEmail === 'shaka.ahmadd@gmail.com' || foundUser.role === 'admin' || foundUser.id === 'admin_shaka';
-
-      if (isAdminAccount) {
-        if (!envAdminPassword) {
-          return res.status(500).json({ error: 'Admin authorization error: No ADMIN_PASSWORD configured in environment (.env).' });
-        }
-        if (!password) {
-          return res.status(400).json({ error: 'Password is required for administrator authorization.' });
-        }
-        // STRICT: ONLY allow the password saved in .env
-        const isMatchesDirect = password === envAdminPassword;
-        const isMatchesHash = verifyPassword(password, hashPassword(envAdminPassword));
-        if (!isMatchesDirect && !isMatchesHash) {
-          return res.status(401).json({ error: 'Access Denied: Invalid administrator password. Only the password configured in the server environment (.env) is authorized.' });
-        }
-
-        // Keep stored passwordHash aligned with the active environment password
-        const currentEnvHash = hashPassword(envAdminPassword);
-        if (foundUser.passwordHash !== currentEnvHash) {
-          foundUser.passwordHash = currentEnvHash;
-          memoryStore.updateUser(foundUser.id, { passwordHash: currentEnvHash });
-          if (isDbConnected() && db) {
-            try {
-              await db.update(users).set({ passwordHash: currentEnvHash }).where(eq(users.id, foundUser.id));
-            } catch {}
-          }
-        }
-      } else {
-        // Standard non-admin password verification:
-        if (foundUser.passwordHash) {
-          if (!password) {
-            return res.status(400).json({ error: 'Password is required to authenticate.' });
-          }
-          const isValid = verifyPassword(password, foundUser.passwordHash);
-          if (!isValid) {
-            return res.status(401).json({ error: 'Invalid password. Please check your credentials and try again.' });
-          }
-        } else if (password) {
-          // Upgrade legacy user with a password
-          const newHash = hashPassword(password);
-          foundUser.passwordHash = newHash;
-          memoryStore.updateUser(foundUser.id, { passwordHash: newHash });
-          if (isDbConnected() && db) {
-            try {
-              await db.update(users).set({ passwordHash: newHash }).where(eq(users.id, foundUser.id));
-            } catch {}
-          }
-        }
+      // Social accounts (passwordHash === null) must NEVER allow arbitrary or blank passwords
+      if (!foundUser.passwordHash || typeof foundUser.passwordHash !== 'string') {
+        return res.status(401).json({
+          error: 'Invalid credentials. Social login accounts must authenticate with Google or Instagram, or establish a password via password reset.'
+        });
       }
 
-      // Generate session token
+      const isValid = verifyPassword(password, foundUser.passwordHash);
+      if (!isValid) {
+        return res.status(401).json({ error: 'Invalid email or password.' });
+      }
+
       const token = createSessionToken({ id: foundUser.id, email: foundUser.email, role: foundUser.role });
-      const isSecureCookie = NODE_ENV === 'production' || APP_URL.startsWith('https://');
-      res.cookie(COOKIE_NAME, token, {
-        httpOnly: true,
-        secure: isSecureCookie,
-        sameSite: isSecureCookie ? 'none' : 'lax',
-        maxAge: 30 * 24 * 60 * 60 * 1000,
-      });
+      setSecureSessionCookie(req, res, token);
 
       let redirectUrl = '/student/dashboard';
       if (foundUser.role === 'admin' || foundUser.role === 'subadmin') {
@@ -927,8 +983,8 @@ async function startServer() {
       const { passwordHash: _, ...safeUser } = foundUser;
       return res.status(200).json({ success: true, user: safeUser, token, redirectUrl });
     } catch (error: any) {
-      console.error('[AUTH] Login error:', error);
-      return res.status(500).json({ error: error.message || 'Authentication failed' });
+      console.error('[AUTH] Login error:', error.message);
+      return res.status(500).json({ error: 'Authentication failed' });
     }
   });
 
@@ -938,7 +994,7 @@ async function startServer() {
     if (user) {
       await logAudit('USER_LOGOUT', `User logged out: ${user.email}`, user.id, undefined, user.role, req);
     }
-    res.clearCookie(COOKIE_NAME);
+    res.clearCookie(COOKIE_NAME, { path: '/' });
     return res.status(200).json({ success: true, message: 'Logged out successfully.' });
   });
 
@@ -950,130 +1006,503 @@ async function startServer() {
         return res.status(401).json({ user: null });
       }
 
-      let foundUser: any = null;
-      if (isDbConnected() && db) {
-        try {
-          const found = await db.select().from(users).where(eq(users.id, session.id)).limit(1);
-          if (found.length > 0) {
-            foundUser = found[0];
-          }
-        } catch {}
-      }
-
-      if (!foundUser) {
-        foundUser = memoryStore.findUserById(session.id);
-      }
-
-      if (!foundUser) {
-        res.clearCookie(COOKIE_NAME);
+      const foundUser = await resolveAuthoritativeUserById(session.id);
+      if (!foundUser || foundUser.suspended) {
+        res.clearCookie(COOKIE_NAME, { path: '/' });
         return res.status(401).json({ user: null });
       }
 
       const { passwordHash: _, ...safeUser } = foundUser;
       return res.status(200).json({ user: safeUser });
-    } catch (err: any) {
-      return res.status(500).json({ error: err.message });
+    } catch {
+      return res.status(500).json({ error: 'Failed to load user session' });
     }
   });
 
   // =========================================================================
-  // OAUTH 2.0 AUTHORIZATION CODE FLOW ENDPOINTS
-  // Providers: Google, Apple, Instagram, X (Twitter), LinkedIn
+  // SECURE PASSWORD RESET (CSPRNG Token, SHA-256 Hashed Storage, Expiry, Rate Limit)
   // =========================================================================
 
-  interface OAuthProviderConfig {
+  interface PersistedResetTokenRecord {
     id: string;
-    name: string;
-    clientId: string | undefined;
-    clientSecret: string | undefined;
-    redirectUri: string;
-    authUrl: string;
-    tokenUrl: string;
-    userInfoUrl: string;
-    scope: string;
-    extraAuthParams?: Record<string, string>;
+    userId: string;
+    tokenHash: string;
+    expiresAt: string;
+    usedAt: string | null;
+    createdAt: string;
   }
 
-  interface OAuthStateRecord {
-    provider: string;
-    redirectUri?: string;
+  function hashResetToken(rawToken: string): string {
+    return crypto.createHash('sha256').update(rawToken).digest('hex');
+  }
+
+  function readPersistedResetTokens(): PersistedResetTokenRecord[] {
+    try {
+      if (fs.existsSync(PERSISTED_RESET_TOKENS_FILE)) {
+        const parsed = JSON.parse(fs.readFileSync(PERSISTED_RESET_TOKENS_FILE, 'utf-8'));
+        if (Array.isArray(parsed)) return parsed;
+      }
+    } catch {}
+    return [];
+  }
+
+  function writePersistedResetTokens(records: PersistedResetTokenRecord[]) {
+    try {
+      const dir = path.dirname(PERSISTED_RESET_TOKENS_FILE);
+      if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+      fs.writeFileSync(PERSISTED_RESET_TOKENS_FILE, JSON.stringify(records, null, 2), 'utf-8');
+    } catch {}
+  }
+
+  // POST /api/auth/forgot-password
+  // Generates a 256-bit CSPRNG token, stores ONLY its SHA-256 hash with 15-min expiry,
+  // enforces strict rate limiting, and NEVER logs or returns the plaintext token in HTTP responses.
+  app.post('/api/auth/forgot-password', async (req, res) => {
+    try {
+      const { email } = req.body || {};
+      if (!email || typeof email !== 'string') {
+        return res.status(400).json({ error: 'Please supply a valid registered email address.' });
+      }
+
+      const cleanEmail = email.toLowerCase().trim();
+      const clientIp = getClientIp(req);
+
+      // Rate-limit password reset requests (max 3 per 15 min per email, max 10 per 15 min per IP)
+      if (
+        isRateLimited(`pwd_reset_email:${cleanEmail}`, 3, 15 * 60 * 1000) ||
+        isRateLimited(`pwd_reset_ip:${clientIp}`, 10, 15 * 60 * 1000)
+      ) {
+        return res.status(429).json({ error: 'Too many password reset requests. Please wait 15 minutes before trying again.' });
+      }
+
+      const foundUser = await resolveAuthoritativeUserByEmail(cleanEmail);
+
+      // Always return a uniform 200 response to prevent user enumeration and never leak reset tokens
+      if (!foundUser) {
+        return res.status(200).json({
+          success: true,
+          message: 'If an account is registered with this email address, password reset instructions have been sent.'
+        });
+      }
+
+      const rawToken = crypto.randomBytes(32).toString('hex');
+      const tokenHash = hashResetToken(rawToken);
+      const nowIso = new Date().toISOString();
+      const expiresAtIso = new Date(Date.now() + 15 * 60 * 1000).toISOString();
+      const recordId = 'prt_' + crypto.randomBytes(12).toString('hex');
+
+      const resetRecord: PersistedResetTokenRecord = {
+        id: recordId,
+        userId: foundUser.id,
+        tokenHash,
+        expiresAt: expiresAtIso,
+        usedAt: null,
+        createdAt: nowIso,
+      };
+
+      if (isDbConnected() && db) {
+        await db.insert(passwordResetTokensTable).values(resetRecord);
+      } else {
+        const current = readPersistedResetTokens().filter(
+          r => r.userId !== foundUser.id && new Date(r.expiresAt).getTime() > Date.now()
+        );
+        current.push(resetRecord);
+        writePersistedResetTokens(current);
+      }
+
+      // Optional outbound email delivery via runtime webhook if configured (never logs token)
+      const emailWebhookUrl = process.env.PASSWORD_RESET_WEBHOOK_URL?.trim();
+      if (emailWebhookUrl) {
+        fetch(emailWebhookUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            to: cleanEmail,
+            resetToken: rawToken,
+            expiresAt: expiresAtIso,
+          }),
+        }).catch(() => {});
+      }
+
+      await logAudit('PASSWORD_RESET_REQUESTED', `Password recovery requested for: ${cleanEmail}`, foundUser.id, foundUser.name, foundUser.role, req);
+
+      return res.status(200).json({
+        success: true,
+        message: 'If an account is registered with this email address, password reset instructions have been sent.'
+      });
+    } catch (err: any) {
+      console.error('[AUTH] Forgot password error:', err.message);
+      return res.status(500).json({ error: 'Failed to process password recovery request' });
+    }
+  });
+
+  // POST /api/auth/reset-password
+  // Verifies SHA-256 token hash, enforces expiration & single-use, updates PostgreSQL passwordHash,
+  // and establishes a secure HTTP-only server session.
+  app.post('/api/auth/reset-password', async (req, res) => {
+    try {
+      const { email, token, newPassword } = req.body || {};
+      if (!email || typeof email !== 'string' || !token || typeof token !== 'string' || !newPassword || typeof newPassword !== 'string') {
+        return res.status(400).json({ error: 'Email, recovery token, and new password are required.' });
+      }
+
+      if (newPassword.length < 6) {
+        return res.status(400).json({ error: 'New password must contain at least 6 characters.' });
+      }
+
+      const cleanEmail = email.toLowerCase().trim();
+      const cleanToken = token.trim();
+      const clientIp = getClientIp(req);
+
+      if (isRateLimited(`pwd_reset_verify:${clientIp}:${cleanEmail}`, 8, 15 * 60 * 1000)) {
+        return res.status(429).json({ error: 'Too many password reset verification attempts. Please wait and try again.' });
+      }
+
+      const foundUser = await resolveAuthoritativeUserByEmail(cleanEmail);
+      if (!foundUser) {
+        return res.status(400).json({ error: 'Invalid or expired recovery token.' });
+      }
+
+      const candidateHash = hashResetToken(cleanToken);
+      const candidateBuf = Buffer.from(candidateHash, 'hex');
+      const nowMs = Date.now();
+      const nowIso = new Date(nowMs).toISOString();
+      let matchedRecordId: string | null = null;
+
+      if (isDbConnected() && db) {
+        const userTokens = await db
+          .select()
+          .from(passwordResetTokensTable)
+          .where(and(eq(passwordResetTokensTable.userId, foundUser.id), isNull(passwordResetTokensTable.usedAt)));
+
+        for (const rec of userTokens) {
+          if (new Date(rec.expiresAt).getTime() <= nowMs) continue;
+          const storedBuf = Buffer.from(rec.tokenHash, 'hex');
+          if (storedBuf.length === candidateBuf.length && crypto.timingSafeEqual(storedBuf, candidateBuf)) {
+            matchedRecordId = rec.id;
+            break;
+          }
+        }
+
+        if (!matchedRecordId) {
+          return res.status(400).json({ error: 'Invalid or expired recovery token.' });
+        }
+
+        // Consume all unused reset tokens for this user
+        await db
+          .update(passwordResetTokensTable)
+          .set({ usedAt: nowIso })
+          .where(and(eq(passwordResetTokensTable.userId, foundUser.id), isNull(passwordResetTokensTable.usedAt)));
+      } else {
+        const allTokens = readPersistedResetTokens();
+        for (const rec of allTokens) {
+          if (rec.userId !== foundUser.id || rec.usedAt) continue;
+          if (new Date(rec.expiresAt).getTime() <= nowMs) continue;
+          try {
+            const storedBuf = Buffer.from(rec.tokenHash, 'hex');
+            if (storedBuf.length === candidateBuf.length && crypto.timingSafeEqual(storedBuf, candidateBuf)) {
+              matchedRecordId = rec.id;
+              break;
+            }
+          } catch {}
+        }
+
+        if (!matchedRecordId) {
+          return res.status(400).json({ error: 'Invalid or expired recovery token.' });
+        }
+
+        const updatedTokens = allTokens.map(rec =>
+          rec.userId === foundUser.id && !rec.usedAt ? { ...rec, usedAt: nowIso } : rec
+        );
+        writePersistedResetTokens(updatedTokens);
+      }
+
+      const newHash = hashPassword(newPassword);
+      if (isDbConnected() && db) {
+        await db.update(users).set({ passwordHash: newHash }).where(eq(users.id, foundUser.id));
+      }
+      memoryStore.updateUser(foundUser.id, { passwordHash: newHash });
+      savePersistedUserUpdate(foundUser.id, { passwordHash: newHash });
+
+      const sessionToken = createSessionToken({ id: foundUser.id, email: foundUser.email, role: foundUser.role });
+      setSecureSessionCookie(req, res, sessionToken);
+
+      await logAudit('USER_PASSWORD_RESET', `Password updated via recovery token for: ${cleanEmail}`, foundUser.id, foundUser.name, foundUser.role, req);
+
+      let redirectUrl = '/student/dashboard';
+      if (foundUser.role === 'admin' || foundUser.role === 'subadmin') {
+        redirectUrl = '/admin';
+      } else if (foundUser.role === 'tutor') {
+        redirectUrl = '/tutor/dashboard';
+      }
+
+      const { passwordHash: _, ...safeUser } = { ...foundUser, passwordHash: newHash };
+      return res.status(200).json({
+        success: true,
+        message: 'Password updated successfully.',
+        user: safeUser,
+        token: sessionToken,
+        redirectUrl
+      });
+    } catch (err: any) {
+      console.error('[AUTH] Reset password error:', err.message);
+      return res.status(500).json({ error: 'Failed to update password' });
+    }
+  });
+
+  // =========================================================================
+  // SEPARATED OAUTH 2.0 IMPLEMENTATIONS (GOOGLE OAUTH & META/INSTAGRAM OAUTH)
+  // Zero hardcoded credentials, strict production domain enforcement, CSPRNG state validation
+  // =========================================================================
+
+  interface OAuthStateEntry {
+    redirectUri: string;
     createdAt: number;
     codeVerifier?: string;
   }
 
-  const oauthStates = new Map<string, OAuthStateRecord>();
+  // Separate state stores per provider
+  const googleOAuthStates = new Map<string, OAuthStateEntry>();
+  const instagramOAuthStates = new Map<string, OAuthStateEntry>();
+  const otherOAuthStates = new Map<string, OAuthStateEntry & { provider: string }>();
 
-  // Prune expired states (> 10 minutes)
   setInterval(() => {
     const now = Date.now();
-    for (const [st, rec] of oauthStates.entries()) {
-      if (now - rec.createdAt > 10 * 60 * 1000) {
-        oauthStates.delete(st);
-      }
+    const ttl = 10 * 60 * 1000;
+    for (const [k, v] of googleOAuthStates.entries()) {
+      if (now - v.createdAt > ttl) googleOAuthStates.delete(k);
+    }
+    for (const [k, v] of instagramOAuthStates.entries()) {
+      if (now - v.createdAt > ttl) instagramOAuthStates.delete(k);
+    }
+    for (const [k, v] of otherOAuthStates.entries()) {
+      if (now - v.createdAt > ttl) otherOAuthStates.delete(k);
     }
   }, 5 * 60 * 1000);
 
-  function getOAuthProviders(baseUrl: string): Record<string, OAuthProviderConfig> {
-    const cleanBase = baseUrl.replace(/\/$/, '');
+  function resolveProductionBaseUrl(): string {
+    if (!APP_URL) return '';
+    if (isForbiddenProductionUrl(APP_URL)) {
+      return '';
+    }
+    return APP_URL;
+  }
+
+  // 1. GOOGLE OAUTH CONFIGURATION (Reads exclusively from process.env at runtime)
+  function getGoogleOAuthConfig() {
+    const clientId = process.env.GOOGLE_CLIENT_ID?.trim() || undefined;
+    const clientSecret = process.env.GOOGLE_CLIENT_SECRET?.trim() || undefined;
+    const prodBase = resolveProductionBaseUrl();
+    const explicitRedirect = process.env.GOOGLE_REDIRECT_URI?.trim() || '';
+    const candidateRedirect = explicitRedirect || (prodBase ? `${prodBase}/api/auth/callback/google` : '');
+    const isRedirectValid = candidateRedirect.length > 0 && !isForbiddenProductionUrl(candidateRedirect);
+
     return {
-      google: {
-        id: 'google',
-        name: 'Google',
-        clientId: process.env.GOOGLE_CLIENT_ID?.trim(),
-        clientSecret: process.env.GOOGLE_CLIENT_SECRET?.trim(),
-        redirectUri: process.env.GOOGLE_REDIRECT_URI?.trim() || `${cleanBase}/api/auth/google/callback`,
-        authUrl: 'https://accounts.google.com/o/oauth2/v2/auth',
-        tokenUrl: 'https://oauth2.googleapis.com/token',
-        userInfoUrl: 'https://www.googleapis.com/oauth2/v2/userinfo',
-        scope: 'openid email profile',
-        extraAuthParams: { access_type: 'offline', prompt: 'select_account' }
-      },
-      apple: {
+      id: 'google' as const,
+      name: 'Google',
+      clientId,
+      clientSecret,
+      redirectUri: isRedirectValid ? candidateRedirect : '',
+      configured: Boolean(clientId && clientSecret && isRedirectValid),
+      authUrl: 'https://accounts.google.com/o/oauth2/v2/auth',
+      tokenUrl: 'https://oauth2.googleapis.com/token',
+      userInfoUrl: 'https://www.googleapis.com/oauth2/v2/userinfo',
+      scope: 'openid email profile',
+    };
+  }
+
+  // 2. META / INSTAGRAM OAUTH CONFIGURATION (Separate from Google; uses official Meta OAuth dialog & Graph API)
+  function getInstagramOAuthConfig() {
+    const clientId = process.env.INSTAGRAM_CLIENT_ID?.trim() || undefined;
+    const clientSecret = process.env.INSTAGRAM_CLIENT_SECRET?.trim() || undefined;
+    const prodBase = resolveProductionBaseUrl();
+    const explicitRedirect = process.env.INSTAGRAM_REDIRECT_URI?.trim() || '';
+    const candidateRedirect = explicitRedirect || (prodBase ? `${prodBase}/api/auth/callback/instagram` : '');
+    const isRedirectValid = candidateRedirect.length > 0 && !isForbiddenProductionUrl(candidateRedirect);
+
+    // Official Meta OAuth 2.0 flow for configured Meta / Instagram apps (supports Instagram Business override if configured)
+    const useInstagramBusinessLogin = process.env.INSTAGRAM_OAUTH_FLOW?.trim() === 'instagram_business';
+
+    return {
+      id: 'instagram' as const,
+      name: 'Instagram',
+      clientId,
+      clientSecret,
+      redirectUri: isRedirectValid ? candidateRedirect : '',
+      configured: Boolean(clientId && clientSecret && isRedirectValid),
+      useInstagramBusinessLogin,
+      authUrl: useInstagramBusinessLogin
+        ? 'https://www.instagram.com/oauth/authorize'
+        : 'https://www.facebook.com/v21.0/dialog/oauth',
+      tokenUrl: useInstagramBusinessLogin
+        ? 'https://api.instagram.com/oauth/access_token'
+        : 'https://graph.facebook.com/v21.0/oauth/access_token',
+      userInfoUrl: useInstagramBusinessLogin
+        ? 'https://graph.instagram.com/v21.0/me?fields=id,username,name,profile_picture_url'
+        : 'https://graph.facebook.com/v21.0/me?fields=id,name,email,picture',
+      scope: process.env.INSTAGRAM_OAUTH_SCOPES?.trim() || (
+        useInstagramBusinessLogin
+          ? 'instagram_business_basic'
+          : 'public_profile,email'
+      ),
+    };
+  }
+
+  function getSecondaryOAuthConfig(providerKey: string) {
+    const prodBase = resolveProductionBaseUrl();
+    if (providerKey === 'apple') {
+      const clientId = process.env.APPLE_CLIENT_ID?.trim();
+      const clientSecret = process.env.APPLE_PRIVATE_KEY?.trim();
+      const redirectUri = process.env.APPLE_REDIRECT_URI?.trim() || (prodBase ? `${prodBase}/api/auth/apple/callback` : '');
+      const validRedirect = redirectUri.length > 0 && !isForbiddenProductionUrl(redirectUri);
+      return {
         id: 'apple',
         name: 'Apple',
-        clientId: process.env.APPLE_CLIENT_ID?.trim(),
-        clientSecret: process.env.APPLE_PRIVATE_KEY?.trim() || process.env.APPLE_KEY_ID?.trim() || process.env.APPLE_TEAM_ID?.trim(),
-        redirectUri: process.env.APPLE_REDIRECT_URI?.trim() || `${cleanBase}/api/auth/apple/callback`,
+        clientId,
+        clientSecret,
+        redirectUri: validRedirect ? redirectUri : '',
+        configured: Boolean(clientId && clientSecret && validRedirect),
         authUrl: 'https://appleid.apple.com/auth/authorize',
         tokenUrl: 'https://appleid.apple.com/auth/token',
         userInfoUrl: '',
         scope: 'name email',
-        extraAuthParams: { response_mode: 'form_post' }
-      },
-      instagram: {
-        id: 'instagram',
-        name: 'Instagram',
-        clientId: process.env.INSTAGRAM_CLIENT_ID?.trim(),
-        clientSecret: process.env.INSTAGRAM_CLIENT_SECRET?.trim(),
-        redirectUri: process.env.INSTAGRAM_REDIRECT_URI?.trim() || `${cleanBase}/api/auth/instagram/callback`,
-        authUrl: 'https://api.instagram.com/oauth/authorize',
-        tokenUrl: 'https://api.instagram.com/oauth/access_token',
-        userInfoUrl: 'https://graph.instagram.com/me?fields=id,username,account_type',
-        scope: 'user_profile,user_media'
-      },
-      x: {
+      };
+    }
+    if (providerKey === 'x') {
+      const clientId = process.env.X_CLIENT_ID?.trim();
+      const clientSecret = process.env.X_CLIENT_SECRET?.trim();
+      const redirectUri = process.env.X_REDIRECT_URI?.trim() || (prodBase ? `${prodBase}/api/auth/x/callback` : '');
+      const validRedirect = redirectUri.length > 0 && !isForbiddenProductionUrl(redirectUri);
+      return {
         id: 'x',
         name: 'X',
-        clientId: process.env.X_CLIENT_ID?.trim(),
-        clientSecret: process.env.X_CLIENT_SECRET?.trim(),
-        redirectUri: process.env.X_REDIRECT_URI?.trim() || `${cleanBase}/api/auth/x/callback`,
+        clientId,
+        clientSecret,
+        redirectUri: validRedirect ? redirectUri : '',
+        configured: Boolean(clientId && clientSecret && validRedirect),
         authUrl: 'https://twitter.com/i/oauth2/authorize',
         tokenUrl: 'https://api.twitter.com/2/oauth2/token',
         userInfoUrl: 'https://api.twitter.com/2/users/me?user.fields=profile_image_url,name,username',
-        scope: 'tweet.read users.read'
-      },
-      linkedin: {
+        scope: 'tweet.read users.read',
+      };
+    }
+    if (providerKey === 'linkedin') {
+      const clientId = process.env.LINKEDIN_CLIENT_ID?.trim();
+      const clientSecret = process.env.LINKEDIN_CLIENT_SECRET?.trim();
+      const redirectUri = process.env.LINKEDIN_REDIRECT_URI?.trim() || (prodBase ? `${prodBase}/api/auth/linkedin/callback` : '');
+      const validRedirect = redirectUri.length > 0 && !isForbiddenProductionUrl(redirectUri);
+      return {
         id: 'linkedin',
         name: 'LinkedIn',
-        clientId: process.env.LINKEDIN_CLIENT_ID?.trim(),
-        clientSecret: process.env.LINKEDIN_CLIENT_SECRET?.trim(),
-        redirectUri: process.env.LINKEDIN_REDIRECT_URI?.trim() || `${cleanBase}/api/auth/linkedin/callback`,
+        clientId,
+        clientSecret,
+        redirectUri: validRedirect ? redirectUri : '',
+        configured: Boolean(clientId && clientSecret && validRedirect),
         authUrl: 'https://www.linkedin.com/oauth/v2/authorization',
         tokenUrl: 'https://www.linkedin.com/oauth/v2/accessToken',
         userInfoUrl: 'https://api.linkedin.com/v2/userinfo',
-        scope: 'openid profile email'
+        scope: 'openid profile email',
+      };
+    }
+    return null;
+  }
+
+  function signOAuthStateCookieValue(provider: string, state: string, redirectUri: string): string {
+    const payload = JSON.stringify({ provider, state, redirectUri, exp: Date.now() + 10 * 60 * 1000 });
+    const encoded = Buffer.from(payload, 'utf8').toString('base64url');
+    const sig = crypto.createHmac('sha256', SESSION_SECRET).update(encoded).digest('base64url');
+    return `${encoded}.${sig}`;
+  }
+
+  function verifyOAuthStateCookieValue(cookieVal: string | undefined, expectedProvider: string, expectedState: string): string | null {
+    if (!cookieVal || !expectedState) return null;
+    try {
+      const [encoded, sig] = cookieVal.split('.');
+      if (!encoded || !sig) return null;
+      const expectedSig = crypto.createHmac('sha256', SESSION_SECRET).update(encoded).digest('base64url');
+      const sigBuf = Buffer.from(sig, 'utf8');
+      const expBuf = Buffer.from(expectedSig, 'utf8');
+      if (sigBuf.length !== expBuf.length || !crypto.timingSafeEqual(sigBuf, expBuf)) return null;
+      const parsed = JSON.parse(Buffer.from(encoded, 'base64url').toString('utf8'));
+      if (parsed.provider !== expectedProvider || parsed.state !== expectedState) return null;
+      if (!parsed.exp || parsed.exp < Date.now()) return null;
+      return parsed.redirectUri || null;
+    } catch {
+      return null;
+    }
+  }
+
+  async function finalizeOAuthUserSession(
+    req: express.Request,
+    res: express.Response,
+    providerLabel: string,
+    verifiedEmail: string,
+    verifiedName: string,
+    verifiedAvatar: string
+  ) {
+    const cleanEmail = verifiedEmail.toLowerCase().trim();
+    let targetUser = await resolveAuthoritativeUserByEmail(cleanEmail);
+
+    if (targetUser && targetUser.suspended) {
+      return renderOAuthErrorPage(res, 'This account has been suspended by an administrator.');
+    }
+
+    if (!targetUser) {
+      const newUserId = 'usr_' + crypto.randomBytes(12).toString('hex');
+      const newUserRecord = {
+        id: newUserId,
+        role: 'student',
+        name: verifiedName || `${providerLabel} Student`,
+        email: cleanEmail,
+        passwordHash: null,
+        avatarUrl: verifiedAvatar || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&auto=format&fit=crop&q=80',
+        createdAt: new Date().toISOString(),
+        suspended: false,
+        verified: true,
+        bio: `Student member authenticated via ${providerLabel}.`,
+        hourlyRate: null,
+        rating: null,
+        reviewCount: null,
+        subjects: null,
+        country: 'US',
+        location: null,
+        phoneNumber: null,
+        education: null,
+        experience: null,
+        subjectExpertise: null,
+        availability: null,
+        canMeet: null,
+        hobbies: null,
+        isApproved: true,
+        status: 'active',
+      };
+
+      if (isDbConnected() && db) {
+        await db.insert(users).values(newUserRecord);
       }
-    };
+      memoryStore.setUser(newUserRecord);
+      savePersistedUserUpdate(newUserId, newUserRecord);
+      targetUser = newUserRecord;
+      await logAudit('OAUTH_REGISTER', `New student account created via ${providerLabel}: ${cleanEmail}`, newUserId, targetUser.name, 'student', req);
+    } else {
+      await logAudit('OAUTH_LOGIN', `User signed in via ${providerLabel}: ${cleanEmail} (${targetUser.role})`, targetUser.id, targetUser.name, targetUser.role, req);
+    }
+
+    const sessionToken = createSessionToken({
+      id: targetUser.id,
+      email: targetUser.email,
+      role: targetUser.role,
+    });
+    setSecureSessionCookie(req, res, sessionToken);
+
+    let targetRedirectUrl = '/student/dashboard';
+    if (targetUser.role === 'admin' || targetUser.role === 'subadmin') {
+      targetRedirectUrl = '/admin';
+    } else if (targetUser.role === 'tutor') {
+      targetRedirectUrl = '/tutor/dashboard';
+    }
+
+    return renderOAuthSuccessPage(res, sessionToken, targetUser, targetRedirectUrl);
   }
 
   function renderOAuthSuccessPage(res: express.Response, sessionToken: string, user: any, redirectUrl: string) {
@@ -1084,6 +1513,9 @@ async function startServer() {
       role: user.role,
       avatarUrl: user.avatarUrl
     };
+    const escapedName = String(safeUser.name || '').replace(/[&<>"']/g, '');
+    const escapedEmail = String(safeUser.email || '').replace(/[&<>"']/g, '');
+    const targetOrigin = resolveProductionBaseUrl() || '*';
 
     return res.status(200).send(`<!DOCTYPE html>
 <html lang="en">
@@ -1097,8 +1529,7 @@ async function startServer() {
     .badge { width: 52px; height: 52px; border-radius: 50%; background: #ecfdf5; color: #059669; display: flex; align-items: center; justify-content: center; margin: 0 auto 16px; font-size: 26px; }
     h2 { font-size: 20px; margin: 0 0 8px; font-weight: 700; color: #0f172a; }
     p { font-size: 14px; color: #64748b; margin: 0 0 20px; line-height: 1.5; }
-    .btn { display: inline-block; background: #ea580c; color: #fff; text-decoration: none; padding: 12px 24px; border-radius: 12px; font-size: 14px; font-weight: 600; cursor: pointer; border: none; transition: background 0.15s ease; }
-    .btn:hover { background: #c2410c; }
+    .btn { display: inline-block; background: #ea580c; color: #fff; text-decoration: none; padding: 12px 24px; border-radius: 12px; font-size: 14px; font-weight: 600; cursor: pointer; border: none; }
     .spinner { display: inline-block; width: 22px; height: 22px; border: 2.5px solid #e2e8f0; border-top-color: #ea580c; border-radius: 50%; animation: spin 0.8s linear infinite; margin: 8px auto 16px; }
     @keyframes spin { to { transform: rotate(360deg); } }
   </style>
@@ -1107,7 +1538,7 @@ async function startServer() {
   <div class="card">
     <div class="badge">✓</div>
     <h2>Authenticated Successfully</h2>
-    <p>Welcome, <strong>${safeUser.name}</strong> (${safeUser.email})! Loading your workspace...</p>
+    <p>Welcome, <strong>${escapedName}</strong> (${escapedEmail})! Loading your workspace...</p>
     <div class="spinner"></div>
     <div>
       <button id="contBtn" onclick="finishLogin()" class="btn">Proceed to Dashboard</button>
@@ -1116,45 +1547,31 @@ async function startServer() {
   <script>
     const payload = {
       type: 'OAUTH_AUTH_SUCCESS',
-      token: ${JSON.stringify(sessionToken)},
       user: ${JSON.stringify(safeUser)},
       redirectUrl: ${JSON.stringify(redirectUrl)}
     };
-
-    // 1. Persist to local storage for instant same-origin pickup
     try {
-      localStorage.setItem('auth_token', payload.token);
       localStorage.setItem('ut_current_user', JSON.stringify(payload.user));
-      localStorage.setItem('ut_oauth_timestamp', String(Date.now()));
     } catch(e) {}
-
-    // 2. BroadcastChannel across all open tabs/windows
     try {
       if (typeof BroadcastChannel !== 'undefined') {
         const bc = new BroadcastChannel('oauth_channel');
         bc.postMessage(payload);
       }
     } catch(e) {}
-
     function finishLogin() {
       if (window.opener && !window.opener.closed) {
-        try {
-          window.opener.postMessage(payload, '*');
-        } catch(e) {}
+        try { window.opener.postMessage(payload, ${JSON.stringify(targetOrigin)}); } catch(e) {}
         setTimeout(() => { try { window.close(); } catch(e){} }, 300);
       } else {
         window.location.href = ${JSON.stringify(redirectUrl)};
       }
     }
-
-    // 3. Post to opener if available
     if (window.opener && !window.opener.closed) {
-      try {
-        window.opener.postMessage(payload, '*');
-      } catch(e) {}
+      try { window.opener.postMessage(payload, ${JSON.stringify(targetOrigin)}); } catch(e) {}
       setTimeout(() => { try { window.close(); } catch(e){} }, 600);
     } else {
-      setTimeout(() => { finishLogin(); }, 1200);
+      setTimeout(() => { finishLogin(); }, 900);
     }
   </script>
 </body>
@@ -1162,6 +1579,8 @@ async function startServer() {
   }
 
   function renderOAuthErrorPage(res: express.Response, errorMsg: string) {
+    const safeMsg = String(errorMsg || 'Authentication failed').replace(/[&<>]/g, '');
+    const targetOrigin = resolveProductionBaseUrl() || '*';
     return res.status(400).send(`<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -1175,19 +1594,18 @@ async function startServer() {
     h2 { font-size: 18px; margin: 0 0 8px; font-weight: 700; color: #991b1b; }
     p { font-size: 13px; color: #64748b; margin: 0 0 24px; line-height: 1.5; }
     button { background: #0f172a; color: #fff; border: 0; padding: 10px 20px; border-radius: 12px; font-size: 13px; font-weight: 600; cursor: pointer; }
-    button:hover { background: #1e293b; }
   </style>
 </head>
 <body>
   <div class="card">
     <div class="badge">✕</div>
     <h2>Sign-In Could Not Complete</h2>
-    <p>${errorMsg}</p>
-    <button onclick="if(window.opener){window.opener.postMessage({type:'OAUTH_AUTH_ERROR',error:${JSON.stringify(errorMsg)}},'*');window.close();}else{window.location.href='/auth';}">Close Window</button>
+    <p>${safeMsg}</p>
+    <button onclick="if(window.opener){window.opener.postMessage({type:'OAUTH_AUTH_ERROR',error:${JSON.stringify(safeMsg)}},${JSON.stringify(targetOrigin)});window.close();}else{window.location.href='/auth';}">Close Window</button>
   </div>
   <script>
     if (window.opener) {
-      window.opener.postMessage({ type: 'OAUTH_AUTH_ERROR', error: ${JSON.stringify(errorMsg)} }, '*');
+      window.opener.postMessage({ type: 'OAUTH_AUTH_ERROR', error: ${JSON.stringify(safeMsg)} }, ${JSON.stringify(targetOrigin)});
     }
   </script>
 </body>
@@ -1195,430 +1613,460 @@ async function startServer() {
   }
 
   // GET /api/auth/providers
-  // Returns configuration status for all 5 providers without leaking secrets
-  app.get('/api/auth/providers', (req, res) => {
-    const providers = getOAuthProviders(APP_URL);
-    const result: Record<string, { configured: boolean; name: string; authUrl: string; redirectUri: string }> = {};
-    for (const [key, p] of Object.entries(providers)) {
-      const configured = Boolean(p.clientId && p.clientSecret);
-      result[key] = {
-        configured,
-        name: p.name,
-        authUrl: `/api/auth/${key}/url`,
-        redirectUri: p.redirectUri
-      };
-    }
-    return res.json({ success: true, providers: result, appUrl: APP_URL });
-  });
+  // Reports provider readiness without exposing any client IDs or secrets
+  app.get('/api/auth/providers', (_req, res) => {
+    const googleCfg = getGoogleOAuthConfig();
+    const instagramCfg = getInstagramOAuthConfig();
+    const appleCfg = getSecondaryOAuthConfig('apple')!;
+    const xCfg = getSecondaryOAuthConfig('x')!;
+    const linkedinCfg = getSecondaryOAuthConfig('linkedin')!;
 
-  // POST /api/auth/demo-login
-  // Allows testing student role creation, session tokens, and redirection flow in development sandbox
-  app.post('/api/auth/demo-login', async (req, res) => {
-    const { provider } = req.body || {};
-    const validProviders = ['google', 'instagram', 'apple', 'x', 'linkedin'];
-    const p = validProviders.includes(provider) ? provider : 'google';
-
-    const providerNames: Record<string, string> = {
-      google: 'Google',
-      instagram: 'Instagram',
-      apple: 'Apple',
-      x: 'X',
-      linkedin: 'LinkedIn'
-    };
-
-    const name = `${providerNames[p]} Student`;
-    const cleanEmail = `${p}.student@university-tutors.com`;
-
-    // Requirement 9: Always assign new users default role "student"
-    let user = memoryStore.findUserByEmail(cleanEmail);
-    if (!user) {
-      const newUserId = 'usr_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7);
-      user = {
-        id: newUserId,
-        email: cleanEmail,
-        name,
-        role: 'student',
-        avatarUrl: p === 'google'
-          ? 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&q=80&w=256'
-          : 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&q=80&w=256',
-        createdAt: new Date().toISOString(),
-        suspended: false,
-        verified: true,
-        bio: `Student member registered via ${p}.`
-      };
-      memoryStore.setUser(user);
-    }
-
-    const sessionToken = createSessionToken({
-      id: user.id,
-      email: user.email,
-      role: 'student'
-    });
-
-    const isSecureCookie = NODE_ENV === 'production' || APP_URL.startsWith('https://');
-    res.cookie(COOKIE_NAME, sessionToken, {
-      httpOnly: true,
-      secure: isSecureCookie,
-      sameSite: isSecureCookie ? 'none' : 'lax',
-      maxAge: 7 * 24 * 60 * 60 * 1000
-    });
-
-    await logAudit('OAUTH_DEMO_LOGIN', `Sandbox verification login for ${p}: ${cleanEmail}`, user.id, user.name, 'student', req);
-
-    return res.status(200).json({
+    return res.json({
       success: true,
-      token: sessionToken,
-      user: {
-        id: user.id,
-        name: user.name,
-        email: user.email,
-        role: 'student',
-        avatarUrl: user.avatarUrl
+      providers: {
+        google: {
+          configured: googleCfg.configured,
+          name: 'Google',
+          authUrl: '/api/auth/google/url',
+          redirectUri: googleCfg.redirectUri,
+        },
+        apple: {
+          configured: appleCfg.configured,
+          name: 'Apple',
+          authUrl: '/api/auth/apple/url',
+          redirectUri: appleCfg.redirectUri,
+        },
+        instagram: {
+          configured: instagramCfg.configured,
+          name: 'Instagram',
+          authUrl: '/api/auth/instagram/url',
+          redirectUri: instagramCfg.redirectUri,
+        },
+        x: {
+          configured: xCfg.configured,
+          name: 'X',
+          authUrl: '/api/auth/x/url',
+          redirectUri: xCfg.redirectUri,
+        },
+        linkedin: {
+          configured: linkedinCfg.configured,
+          name: 'LinkedIn',
+          authUrl: '/api/auth/linkedin/url',
+          redirectUri: linkedinCfg.redirectUri,
+        },
       },
-      redirectUrl: '/student/dashboard'
+      appUrl: resolveProductionBaseUrl(),
     });
   });
 
-  // GET /api/auth/:provider/url
-  // Initiates OAuth 2.0 flow, generates CSRF state, and returns provider authorization URL
-  app.get('/api/auth/:provider/url', (req, res) => {
-    const providerKey = req.params.provider.toLowerCase();
-    const providers = getOAuthProviders(APP_URL);
-    const p = providers[providerKey];
-    if (!p) {
-      return res.status(404).json({ error: `Unsupported provider: ${providerKey}` });
-    }
-
-    if (!p.clientId || !p.clientSecret) {
+  // -------------------------------------------------------------------------
+  // DEDICATED GOOGLE OAUTH 2.0 INITIATION & CALLBACK HANDLERS
+  // -------------------------------------------------------------------------
+  app.get('/api/auth/google/url', (req, res) => {
+    const cfg = getGoogleOAuthConfig();
+    if (!cfg.clientId || !cfg.clientSecret) {
       return res.status(400).json({
-        error: `${p.name} OAuth credentials are not configured on this server. Please set ${p.id.toUpperCase()}_CLIENT_ID and ${p.id.toUpperCase()}_CLIENT_SECRET in environment variables.`
+        error: 'Google OAuth is not configured on this server. Set GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET in runtime environment variables.'
+      });
+    }
+    if (!cfg.redirectUri) {
+      return res.status(400).json({
+        error: 'Google OAuth configuration error: A valid HTTPS production domain is required in GOOGLE_REDIRECT_URI or APP_URL (preview, localhost, development, and container URLs are prohibited).'
       });
     }
 
-    const state = crypto.randomBytes(24).toString('hex');
-    let codeVerifier: string | undefined;
-
-    const params = new URLSearchParams({
-      client_id: p.clientId,
-      redirect_uri: p.redirectUri,
-      response_type: 'code',
-      scope: p.scope,
-      state: state,
+    const state = crypto.randomBytes(32).toString('hex');
+    googleOAuthStates.set(state, {
+      redirectUri: cfg.redirectUri,
+      createdAt: Date.now(),
     });
 
-    if (p.id === 'x') {
+    const isHttps = NODE_ENV === 'production' || cfg.redirectUri.startsWith('https://') || req.secure;
+    res.cookie('oauth_state_google', signOAuthStateCookieValue('google', state, cfg.redirectUri), {
+      httpOnly: true,
+      secure: isHttps,
+      sameSite: isHttps ? 'none' : 'lax',
+      path: '/',
+      maxAge: 10 * 60 * 1000,
+    });
+
+    const params = new URLSearchParams({
+      client_id: cfg.clientId,
+      redirect_uri: cfg.redirectUri,
+      response_type: 'code',
+      scope: cfg.scope,
+      state,
+      access_type: 'offline',
+      prompt: 'select_account',
+    });
+
+    return res.json({ success: true, url: `${cfg.authUrl}?${params.toString()}`, state });
+  });
+
+  const handleGoogleOAuthCallback = async (req: express.Request, res: express.Response) => {
+    const errorParam = (req.query.error || req.query.error_description) as string | undefined;
+    if (errorParam) {
+      return renderOAuthErrorPage(res, `Google authorization error: ${errorParam}`);
+    }
+
+    const code = req.query.code as string | undefined;
+    const state = req.query.state as string | undefined;
+
+    if (!state || typeof state !== 'string') {
+      return renderOAuthErrorPage(res, 'Missing OAuth state parameter (CSRF validation failed).');
+    }
+
+    const cfg = getGoogleOAuthConfig();
+    if (!cfg.configured || !cfg.clientId || !cfg.clientSecret) {
+      return renderOAuthErrorPage(res, 'Google OAuth is not configured on this server.');
+    }
+
+    // Strict CSRF state verification: must exist in server state store or match HMAC-signed cookie
+    const memEntry = googleOAuthStates.get(state);
+    const cookieRedirect = verifyOAuthStateCookieValue(req.cookies?.oauth_state_google, 'google', state);
+    res.clearCookie('oauth_state_google', { path: '/' });
+
+    if (!memEntry && !cookieRedirect) {
+      return renderOAuthErrorPage(res, 'Invalid or expired OAuth state parameter (CSRF protection failed).');
+    }
+    if (memEntry) {
+      googleOAuthStates.delete(state);
+      if (Date.now() - memEntry.createdAt > 10 * 60 * 1000) {
+        return renderOAuthErrorPage(res, 'Expired OAuth state parameter. Please try signing in again.');
+      }
+    }
+
+    if (!code || typeof code !== 'string') {
+      return renderOAuthErrorPage(res, 'Missing authorization code from Google.');
+    }
+
+    const redirectUriToUse = memEntry?.redirectUri || cookieRedirect || cfg.redirectUri;
+
+    try {
+      const tokenRes = await fetch(cfg.tokenUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({
+          code,
+          client_id: cfg.clientId,
+          client_secret: cfg.clientSecret,
+          redirect_uri: redirectUriToUse,
+          grant_type: 'authorization_code',
+        }),
+      });
+      const tokenData = await tokenRes.json();
+      if (!tokenRes.ok || !tokenData.access_token) {
+        return renderOAuthErrorPage(res, 'Google token exchange failed. Please verify your OAuth configuration and try again.');
+      }
+
+      const userRes = await fetch(cfg.userInfoUrl, {
+        headers: { Authorization: `Bearer ${tokenData.access_token}` },
+      });
+      const userData = await userRes.json();
+      if (!userRes.ok || !userData.email) {
+        return renderOAuthErrorPage(res, 'Google profile did not include a verified email address.');
+      }
+
+      const profileEmail = String(userData.email).toLowerCase().trim();
+      const profileName = userData.name || profileEmail.split('@')[0] || 'Google Student';
+      const profileAvatar = userData.picture || '';
+
+      return await finalizeOAuthUserSession(req, res, 'Google', profileEmail, profileName, profileAvatar);
+    } catch {
+      return renderOAuthErrorPage(res, 'Failed to complete Google authentication.');
+    }
+  };
+
+  app.all([
+    '/api/auth/callback/google',
+    '/api/auth/callback/google/',
+    '/api/auth/google/callback',
+    '/api/auth/google/callback/',
+    '/auth/google/callback',
+    '/auth/callback/google',
+  ], handleGoogleOAuthCallback);
+
+  // -------------------------------------------------------------------------
+  // DEDICATED META / INSTAGRAM OAUTH 2.0 INITIATION & CALLBACK HANDLERS
+  // -------------------------------------------------------------------------
+  app.get('/api/auth/instagram/url', (req, res) => {
+    const cfg = getInstagramOAuthConfig();
+    if (!cfg.clientId || !cfg.clientSecret) {
+      return res.status(400).json({
+        error: 'Meta/Instagram OAuth is not configured on this server. Set INSTAGRAM_CLIENT_ID and INSTAGRAM_CLIENT_SECRET in runtime environment variables.'
+      });
+    }
+    if (!cfg.redirectUri) {
+      return res.status(400).json({
+        error: 'Meta/Instagram OAuth configuration error: A valid HTTPS production domain is required in INSTAGRAM_REDIRECT_URI or APP_URL (preview, localhost, development, and container URLs are prohibited).'
+      });
+    }
+
+    const state = crypto.randomBytes(32).toString('hex');
+    instagramOAuthStates.set(state, {
+      redirectUri: cfg.redirectUri,
+      createdAt: Date.now(),
+    });
+
+    const isHttps = NODE_ENV === 'production' || cfg.redirectUri.startsWith('https://') || req.secure;
+    res.cookie('oauth_state_instagram', signOAuthStateCookieValue('instagram', state, cfg.redirectUri), {
+      httpOnly: true,
+      secure: isHttps,
+      sameSite: isHttps ? 'none' : 'lax',
+      path: '/',
+      maxAge: 10 * 60 * 1000,
+    });
+
+    const params = new URLSearchParams({
+      client_id: cfg.clientId,
+      redirect_uri: cfg.redirectUri,
+      response_type: 'code',
+      scope: cfg.scope,
+      state,
+    });
+
+    return res.json({ success: true, url: `${cfg.authUrl}?${params.toString()}`, state });
+  });
+
+  const handleInstagramOAuthCallback = async (req: express.Request, res: express.Response) => {
+    const errorParam = (req.query.error_message || req.query.error_description || req.query.error) as string | undefined;
+    if (errorParam) {
+      return renderOAuthErrorPage(res, `Meta/Instagram authorization error: ${errorParam}`);
+    }
+
+    const rawCode = req.query.code as string | undefined;
+    const state = req.query.state as string | undefined;
+
+    if (!state || typeof state !== 'string') {
+      return renderOAuthErrorPage(res, 'Missing OAuth state parameter (CSRF validation failed).');
+    }
+
+    const cfg = getInstagramOAuthConfig();
+    if (!cfg.configured || !cfg.clientId || !cfg.clientSecret) {
+      return renderOAuthErrorPage(res, 'Meta/Instagram OAuth is not configured on this server.');
+    }
+
+    const memEntry = instagramOAuthStates.get(state);
+    const cookieRedirect = verifyOAuthStateCookieValue(req.cookies?.oauth_state_instagram, 'instagram', state);
+    res.clearCookie('oauth_state_instagram', { path: '/' });
+
+    if (!memEntry && !cookieRedirect) {
+      return renderOAuthErrorPage(res, 'Invalid or expired OAuth state parameter (CSRF protection failed).');
+    }
+    if (memEntry) {
+      instagramOAuthStates.delete(state);
+      if (Date.now() - memEntry.createdAt > 10 * 60 * 1000) {
+        return renderOAuthErrorPage(res, 'Expired OAuth state parameter. Please try signing in again.');
+      }
+    }
+
+    if (!rawCode || typeof rawCode !== 'string') {
+      return renderOAuthErrorPage(res, 'Missing authorization code from Meta/Instagram.');
+    }
+
+    const cleanCode = rawCode.replace(/#_$/, '');
+    const redirectUriToUse = memEntry?.redirectUri || cookieRedirect || cfg.redirectUri;
+
+    try {
+      let accessToken = '';
+      let fallbackPlatformUserId = '';
+
+      if (cfg.useInstagramBusinessLogin) {
+        const tokenRes = await fetch(cfg.tokenUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: new URLSearchParams({
+            client_id: cfg.clientId,
+            client_secret: cfg.clientSecret,
+            grant_type: 'authorization_code',
+            redirect_uri: redirectUriToUse,
+            code: cleanCode,
+          }),
+        });
+        const tokenData = await tokenRes.json();
+        if (!tokenRes.ok || !tokenData.access_token) {
+          return renderOAuthErrorPage(res, 'Instagram token exchange failed. Please verify your Meta app configuration.');
+        }
+        accessToken = tokenData.access_token;
+        fallbackPlatformUserId = String(tokenData.user_id || '');
+      } else {
+        const tokenParams = new URLSearchParams({
+          client_id: cfg.clientId,
+          client_secret: cfg.clientSecret,
+          redirect_uri: redirectUriToUse,
+          code: cleanCode,
+        });
+        const tokenRes = await fetch(`${cfg.tokenUrl}?${tokenParams.toString()}`, {
+          method: 'GET',
+        });
+        const tokenData = await tokenRes.json();
+        if (!tokenRes.ok || !tokenData.access_token) {
+          return renderOAuthErrorPage(res, 'Meta OAuth token exchange failed. Please verify your Meta App ID, Secret, and Valid OAuth Redirect URI.');
+        }
+        accessToken = tokenData.access_token;
+      }
+
+      const profileRes = await fetch(cfg.userInfoUrl, {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
+      const profileData = await profileRes.json();
+      if (!profileRes.ok || (!profileData.id && !fallbackPlatformUserId)) {
+        return renderOAuthErrorPage(res, 'Failed to retrieve verified profile from Meta/Instagram.');
+      }
+
+      const providerAccountId = String(profileData.id || fallbackPlatformUserId);
+      const profileName = profileData.name || profileData.username || 'Instagram Student';
+      const profileEmail = (typeof profileData.email === 'string' && profileData.email.includes('@'))
+        ? profileData.email.toLowerCase().trim()
+        : `meta_${providerAccountId}@instagram.university-tutors.com`;
+      const profileAvatar = profileData.picture?.data?.url || profileData.profile_picture_url || '';
+
+      return await finalizeOAuthUserSession(req, res, 'Instagram', profileEmail, profileName, profileAvatar);
+    } catch {
+      return renderOAuthErrorPage(res, 'Failed to complete Meta/Instagram authentication.');
+    }
+  };
+
+  app.all([
+    '/api/auth/callback/instagram',
+    '/api/auth/callback/instagram/',
+    '/api/auth/instagram/callback',
+    '/api/auth/instagram/callback/',
+    '/auth/instagram/callback',
+    '/auth/callback/instagram',
+  ], handleInstagramOAuthCallback);
+
+  // Secondary OAuth providers (Apple, X, LinkedIn) - strict configuration & state checks, zero fake logins
+  app.get('/api/auth/:provider/url', (req, res) => {
+    const providerKey = req.params.provider.toLowerCase();
+    const cfg = getSecondaryOAuthConfig(providerKey);
+    if (!cfg) {
+      return res.status(404).json({ error: `Unsupported OAuth provider: ${providerKey}` });
+    }
+    if (!cfg.configured || !cfg.clientId || !cfg.clientSecret || !cfg.redirectUri) {
+      return res.status(400).json({
+        error: `${cfg.name} OAuth is not configured on this server. Set ${cfg.id.toUpperCase()}_CLIENT_ID, ${cfg.id.toUpperCase()}_CLIENT_SECRET, and a valid production redirect URI in environment variables.`
+      });
+    }
+
+    const state = crypto.randomBytes(32).toString('hex');
+    let codeVerifier: string | undefined;
+    const params = new URLSearchParams({
+      client_id: cfg.clientId,
+      redirect_uri: cfg.redirectUri,
+      response_type: 'code',
+      scope: cfg.scope,
+      state,
+    });
+
+    if (cfg.id === 'x') {
       codeVerifier = crypto.randomBytes(32).toString('base64url');
       const codeChallenge = crypto.createHash('sha256').update(codeVerifier).digest('base64url');
       params.set('code_challenge', codeChallenge);
       params.set('code_challenge_method', 'S256');
     }
 
-    if (p.extraAuthParams) {
-      for (const [k, v] of Object.entries(p.extraAuthParams)) {
-        params.set(k, v);
-      }
-    }
-
-    oauthStates.set(state, {
-      provider: p.id,
-      redirectUri: p.redirectUri,
+    otherOAuthStates.set(state, {
+      provider: cfg.id,
+      redirectUri: cfg.redirectUri,
       createdAt: Date.now(),
-      codeVerifier
+      codeVerifier,
     });
 
-    const isSecureCookie = NODE_ENV === 'production' || APP_URL.startsWith('https://');
-    res.cookie('oauth_state', state, {
-      httpOnly: true,
-      secure: isSecureCookie,
-      sameSite: isSecureCookie ? 'none' : 'lax',
-      maxAge: 10 * 60 * 1000
-    });
-
-    const finalAuthUrl = `${p.authUrl}?${params.toString()}`;
-    return res.json({ success: true, url: finalAuthUrl, state });
+    return res.json({ success: true, url: `${cfg.authUrl}?${params.toString()}`, state });
   });
 
-  // ALL /api/auth/:provider/callback and /api/auth/callback/:provider
-  // Handles OAuth provider callbacks, validates state parameter, creates user and secure session
-  const OAUTH_CALLBACK_ROUTES = [
+  app.all([
     '/api/auth/:provider/callback',
-    '/api/auth/:provider/callback/',
     '/api/auth/callback/:provider',
-    '/api/auth/callback/:provider/',
-    '/auth/:provider/callback',
-    '/auth/callback/:provider',
-    '/api/auth/callback',
-    '/auth/callback'
-  ];
-
-  app.all(OAUTH_CALLBACK_ROUTES, async (req, res) => {
-    const code = (req.query.code || req.body?.code) as string | undefined;
+  ], async (req, res) => {
+    const providerKey = (req.params.provider || '').toLowerCase();
     const state = (req.query.state || req.body?.state) as string | undefined;
-    const errorParam = (req.query.error || req.body?.error || req.query.error_description || req.body?.error_description) as string | undefined;
+    if (!state || typeof state !== 'string') {
+      return renderOAuthErrorPage(res, 'Missing OAuth state parameter (CSRF validation failed).');
+    }
+    const stored = otherOAuthStates.get(state);
+    if (!stored || stored.provider !== providerKey || Date.now() - stored.createdAt > 10 * 60 * 1000) {
+      return renderOAuthErrorPage(res, 'Invalid or expired OAuth state parameter (CSRF protection failed).');
+    }
+    otherOAuthStates.delete(state);
 
-    if (errorParam) {
-      return renderOAuthErrorPage(res, `Provider authorization error: ${errorParam}`);
+    const cfg = getSecondaryOAuthConfig(providerKey);
+    if (!cfg || !cfg.configured || !cfg.clientId || !cfg.clientSecret) {
+      return renderOAuthErrorPage(res, `${providerKey} OAuth is not configured on this server.`);
     }
 
+    const code = (req.query.code || req.body?.code) as string | undefined;
     if (!code) {
-      return renderOAuthErrorPage(res, 'Missing authorization code parameter from OAuth provider.');
+      return renderOAuthErrorPage(res, 'Missing authorization code from OAuth provider.');
     }
-
-    const storedState = state ? oauthStates.get(state) : undefined;
-    let providerKey = (req.params.provider || storedState?.provider || (req.query.provider as string) || '').toLowerCase();
-    if (!providerKey) {
-      const fullUrl = req.originalUrl.toLowerCase();
-      if (fullUrl.includes('google')) providerKey = 'google';
-      else if (fullUrl.includes('instagram') || fullUrl.includes('facebook') || fullUrl.includes('meta')) providerKey = 'instagram';
-      else if (fullUrl.includes('apple')) providerKey = 'apple';
-      else if (fullUrl.includes('linkedin')) providerKey = 'linkedin';
-      else if (fullUrl.includes('x') || fullUrl.includes('twitter')) providerKey = 'x';
-    }
-
-    const providers = getOAuthProviders(APP_URL);
-    const p = providers[providerKey];
-
-    if (!p) {
-      return renderOAuthErrorPage(res, `Unknown or unsupported OAuth provider "${providerKey}".`);
-    }
-
-    // Validate state parameter (either in-memory or secure cookie)
-    const cookieState = req.cookies?.oauth_state;
-    if (state && storedState) {
-      if (storedState.provider !== p.id) {
-        return renderOAuthErrorPage(res, 'OAuth state provider mismatch. Please try logging in again.');
-      }
-      oauthStates.delete(state);
-    } else if (state && cookieState && cookieState === state) {
-      // Cookie state matched across server worker/instances
-    } else if (!state) {
-      return renderOAuthErrorPage(res, 'Missing OAuth state parameter (CSRF protection failed). Please try logging in again.');
-    }
-
-    // Strip any trailing #_ added by Meta/Facebook OAuth
-    const cleanCode = code.replace(/#_$/, '');
-    const redirectUriToUse = storedState?.redirectUri || p.redirectUri;
 
     try {
-      let profileEmail = '';
-      let profileName = `${p.name} Student`;
-      let profileAvatar = '';
-
-      if (p.id === 'google') {
-        const tokenRes = await fetch(p.tokenUrl, {
+      if (cfg.id === 'linkedin') {
+        const tokenRes = await fetch(cfg.tokenUrl, {
           method: 'POST',
           headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
           body: new URLSearchParams({
-            code: cleanCode,
-            client_id: p.clientId!,
-            client_secret: p.clientSecret!,
-            redirect_uri: redirectUriToUse,
-            grant_type: 'authorization_code'
-          })
+            code,
+            client_id: cfg.clientId,
+            client_secret: cfg.clientSecret,
+            redirect_uri: stored.redirectUri,
+            grant_type: 'authorization_code',
+          }),
         });
         const tokenData = await tokenRes.json();
         if (!tokenRes.ok || !tokenData.access_token) {
-          throw new Error(tokenData.error_description || tokenData.error || 'Failed to exchange authorization code with Google');
+          return renderOAuthErrorPage(res, 'LinkedIn token exchange failed.');
         }
-
-        const userRes = await fetch(p.userInfoUrl, {
-          headers: { Authorization: `Bearer ${tokenData.access_token}` }
+        const userRes = await fetch(cfg.userInfoUrl, {
+          headers: { Authorization: `Bearer ${tokenData.access_token}` },
         });
         const userData = await userRes.json();
-        profileEmail = userData.email;
-        profileName = userData.name || userData.email?.split('@')[0] || 'Google User';
-        profileAvatar = userData.picture || '';
-
-      } else if (p.id === 'linkedin') {
-        const tokenRes = await fetch(p.tokenUrl, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-          body: new URLSearchParams({
-            code: cleanCode,
-            client_id: p.clientId!,
-            client_secret: p.clientSecret!,
-            redirect_uri: redirectUriToUse,
-            grant_type: 'authorization_code'
-          })
-        });
-        const tokenData = await tokenRes.json();
-        if (!tokenRes.ok || !tokenData.access_token) {
-          throw new Error(tokenData.error_description || tokenData.error || 'Failed to exchange authorization code with LinkedIn');
+        if (!userRes.ok || !userData.email) {
+          return renderOAuthErrorPage(res, 'LinkedIn did not return a verified email address.');
         }
+        return await finalizeOAuthUserSession(req, res, 'LinkedIn', userData.email, userData.name || 'LinkedIn Student', userData.picture || '');
+      }
 
-        const userRes = await fetch(p.userInfoUrl, {
-          headers: { Authorization: `Bearer ${tokenData.access_token}` }
-        });
-        const userData = await userRes.json();
-        profileEmail = userData.email;
-        profileName = userData.name || `${userData.given_name || ''} ${userData.family_name || ''}`.trim() || 'LinkedIn User';
-        profileAvatar = userData.picture || '';
-
-      } else if (p.id === 'x') {
-        const basicAuth = Buffer.from(`${p.clientId}:${p.clientSecret}`).toString('base64');
-        const tokenRes = await fetch(p.tokenUrl, {
+      if (cfg.id === 'x') {
+        const basicAuth = Buffer.from(`${cfg.clientId}:${cfg.clientSecret}`).toString('base64');
+        const tokenRes = await fetch(cfg.tokenUrl, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/x-www-form-urlencoded',
-            'Authorization': `Basic ${basicAuth}`
+            'Authorization': `Basic ${basicAuth}`,
           },
           body: new URLSearchParams({
-            code: cleanCode,
+            code,
             grant_type: 'authorization_code',
-            redirect_uri: redirectUriToUse,
-            code_verifier: storedState?.codeVerifier || ''
-          })
+            redirect_uri: stored.redirectUri,
+            code_verifier: stored.codeVerifier || '',
+          }),
         });
         const tokenData = await tokenRes.json();
         if (!tokenRes.ok || !tokenData.access_token) {
-          throw new Error(tokenData.error_description || tokenData.error || 'Failed to exchange authorization code with X');
+          return renderOAuthErrorPage(res, 'X token exchange failed.');
         }
-
-        const userRes = await fetch(p.userInfoUrl, {
-          headers: { Authorization: `Bearer ${tokenData.access_token}` }
+        const userRes = await fetch(cfg.userInfoUrl, {
+          headers: { Authorization: `Bearer ${tokenData.access_token}` },
         });
         const userData = await userRes.json();
-        profileName = userData.data?.name || userData.data?.username || 'X User';
-        profileEmail = `x_${userData.data?.username || userData.data?.id || Date.now()}@x.university-tutors.com`;
-        profileAvatar = userData.data?.profile_image_url || '';
-
-      } else if (p.id === 'instagram') {
-        const tokenRes = await fetch(p.tokenUrl, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-          body: new URLSearchParams({
-            client_id: p.clientId!,
-            client_secret: p.clientSecret!,
-            grant_type: 'authorization_code',
-            redirect_uri: redirectUriToUse,
-            code: cleanCode
-          })
-        });
-        const tokenData = await tokenRes.json();
-        if (!tokenRes.ok || !tokenData.access_token) {
-          throw new Error(tokenData.error_message || tokenData.error?.message || tokenData.error || 'Failed to exchange authorization code with Instagram');
+        if (!userRes.ok || !userData.data?.id) {
+          return renderOAuthErrorPage(res, 'Failed to fetch verified X profile.');
         }
-
-        let userData: any = null;
-        try {
-          const userRes = await fetch(`${p.userInfoUrl}&access_token=${encodeURIComponent(tokenData.access_token)}`, {
-            headers: { Authorization: `Bearer ${tokenData.access_token}` }
-          });
-          userData = await userRes.json();
-        } catch {
-          userData = { id: tokenData.user_id, username: 'instagram_user' };
-        }
-        profileName = userData?.username || (tokenData.user_id ? `Instagram User (${tokenData.user_id})` : 'Instagram User');
-        profileEmail = `instagram_${userData?.username || userData?.id || tokenData.user_id || Date.now()}@instagram.university-tutors.com`;
-
-      } else if (p.id === 'apple') {
-        if (req.body?.user) {
-          try {
-            const u = typeof req.body.user === 'string' ? JSON.parse(req.body.user) : req.body.user;
-            if (u.name) {
-              profileName = `${u.name.firstName || ''} ${u.name.lastName || ''}`.trim() || 'Apple User';
-            }
-          } catch {}
-        }
-        profileEmail = (req.body?.email || req.query.email || `apple_${Date.now()}@privaterelay.appleid.com`) as string;
+        return await finalizeOAuthUserSession(
+          req,
+          res,
+          'X',
+          `x_${userData.data.id}@x.university-tutors.com`,
+          userData.data.name || userData.data.username || 'X Student',
+          userData.data.profile_image_url || ''
+        );
       }
 
-      const cleanEmail = (profileEmail || `${p.id}_${Date.now()}@university-tutors.com`).toLowerCase().trim();
-
-      // Requirement 9: Find or create user in PostgreSQL
-      let targetUser: any = null;
-      if (isDbConnected() && db) {
-        try {
-          const rows = await db.select().from(users).where(eq(users.email, cleanEmail)).limit(1);
-          if (rows.length > 0) {
-            targetUser = rows[0];
-          }
-        } catch (dbErr: any) {
-          console.warn('[OAUTH] DB search error:', dbErr.message);
-        }
-      }
-
-      if (!targetUser) {
-        targetUser = memoryStore.findUserByEmail(cleanEmail);
-      }
-
-      if (!targetUser) {
-        // Requirement 9: assign new users the default role "student"
-        const newUserId = 'usr_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7);
-        const newUserRecord = {
-          id: newUserId,
-          role: 'student', // Default role "student"
-          name: profileName || `${p.name} Student`,
-          email: cleanEmail,
-          passwordHash: null,
-          avatarUrl: profileAvatar || `https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&auto=format&fit=crop&q=80`,
-          createdAt: new Date().toISOString(),
-          suspended: false,
-          verified: true,
-          bio: `Student member registered via ${p.name}.`,
-          hourlyRate: null,
-          rating: null,
-          reviewCount: null,
-          subjects: null,
-          country: 'US',
-          location: null,
-          phoneNumber: null,
-          education: null,
-          experience: null,
-          subjectExpertise: null,
-          availability: null,
-          canMeet: null,
-          hobbies: null,
-          isApproved: true,
-          status: 'active',
-        };
-
-        memoryStore.setUser(newUserRecord);
-        if (isDbConnected() && db) {
-          try {
-            await db.insert(users).values(newUserRecord);
-          } catch (insertErr: any) {
-            console.warn('[OAUTH] DB insert error:', insertErr.message);
-          }
-        }
-        targetUser = newUserRecord;
-        await logAudit('OAUTH_REGISTER', `New user registered via ${p.name}: ${cleanEmail}`, newUserId, targetUser.name, 'student', req);
-      } else {
-        await logAudit('OAUTH_LOGIN', `User signed in via ${p.name}: ${cleanEmail} (${targetUser.role})`, targetUser.id, targetUser.name, targetUser.role, req);
-      }
-
-      // Requirement 9: Create secure session
-      const sessionToken = createSessionToken({
-        id: targetUser.id,
-        email: targetUser.email,
-        role: targetUser.role
-      });
-
-      const isSecureCookie = NODE_ENV === 'production' || APP_URL.startsWith('https://');
-      res.cookie(COOKIE_NAME, sessionToken, {
-        httpOnly: true,
-        secure: isSecureCookie,
-        sameSite: isSecureCookie ? 'none' : 'lax',
-        maxAge: 30 * 24 * 60 * 60 * 1000
-      });
-
-      // Requirement 9: Redirect rules:
-      // - students directly to /student/dashboard
-      // - tutors to /tutor/dashboard
-      // - admins and subadmins to /admin
-      let targetRedirectUrl = '/student/dashboard';
-      if (targetUser.role === 'admin' || targetUser.role === 'subadmin') {
-        targetRedirectUrl = '/admin';
-      } else if (targetUser.role === 'tutor') {
-        targetRedirectUrl = '/tutor/dashboard';
-      } else {
-        targetRedirectUrl = '/student/dashboard';
-      }
-
-      return renderOAuthSuccessPage(res, sessionToken, targetUser, targetRedirectUrl);
-    } catch (err: any) {
-      console.error(`[OAUTH] Callback error for ${p.name}:`, err.message);
-      return renderOAuthErrorPage(res, `Failed to authenticate with ${p.name}: ${err.message}`);
+      return renderOAuthErrorPage(res, `${cfg.name} OAuth verification is not enabled.`);
+    } catch {
+      return renderOAuthErrorPage(res, `Failed to authenticate with ${cfg.name}.`);
     }
   });
 
@@ -1639,7 +2087,6 @@ async function startServer() {
   // USERS & PRIVILEGED ACCOUNTS ENDPOINTS
   // ==========================================
 
-  const PERSISTED_UPDATES_FILE = path.join(UPLOADS_DIR, 'persisted_user_updates.json');
   const PERSISTED_PRIVATE_FILES_FILE = path.join(UPLOADS_DIR, 'persisted_private_files.json');
 
   // Migrate legacy data directory files to persistent UPLOADS_DIR if present
@@ -1686,30 +2133,6 @@ async function startServer() {
   }
 
   loadPersistedPrivateFiles();
-
-  function getPersistedUserUpdates(): Record<string, any> {
-    try {
-      if (fs.existsSync(PERSISTED_UPDATES_FILE)) {
-        const raw = fs.readFileSync(PERSISTED_UPDATES_FILE, 'utf-8');
-        return JSON.parse(raw);
-      }
-    } catch (e) {
-      console.warn('[Storage] Notice reading persisted_user_updates.json:', e);
-    }
-    return {};
-  }
-
-  function savePersistedUserUpdate(userId: string, data: Record<string, any>) {
-    try {
-      const dir = path.dirname(PERSISTED_UPDATES_FILE);
-      if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-      const current = getPersistedUserUpdates();
-      current[userId] = { ...(current[userId] || {}), ...data, updatedAt: new Date().toISOString() };
-      fs.writeFileSync(PERSISTED_UPDATES_FILE, JSON.stringify(current, null, 2), 'utf-8');
-    } catch (e) {
-      console.warn('[Storage] Notice saving persisted_user_updates.json:', e);
-    }
-  }
 
   // GET /api/users - returns all platform users including seed tutors, memory store, and PostgreSQL
   app.get('/api/users', async (req, res) => {
@@ -2245,8 +2668,8 @@ async function startServer() {
   });
 
   // POST /api/admin/tutors
-  // Dynamic Admin Profile Creation with deduplication guarantee and instant indexing
-  app.post('/api/admin/tutors', (req, res, next) => {
+  // Protected Admin/Subadmin Tutor Profile Creation with deduplication guarantee
+  app.post('/api/admin/tutors', requireRole('admin', 'subadmin'), (req, res, next) => {
     if (req.is('multipart/form-data')) {
       avatarMulterUpload.single('profileImage')(req, res, (err) => {
         if (err) return res.status(400).json({ error: err.message });
@@ -2706,79 +3129,46 @@ async function startServer() {
         ? avatarUrl.trim()
         : 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=300&auto=format&fit=crop&q=80';
 
-      const isApp = isApproved !== undefined ? Boolean(isApproved) : true;
-      const stat = status || (isApp ? 'approved' : 'pending');
+      const caller = (req as any).user;
+      const isCallerAdmin = caller && (caller.role === 'admin' || caller.role === 'subadmin');
+      const isApp = isCallerAdmin ? (isApproved !== undefined ? Boolean(isApproved) : true) : false;
+      const stat = isCallerAdmin ? (status || (isApp ? 'approved' : 'pending')) : 'pending';
       const rate = hourlyRate ? Math.round(Number(hourlyRate)) : 45;
 
-      // Check if user with this email already exists in PostgreSQL
-      if (isDbConnected() && db) {
-        try {
-          const existing = await db.select().from(users).where(eq(users.email, cleanEmail)).limit(1);
-          if (existing.length > 0) {
-            const existingUser = existing[0];
-            const updates = {
-              name: name.trim(),
-              role: 'tutor',
-              avatarUrl: avatar,
-              bio: bio || existingUser.bio || 'Dedicated academic tutor and subject mentor.',
-              hourlyRate: rate,
-              subjects: JSON.stringify(subjectsArray),
-              country: country || existingUser.country || 'US',
-              location: locText,
-              phoneNumber: phoneNumber || existingUser.phoneNumber,
-              education: education || existingUser.education,
-              experience: expText || existingUser.experience,
-              subjectExpertise: JSON.stringify(subjectExpertiseArray),
-              availability: availText || existingUser.availability,
-              canMeet: canMeet || existingUser.canMeet || 'Online',
-              hobbies: hobbies || existingUser.hobbies,
-              isApproved: isApp,
-              status: stat,
-            };
-
-            await db.update(users).set(updates).where(eq(users.id, existingUser.id));
-            const fullUpdated = { ...existingUser, ...updates };
-            memoryStore.setUser(fullUpdated);
-
-            await logAudit('TUTOR_PROFILE_UPDATED', `Updated existing tutor profile: ${cleanEmail}`, existingUser.id, name.trim(), 'tutor', req);
-
-            const { passwordHash: _, ...safeTutor } = fullUpdated;
-            return res.status(200).json({
-              success: true,
-              tutor: { ...safeTutor, subjects: subjectsArray, subjectExpertise: subjectExpertiseArray },
-              user: { ...safeTutor, subjects: subjectsArray, subjectExpertise: subjectExpertiseArray },
-              updated: true
-            });
-          }
-        } catch (dbErr: any) {
-          console.warn('[API] DB check/update for tutor failed:', dbErr.message);
+      const existingAccount = await resolveAuthoritativeUserByEmail(cleanEmail);
+      if (existingAccount) {
+        if (!isCallerAdmin) {
+          return res.status(409).json({ error: 'An account with this email already exists. Please sign in or contact an administrator.' });
         }
-      }
-
-      // Check memory store for existing user by email
-      const memExisting = memoryStore.findUserByEmail(cleanEmail);
-      if (memExisting) {
         const updates = {
           name: name.trim(),
-          role: 'tutor' as any,
+          role: existingAccount.role === 'admin' ? 'admin' : 'tutor',
           avatarUrl: avatar,
-          bio: bio || memExisting.bio,
+          bio: bio || existingAccount.bio || 'Dedicated academic tutor and subject mentor.',
           hourlyRate: rate,
           subjects: JSON.stringify(subjectsArray),
-          country: country || memExisting.country || 'US',
+          country: country || existingAccount.country || 'US',
           location: locText,
-          phoneNumber: phoneNumber || memExisting.phoneNumber,
-          education: education || memExisting.education,
-          experience: expText || memExisting.experience,
+          phoneNumber: phoneNumber || existingAccount.phoneNumber,
+          education: education || existingAccount.education,
+          experience: expText || existingAccount.experience,
           subjectExpertise: JSON.stringify(subjectExpertiseArray),
-          availability: availText || memExisting.availability,
-          canMeet: canMeet || memExisting.canMeet || 'Online',
-          hobbies: hobbies || memExisting.hobbies,
+          availability: availText || existingAccount.availability,
+          canMeet: canMeet || existingAccount.canMeet || 'Online',
+          hobbies: hobbies || existingAccount.hobbies,
           isApproved: isApp,
           status: stat,
         };
-        const updated = memoryStore.updateUser(memExisting.id, updates) || { ...memExisting, ...updates };
-        const { passwordHash: _, ...safeTutor } = updated;
+        if (isDbConnected() && db) {
+          await db.update(users).set(updates).where(eq(users.id, existingAccount.id));
+        }
+        const fullUpdated = { ...existingAccount, ...updates };
+        memoryStore.setUser(fullUpdated);
+        savePersistedUserUpdate(existingAccount.id, updates);
+
+        await logAudit('TUTOR_PROFILE_UPDATED', `Updated existing tutor profile: ${cleanEmail}`, caller.id, caller.name, caller.role, req);
+
+        const { passwordHash: _, ...safeTutor } = fullUpdated;
         return res.status(200).json({
           success: true,
           tutor: { ...safeTutor, subjects: subjectsArray, subjectExpertise: subjectExpertiseArray },
@@ -2787,10 +3177,10 @@ async function startServer() {
         });
       }
 
-      // Create new tutor profile
-      const newTutorId = 'tutor_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7);
+      // Create new tutor profile without any hardcoded fallback password
+      const newTutorId = 'tutor_' + crypto.randomBytes(10).toString('hex');
       const now = new Date().toISOString();
-      const pHash = hashPassword(password || 'TutorPass@2026');
+      const pHash = (password && typeof password === 'string' && password.length >= 6) ? hashPassword(password) : null;
 
       const newTutorRecord = {
         id: newTutorId,
@@ -2851,22 +3241,26 @@ async function startServer() {
   });
 
   // POST /api/create-privileged-user
-  // Admin creates Tutor or Subadmin roles
-  app.post('/api/create-privileged-user', async (req, res) => {
+  // Strictly restricted to authenticated Administrators; requires explicit password (no hardcoded fallback)
+  app.post('/api/create-privileged-user', requireRole('admin'), async (req, res) => {
     try {
-      const { name, email, role, password, extra } = req.body;
+      const { name, email, role, password, extra } = req.body || {};
 
-      if (!name || !email || !role) {
-        return res.status(400).json({ error: 'Missing required fields: name, email, role' });
+      if (!name || !email || !role || !password || typeof password !== 'string') {
+        return res.status(400).json({ error: 'Missing required fields: name, email, role, password' });
       }
 
-      if (role !== 'tutor' && role !== 'admin') {
-        return res.status(400).json({ error: "Invalid role. Only 'tutor' and 'admin' can be created." });
+      if (password.length < 8) {
+        return res.status(400).json({ error: 'Privileged account passwords must be at least 8 characters long.' });
+      }
+
+      if (role !== 'tutor' && role !== 'admin' && role !== 'subadmin') {
+        return res.status(400).json({ error: "Invalid role. Only 'tutor', 'subadmin', and 'admin' can be created." });
       }
 
       const cleanEmail = email.toLowerCase().trim();
-      const pHash = hashPassword(password || 'TutorPass@2026');
-      const userId = (role === 'admin' ? 'admin_' : 'tutor_') + Date.now() + '_' + Math.random().toString(36).slice(2, 6);
+      const pHash = hashPassword(password);
+      const userId = `${role}_${crypto.randomBytes(10).toString('hex')}`;
 
       const avatar = (extra?.avatarUrl && typeof extra.avatarUrl === 'string' && extra.avatarUrl.trim())
         ? extra.avatarUrl.trim()
@@ -2900,8 +3294,8 @@ async function startServer() {
         status: 'approved',
       };
 
-      // Always save to memory store
       memoryStore.setUser(newUser);
+      savePersistedUserUpdate(userId, newUser);
 
       if (isDbConnected() && db) {
         try {
@@ -2910,6 +3304,7 @@ async function startServer() {
             set: {
               role: newUser.role,
               name: newUser.name,
+              passwordHash: newUser.passwordHash,
               avatarUrl: newUser.avatarUrl,
               bio: newUser.bio,
               hourlyRate: newUser.hourlyRate,
@@ -2932,23 +3327,43 @@ async function startServer() {
         }
       }
 
-      await logAudit('CREATE_PRIVILEGED_USER', `Admin created privileged user: ${cleanEmail} (${role})`, userId, name, role, req);
+      const caller = (req as any).user;
+      await logAudit('CREATE_PRIVILEGED_USER', `Admin created privileged user: ${cleanEmail} (${role})`, caller?.id || userId, caller?.name || name, caller?.role || 'admin', req);
 
       const { passwordHash: _, ...safeUser } = newUser;
       return res.status(200).json({ success: true, user: safeUser });
     } catch (err: any) {
-      console.error('[API] Error in create-privileged-user:', err);
-      return res.status(500).json({ error: err.message });
+      console.error('[API] Error in create-privileged-user:', err.message);
+      return res.status(500).json({ error: 'Failed to create privileged user' });
     }
   });
 
   // PUT /api/users/:id
-  app.put('/api/users/:id', async (req, res) => {
+  // Protected: requires authentication; users can only update their own non-privileged profile fields unless admin/subadmin
+  app.put('/api/users/:id', requireAuth, async (req, res) => {
     try {
       const { id } = req.params;
+      const caller = (req as any).user;
+      const isAdminCaller = caller.role === 'admin' || caller.role === 'subadmin';
+      if (!isAdminCaller && caller.id !== id) {
+        return res.status(403).json({ error: 'Forbidden: You do not have permission to modify another user profile.' });
+      }
+
       const updates = { ...req.body };
       delete updates.id;
       delete updates.passwordHash;
+      delete updates.password;
+
+      // Prevent privilege escalation: non-admins cannot alter role, approval, verification, or suspension flags
+      if (!isAdminCaller) {
+        delete updates.role;
+        delete updates.suspended;
+        delete updates.isApproved;
+        delete updates.status;
+        delete updates.verified;
+      } else if (updates.role === 'admin' && caller.role !== 'admin') {
+        delete updates.role;
+      }
 
       if (updates.subjects && Array.isArray(updates.subjects)) {
         updates.subjects = JSON.stringify(updates.subjects);
@@ -4071,7 +4486,7 @@ async function startServer() {
   // ==========================================
 
   // GET /api/audit-logs
-  app.get('/api/audit-logs', async (req, res) => {
+  app.get('/api/audit-logs', requireRole('admin', 'subadmin'), async (_req, res) => {
     try {
       if (isDbConnected() && db) {
         try {
@@ -4083,16 +4498,20 @@ async function startServer() {
       }
 
       return res.status(200).json({ logs: memoryStore.getAuditLogs() });
-    } catch (err: any) {
+    } catch {
       return res.status(200).json({ logs: [] });
     }
   });
 
   // POST /api/audit-logs
-  app.post('/api/audit-logs', async (req, res) => {
+  app.post('/api/audit-logs', requireAuth, async (req, res) => {
     try {
-      const { action, details, userId, userName, userRole } = req.body;
-      await logAudit(action, details, userId, userName, userRole, req);
+      const caller = (req as any).user;
+      const { action, details } = req.body || {};
+      if (!action || typeof action !== 'string') {
+        return res.status(400).json({ error: 'Action is required.' });
+      }
+      await logAudit(action, details || '', caller.id, caller.name, caller.role, req);
       return res.status(201).json({ success: true });
     } catch (err: any) {
       return res.status(500).json({ error: err.message });
@@ -4384,12 +4803,9 @@ async function startServer() {
   });
 
   // POST /api/blogs (Admin create)
-  app.post('/api/blogs', async (req, res) => {
+  app.post('/api/blogs', requireRole('admin', 'subadmin'), async (req, res) => {
     try {
       const user = (req as any).user;
-      if (!user || user.role !== 'admin') {
-        return res.status(403).json({ error: 'Unauthorized: Only platform administrators can publish blogs.' });
-      }
 
       const { title, excerpt, content, category, readTime, imageUrl, image, tags, featured } = req.body;
       if (!title || !content || !category) {
@@ -4450,12 +4866,9 @@ async function startServer() {
   });
 
   // PUT /api/blogs/:id (Admin update)
-  app.put('/api/blogs/:id', async (req, res) => {
+  app.put('/api/blogs/:id', requireRole('admin', 'subadmin'), async (req, res) => {
     try {
       const user = (req as any).user;
-      if (!user || user.role !== 'admin') {
-        return res.status(403).json({ error: 'Unauthorized: Only platform administrators can update blogs.' });
-      }
 
       const { id } = req.params;
       const updates = { ...req.body };
@@ -4485,12 +4898,9 @@ async function startServer() {
   });
 
   // DELETE /api/blogs/:id (Admin delete)
-  app.delete('/api/blogs/:id', async (req, res) => {
+  app.delete('/api/blogs/:id', requireRole('admin', 'subadmin'), async (req, res) => {
     try {
       const user = (req as any).user;
-      if (!user || user.role !== 'admin') {
-        return res.status(403).json({ error: 'Unauthorized: Only platform administrators can delete blogs.' });
-      }
 
       const { id } = req.params;
       memoryStore.deleteBlog(id);
@@ -4512,12 +4922,9 @@ async function startServer() {
   });
 
   // POST /api/blogs/sync-defaults (Admin reset/sync all 20 default educational blogs)
-  app.post('/api/blogs/sync-defaults', async (req, res) => {
+  app.post('/api/blogs/sync-defaults', requireRole('admin', 'subadmin'), async (req, res) => {
     try {
       const user = (req as any).user;
-      if (!user || user.role !== 'admin') {
-        return res.status(403).json({ error: 'Unauthorized: Only platform administrators can sync default blogs.' });
-      }
 
       // 1. Reset memoryStore
       const syncedBlogs = memoryStore.resetDefaultBlogs();

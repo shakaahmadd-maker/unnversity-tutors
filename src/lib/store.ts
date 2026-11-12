@@ -540,6 +540,7 @@ export class AppStore {
     try {
       const res = await fetch('/api/auth/login', {
         method: 'POST',
+        credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: cleanEmail, password: password || '' })
       });
@@ -559,31 +560,32 @@ export class AppStore {
       this.notify();
       return true;
     } catch (err: any) {
-      console.error('[AUTH] Login error:', err);
-      // Fallback matching in local users array if offline
-      const matched = this.users.find(u => u.email.toLowerCase().trim() === cleanEmail);
-      if (matched) {
-        this.currentUser = matched;
-        localStorage.setItem('ut_current_user', JSON.stringify(matched));
-        this.notify();
-        return true;
-      }
+      console.error('[AUTH] Login error:', err.message);
       throw err;
     }
   }
 
-  async register(name: string, email: string, role: UserRole, extra?: Partial<User>): Promise<boolean> {
+  async register(name: string, email: string, _role: UserRole, extra?: Partial<User>): Promise<boolean> {
     const cleanEmail = email.toLowerCase().trim();
+    if (!extra?.password || typeof extra.password !== 'string') {
+      throw new Error('Password is required to register an account.');
+    }
     try {
       const res = await fetch('/api/auth/register', {
         method: 'POST',
+        credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           name: name.trim(),
           email: cleanEmail,
-          password: extra?.password || 'Student@123456',
-          role,
-          extra
+          password: extra.password,
+          extra: {
+            bio: extra.bio,
+            country: extra.country,
+            location: extra.location,
+            phoneNumber: extra.phoneNumber,
+            education: extra.education,
+          }
         })
       });
 
@@ -602,13 +604,13 @@ export class AppStore {
       this.notify();
       return true;
     } catch (err: any) {
-      console.error('[AUTH] Register error:', err);
+      console.error('[AUTH] Register error:', err.message);
       throw err;
     }
   }
 
   logout() {
-    fetch('/api/auth/logout', { method: 'POST' }).catch(() => {});
+    fetch('/api/auth/logout', { method: 'POST', credentials: 'include' }).catch(() => {});
     this.currentUser = null;
     localStorage.removeItem('ut_current_user');
     localStorage.removeItem('auth_token');
@@ -616,67 +618,34 @@ export class AppStore {
   }
 
   async createTutorProfile(tutorData: any): Promise<boolean> {
-    try {
-      const res = await fetch('/api/tutors', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(tutorData)
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data.error || 'Failed to create tutor profile');
-      }
-
-      const created = data.tutor || data.user;
-      if (created) {
-        const normalized: User = {
-          ...created,
-          role: UserRole.TUTOR,
-          subjects: typeof created.subjects === 'string' ? JSON.parse(created.subjects || '[]') : (created.subjects || []),
-          subjectExpertise: typeof created.subjectExpertise === 'string' ? JSON.parse(created.subjectExpertise || '[]') : (created.subjectExpertise || []),
-        };
-        const idx = this.users.findIndex(u => u.id === normalized.id || u.email.toLowerCase().trim() === normalized.email.toLowerCase().trim());
-        if (idx !== -1) {
-          this.users[idx] = { ...this.users[idx], ...normalized };
-        } else {
-          this.users.unshift(normalized);
-        }
-        this.notify();
-      }
-      return true;
-    } catch (err: any) {
-      console.error('[STORE] createTutorProfile error:', err);
-      // Fallback: create locally so UI is immediately responsive even if network is offline
-      const fallbackId = 'tutor_' + Date.now();
-      const fallbackTutor: User = {
-        id: fallbackId,
-        role: UserRole.TUTOR,
-        name: tutorData.name,
-        email: tutorData.email,
-        avatarUrl: tutorData.avatarUrl || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=300&auto=format&fit=crop&q=80',
-        createdAt: new Date().toISOString(),
-        verified: true,
-        isApproved: tutorData.isApproved !== undefined ? tutorData.isApproved : true,
-        status: tutorData.status || (tutorData.isApproved !== false ? 'approved' : 'pending'),
-        bio: tutorData.bio || 'Dedicated academic tutor and subject mentor.',
-        education: tutorData.education,
-        experience: tutorData.experiences || tutorData.experience,
-        experiences: tutorData.experiences,
-        subjectExpertise: tutorData.subjectExpertise,
-        subjects: Array.isArray(tutorData.subjectExpertise) ? tutorData.subjectExpertise : (typeof tutorData.subjectExpertise === 'string' ? tutorData.subjectExpertise.split(',').map((s: string) => s.trim()) : ['General Academics']),
-        availabilities: tutorData.availabilities,
-        availability: tutorData.availabilities,
-        canMeet: tutorData.canMeet,
-        hobbies: tutorData.hobbies,
-        hourlyRate: tutorData.hourlyRate || 45,
-        country: tutorData.country || 'US',
-        phoneNumber: tutorData.phoneNumber,
-        location: tutorData.location,
-      };
-      this.users.unshift(fallbackTutor);
-      this.notify();
-      return true;
+    const res = await fetch('/api/tutors', {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(tutorData)
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      throw new Error(data.error || 'Failed to create tutor profile');
     }
+
+    const created = data.tutor || data.user;
+    if (created) {
+      const normalized: User = {
+        ...created,
+        role: UserRole.TUTOR,
+        subjects: typeof created.subjects === 'string' ? JSON.parse(created.subjects || '[]') : (created.subjects || []),
+        subjectExpertise: typeof created.subjectExpertise === 'string' ? JSON.parse(created.subjectExpertise || '[]') : (created.subjectExpertise || []),
+      };
+      const idx = this.users.findIndex(u => u.id === normalized.id || u.email.toLowerCase().trim() === normalized.email.toLowerCase().trim());
+      if (idx !== -1) {
+        this.users[idx] = { ...this.users[idx], ...normalized };
+      } else {
+        this.users.unshift(normalized);
+      }
+      this.notify();
+    }
+    return true;
   }
 
   async registerTutorFromModal(tutorData: any): Promise<boolean> {
@@ -756,30 +725,41 @@ export class AppStore {
     return this.updateUserProfile(userId, data);
   }
 
-  // Password reset methods
-  async requestPasswordReset(email: string): Promise<string | null> {
-    const user = this.users.find(u => u.email.toLowerCase().trim() === email.toLowerCase().trim());
-    if (!user) return null;
-    const token = Math.random().toString(36).substring(2, 8).toUpperCase();
-    user.resetToken = token;
-    this.notify();
-    return token;
-  }
-
-  async setResetToken(email: string, token: string): Promise<boolean> {
-    const user = this.users.find(u => u.email.toLowerCase().trim() === email.toLowerCase().trim());
-    if (user) {
-      user.resetToken = token;
-      this.notify();
-      return true;
+  // Password reset methods - connected strictly to server API endpoints (never receives or logs reset tokens)
+  async requestPasswordReset(email: string): Promise<boolean> {
+    const cleanEmail = email.toLowerCase().trim();
+    const res = await fetch('/api/auth/forgot-password', {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: cleanEmail })
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      throw new Error(data.error || 'Password reset request failed');
     }
-    return false;
+    return true;
   }
 
   async resetPassword(email: string, token: string, newPassword: string): Promise<boolean> {
-    const user = this.users.find(u => u.email.toLowerCase().trim() === email.toLowerCase().trim());
-    if (!user) return false;
-    user.resetToken = undefined;
+    const cleanEmail = email.toLowerCase().trim();
+    const res = await fetch('/api/auth/reset-password', {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: cleanEmail, token, newPassword })
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      throw new Error(data.error || 'Failed to reset password');
+    }
+    if (data.user) {
+      this.currentUser = data.user;
+      localStorage.setItem('ut_current_user', JSON.stringify(data.user));
+    }
+    if (data.token) {
+      localStorage.setItem('auth_token', data.token);
+    }
     this.notify();
     return true;
   }

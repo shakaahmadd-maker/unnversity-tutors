@@ -14,9 +14,16 @@ import {
   Compass,
   FileText,
   MessageCircle,
-  Users
+  Users,
+  Video,
+  Calendar
 } from 'lucide-react';
 import { User, UserRole } from '../types';
+import {
+  DEDICATED_SERVICE_ROUTES,
+  resolveDedicatedServiceRoute,
+  isModifiedAnchorClick,
+} from '../data/dedicatedServiceRoutes';
 
 interface HeaderProps {
   currentUser: User | null;
@@ -144,7 +151,12 @@ export default function Header({
                 onClick={() => setIsServicesDropdownOpen(!isServicesDropdownOpen)}
                 onMouseEnter={() => setIsServicesDropdownOpen(true)}
                 className={`text-sm font-semibold tracking-wide transition-colors cursor-pointer flex items-center gap-1 pb-1 ${
-                  activeView === 'services' || activeView === 'specialized-service' || activeView.startsWith('assignment-guidance') || activeView.startsWith('coursework-tutoring') || activeView.startsWith('writing-tutoring')
+                  activeView === 'services' ||
+                  Boolean(resolveDedicatedServiceRoute(activeView)) ||
+                  activeView === 'specialized-service' ||
+                  activeView.startsWith('assignment-guidance') ||
+                  activeView.startsWith('coursework-tutoring') ||
+                  activeView.startsWith('writing-tutoring')
                     ? 'text-orange-500 border-b-2 border-orange-500'
                     : 'text-gray-650 hover:text-orange-500'
                 }`}
@@ -156,56 +168,68 @@ export default function Header({
               {/* Dropdown Menu */}
               <div 
                 onMouseLeave={() => setIsServicesDropdownOpen(false)}
-                className={`absolute top-full left-0 mt-2 w-72 bg-white rounded-2xl shadow-xl border border-slate-200 p-2 z-50 transition-all ${
+                className={`absolute top-full left-0 mt-2 w-76 bg-white rounded-2xl shadow-xl border border-slate-200 p-2 z-50 transition-all ${
                   isServicesDropdownOpen ? 'opacity-100 visible translate-y-0' : 'opacity-0 invisible pointer-events-none -translate-y-2'
                 }`}
               >
                 <div className="p-1 space-y-1">
-                  <button
-                    onClick={() => handleLinkClick('services')}
-                    className="w-full text-left p-2.5 rounded-xl hover:bg-orange-50/70 transition-colors flex items-start gap-2.5 group cursor-pointer"
+                  <a
+                    href="/services"
+                    onClick={(e) => {
+                      if (!isModifiedAnchorClick(e)) {
+                        e.preventDefault();
+                        handleLinkClick('services');
+                      }
+                    }}
+                    className={`w-full text-left p-2.5 rounded-xl hover:bg-orange-50/70 transition-colors flex items-start gap-2.5 group cursor-pointer ${
+                      activeView === 'services' ? 'bg-orange-50/80' : ''
+                    }`}
                   >
-                    <BookOpen className="w-4 h-4 text-orange-500 mt-0.5" />
+                    <BookOpen className="w-4 h-4 text-orange-500 mt-0.5 shrink-0" />
                     <div>
-                      <div className="text-xs font-bold text-slate-900 group-hover:text-orange-600">All Tutoring Services</div>
-                      <div className="text-[10px] text-slate-500">Explore comprehensive 1-on-1 tutoring</div>
+                      <div className="text-xs font-bold text-slate-900 group-hover:text-orange-600">All Tutoring Services Hub</div>
+                      <div className="text-[10px] text-slate-500">Overview of all core academic services</div>
                     </div>
-                  </button>
+                  </a>
 
                   <div className="border-t border-slate-100 my-1"></div>
 
-                  <button
-                    onClick={() => handleLinkClick('assignment-guidance')}
-                    className="w-full text-left p-2.5 rounded-xl hover:bg-orange-50/70 transition-colors flex items-start gap-2.5 group cursor-pointer"
-                  >
-                    <FileCheck className="w-4 h-4 text-orange-500 mt-0.5" />
-                    <div>
-                      <div className="text-xs font-bold text-slate-900 group-hover:text-orange-600">Assignment Guidance</div>
-                      <div className="text-[10px] text-slate-500">Rubric analysis &amp; planning support</div>
-                    </div>
-                  </button>
-
-                  <button
-                    onClick={() => handleLinkClick('coursework-tutoring')}
-                    className="w-full text-left p-2.5 rounded-xl hover:bg-orange-50/70 transition-colors flex items-start gap-2.5 group cursor-pointer"
-                  >
-                    <Compass className="w-4 h-4 text-orange-500 mt-0.5" />
-                    <div>
-                      <div className="text-xs font-bold text-slate-900 group-hover:text-orange-600">Coursework Tutoring</div>
-                      <div className="text-[10px] text-slate-500">Continuous assessment &amp; STEM units</div>
-                    </div>
-                  </button>
-
-                  <button
-                    onClick={() => handleLinkClick('writing-tutoring')}
-                    className="w-full text-left p-2.5 rounded-xl hover:bg-orange-50/70 transition-colors flex items-start gap-2.5 group cursor-pointer"
-                  >
-                    <FileText className="w-4 h-4 text-orange-500 mt-0.5" />
-                    <div>
-                      <div className="text-xs font-bold text-slate-900 group-hover:text-orange-600">Writing Tutoring</div>
-                      <div className="text-[10px] text-slate-500">Academic essay &amp; research writing</div>
-                    </div>
-                  </button>
+                  {DEDICATED_SERVICE_ROUTES.map((route) => {
+                    const icon =
+                      route.id === '1on1' ? (
+                        <Video className="w-4 h-4 text-orange-500 mt-0.5 shrink-0" />
+                      ) : route.id === 'assignment' ? (
+                        <FileCheck className="w-4 h-4 text-orange-500 mt-0.5 shrink-0" />
+                      ) : route.id === 'coursework' ? (
+                        <Calendar className="w-4 h-4 text-orange-500 mt-0.5 shrink-0" />
+                      ) : (
+                        <FileText className="w-4 h-4 text-orange-500 mt-0.5 shrink-0" />
+                      );
+                    const isItemActive = activeView === route.view;
+                    return (
+                      <a
+                        key={route.id}
+                        href={route.path}
+                        onClick={(e) => {
+                          if (!isModifiedAnchorClick(e)) {
+                            e.preventDefault();
+                            handleLinkClick(route.view);
+                          }
+                        }}
+                        className={`w-full text-left p-2.5 rounded-xl hover:bg-orange-50/70 transition-colors flex items-start gap-2.5 group cursor-pointer ${
+                          isItemActive ? 'bg-orange-50/80 ring-1 ring-orange-200/70' : ''
+                        }`}
+                      >
+                        {icon}
+                        <div>
+                          <div className={`text-xs font-bold group-hover:text-orange-600 ${isItemActive ? 'text-orange-600' : 'text-slate-900'}`}>
+                            {route.label}
+                          </div>
+                          <div className="text-[10px] text-slate-500">{route.shortDesc}</div>
+                        </div>
+                      </a>
+                    );
+                  })}
                 </div>
               </div>
             </div>
@@ -320,37 +344,59 @@ export default function Header({
             {/* Specialized Services Mobile Accordion */}
             <div className="p-3 bg-slate-50 rounded-2xl border border-slate-200/80 space-y-2">
               <div className="text-xs font-bold text-slate-500 uppercase tracking-wider px-1">
-                Specialized Tutoring Hubs
+                Academic Services
               </div>
               <div className="grid grid-cols-1 gap-1">
-                <button
-                  onClick={() => handleLinkClick('services')}
-                  className="flex items-center gap-2 text-left text-xs font-bold text-slate-800 p-2 rounded-lg hover:bg-orange-50 hover:text-orange-600"
+                <a
+                  href="/services"
+                  onClick={(e) => {
+                    if (!isModifiedAnchorClick(e)) {
+                      e.preventDefault();
+                      handleLinkClick('services');
+                    }
+                  }}
+                  className={`flex items-center gap-2 text-left text-xs font-bold p-2 rounded-lg transition-colors ${
+                    activeView === 'services'
+                      ? 'bg-orange-50 text-orange-600'
+                      : 'text-slate-800 hover:bg-orange-50 hover:text-orange-600'
+                  }`}
                 >
-                  <BookOpen className="w-4 h-4 text-orange-500" />
-                  <span>All Tutoring Services</span>
-                </button>
-                <button
-                  onClick={() => handleLinkClick('assignment-guidance')}
-                  className="flex items-center gap-2 text-left text-xs font-bold text-slate-800 p-2 rounded-lg hover:bg-orange-50 hover:text-orange-600"
-                >
-                  <FileCheck className="w-4 h-4 text-orange-500" />
-                  <span>Assignment Guidance</span>
-                </button>
-                <button
-                  onClick={() => handleLinkClick('coursework-tutoring')}
-                  className="flex items-center gap-2 text-left text-xs font-bold text-slate-800 p-2 rounded-lg hover:bg-orange-50 hover:text-orange-600"
-                >
-                  <Compass className="w-4 h-4 text-orange-500" />
-                  <span>Coursework Tutoring</span>
-                </button>
-                <button
-                  onClick={() => handleLinkClick('writing-tutoring')}
-                  className="flex items-center gap-2 text-left text-xs font-bold text-slate-800 p-2 rounded-lg hover:bg-orange-50 hover:text-orange-600"
-                >
-                  <FileText className="w-4 h-4 text-orange-500" />
-                  <span>Writing Tutoring</span>
-                </button>
+                  <BookOpen className="w-4 h-4 text-orange-500 shrink-0" />
+                  <span>All Tutoring Services Hub</span>
+                </a>
+                {DEDICATED_SERVICE_ROUTES.map((route) => {
+                  const icon =
+                    route.id === '1on1' ? (
+                      <Video className="w-4 h-4 text-orange-500 shrink-0" />
+                    ) : route.id === 'assignment' ? (
+                      <FileCheck className="w-4 h-4 text-orange-500 shrink-0" />
+                    ) : route.id === 'coursework' ? (
+                      <Calendar className="w-4 h-4 text-orange-500 shrink-0" />
+                    ) : (
+                      <FileText className="w-4 h-4 text-orange-500 shrink-0" />
+                    );
+                  const isItemActive = activeView === route.view;
+                  return (
+                    <a
+                      key={route.id}
+                      href={route.path}
+                      onClick={(e) => {
+                        if (!isModifiedAnchorClick(e)) {
+                          e.preventDefault();
+                          handleLinkClick(route.view);
+                        }
+                      }}
+                      className={`flex items-center gap-2 text-left text-xs font-bold p-2 rounded-lg transition-colors ${
+                        isItemActive
+                          ? 'bg-orange-50 text-orange-600'
+                          : 'text-slate-800 hover:bg-orange-50 hover:text-orange-600'
+                      }`}
+                    >
+                      {icon}
+                      <span>{route.label}</span>
+                    </a>
+                  );
+                })}
               </div>
             </div>
 

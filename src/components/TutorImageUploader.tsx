@@ -74,14 +74,10 @@ export default function TutorImageUploader({
       }
 
       const token = localStorage.getItem('auth_token');
-      const currentUserId = store.currentUser?.id || localStorage.getItem('current_user_id');
       const headers: Record<string, string> = {};
       if (token) {
         headers['Authorization'] = `Bearer ${token}`;
         headers['X-Auth-Token'] = token;
-      }
-      if (currentUserId) {
-        headers['X-User-Id'] = currentUserId;
       }
 
       const res = await fetch('/api/admin/tutors/upload-avatar', {

@@ -40,6 +40,10 @@ import hero1on1Img from '../assets/images/hero_1on1_tutoring_1787387369345.jpg';
 import heroAssignmentImg from '../assets/images/hero_assignment_guidance_1787387387028.jpg';
 import heroCourseworkImg from '../assets/images/hero_coursework_tracks_1787387403661.jpg';
 import heroEssayImg from '../assets/images/hero_essay_rhetoric_1787387419893.jpg';
+import {
+  resolveDedicatedServiceRoute,
+  isModifiedAnchorClick,
+} from '../data/dedicatedServiceRoutes';
 
 interface MarketingPagesProps {
   activeView: string;
@@ -576,10 +580,11 @@ export default function MarketingPages({
   // Blog Details state
   const [selectedBlog, setSelectedBlog] = useState<Blog | null>(null);
 
-  // Clear selected blog or services when navigating to separate views
+  // Sync selected blog and dedicated service page with activeView URL state
   useEffect(() => {
     setSelectedBlog(null);
-    setSelectedServiceId(null);
+    const matchedDedicated = resolveDedicatedServiceRoute(activeView);
+    setSelectedServiceId(matchedDedicated ? matchedDedicated.id : null);
   }, [activeView]);
 
   // Sync state between sibling child views if lateral jump takes place
@@ -587,14 +592,19 @@ export default function MarketingPages({
     const handleServiceChange = (e: Event) => {
       const customEvent = e as CustomEvent<string>;
       if (customEvent.detail) {
-        setSelectedServiceId(customEvent.detail);
+        const route = resolveDedicatedServiceRoute(customEvent.detail);
+        if (route) {
+          onNavigate(route.view);
+        } else {
+          setSelectedServiceId(customEvent.detail);
+        }
       }
     };
     window.addEventListener('change-dedicated-service', handleServiceChange);
     return () => {
       window.removeEventListener('change-dedicated-service', handleServiceChange);
     };
-  }, []);
+  }, [onNavigate]);
 
   // Better browseability & search state for Blog Hub
   const [blogSearchQuery, setBlogSearchQuery] = useState('');
@@ -1092,8 +1102,94 @@ export default function MarketingPages({
             </div>
           </section>
 
-          {/* Trust University Bar */}
-          <section className="bg-gray-50 py-8 border-b border-gray-100 px-4">
+          {/* REDESIGNED SECTION: Auto-Scrolling University Slider (Mobile Only) */}
+          <div className="block sm:hidden py-4 bg-white border-t border-b border-slate-100 overflow-hidden">
+            {/* Section Header */}
+            <div className="text-center mb-3 px-4">
+              <span className="text-[9px] font-bold tracking-widest text-slate-400 uppercase block mb-0.5">
+                Global Academic Excellence
+              </span>
+              <h3 className="text-[11px] font-bold text-slate-800 tracking-tight leading-snug">
+                TRUSTED BY STUDENTS FROM LEADING UNIVERSITIES
+              </h3>
+            </div>
+
+            <div className="relative w-full overflow-hidden py-1">
+              {/* Gradient Fade Edges */}
+              <div className="absolute left-0 top-0 bottom-0 w-6 bg-gradient-to-r from-white to-transparent z-10 pointer-events-none"></div>
+              <div className="absolute right-0 top-0 bottom-0 w-6 bg-gradient-to-l from-white to-transparent z-10 pointer-events-none"></div>
+
+              {/* Scrolling Track (Duplicated items for infinite loop illusion) */}
+              <div className="animate-marquee space-x-2 px-2">
+                {[0, 1].map((dupIdx) => (
+                  <React.Fragment key={dupIdx}>
+                    <div className="shrink-0 w-36 py-2 px-3 rounded-xl bg-slate-50 border border-slate-100 flex items-center space-x-2.5 shadow-sm">
+                      <div className="w-7 h-7 shrink-0 rounded-lg bg-amber-100 text-amber-700 flex items-center justify-center text-sm">
+                        🏛️
+                      </div>
+                      <div className="min-w-0 text-left">
+                        <p className="text-[10px] font-bold text-slate-800 truncate leading-tight">Oxford</p>
+                        <p className="text-[8px] font-medium text-slate-400 truncate leading-tight">UK University</p>
+                      </div>
+                    </div>
+
+                    <div className="shrink-0 w-36 py-2 px-3 rounded-xl bg-slate-50 border border-slate-100 flex items-center space-x-2.5 shadow-sm">
+                      <div className="w-7 h-7 shrink-0 rounded-lg bg-rose-100 text-rose-700 flex items-center justify-center text-sm">
+                        🎓
+                      </div>
+                      <div className="min-w-0 text-left">
+                        <p className="text-[10px] font-bold text-slate-800 truncate leading-tight">Harvard</p>
+                        <p className="text-[8px] font-medium text-slate-400 truncate leading-tight">USA College</p>
+                      </div>
+                    </div>
+
+                    <div className="shrink-0 w-36 py-2 px-3 rounded-xl bg-slate-50 border border-slate-100 flex items-center space-x-2.5 shadow-sm">
+                      <div className="w-7 h-7 shrink-0 rounded-lg bg-blue-100 text-blue-700 flex items-center justify-center text-sm">
+                        🏫
+                      </div>
+                      <div className="min-w-0 text-left">
+                        <p className="text-[10px] font-bold text-slate-800 truncate leading-tight">Toronto</p>
+                        <p className="text-[8px] font-medium text-slate-400 truncate leading-tight">Canada</p>
+                      </div>
+                    </div>
+
+                    <div className="shrink-0 w-36 py-2 px-3 rounded-xl bg-slate-50 border border-slate-100 flex items-center space-x-2.5 shadow-sm">
+                      <div className="w-7 h-7 shrink-0 rounded-lg bg-emerald-100 text-emerald-700 flex items-center justify-center text-sm">
+                        🏛️
+                      </div>
+                      <div className="min-w-0 text-left">
+                        <p className="text-[10px] font-bold text-slate-800 truncate leading-tight">Sydney</p>
+                        <p className="text-[8px] font-medium text-slate-400 truncate leading-tight">Australia</p>
+                      </div>
+                    </div>
+
+                    <div className="shrink-0 w-36 py-2 px-3 rounded-xl bg-slate-50 border border-slate-100 flex items-center space-x-2.5 shadow-sm">
+                      <div className="w-7 h-7 shrink-0 rounded-lg bg-indigo-100 text-indigo-700 flex items-center justify-center text-sm">
+                        🏫
+                      </div>
+                      <div className="min-w-0 text-left">
+                        <p className="text-[10px] font-bold text-slate-800 truncate leading-tight">Dublin Trinity</p>
+                        <p className="text-[8px] font-medium text-slate-400 truncate leading-tight">Ireland</p>
+                      </div>
+                    </div>
+
+                    <div className="shrink-0 w-36 py-2 px-3 rounded-xl bg-slate-50 border border-slate-100 flex items-center space-x-2.5 shadow-sm">
+                      <div className="w-7 h-7 shrink-0 rounded-lg bg-teal-100 text-teal-700 flex items-center justify-center text-sm">
+                        🎓
+                      </div>
+                      <div className="min-w-0 text-left">
+                        <p className="text-[10px] font-bold text-slate-800 truncate leading-tight">Auckland</p>
+                        <p className="text-[8px] font-medium text-slate-400 truncate leading-tight">New Zealand</p>
+                      </div>
+                    </div>
+                  </React.Fragment>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* Trust University Bar (Desktop & Tablet) */}
+          <section className="hidden sm:block bg-gray-50 py-8 border-b border-gray-100 px-4">
             <div className="container mx-auto max-w-7xl text-center">
               <span className="text-[10px] font-bold text-gray-450 uppercase tracking-widest block mb-4">
                 Trusted by high-achieving students from the world's leading universities
@@ -1136,12 +1232,16 @@ export default function MarketingPages({
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5 sm:gap-6 text-left">
                 
                 {/* Card 1: 1-on-1 Live Tutoring */}
-                <div 
+                <a 
                   id="pillar-card-0"
+                  href="/services/1-on-1-live-tutoring"
                   className="group relative bg-white border border-slate-200/90 hover:border-orange-300 rounded-2xl sm:rounded-3xl p-4 sm:p-6 flex flex-col justify-between shadow-xs hover:shadow-xl sm:hover:-translate-y-1 transition-all duration-300 cursor-pointer overflow-hidden select-none active:scale-[0.99] sm:active:scale-100"
-                  onClick={() => {
-                    setActiveServiceTab(0);
-                    onNavigate('services');
+                  onClick={(e) => {
+                    if (!isModifiedAnchorClick(e)) {
+                      e.preventDefault();
+                      setActiveServiceTab(0);
+                      onNavigate('service-1on1');
+                    }
                   }}
                 >
                   <div>
@@ -1250,15 +1350,19 @@ export default function MarketingPages({
                       <ArrowRight className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
                     </div>
                   </div>
-                </div>
+                </a>
 
                 {/* Card 2: Assignment Tutoring */}
-                <div 
+                <a 
                   id="pillar-card-1"
+                  href="/services/assignment-guidance"
                   className="group relative bg-white border border-slate-200/90 hover:border-orange-300 rounded-2xl sm:rounded-3xl p-4 sm:p-6 flex flex-col justify-between shadow-xs hover:shadow-xl sm:hover:-translate-y-1 transition-all duration-300 cursor-pointer overflow-hidden select-none active:scale-[0.99] sm:active:scale-100"
-                  onClick={() => {
-                    setActiveServiceTab(1);
-                    onNavigate('services');
+                  onClick={(e) => {
+                    if (!isModifiedAnchorClick(e)) {
+                      e.preventDefault();
+                      setActiveServiceTab(1);
+                      onNavigate('service-assignment');
+                    }
                   }}
                 >
                   <div>
@@ -1356,15 +1460,19 @@ export default function MarketingPages({
                       <ArrowRight className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
                     </div>
                   </div>
-                </div>
+                </a>
 
                 {/* Card 3: Coursework Tutoring */}
-                <div 
+                <a 
                   id="pillar-card-2"
+                  href="/services/coursework-track"
                   className="group relative bg-white border border-slate-200/90 hover:border-orange-300 rounded-2xl sm:rounded-3xl p-4 sm:p-6 flex flex-col justify-between shadow-xs hover:shadow-xl sm:hover:-translate-y-1 transition-all duration-300 cursor-pointer overflow-hidden select-none active:scale-[0.99] sm:active:scale-100"
-                  onClick={() => {
-                    setActiveServiceTab(2);
-                    onNavigate('services');
+                  onClick={(e) => {
+                    if (!isModifiedAnchorClick(e)) {
+                      e.preventDefault();
+                      setActiveServiceTab(2);
+                      onNavigate('service-coursework');
+                    }
                   }}
                 >
                   <div>
@@ -1460,15 +1568,19 @@ export default function MarketingPages({
                       <ArrowRight className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
                     </div>
                   </div>
-                </div>
+                </a>
 
                 {/* Card 4: Academic Writing Coach */}
-                <div 
+                <a 
                   id="pillar-card-3"
+                  href="/services/essay-reference-checks"
                   className="group relative bg-white border border-slate-200/90 hover:border-orange-300 rounded-2xl sm:rounded-3xl p-4 sm:p-6 flex flex-col justify-between shadow-xs hover:shadow-xl sm:hover:-translate-y-1 transition-all duration-300 cursor-pointer overflow-hidden select-none active:scale-[0.99] sm:active:scale-100"
-                  onClick={() => {
-                    setActiveServiceTab(3);
-                    onNavigate('services');
+                  onClick={(e) => {
+                    if (!isModifiedAnchorClick(e)) {
+                      e.preventDefault();
+                      setActiveServiceTab(3);
+                      onNavigate('service-essay');
+                    }
                   }}
                 >
                   <div>
@@ -1566,7 +1678,7 @@ export default function MarketingPages({
                       <ArrowRight className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
                     </div>
                   </div>
-                </div>
+                </a>
 
               </div>
             </div>
@@ -1640,8 +1752,20 @@ export default function MarketingPages({
                   In today's competitive academic landscape, students face immense pressure to maintain high grades while balancing tight schedules, making professional educational support a necessity rather than a luxury. Opting for online 1 on 1 tutoring offers a customized learning experience where a dedicated mentor identifies specific knowledge gaps, simplifies complex theories, and provides targeted feedback. Instead of getting lost in a crowded lecture hall, students can easily hire expert tutor for university levels to focus entirely on their weak areas. This personalized online tutoring ensures that an individual's unique learning style is accommodated, dramatically accelerating their comprehension, boosting their confidence, and driving rapid academic growth.
                 </p>
 
-                {/* Bottom Action Link */}
-                <div className="flex items-center justify-end pt-2 border-t border-slate-100">
+                {/* Bottom Action Links */}
+                <div className="flex items-center justify-between gap-2 pt-2 border-t border-slate-100">
+                  <a
+                    href="/services/1-on-1-live-tutoring"
+                    onClick={(e) => {
+                      if (!isModifiedAnchorClick(e)) {
+                        e.preventDefault();
+                        onNavigate('service-1on1');
+                      }
+                    }}
+                    className="text-xs font-bold text-slate-700 hover:text-orange-600 hover:underline py-1 px-1.5 transition cursor-pointer"
+                  >
+                    Explore Service Page &rarr;
+                  </a>
                   <button 
                     onClick={() => setPillarBookingService('1. Personalized 1-1 Tutoring Services')} 
                     className="text-xs font-bold text-orange-600 inline-flex items-center gap-1 py-1 px-2 rounded-lg hover:bg-orange-50 active:scale-95 transition cursor-pointer">
@@ -1682,8 +1806,20 @@ export default function MarketingPages({
                   When it comes to managing the heavy influx of continuous assessments, utilizing expert assignment tutoring transforms overwhelming homework into manageable, stress-free milestones. Many students find themselves searching for reliable university tutoring support when deadlines loom close and instructions are ambiguous. Working with a dedicated specialist allows students to break down intricate prompts, organize their foundational research, and develop the skills needed to meet strict rubric standards. This structured guidance not only prevents stress but also teaches students how to approach complex problem-solving independently.
                 </p>
 
-                {/* Bottom Action Link */}
-                <div className="flex items-center justify-end pt-2 border-t border-slate-100">
+                {/* Bottom Action Links */}
+                <div className="flex items-center justify-between gap-2 pt-2 border-t border-slate-100">
+                  <a
+                    href="/services/assignment-guidance"
+                    onClick={(e) => {
+                      if (!isModifiedAnchorClick(e)) {
+                        e.preventDefault();
+                        onNavigate('service-assignment');
+                      }
+                    }}
+                    className="text-xs font-bold text-slate-700 hover:text-orange-600 hover:underline py-1 px-1.5 transition cursor-pointer"
+                  >
+                    Explore Service Page &rarr;
+                  </a>
                   <button 
                     onClick={() => setPillarBookingService('2. Professional Assignment Tutoring & Guidance')} 
                     className="text-xs font-bold text-orange-600 inline-flex items-center gap-1 py-1 px-2 rounded-lg hover:bg-orange-50 active:scale-95 transition cursor-pointer">
@@ -1724,8 +1860,20 @@ export default function MarketingPages({
                   Beyond standard homework, managing extensive, multi-phase projects requires specialized university coursework tutoring. This long-term academic support is invaluable for helping students maintain consistency across deep-dive modules, laboratory reports, and major term papers. Professional mentors guide them through the critical phases of outlining, analyzing data, and synthesizing findings, ensuring their final output is cohesive and academically rigorous. Investing in long-term coursework assistance ensures that major, high-stakes academic projects stay on track from week one all the way to final submission.
                 </p>
 
-                {/* Bottom Action Link */}
-                <div className="flex items-center justify-end pt-2 border-t border-slate-100">
+                {/* Bottom Action Links */}
+                <div className="flex items-center justify-between gap-2 pt-2 border-t border-slate-100">
+                  <a
+                    href="/services/coursework-track"
+                    onClick={(e) => {
+                      if (!isModifiedAnchorClick(e)) {
+                        e.preventDefault();
+                        onNavigate('service-coursework');
+                      }
+                    }}
+                    className="text-xs font-bold text-slate-700 hover:text-orange-600 hover:underline py-1 px-1.5 transition cursor-pointer"
+                  >
+                    Explore Service Page &rarr;
+                  </a>
                   <button 
                     onClick={() => setPillarBookingService('3. Comprehensive Coursework Tutoring')} 
                     className="text-xs font-bold text-orange-600 inline-flex items-center gap-1 py-1 px-2 rounded-lg hover:bg-orange-50 active:scale-95 transition cursor-pointer">
@@ -1766,8 +1914,20 @@ export default function MarketingPages({
                   Mastering the mechanics of scholarly prose can be incredibly challenging, which is why integrated professional academic writing coaching is crucial for modern students. Expert assistance in this area helps students refine their arguments, eliminate structural ambiguity, and master complex citation styles like APA, Harvard, or MLA. Whether a student needs help editing and proofreading university essays or requires guidance on scholarly essay structuring, learning how to articulate thoughts clearly and professionally is vital. By refining their written communication, students don't just secure academic clarity—they build essential skills that prepare them for future career success.
                 </p>
 
-                {/* Bottom Action Link */}
-                <div className="flex items-center justify-end pt-2 border-t border-slate-100">
+                {/* Bottom Action Links */}
+                <div className="flex items-center justify-between gap-2 pt-2 border-t border-slate-100">
+                  <a
+                    href="/services/essay-reference-checks"
+                    onClick={(e) => {
+                      if (!isModifiedAnchorClick(e)) {
+                        e.preventDefault();
+                        onNavigate('service-essay');
+                      }
+                    }}
+                    className="text-xs font-bold text-slate-700 hover:text-orange-600 hover:underline py-1 px-1.5 transition cursor-pointer"
+                  >
+                    Explore Service Page &rarr;
+                  </a>
                   <button 
                     onClick={() => setPillarBookingService('4. Expert Academic Writing Consultation')} 
                     className="text-xs font-bold text-orange-600 inline-flex items-center gap-1 py-1 px-2 rounded-lg hover:bg-orange-50 active:scale-95 transition cursor-pointer">
@@ -1807,7 +1967,20 @@ export default function MarketingPages({
                   <p className="text-neutral-600 text-sm md:text-base leading-relaxed font-normal text-justify mb-6">
                     In today’s competitive academic landscape, students face immense pressure to maintain high grades while balancing tight schedules, making professional educational support a necessity rather than a luxury. Opting for online 1 on 1 tutoring offers a customized learning experience where a dedicated mentor identifies specific knowledge gaps, simplifies complex theories, and provides targeted feedback. Instead of getting lost in a crowded lecture hall, students can easily hire expert tutor for university levels to focus entirely on their weak areas. This personalized online tutoring ensures that an individual's unique learning style is accommodated, dramatically accelerating their comprehension, boosting their confidence, and driving rapid academic growth.
                   </p>
-                  <div>
+                  <div className="flex flex-wrap items-center gap-3">
+                    <a
+                      href="/services/1-on-1-live-tutoring"
+                      onClick={(e) => {
+                        if (!isModifiedAnchorClick(e)) {
+                          e.preventDefault();
+                          onNavigate('service-1on1');
+                        }
+                      }}
+                      className="inline-flex items-center gap-2 text-xs font-bold text-white bg-slate-900 hover:bg-orange-600 py-2.5 px-4 rounded-xl transition cursor-pointer"
+                    >
+                      <span>Explore 1-on-1 Tutoring Page</span>
+                      <ArrowRight className="w-4 h-4" />
+                    </a>
                     <button 
                       onClick={() => setPillarBookingService('1. Personalized 1-1 Tutoring Services')}
                       className="inline-flex items-center gap-2 text-xs font-bold text-orange-600 hover:text-orange-700 bg-orange-50 hover:bg-orange-100 py-2.5 px-4 rounded-xl transition cursor-pointer"
@@ -1833,7 +2006,20 @@ export default function MarketingPages({
                   <p className="text-neutral-600 text-sm md:text-base leading-relaxed font-normal text-justify mb-6">
                     When it comes to managing the heavy influx of continuous assessments, utilizing expert assignment tutoring transforms overwhelming homework into manageable, stress-free milestones. Many students find themselves searching for reliable university tutoring support when deadlines loom close and instructions are ambiguous. Working with a dedicated specialist allows students to break down intricate prompts, organize their foundational research, and develop the skills needed to meet strict rubric standards. This structured guidance not only prevents stress but also teaches students how to approach complex problem-solving independently.
                   </p>
-                  <div>
+                  <div className="flex flex-wrap items-center gap-3">
+                    <a
+                      href="/services/assignment-guidance"
+                      onClick={(e) => {
+                        if (!isModifiedAnchorClick(e)) {
+                          e.preventDefault();
+                          onNavigate('service-assignment');
+                        }
+                      }}
+                      className="inline-flex items-center gap-2 text-xs font-bold text-white bg-slate-900 hover:bg-orange-600 py-2.5 px-4 rounded-xl transition cursor-pointer"
+                    >
+                      <span>Explore Assignment Guidance Page</span>
+                      <ArrowRight className="w-4 h-4" />
+                    </a>
                     <button 
                       onClick={() => setPillarBookingService('2. Professional Assignment Tutoring & Guidance')}
                       className="inline-flex items-center gap-2 text-xs font-bold text-orange-600 hover:text-orange-700 bg-orange-50 hover:bg-orange-100 py-2.5 px-4 rounded-xl transition cursor-pointer"
@@ -1877,7 +2063,20 @@ export default function MarketingPages({
                   <p className="text-neutral-600 text-sm md:text-base leading-relaxed font-normal text-justify mb-6">
                     Beyond standard homework, managing extensive, multi-phase projects requires specialized university coursework tutoring. This long-term academic support is invaluable for helping students maintain consistency across deep-dive modules, laboratory reports, and major term papers. Professional mentors guide them through the critical phases of outlining, analyzing data, and synthesizing findings, ensuring their final output is cohesive and academically rigorous. Investing in long-term coursework assistance ensures that major, high-stakes academic projects stay on track from week one all the way to final submission.
                   </p>
-                  <div>
+                  <div className="flex flex-wrap items-center gap-3">
+                    <a
+                      href="/services/coursework-track"
+                      onClick={(e) => {
+                        if (!isModifiedAnchorClick(e)) {
+                          e.preventDefault();
+                          onNavigate('service-coursework');
+                        }
+                      }}
+                      className="inline-flex items-center gap-2 text-xs font-bold text-white bg-slate-900 hover:bg-orange-600 py-2.5 px-4 rounded-xl transition cursor-pointer"
+                    >
+                      <span>Explore Coursework Track Page</span>
+                      <ArrowRight className="w-4 h-4" />
+                    </a>
                     <button 
                       onClick={() => setPillarBookingService('3. Comprehensive Coursework Tutoring')}
                       className="inline-flex items-center gap-2 text-xs font-bold text-orange-600 hover:text-orange-700 bg-orange-50 hover:bg-orange-100 py-2.5 px-4 rounded-xl transition cursor-pointer"
@@ -1903,7 +2102,20 @@ export default function MarketingPages({
                   <p className="text-neutral-600 text-sm md:text-base leading-relaxed font-normal text-justify mb-6">
                     Mastering the mechanics of scholarly prose can be incredibly challenging, which is why integrated professional academic writing coaching is crucial for modern students. Expert assistance in this area helps students refine their arguments, eliminate structural ambiguity, and master complex citation styles like APA, Harvard, or MLA. Whether a student needs help editing and proofreading university essays or requires guidance on scholarly essay structuring, learning how to articulate thoughts clearly and professionally is vital. By refining their written communication, students don't just secure academic clarity—they build essential skills that prepare them for future career success.
                   </p>
-                  <div>
+                  <div className="flex flex-wrap items-center gap-3">
+                    <a
+                      href="/services/essay-reference-checks"
+                      onClick={(e) => {
+                        if (!isModifiedAnchorClick(e)) {
+                          e.preventDefault();
+                          onNavigate('service-essay');
+                        }
+                      }}
+                      className="inline-flex items-center gap-2 text-xs font-bold text-white bg-slate-900 hover:bg-orange-600 py-2.5 px-4 rounded-xl transition cursor-pointer"
+                    >
+                      <span>Explore Essay &amp; Citations Page</span>
+                      <ArrowRight className="w-4 h-4" />
+                    </a>
                     <button 
                       onClick={() => setPillarBookingService('4. Expert Academic Writing Consultation')}
                       className="inline-flex items-center gap-2 text-xs font-bold text-orange-600 hover:text-orange-700 bg-orange-50 hover:bg-orange-100 py-2.5 px-4 rounded-xl transition cursor-pointer"
@@ -2750,7 +2962,7 @@ export default function MarketingPages({
       )}
 
       {/* ==================== 3. SERVICES HUB & DEDICATED PAGES ==================== */}
-      {activeView === 'services' && (
+      {(activeView === 'services' || Boolean(resolveDedicatedServiceRoute(activeView))) && (
         <section id="services-section" className="py-12 md:py-20 container mx-auto px-4 md:px-8 max-w-7xl text-left animate-fade-in">
           
           {selectedServiceId === null ? (
@@ -2867,16 +3079,19 @@ export default function MarketingPages({
                   </div>
                   <div className="pt-6 mt-6 border-t border-gray-100 flex items-center justify-between font-semibold">
                     <span className="text-xs font-bold text-orange-600">Case-by-case Escrow Quotes</span>
-                    <button
-                      onClick={() => {
-                        setSelectedServiceId('1on1');
-                        window.scrollTo({ top: 300, behavior: 'smooth' });
+                    <a
+                      href="/services/1-on-1-live-tutoring"
+                      onClick={(e) => {
+                        if (!isModifiedAnchorClick(e)) {
+                          e.preventDefault();
+                          onNavigate('service-1on1');
+                        }
                       }}
                       className="bg-orange-500 hover:bg-orange-600 text-white font-bold text-xs px-5 py-2.5 rounded-xl cursor-pointer flex items-center gap-1.5 transition-all"
                     >
                       <span>Explore Dedicated Page</span>
                       <ArrowRight className="w-3.5 h-3.5" />
-                    </button>
+                    </a>
                   </div>
                 </div>
 
@@ -2916,16 +3131,19 @@ export default function MarketingPages({
                   </div>
                   <div className="pt-6 mt-6 border-t border-gray-100 flex items-center justify-between font-semibold">
                     <span className="text-xs font-bold text-orange-655 font-bold">Emergency Vetting Available</span>
-                    <button
-                      onClick={() => {
-                        setSelectedServiceId('assignment');
-                        window.scrollTo({ top: 300, behavior: 'smooth' });
+                    <a
+                      href="/services/assignment-guidance"
+                      onClick={(e) => {
+                        if (!isModifiedAnchorClick(e)) {
+                          e.preventDefault();
+                          onNavigate('service-assignment');
+                        }
                       }}
                       className="bg-orange-500 hover:bg-orange-600 text-white font-bold text-xs px-5 py-2.5 rounded-xl cursor-pointer flex items-center gap-1.5 transition-all"
                     >
                       <span>Explore Dedicated Page</span>
                       <ArrowRight className="w-3.5 h-3.5" />
-                    </button>
+                    </a>
                   </div>
                 </div>
 
@@ -2965,16 +3183,19 @@ export default function MarketingPages({
                   </div>
                   <div className="pt-6 mt-6 border-t border-gray-100 flex items-center justify-between font-semibold">
                     <span className="text-xs font-bold text-orange-655 font-bold">Syllabus-Mapped Planner</span>
-                    <button
-                      onClick={() => {
-                        setSelectedServiceId('coursework');
-                        window.scrollTo({ top: 300, behavior: 'smooth' });
+                    <a
+                      href="/services/coursework-track"
+                      onClick={(e) => {
+                        if (!isModifiedAnchorClick(e)) {
+                          e.preventDefault();
+                          onNavigate('service-coursework');
+                        }
                       }}
                       className="bg-orange-500 hover:bg-orange-600 text-white font-bold text-xs px-5 py-2.5 rounded-xl cursor-pointer flex items-center gap-1.5 transition-all"
                     >
                       <span>Explore Dedicated Page</span>
                       <ArrowRight className="w-3.5 h-3.5" />
-                    </button>
+                    </a>
                   </div>
                 </div>
 
@@ -3014,16 +3235,19 @@ export default function MarketingPages({
                   </div>
                   <div className="pt-6 mt-6 border-t border-gray-100 flex items-center justify-between font-semibold font-semibold">
                     <span className="text-xs font-bold text-orange-655">APA, MLA, Harvard, Chicago</span>
-                    <button
-                      onClick={() => {
-                        setSelectedServiceId('essay');
-                        window.scrollTo({ top: 300, behavior: 'smooth' });
+                    <a
+                      href="/services/essay-reference-checks"
+                      onClick={(e) => {
+                        if (!isModifiedAnchorClick(e)) {
+                          e.preventDefault();
+                          onNavigate('service-essay');
+                        }
                       }}
                       className="bg-orange-500 hover:bg-orange-600 text-white font-bold text-xs px-5 py-2.5 rounded-xl cursor-pointer flex items-center gap-1.5 transition-all"
                     >
                       <span>Explore Dedicated Page</span>
                       <ArrowRight className="w-3.5 h-3.5" />
-                    </button>
+                    </a>
                   </div>
                 </div>
 
@@ -3051,8 +3275,7 @@ export default function MarketingPages({
                 onTutorSelect={onTutorSelect}
                 onNavigate={onNavigate}
                 onBackToHub={() => {
-                  setSelectedServiceId(null);
-                  window.scrollTo({ top: 300, behavior: 'smooth' });
+                  onNavigate('services');
                 }}
               />
             </React.Suspense>

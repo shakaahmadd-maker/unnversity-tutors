@@ -11,6 +11,7 @@ import {
   Shield
 } from 'lucide-react';
 import FooterLocationsSubjects from './FooterLocationsSubjects';
+import { isModifiedAnchorClick } from '../data/dedicatedServiceRoutes';
 
 interface FooterProps {
   onNavigate: (view: string) => void;
@@ -22,16 +23,16 @@ export default function Footer({ onNavigate, onOpenBecomeTutor }: FooterProps) {
 
   // Compliant SEO keywords strictly aligned with Google Ads and Academic Integrity Policies
   const seoKeywords = [
-    { text: 'find university tutors online', href: '#services' },
-    { text: 'prepare for final exam questions', href: '#services' },
-    { text: 'academic essay structure help', href: '#services' },
-    { text: 'urgent academic tutoring help', href: '#services' },
-    { text: 'online study guide assistance', href: '#services' },
-    { text: 'professional coursework mentoring', href: '#services' },
-    { text: 'dissertation format review', href: '#services' },
-    { text: 'grammar and citation proofreading', href: '#services' },
-    { text: 'math derivation step-by-step coaching', href: '#services' },
-    { text: 'guided software project tutor', href: '#services' }
+    { text: 'find university tutors online', href: '/tutors', view: 'tutors' },
+    { text: 'prepare for final exam questions', href: '/services/coursework-track', view: 'service-coursework' },
+    { text: 'academic essay structure help', href: '/services/essay-reference-checks', view: 'service-essay' },
+    { text: 'urgent academic tutoring help', href: '/services/1-on-1-live-tutoring', view: 'service-1on1' },
+    { text: 'online study guide assistance', href: '/services/assignment-guidance', view: 'service-assignment' },
+    { text: 'professional coursework mentoring', href: '/services/coursework-track', view: 'service-coursework' },
+    { text: 'dissertation format review', href: '/services/essay-reference-checks', view: 'service-essay' },
+    { text: 'grammar and citation proofreading', href: '/services/essay-reference-checks', view: 'service-essay' },
+    { text: 'math derivation step-by-step coaching', href: '/services/1-on-1-live-tutoring', view: 'service-1on1' },
+    { text: 'guided software project tutor', href: '/services/assignment-guidance', view: 'service-assignment' }
   ];
   return (
     <footer className="bg-[#ffeedd] border-t-2 border-[#ffab85] text-[#542104] font-sans" id="main-footer">
@@ -92,30 +93,46 @@ export default function Footer({ onNavigate, onOpenBecomeTutor }: FooterProps) {
           {/* Quick Nav Links */}
           <div className="space-y-4">
             <h4 className="text-xs font-display font-bold text-[#331301] uppercase tracking-widest pb-1 border-b border-[#ffab85]/60 mb-2">Academic Portals</h4>
-            <ul className="text-xs space-y-3 font-semibold">
+            <ul className="text-xs space-y-2.5 font-semibold">
               {[
-                { name: 'University Subjects', view: 'services' },
-                { name: 'WhatsApp Academic Hotline', view: 'whatsapp' },
-                { name: '1-on-1 Online Mentorship', view: 'services' },
-                { name: 'Assignment Prep & Tutoring', view: 'services' },
+                { name: 'All Tutoring Services Hub', view: 'services', href: '/services' },
+                { name: '1-on-1 Live Tutoring', view: 'service-1on1', href: '/services/1-on-1-live-tutoring' },
+                { name: 'Assignment Guidance', view: 'service-assignment', href: '/services/assignment-guidance' },
+                { name: 'Coursework Track', view: 'service-coursework', href: '/services/coursework-track' },
+                { name: 'Essay & Reference Checks', view: 'service-essay', href: '/services/essay-reference-checks' },
+                { name: 'WhatsApp Academic Hotline', view: 'whatsapp', href: '/whatsapp' },
                 { name: 'Become a Tutor (Apply Now)', action: 'become-tutor' },
-                { name: 'About Founding Team', view: 'about' },
-                { name: 'Knowledge Center (Blog)', view: 'blog' },
+                { name: 'About Founding Team', view: 'about', href: '/about-us' },
+                { name: 'Knowledge Center (Blog)', view: 'blog', href: '/our-blog' },
               ].map((link, idx) => (
                 <li key={idx}>
-                  <button 
-                    id={`footer-nav-link-${idx}`}
-                    onClick={() => {
-                      if (link.action === 'become-tutor' && onOpenBecomeTutor) {
-                        onOpenBecomeTutor();
-                      } else if (link.view) {
-                        onNavigate(link.view);
-                      }
-                    }} 
-                    className="hover:text-orange-700 hover:translate-x-1.5 transition-all text-left cursor-pointer text-[#542104] hover:font-bold"
-                  >
-                    {link.name}
-                  </button>
+                  {link.href ? (
+                    <a
+                      id={`footer-nav-link-${idx}`}
+                      href={link.href}
+                      onClick={(e) => {
+                        if (!isModifiedAnchorClick(e)) {
+                          e.preventDefault();
+                          if (link.view) onNavigate(link.view);
+                        }
+                      }}
+                      className="inline-block hover:text-orange-700 hover:translate-x-1.5 transition-all text-left cursor-pointer text-[#542104] hover:font-bold"
+                    >
+                      {link.name}
+                    </a>
+                  ) : (
+                    <button 
+                      id={`footer-nav-link-${idx}`}
+                      onClick={() => {
+                        if (link.action === 'become-tutor' && onOpenBecomeTutor) {
+                          onOpenBecomeTutor();
+                        }
+                      }} 
+                      className="hover:text-orange-700 hover:translate-x-1.5 transition-all text-left cursor-pointer text-[#542104] hover:font-bold"
+                    >
+                      {link.name}
+                    </button>
+                  )}
                 </li>
               ))}
             </ul>
@@ -178,8 +195,10 @@ export default function Footer({ onNavigate, onOpenBecomeTutor }: FooterProps) {
                 id={`seo-keyword-${idx}`}
                 href={kw.href}
                 onClick={(e) => {
-                  e.preventDefault();
-                  onNavigate('services');
+                  if (!isModifiedAnchorClick(e)) {
+                    e.preventDefault();
+                    onNavigate(kw.view);
+                  }
                 }}
                 rel="nofollow"
                 className="text-[#542104]/80 hover:text-orange-700 hover:bg-[#ffece1] hover:border-[#ffab85] transition-all duration-200 cursor-pointer block border border-[#ffab85]/35 px-3 py-1 rounded-lg bg-[#fffbf7]"

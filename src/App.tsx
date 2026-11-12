@@ -27,6 +27,7 @@ import ChatNotificationToast from './components/ChatNotificationToast';
 import { audioNotifier, ToastNotification } from './utils/audioNotification';
 import { COUNTRY_ONLINE_TUTORING_PAGES } from './data/countryOnlineTutoringData';
 import { SPECIALIZED_SERVICE_PAGES_MAP } from './data/specializedTutoringServicesData';
+import { resolveDedicatedServiceRoute } from './data/dedicatedServiceRoutes';
 import { updatePageSeo } from './utils/seo';
 
 import { store } from './lib/store';
@@ -155,6 +156,11 @@ export default function App() {
         description = sPage.summary || description;
         canonicalPath = `/${activeSpecializedServiceSlug}`;
       }
+    } else if (resolveDedicatedServiceRoute(activeView)) {
+      const dService = resolveDedicatedServiceRoute(activeView)!;
+      title = dService.seoTitle;
+      description = dService.seoDescription;
+      canonicalPath = dService.path;
     } else if (activeView === 'services') {
       title = 'Academic Tutoring Services - University Tutors';
       canonicalPath = '/services';
@@ -307,6 +313,16 @@ export default function App() {
       setSelectedTutorProfile(null);
       setActiveView('country-online-tutoring');
       path = '/' + view;
+      window.history.pushState(null, '', path);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
+
+    const dedicatedService = resolveDedicatedServiceRoute(view);
+    if (dedicatedService) {
+      setSelectedTutorProfile(null);
+      setActiveView(dedicatedService.view);
+      path = dedicatedService.path;
       window.history.pushState(null, '', path);
       window.scrollTo({ top: 0, behavior: 'smooth' });
       return;
@@ -472,7 +488,12 @@ export default function App() {
         hash === '#get a quote'
       ) {
         setActiveView('get-a-quote');
+      } else if (resolveDedicatedServiceRoute(decodedPath) || resolveDedicatedServiceRoute(hash)) {
+        const matchedService = (resolveDedicatedServiceRoute(decodedPath) || resolveDedicatedServiceRoute(hash))!;
+        setSelectedTutorProfile(null);
+        setActiveView(matchedService.view);
       } else if (decodedPath === '/services' || hash === '#services') {
+        setSelectedTutorProfile(null);
         setActiveView('services');
       } else if (
         decodedPath === '/student' || hash === '#student' ||

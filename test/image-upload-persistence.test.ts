@@ -1,11 +1,13 @@
+import crypto from 'crypto';
 import fs from 'fs';
 import path from 'path';
-import { db, isDbConnected } from '../src/db/index';
+import { db, isDbConnected, checkDbConnection } from '../src/db/index';
 import { tutors, users } from '../src/db/schema';
 import { eq } from 'drizzle-orm';
 
 const BASE_URL = process.env.TEST_APP_URL || 'http://localhost:3000';
 const UPLOADS_DIR = process.env.UPLOADS_DIR || '/app/uploads';
+const PERSISTED_UPDATES_FILE = path.join(UPLOADS_DIR, 'persisted_user_updates.json');
 
 function getHeaders(token?: string, extra: Record<string, string> = {}) {
   const headers: Record<string, string> = { ...extra };
@@ -17,21 +19,16 @@ function getHeaders(token?: string, extra: Record<string, string> = {}) {
 }
 
 async function registerTestUser(name: string, role: string, suffix: string): Promise<{ token: string; user: any; extraHeaders: Record<string, string> }> {
-  if (role === 'admin') {
-    return {
-      token: 'admin_session_token',
-      user: { id: 'admin_shaka', role: 'admin', email: 'shaka.ahmadd@gmail.com', name: 'Shaka Ahmad' },
-      extraHeaders: { 'X-User-Id': 'admin_shaka' }
-    };
-  }
+  await checkDbConnection();
   const email = `test_${role}_${suffix}_${Date.now()}@testplatform.com`;
+  const runtimePassword = `${crypto.randomBytes(16).toString('base64url')}!9Aa`;
   const res = await fetch(`${BASE_URL}/api/auth/register`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       name,
       email,
-      password: 'AdminPassword123!',
+      password: runtimePassword,
       role,
     }),
   });
@@ -39,7 +36,32 @@ async function registerTestUser(name: string, role: string, suffix: string): Pro
   if (!res.ok) {
     throw new Error(`Failed to register test user ${email}: ${data.error}`);
   }
-  return { token: data.token, user: data.user, extraHeaders: {} };
+
+  if (role === 'student') {
+    return { token: data.token, user: data.user, extraHeaders: {} };
+  }
+
+  if (isDbConnected() && db) {
+    await db.update(users).set({ role }).where(eq(users.id, data.user.id));
+  }
+  const dir = path.dirname(PERSISTED_UPDATES_FILE);
+  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+  const current = fs.existsSync(PERSISTED_UPDATES_FILE)
+    ? JSON.parse(fs.readFileSync(PERSISTED_UPDATES_FILE, 'utf-8'))
+    : {};
+  current[data.user.id] = { ...(current[data.user.id] || {}), role, updatedAt: new Date().toISOString() };
+  fs.writeFileSync(PERSISTED_UPDATES_FILE, JSON.stringify(current, null, 2), 'utf-8');
+
+  const loginRes = await fetch(`${BASE_URL}/api/auth/login`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email, password: runtimePassword }),
+  });
+  const loginData = await loginRes.json();
+  if (!loginRes.ok) {
+    throw new Error(`Failed to login elevated user ${email}: ${loginData.error}`);
+  }
+  return { token: loginData.token, user: loginData.user, extraHeaders: {} };
 }
 
 // Minimal valid 1x1 JPEG image buffer

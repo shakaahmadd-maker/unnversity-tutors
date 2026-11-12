@@ -32,16 +32,6 @@ interface AuthPageProps {
   onNavigate: (view: string) => void;
 }
 
-interface SimEmail {
-  id: string;
-  to: string;
-  subject: string;
-  type: 'verification' | 'reset';
-  token?: string;
-  body: string;
-  timestamp: string;
-}
-
 // Minimal, clean SVG icons for One-Click Social Registration & Login
 const GoogleIcon = () => (
   <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24">
@@ -113,32 +103,6 @@ export default function AuthPage({ onLogin, onRegister, onNavigate }: AuthPagePr
   const [resetEmail, setResetEmail] = useState('');
   const [resetTokenInput, setResetTokenInput] = useState('');
   const [newPasswordInput, setNewPasswordInput] = useState('');
-
-  // Simulated email inbox sandbox for recovery tokens
-  const [simEmails, setSimEmails] = useState<SimEmail[]>(() => {
-    const cached = localStorage.getItem('ut_sim_emails');
-    if (cached) {
-      try {
-        return JSON.parse(cached);
-      } catch (e) {
-        return [];
-      }
-    }
-    return [
-      {
-        id: 'welcome_student',
-        to: 'alex@example.com',
-        subject: 'Welcome to University Tutors Portal',
-        type: 'verification',
-        body: 'Welcome to your verified academic coaching portal. Connect directly with vetted university tutors.',
-        timestamp: 'Just now'
-      }
-    ];
-  });
-
-  useEffect(() => {
-    localStorage.setItem('ut_sim_emails', JSON.stringify(simEmails));
-  }, [simEmails]);
 
   // Fetch configured OAuth providers on mount
   useEffect(() => {
@@ -259,51 +223,25 @@ export default function AuthPage({ onLogin, onRegister, onNavigate }: AuthPagePr
     setActiveTab(mode);
   };
 
-  const handleQuickFill = (presetEmail: string, presetName: string) => {
-    setEmail(presetEmail);
-    setPassword('student123');
-    setName(presetName);
-    showToast(`Pre-filled credentials for ${presetName}`);
-  };
-
   const handleForgotPasswordSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg('');
     setSuccessMsg('');
 
-    if (!resetEmail) {
+    if (!resetEmail.trim()) {
       setErrorMsg('Please input your registered email address.');
       return;
     }
 
-    const matchedUser = store.users.find(u => u.email.toLowerCase().trim() === resetEmail.toLowerCase().trim());
-    if (!matchedUser) {
-      setErrorMsg('No registered student account was found with this email. Please check spelling or create an account.');
-      return;
-    }
-
-    const secureToken = 'RESET-' + Math.floor(100000 + Math.random() * 900000);
-    const success = await store.setResetToken(resetEmail, secureToken);
-
-    if (success) {
-      const newMail: SimEmail = {
-        id: 'reset_' + Date.now(),
-        to: resetEmail,
-        subject: 'Security Token: Reset Your Password',
-        type: 'reset',
-        token: secureToken,
-        body: `Your secure password reset key is: ${secureToken}. Enter this key on the verification screen to establish a new password.`,
-        timestamp: 'Just now'
-      };
-      setSimEmails(prev => [newMail, ...prev]);
-
-      setSuccessMsg(`Recovery token generated and sent to ${resetEmail}. Check your simulated inbox.`);
-      showToast(`Recovery key sent: ${secureToken}`);
+    try {
+      await store.requestPasswordReset(resetEmail.trim());
+      setSuccessMsg(`If an account exists for ${resetEmail.trim()}, a password reset token has been sent to that email address.`);
+      showToast('Check your email for the recovery token');
       setIsForgotPasswordView(false);
       setIsResetPasswordView(true);
-      setResetTokenInput(secureToken);
-    } else {
-      setErrorMsg('Unable to dispatch security token. Please try again.');
+      setResetTokenInput('');
+    } catch (err: any) {
+      setErrorMsg(err.message || 'Unable to process password reset request. Please try again later.');
     }
   };
 
@@ -322,20 +260,26 @@ export default function AuthPage({ onLogin, onRegister, onNavigate }: AuthPagePr
       return;
     }
 
-    const success = await store.resetPassword(
-      resetEmail,
-      resetTokenInput.trim(),
-      newPasswordInput
-    );
+    try {
+      const success = await store.resetPassword(
+        resetEmail.trim(),
+        resetTokenInput.trim(),
+        newPasswordInput
+      );
 
-    if (success) {
-      setSuccessMsg('Your security password has been updated successfully. Please sign in with your new credentials.');
-      showToast('Password updated successfully!');
-      setIsResetPasswordView(false);
-      setActiveTab('signin');
-      setPassword(newPasswordInput);
-    } else {
-      setErrorMsg('Invalid or expired security token. Please request a new token.');
+      if (success) {
+        setSuccessMsg('Your security password has been updated and you are now authenticated!');
+        showToast('Password updated successfully!');
+        setTimeout(() => {
+          setIsResetPasswordView(false);
+          const current = store.currentUser;
+          onNavigate(current?.role === 'admin' ? 'admin' : 'student/dashboard');
+        }, 800);
+      } else {
+        setErrorMsg('Invalid or expired security token. Please request a new token.');
+      }
+    } catch (err: any) {
+      setErrorMsg(err.message || 'Invalid or expired security token. Please request a new token.');
     }
   };
 
@@ -401,28 +345,22 @@ export default function AuthPage({ onLogin, onRegister, onNavigate }: AuthPagePr
 
     setIsSubmitting(true);
     try {
-      const isShaka = email.toLowerCase().trim() === 'shaka.ahmadd@gmail.com';
-      const assignedRole = isShaka ? UserRole.ADMIN : UserRole.STUDENT;
-
       const success = await onRegister(
         name.trim(),
         email.trim(),
-        assignedRole,
+        UserRole.STUDENT,
         {
-          verified: true,
           password: password,
           signupMethod: 'email',
-          verifiedAt: new Date().toISOString()
         }
       );
 
       if (success) {
         setSuccessMsg('Student account created successfully! Welcome to the portal.');
         showToast('Account Created Successfully!');
-        setTimeout(async () => {
-          await onLogin(email.trim(), password);
+        setTimeout(() => {
           onNavigate('student/dashboard');
-        }, 600);
+        }, 500);
       } else {
         setErrorMsg('Something went wrong establishing your student account.');
       }
@@ -499,38 +437,6 @@ export default function AuthPage({ onLogin, onRegister, onNavigate }: AuthPagePr
       }, 1000);
     } catch (err: any) {
       setErrorMsg(err.message || 'Social sign-in failed.');
-      setIsSubmitting(false);
-    }
-  };
-
-  // Development sandbox authorization handler to test student workflow immediately
-  const handleDemoAuth = async (providerKey: string) => {
-    setIsSubmitting(true);
-    setErrorMsg('');
-    try {
-      const res = await fetch('/api/auth/demo-login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ provider: providerKey })
-      });
-      const data = await res.json();
-      if (!res.ok || !data.user) {
-        throw new Error(data.error || 'Sandbox authorization failed.');
-      }
-      if (data.token) {
-        localStorage.setItem('auth_token', data.token);
-      }
-      store.currentUser = data.user;
-      localStorage.setItem('ut_current_user', JSON.stringify(data.user));
-      store.notify();
-      setOauthModalProvider(null);
-      showToast(`Logged in successfully via ${providers[providerKey]?.name || 'Social'}!`);
-      setTimeout(() => {
-        onNavigate('dashboard');
-      }, 400);
-    } catch (err: any) {
-      setErrorMsg(err.message || 'Sandbox authorization failed.');
-    } finally {
       setIsSubmitting(false);
     }
   };
@@ -749,27 +655,6 @@ export default function AuthPage({ onLogin, onRegister, onNavigate }: AuthPagePr
           /* VIEW 1: SIGN IN VIEW                           */
           /* ============================================== */
           <div id="signin-view" className="space-y-4">
-            
-            {/* Quick Demo Pre-fill Pill Bar */}
-            <div className="p-2.5 bg-slate-50 border border-slate-200 rounded-xl flex items-center justify-between text-xs">
-              <span className="text-slate-500 font-medium text-[11px]">Quick Demo:</span>
-              <div className="flex gap-1.5">
-                <button
-                  type="button"
-                  onClick={() => handleQuickFill('alex@example.com', 'Alex Mercer')}
-                  className="px-2 py-0.5 bg-white hover:bg-orange-50 text-slate-700 hover:text-orange-600 font-bold rounded border border-slate-200 transition-colors text-[10px] cursor-pointer"
-                >
-                  Alex
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleQuickFill('lunn@example.com', 'Lunn (Student)')}
-                  className="px-2 py-0.5 bg-white hover:bg-orange-50 text-slate-700 hover:text-orange-600 font-bold rounded border border-slate-200 transition-colors text-[10px] cursor-pointer"
-                >
-                  Lunn
-                </button>
-              </div>
-            </div>
 
             <form onSubmit={handleSignInSubmit} className="space-y-3.5">
               {/* Email */}
@@ -802,7 +687,7 @@ export default function AuthPage({ onLogin, onRegister, onNavigate }: AuthPagePr
                   <button 
                     type="button"
                     onClick={() => {
-                      setResetEmail(email || 'alex@example.com');
+                      setResetEmail(email || '');
                       setIsForgotPasswordView(true);
                     }} 
                     className="text-[11px] font-bold text-orange-600 hover:text-orange-700 cursor-pointer"
@@ -1226,28 +1111,13 @@ export default function AuthPage({ onLogin, onRegister, onNavigate }: AuthPagePr
               {/* Environment Variables to Set */}
               <div>
                 <label className="block text-[11px] font-bold text-slate-700 uppercase tracking-wider mb-1">
-                  Add to <code className="text-slate-900 font-mono">.env</code>:
+                  Configure in Dokploy Runtime Environment:
                 </label>
                 <pre className="p-2.5 bg-slate-900 text-emerald-400 rounded-lg font-mono text-[11px] overflow-x-auto">
-{`${oauthModalProvider.toUpperCase()}_CLIENT_ID=your_${oauthModalProvider}_client_id
-${oauthModalProvider.toUpperCase()}_CLIENT_SECRET=your_${oauthModalProvider}_secret`}
+{`${oauthModalProvider.toUpperCase()}_CLIENT_ID=<provider_client_id>
+${oauthModalProvider.toUpperCase()}_CLIENT_SECRET=<provider_client_secret>
+${oauthModalProvider.toUpperCase()}_REDIRECT_URI=<production_https_callback_url>`}
                 </pre>
-              </div>
-
-              {/* Instant Sandbox Test Option */}
-              <div className="pt-2 border-t border-slate-100">
-                <p className="text-[11px] text-slate-500 mb-2">
-                  Want to test the student dashboard immediately without setting up API keys right now?
-                </p>
-                <button
-                  type="button"
-                  onClick={() => handleDemoAuth(oauthModalProvider)}
-                  disabled={isSubmitting}
-                  className="w-full py-2.5 px-4 bg-orange-600 hover:bg-orange-700 active:bg-orange-800 text-white font-bold rounded-xl transition-all shadow-sm flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
-                >
-                  <GraduationCap className="w-4 h-4" />
-                  <span>Test Verified Student Dashboard Login</span>
-                </button>
               </div>
             </div>
           </div>

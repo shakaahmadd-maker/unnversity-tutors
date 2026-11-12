@@ -73,33 +73,165 @@ export default function FooterLocationsSubjects({
     }
   ];
 
-  const locationsCol1 = [
-    { name: 'Atlanta Tutoring', city: 'Atlanta, GA' },
-    { name: 'Boston Tutoring', city: 'Boston, MA' },
-    { name: 'Chicago Tutoring', city: 'Chicago, IL' },
-    { name: 'Dallas Tutoring', city: 'Dallas, TX' },
-    { name: 'Houston Tutoring', city: 'Houston, TX' },
-    { name: 'London Tutoring', city: 'London, UK' },
-    { name: 'Los Angeles Tutoring', city: 'Los Angeles, CA' },
+  const usaCities = [
+    { name: 'Atlanta Tutoring', city: 'Atlanta, GA, USA' },
+    { name: 'Austin Tutoring', city: 'Austin, TX, USA' },
+    { name: 'Baltimore Tutoring', city: 'Baltimore, MD, USA' },
+    { name: 'Boston Tutoring', city: 'Boston, MA, USA' },
+    { name: 'Charlotte Tutoring', city: 'Charlotte, NC, USA' },
+    { name: 'Chicago Tutoring', city: 'Chicago, IL, USA' },
+    { name: 'Cleveland Tutoring', city: 'Cleveland, OH, USA' },
+    { name: 'Columbus Tutoring', city: 'Columbus, OH, USA' },
+    { name: 'Dallas Tutoring', city: 'Dallas, TX, USA' },
+    { name: 'Denver Tutoring', city: 'Denver, CO, USA' },
+    { name: 'Detroit Tutoring', city: 'Detroit, MI, USA' },
+    { name: 'Honolulu Tutoring', city: 'Honolulu, HI, USA' },
+    { name: 'Houston Tutoring', city: 'Houston, TX, USA' },
+    { name: 'Indianapolis Tutoring', city: 'Indianapolis, IN, USA' },
+    { name: 'Kansas City Tutoring', city: 'Kansas City, MO, USA' },
+    { name: 'Las Vegas Tutoring', city: 'Las Vegas, NV, USA' },
+    { name: 'Los Angeles Tutoring', city: 'Los Angeles, CA, USA' },
+    { name: 'Memphis Tutoring', city: 'Memphis, TN, USA' },
+    { name: 'Miami Tutoring', city: 'Miami, FL, USA' },
+    { name: 'Minneapolis Tutoring', city: 'Minneapolis, MN, USA' },
+    { name: 'Nashville Tutoring', city: 'Nashville, TN, USA' },
+    { name: 'New Orleans Tutoring', city: 'New Orleans, LA, USA' },
+    { name: 'New York Tutoring', city: 'New York, NY, USA' },
+    { name: 'Orlando Tutoring', city: 'Orlando, FL, USA' },
+    { name: 'Philadelphia Tutoring', city: 'Philadelphia, PA, USA' },
+    { name: 'Phoenix Tutoring', city: 'Phoenix, AZ, USA' },
+    { name: 'Pittsburgh Tutoring', city: 'Pittsburgh, PA, USA' },
+    { name: 'Portland Tutoring', city: 'Portland, OR, USA' },
+    { name: 'Sacramento Tutoring', city: 'Sacramento, CA, USA' },
+    { name: 'Salt Lake City Tutoring', city: 'Salt Lake City, UT, USA' },
+    { name: 'San Antonio Tutoring', city: 'San Antonio, TX, USA' },
+    { name: 'San Diego Tutoring', city: 'San Diego, CA, USA' },
+    { name: 'San Francisco Tutoring', city: 'San Francisco, CA, USA' },
+    { name: 'San Jose Tutoring', city: 'San Jose, CA, USA' },
+    { name: 'Seattle Tutoring', city: 'Seattle, WA, USA' },
+    { name: 'St. Louis Tutoring', city: 'St. Louis, MO, USA' },
+    { name: 'Tampa Tutoring', city: 'Tampa, FL, USA' },
+    { name: 'Washington DC Tutoring', city: 'Washington, DC, USA' },
   ];
 
-  const locationsCol2 = [
-    { name: 'Melbourne Tutoring', city: 'Melbourne, AU' },
-    { name: 'Miami Tutoring', city: 'Miami, FL' },
-    { name: 'Montreal Tutoring', city: 'Montreal, CA' },
-    { name: 'New York Tutoring', city: 'New York, NY' },
-    { name: 'Philadelphia Tutoring', city: 'Philadelphia, PA' },
-    { name: 'Phoenix Tutoring', city: 'Phoenix, AZ' },
-    { name: 'San Diego Tutoring', city: 'San Diego, CA' },
+  const column2Groups = [
+    {
+      code: 'GB',
+      label: 'United Kingdom',
+      cities: [
+        { name: 'Belfast Tutoring', city: 'Belfast, UK' },
+        { name: 'Birmingham Tutoring', city: 'Birmingham, UK' },
+        { name: 'Bristol Tutoring', city: 'Bristol, UK' },
+        { name: 'Cardiff Tutoring', city: 'Cardiff, UK' },
+        { name: 'Edinburgh Tutoring', city: 'Edinburgh, UK' },
+        { name: 'Glasgow Tutoring', city: 'Glasgow, UK' },
+        { name: 'Leeds Tutoring', city: 'Leeds, UK' },
+        { name: 'Liverpool Tutoring', city: 'Liverpool, UK' },
+        { name: 'London Tutoring', city: 'London, UK' },
+        { name: 'Manchester Tutoring', city: 'Manchester, UK' },
+        { name: 'Newcastle Tutoring', city: 'Newcastle, UK' },
+        { name: 'Nottingham Tutoring', city: 'Nottingham, UK' },
+        { name: 'Oxford Tutoring', city: 'Oxford, UK' },
+        { name: 'Sheffield Tutoring', city: 'Sheffield, UK' },
+      ],
+    },
+    {
+      code: 'IE',
+      label: 'Ireland',
+      cities: [
+        { name: 'Cork Tutoring', city: 'Cork, Ireland' },
+        { name: 'Dublin Tutoring', city: 'Dublin, Ireland' },
+        { name: 'Galway Tutoring', city: 'Galway, Ireland' },
+        { name: 'Limerick Tutoring', city: 'Limerick, Ireland' },
+        { name: 'Waterford Tutoring', city: 'Waterford, Ireland' },
+      ],
+    },
+    {
+      code: 'SG',
+      label: 'Singapore',
+      cities: [
+        { name: 'Central Singapore', city: 'Central Singapore, Singapore' },
+        { name: 'Jurong Tutoring', city: 'Jurong, Singapore' },
+        { name: 'Tampines Tutoring', city: 'Tampines, Singapore' },
+        { name: 'Woodlands Tutoring', city: 'Woodlands, Singapore' },
+      ],
+    },
+    {
+      code: 'MY',
+      label: 'Malaysia',
+      cities: [
+        { name: 'Kuala Lumpur', city: 'Kuala Lumpur, Malaysia' },
+        { name: 'Penang Tutoring', city: 'Penang, Malaysia' },
+        { name: 'Johor Bahru', city: 'Johor Bahru, Malaysia' },
+        { name: 'Petaling Jaya', city: 'Petaling Jaya, Malaysia' },
+      ],
+    },
+    {
+      code: 'AE',
+      label: 'UAE &',
+      secondaryCode: 'SA',
+      secondaryLabel: 'KSA',
+      cities: [
+        { name: 'Dubai Tutoring', city: 'Dubai, UAE' },
+        { name: 'Abu Dhabi Tutoring', city: 'Abu Dhabi, UAE' },
+        { name: 'Sharjah Tutoring', city: 'Sharjah, UAE' },
+        { name: 'Riyadh Tutoring', city: 'Riyadh, KSA' },
+        { name: 'Jeddah Tutoring', city: 'Jeddah, KSA' },
+      ],
+    },
   ];
 
-  const locationsCol3 = [
-    { name: 'San Francisco Tutoring', city: 'San Francisco, CA' },
-    { name: 'Seattle Tutoring', city: 'Seattle, WA' },
-    { name: 'Sydney Tutoring', city: 'Sydney, AU' },
-    { name: 'Toronto Tutoring', city: 'Toronto, CA' },
-    { name: 'Vancouver Tutoring', city: 'Vancouver, CA' },
-    { name: 'Washington DC Tutoring', city: 'Washington, DC' },
+  const column3Groups = [
+    {
+      code: 'CA',
+      label: 'Canada',
+      cities: [
+        { name: 'Calgary Tutoring', city: 'Calgary, Canada' },
+        { name: 'Edmonton Tutoring', city: 'Edmonton, Canada' },
+        { name: 'Halifax Tutoring', city: 'Halifax, Canada' },
+        { name: 'Hamilton Tutoring', city: 'Hamilton, Canada' },
+        { name: 'Kitchener Tutoring', city: 'Kitchener, Canada' },
+        { name: 'London (Canada)', city: 'London, ON, Canada' },
+        { name: 'Montreal Tutoring', city: 'Montreal, Canada' },
+        { name: 'Ottawa Tutoring', city: 'Ottawa, Canada' },
+        { name: 'Quebec City', city: 'Quebec City, Canada' },
+        { name: 'Toronto Tutoring', city: 'Toronto, Canada' },
+        { name: 'Vancouver Tutoring', city: 'Vancouver, Canada' },
+        { name: 'Victoria Tutoring', city: 'Victoria, Canada' },
+        { name: 'Winnipeg Tutoring', city: 'Winnipeg, Canada' },
+      ],
+    },
+    {
+      code: 'AU',
+      label: 'Australia',
+      cities: [
+        { name: 'Adelaide Tutoring', city: 'Adelaide, Australia' },
+        { name: 'Brisbane Tutoring', city: 'Brisbane, Australia' },
+        { name: 'Canberra Tutoring', city: 'Canberra, Australia' },
+        { name: 'Darwin Tutoring', city: 'Darwin, Australia' },
+        { name: 'Gold Coast Tutoring', city: 'Gold Coast, Australia' },
+        { name: 'Hobart Tutoring', city: 'Hobart, Australia' },
+        { name: 'Melbourne Tutoring', city: 'Melbourne, Australia' },
+        { name: 'Newcastle (AU)', city: 'Newcastle, Australia' },
+        { name: 'Perth Tutoring', city: 'Perth, Australia' },
+        { name: 'Sydney Tutoring', city: 'Sydney, Australia' },
+        { name: 'Wollongong', city: 'Wollongong, Australia' },
+      ],
+    },
+    {
+      code: 'NZ',
+      label: 'New Zealand',
+      cities: [
+        { name: 'Auckland Tutoring', city: 'Auckland, New Zealand' },
+        { name: 'Christchurch', city: 'Christchurch, New Zealand' },
+        { name: 'Dunedin Tutoring', city: 'Dunedin, New Zealand' },
+        { name: 'Hamilton (NZ)', city: 'Hamilton, New Zealand' },
+        { name: 'Napier Tutoring', city: 'Napier, New Zealand' },
+        { name: 'Palmerston North', city: 'Palmerston North, New Zealand' },
+        { name: 'Tauranga Tutoring', city: 'Tauranga, New Zealand' },
+        { name: 'Wellington', city: 'Wellington, New Zealand' },
+      ],
+    },
   ];
 
   const subjectsCol1 = [
@@ -134,8 +266,8 @@ export default function FooterLocationsSubjects({
   ];
 
   return (
-    <div className="bg-[#f8fafc] border-t border-b border-[#cbd5e1] py-12 text-[#2b4260] font-sans">
-      <div className="container mx-auto max-w-7xl px-4 md:px-8 space-y-10">
+    <div className="bg-[#f8fafc] border-t border-b border-[#cbd5e1] py-10 sm:py-12 text-[#2b4260] font-sans">
+      <div className="container mx-auto max-w-7xl px-3 sm:px-6 md:px-8 space-y-8 sm:space-y-10">
         
         {/* Country Dedicated Online Tutoring Hubs */}
         <div className="space-y-4">
@@ -208,96 +340,149 @@ export default function FooterLocationsSubjects({
           </div>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 pt-2 border-t border-slate-200/80">
-          
-          {/* Left Block: Popular International Locations */}
-          <div className="space-y-4">
-            <h3 className="text-base font-bold text-[#204070] font-sans tracking-tight">
+        {/* Popular International Locations (Mobile & Desktop 3-Column Directory Card) */}
+        <div className="pt-2 border-t border-slate-200/80 space-y-6">
+          <div className="bg-white rounded-2xl sm:rounded-3xl p-4 sm:p-7 border border-slate-200/80 shadow-2xs">
+            <h3 className="text-base sm:text-lg font-extrabold text-slate-950 font-sans tracking-tight mb-4 sm:mb-5">
               Popular International Locations
             </h3>
 
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-x-6 gap-y-2 text-xs">
-              {/* Column 1 */}
-              <div className="space-y-2">
-                {locationsCol1.map((loc, idx) => (
-                  <button
-                    key={idx}
-                    onClick={() => onNavigateLocation(loc.city)}
-                    className="text-[#3b6090] hover:text-[#1a3560] hover:underline text-left block font-normal cursor-pointer transition-colors"
-                  >
-                    {loc.name}
-                  </button>
+            <div className="grid grid-cols-3 gap-x-2.5 sm:gap-x-8 lg:gap-x-12 items-start">
+              {/* Column 1: US USA Cities */}
+              <div>
+                <h4 className="border-b border-slate-100 pb-1.5 mb-2 flex flex-wrap items-baseline gap-1 text-slate-900">
+                  <span className="text-[9px] sm:text-[10px] font-extrabold uppercase tracking-tight text-slate-700">
+                    US
+                  </span>
+                  <span className="text-[11px] sm:text-[13px] font-bold tracking-tight">
+                    USA Cities
+                  </span>
+                </h4>
+                <ul className="space-y-1 sm:space-y-1.5">
+                  {usaCities.map((loc) => (
+                    <li key={loc.name}>
+                      <button
+                        type="button"
+                        onClick={() => onNavigateLocation(loc.city)}
+                        className="text-[10.5px] sm:text-xs md:text-[13px] leading-[1.4] sm:leading-[1.55] text-[#1d70b8] hover:text-[#0f4c81] hover:underline text-left block font-normal cursor-pointer transition-colors"
+                      >
+                        {loc.name}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+
+              {/* Column 2: GB United Kingdom, IE Ireland, SG Singapore, MY Malaysia, AE UAE & SA KSA */}
+              <div className="space-y-4 sm:space-y-5">
+                {column2Groups.map((group) => (
+                  <div key={group.code}>
+                    <h4 className="border-b border-slate-100 pb-1.5 mb-2 flex flex-wrap items-baseline gap-1 text-slate-900">
+                      <span className="text-[9px] sm:text-[10px] font-extrabold uppercase tracking-tight text-slate-700">
+                        {group.code}
+                      </span>
+                      <span className="text-[11px] sm:text-[13px] font-bold tracking-tight">
+                        {group.label}
+                      </span>
+                      {group.secondaryCode && (
+                        <>
+                          <span className="text-[9px] sm:text-[10px] font-extrabold uppercase tracking-tight text-slate-700">
+                            {group.secondaryCode}
+                          </span>
+                          <span className="text-[11px] sm:text-[13px] font-bold tracking-tight">
+                            {group.secondaryLabel}
+                          </span>
+                        </>
+                      )}
+                    </h4>
+                    <ul className="space-y-1 sm:space-y-1.5">
+                      {group.cities.map((loc) => (
+                        <li key={loc.name}>
+                          <button
+                            type="button"
+                            onClick={() => onNavigateLocation(loc.city)}
+                            className="text-[10.5px] sm:text-xs md:text-[13px] leading-[1.4] sm:leading-[1.55] text-[#1d70b8] hover:text-[#0f4c81] hover:underline text-left block font-normal cursor-pointer transition-colors"
+                          >
+                            {loc.name}
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
                 ))}
               </div>
 
-              {/* Column 2 */}
-              <div className="space-y-2">
-                {locationsCol2.map((loc, idx) => (
-                  <button
-                    key={idx}
-                    onClick={() => onNavigateLocation(loc.city)}
-                    className="text-[#3b6090] hover:text-[#1a3560] hover:underline text-left block font-normal cursor-pointer transition-colors"
-                  >
-                    {loc.name}
-                  </button>
-                ))}
-              </div>
-
-              {/* Column 3 */}
-              <div className="space-y-2">
-                {locationsCol3.map((loc, idx) => (
-                  <button
-                    key={idx}
-                    onClick={() => onNavigateLocation(loc.city)}
-                    className="text-[#3b6090] hover:text-[#1a3560] hover:underline text-left block font-normal cursor-pointer transition-colors"
-                  >
-                    {loc.name}
-                  </button>
+              {/* Column 3: CA Canada, AU Australia, NZ New Zealand */}
+              <div className="space-y-4 sm:space-y-5">
+                {column3Groups.map((group) => (
+                  <div key={group.code}>
+                    <h4 className="border-b border-slate-100 pb-1.5 mb-2 flex flex-wrap items-baseline gap-1 text-slate-900">
+                      <span className="text-[9px] sm:text-[10px] font-extrabold uppercase tracking-tight text-slate-700">
+                        {group.code}
+                      </span>
+                      <span className="text-[11px] sm:text-[13px] font-bold tracking-tight">
+                        {group.label}
+                      </span>
+                    </h4>
+                    <ul className="space-y-1 sm:space-y-1.5">
+                      {group.cities.map((loc) => (
+                        <li key={loc.name}>
+                          <button
+                            type="button"
+                            onClick={() => onNavigateLocation(loc.city)}
+                            className="text-[10.5px] sm:text-xs md:text-[13px] leading-[1.4] sm:leading-[1.55] text-[#1d70b8] hover:text-[#0f4c81] hover:underline text-left block font-normal cursor-pointer transition-colors"
+                          >
+                            {loc.name}
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
                 ))}
               </div>
             </div>
           </div>
 
-          {/* Right Block: Popular Online Subjects */}
-          <div className="space-y-4">
-            <h3 className="text-base font-bold text-[#204070] font-sans tracking-tight">
+          {/* Popular Online Subjects */}
+          <div className="bg-white rounded-2xl sm:rounded-3xl p-4 sm:p-7 border border-slate-200/80 shadow-2xs space-y-4">
+            <h3 className="text-base sm:text-lg font-extrabold text-slate-950 font-sans tracking-tight">
               Popular Online Subjects
             </h3>
 
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-x-6 gap-y-2 text-xs">
-              {/* Column 1 */}
-              <div className="space-y-2">
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-4 sm:gap-x-8 gap-y-2 text-xs">
+              <div className="space-y-1.5 sm:space-y-2">
                 {subjectsCol1.map((subj, idx) => (
                   <button
                     key={idx}
+                    type="button"
                     onClick={() => onNavigateSubject(subj)}
-                    className="text-[#3b6090] hover:text-[#1a3560] hover:underline text-left block font-normal cursor-pointer transition-colors"
+                    className="text-[11px] sm:text-[13px] text-[#1d70b8] hover:text-[#0f4c81] hover:underline text-left block font-normal cursor-pointer transition-colors"
                   >
                     {subj}
                   </button>
                 ))}
               </div>
 
-              {/* Column 2 */}
-              <div className="space-y-2">
+              <div className="space-y-1.5 sm:space-y-2">
                 {subjectsCol2.map((subj, idx) => (
                   <button
                     key={idx}
+                    type="button"
                     onClick={() => onNavigateSubject(subj)}
-                    className="text-[#3b6090] hover:text-[#1a3560] hover:underline text-left block font-normal cursor-pointer transition-colors"
+                    className="text-[11px] sm:text-[13px] text-[#1d70b8] hover:text-[#0f4c81] hover:underline text-left block font-normal cursor-pointer transition-colors"
                   >
                     {subj}
                   </button>
                 ))}
               </div>
 
-              {/* Column 3 */}
-              <div className="space-y-2">
+              <div className="space-y-1.5 sm:space-y-2 col-span-2 sm:col-span-1">
                 {subjectsCol3.map((subj, idx) => (
                   <button
                     key={idx}
+                    type="button"
                     onClick={() => onNavigateSubject(subj)}
-                    className="text-[#3b6090] hover:text-[#1a3560] hover:underline text-left block font-normal cursor-pointer transition-colors"
+                    className="text-[11px] sm:text-[13px] text-[#1d70b8] hover:text-[#0f4c81] hover:underline text-left block font-normal cursor-pointer transition-colors"
                   >
                     {subj}
                   </button>
@@ -305,7 +490,6 @@ export default function FooterLocationsSubjects({
               </div>
             </div>
           </div>
-
         </div>
       </div>
     </div>
