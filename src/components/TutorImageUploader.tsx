@@ -73,17 +73,9 @@ export default function TutorImageUploader({
         formData.append('tutorId', tutorId);
       }
 
-      const token = localStorage.getItem('auth_token');
-      const headers: Record<string, string> = {};
-      if (token) {
-        headers['Authorization'] = `Bearer ${token}`;
-        headers['X-Auth-Token'] = token;
-      }
-
       const res = await fetch('/api/admin/tutors/upload-avatar', {
         method: 'POST',
         credentials: 'include',
-        headers,
         body: formData,
         signal: controller.signal,
       });

@@ -742,21 +742,30 @@ async function runAuthSystemTests() {
       // ----------------------------------------------------------------------
       // Scenario 6.1: Missing OAuth Environment Variables
       // ----------------------------------------------------------------------
-      for (const missingVar of ['GOOGLE_CLIENT_ID', 'GOOGLE_CLIENT_SECRET', 'GOOGLE_REDIRECT_URI'] as const) {
+      for (const missingVar of ['GOOGLE_CLIENT_ID', 'GOOGLE_CLIENT_SECRET', 'GOOGLE_REDIRECT_URI', 'APP_URL'] as const) {
         setValidProdGoogleEnv();
         delete process.env[missingVar];
 
         const pRes = await fetch(`${OAUTH_TEST_BASE}/api/auth/providers`);
         const pData = await pRes.json();
+        const rawProviderJson = JSON.stringify(pData);
         testAssert(
-          pData.providers?.google?.configured === false,
-          `[6.1 Missing Env] providers.google.configured is false when ${missingVar} is missing`
+          pData.providers?.google?.configured === false &&
+            Array.isArray(pData.providers?.google?.missingVars) &&
+            pData.providers.google.missingVars.includes(missingVar) &&
+            !rawProviderJson.includes(runtimeTestClientId) &&
+            !rawProviderJson.includes(runtimeTestClientSecret) &&
+            !rawProviderJson.includes(runtimeTestSessionSecret),
+          `[6.1 Missing Env] providers.google.configured is false and missingVars safely lists only ${missingVar} without leaking values`
         );
 
         const uRes = await fetch(`${OAUTH_TEST_BASE}/api/auth/google/url`);
         const uData = await uRes.json();
         testAssert(
-          uRes.status === 400 && uData.code === 'missing_oauth_credentials' && String(uData.error).includes(missingVar),
+          uRes.status === 400 &&
+            uData.code === 'missing_oauth_credentials' &&
+            String(uData.error).includes(missingVar) &&
+            !JSON.stringify(uData).includes(runtimeTestClientSecret),
           `[6.1 Missing Env] /api/auth/google/url rejects missing ${missingVar} with 400 missing_oauth_credentials`
         );
 
@@ -768,15 +777,16 @@ async function runAuthSystemTests() {
         );
       }
 
-      // Confirm setting ONLY the 3 core variables (GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, GOOGLE_REDIRECT_URI) without APP_URL works cleanly
+      // Confirm provider status reports configured=true ONLY when all 4 required runtime variables exist
       setValidProdGoogleEnv();
-      delete process.env.APP_URL;
-      const threeVarsProvRes = await fetch(`${OAUTH_TEST_BASE}/api/auth/providers`);
-      const threeVarsProvData = await threeVarsProvRes.json();
-      const threeVarsUrlRes = await fetch(`${OAUTH_TEST_BASE}/api/auth/google/url`);
+      const allFourProvRes = await fetch(`${OAUTH_TEST_BASE}/api/auth/providers`);
+      const allFourProvData = await allFourProvRes.json();
       testAssert(
-        threeVarsProvData.providers?.google?.configured === true && threeVarsUrlRes.status === 200,
-        '[6.1 Three Core Vars] Setting GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, and GOOGLE_REDIRECT_URI activates Google OAuth even when APP_URL is omitted'
+        allFourProvData.providers?.google?.configured === true &&
+          Array.isArray(allFourProvData.providers?.google?.missingVars) &&
+          allFourProvData.providers.google.missingVars.length === 0 &&
+          allFourProvData.providers?.google?.callbackPath === '/api/auth/callback/google',
+        '[6.1 All Four Vars] /api/auth/providers reports configured=true and empty missingVars only when all 4 runtime variables exist'
       );
 
       // ----------------------------------------------------------------------

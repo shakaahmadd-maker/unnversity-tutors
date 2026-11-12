@@ -1,5 +1,5 @@
 import dotenv from 'dotenv';
-dotenv.config();
+dotenv.config({ override: false, quiet: true } as any);
 
 import express from 'express';
 import compression from 'compression';
@@ -17,34 +17,68 @@ import { memoryStore, PrivateFileRecord } from './src/db/memoryStore';
 import { DEFAULT_20_BLOGS } from './src/data/defaultBlogsData';
 import { TRENDING_TUTORS_500, TRENDING_TUTORS_200 } from './src/data/trendingTutors500Data';
 
-// Configurable Environment Variables read strictly from process.env at runtime (zero hardcoded fallbacks)
-const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
-const NODE_ENV = process.env.NODE_ENV || 'production';
-
-function cleanEnvValue(val?: string): string {
+// Bundler-safe runtime environment reader: reads strictly from process['env'] at runtime (zero hardcoded fallbacks)
+export function readRuntimeEnv(key: string): string {
+  const runtimeEnv: Record<string, string | undefined> = process['env'];
+  const val = runtimeEnv[key];
   if (!val || typeof val !== 'string') return '';
   return val.trim().replace(/^['"]+|['"]+$/g, '').trim();
 }
 
+const PORT = readRuntimeEnv('PORT') ? parseInt(readRuntimeEnv('PORT'), 10) : 3000;
+const NODE_ENV = readRuntimeEnv('NODE_ENV') || 'production';
+
 export function getRuntimeAppUrl(): string {
-  return cleanEnvValue(process.env.APP_URL).replace(/\/+$/, '');
+  return readRuntimeEnv('APP_URL').replace(/\/+$/, '');
 }
 
 export const GOOGLE_OAUTH_CALLBACK_PATH = '/api/auth/callback/google';
-const SUPPORTED_GOOGLE_CALLBACK_PATHS = [GOOGLE_OAUTH_CALLBACK_PATH, '/api/auth/google/callback'];
 
-// Secure session signing key: read strictly from process.env.SESSION_SECRET at runtime.
+const FORBIDDEN_LOG_KEYS = new Set([
+  'clientsecret',
+  'client_secret',
+  'accesstoken',
+  'access_token',
+  'refreshtoken',
+  'refresh_token',
+  'idtoken',
+  'id_token',
+  'password',
+  'passwordhash',
+  'sessionsecret',
+  'session_secret',
+  'databaseurl',
+  'database_url',
+  'token',
+  'code',
+]);
+
+// Safe structured OAuth logger: never logs secrets, tokens, passwords, DATABASE_URL, or SESSION_SECRET
+function logSafeOAuthEvent(
+  stage: string,
+  details: Record<string, string | number | boolean | string[] | null | undefined>
+) {
+  const safePayload: Record<string, unknown> = { stage, ts: new Date().toISOString() };
+  for (const [k, v] of Object.entries(details)) {
+    if (FORBIDDEN_LOG_KEYS.has(k.toLowerCase())) continue;
+    safePayload[k] = v;
+  }
+  console.info(`[OAUTH] ${JSON.stringify(safePayload)}`);
+}
+
+// Secure session signing key: read strictly from runtime process.env.SESSION_SECRET.
 // Never log SESSION_SECRET or DATABASE_URL.
 function getSessionSecret(): string {
-  if (process.env.SESSION_SECRET && process.env.SESSION_SECRET.trim().length >= 16) {
-    return process.env.SESSION_SECRET.trim();
+  const secret = readRuntimeEnv('SESSION_SECRET');
+  if (secret.length >= 16) {
+    return secret;
   }
   return EPHEMERAL_SESSION_SECRET;
 }
 
 const EPHEMERAL_SESSION_SECRET = crypto.randomBytes(32).toString('hex');
 
-if (!process.env.SESSION_SECRET && process.env.SKIP_AUTO_SERVER_START !== 'true') {
+if (!readRuntimeEnv('SESSION_SECRET') && readRuntimeEnv('SKIP_AUTO_SERVER_START') !== 'true') {
   console.warn('[AUTH] SESSION_SECRET is not configured in process.env. Generated an ephemeral runtime signing key.');
 }
 
@@ -1431,18 +1465,19 @@ export async function createApp(options: CreateAppOptions = {}) {
   }
 
   // 1. GOOGLE OAUTH CONFIGURATION
-  // Reads ONLY GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, GOOGLE_REDIRECT_URI, and optional APP_URL from process.env at runtime.
+  // Reads ONLY GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, GOOGLE_REDIRECT_URI, and APP_URL from runtime process.env.
   // Never uses fallback credentials, preview container URLs, localhost URLs, or dynamic container hosts.
   function getGoogleOAuthConfig() {
-    const clientId = cleanEnvValue(process.env.GOOGLE_CLIENT_ID);
-    const clientSecret = cleanEnvValue(process.env.GOOGLE_CLIENT_SECRET);
-    const explicitRedirectUri = cleanEnvValue(process.env.GOOGLE_REDIRECT_URI).replace(/\/+$/, '');
+    const clientId = readRuntimeEnv('GOOGLE_CLIENT_ID');
+    const clientSecret = readRuntimeEnv('GOOGLE_CLIENT_SECRET');
+    const explicitRedirectUri = readRuntimeEnv('GOOGLE_REDIRECT_URI').replace(/\/+$/, '');
     const rawAppUrl = getRuntimeAppUrl();
 
     const missingVars: string[] = [];
     if (!clientId) missingVars.push('GOOGLE_CLIENT_ID');
     if (!clientSecret) missingVars.push('GOOGLE_CLIENT_SECRET');
     if (!explicitRedirectUri) missingVars.push('GOOGLE_REDIRECT_URI');
+    if (!rawAppUrl) missingVars.push('APP_URL');
 
     if (missingVars.length > 0) {
       return {
@@ -1453,14 +1488,37 @@ export async function createApp(options: CreateAppOptions = {}) {
         appUrl: '',
         redirectUri: '',
         configured: false,
+        missingVars,
         errorCode: 'missing_oauth_credentials' as const,
-        error: `Missing Google OAuth credentials: Required environment variable(s) not set: ${missingVars.join(', ')}.`,
+        error: `Missing Google OAuth credentials: ${missingVars.join(', ')}`,
         authUrl: 'https://accounts.google.com/o/oauth2/v2/auth',
         tokenUrl: 'https://oauth2.googleapis.com/token',
         userInfoUrl: 'https://www.googleapis.com/oauth2/v2/userinfo',
         scope: 'openid email profile',
       };
     }
+
+    const prodBase = resolveProductionBaseUrl();
+    if (!prodBase) {
+      return {
+        id: 'google' as const,
+        name: 'Google',
+        clientId: undefined,
+        clientSecret: undefined,
+        appUrl: '',
+        redirectUri: '',
+        configured: false,
+        missingVars: [] as string[],
+        errorCode: 'redirect_uri_mismatch' as const,
+        error: 'Google OAuth configuration error: APP_URL must be a valid HTTPS live production domain (localhost, preview URLs, and container URLs are prohibited).',
+        authUrl: 'https://accounts.google.com/o/oauth2/v2/auth',
+        tokenUrl: 'https://oauth2.googleapis.com/token',
+        userInfoUrl: 'https://www.googleapis.com/oauth2/v2/userinfo',
+        scope: 'openid email profile',
+      };
+    }
+
+    const expectedRedirectUri = `${prodBase}${GOOGLE_OAUTH_CALLBACK_PATH}`;
 
     if (isForbiddenProductionUrl(explicitRedirectUri)) {
       return {
@@ -1468,11 +1526,12 @@ export async function createApp(options: CreateAppOptions = {}) {
         name: 'Google',
         clientId: undefined,
         clientSecret: undefined,
-        appUrl: '',
+        appUrl: prodBase,
         redirectUri: '',
         configured: false,
+        missingVars: [] as string[],
         errorCode: 'redirect_uri_mismatch' as const,
-        error: `Redirect URI mismatch: GOOGLE_REDIRECT_URI must be a valid HTTPS production URL (development, preview container, localhost, and dynamic container hosts are prohibited).`,
+        error: `Redirect URI mismatch: GOOGLE_REDIRECT_URI must be a valid HTTPS live production URL matching ${expectedRedirectUri}.`,
         authUrl: 'https://accounts.google.com/o/oauth2/v2/auth',
         tokenUrl: 'https://oauth2.googleapis.com/token',
         userInfoUrl: 'https://www.googleapis.com/oauth2/v2/userinfo',
@@ -1480,97 +1539,34 @@ export async function createApp(options: CreateAppOptions = {}) {
       };
     }
 
-    let redirectParsed: URL;
-    try {
-      redirectParsed = new URL(explicitRedirectUri);
-    } catch {
+    if (explicitRedirectUri !== expectedRedirectUri) {
       return {
         id: 'google' as const,
         name: 'Google',
         clientId: undefined,
         clientSecret: undefined,
-        appUrl: '',
+        appUrl: prodBase,
         redirectUri: '',
         configured: false,
+        missingVars: [] as string[],
         errorCode: 'redirect_uri_mismatch' as const,
-        error: 'Redirect URI mismatch: GOOGLE_REDIRECT_URI is not a valid URL.',
+        error: `Redirect URI mismatch: GOOGLE_REDIRECT_URI must exactly match ${expectedRedirectUri}.`,
         authUrl: 'https://accounts.google.com/o/oauth2/v2/auth',
         tokenUrl: 'https://oauth2.googleapis.com/token',
         userInfoUrl: 'https://www.googleapis.com/oauth2/v2/userinfo',
         scope: 'openid email profile',
       };
     }
-
-    if (!SUPPORTED_GOOGLE_CALLBACK_PATHS.includes(redirectParsed.pathname)) {
-      return {
-        id: 'google' as const,
-        name: 'Google',
-        clientId: undefined,
-        clientSecret: undefined,
-        appUrl: redirectParsed.origin,
-        redirectUri: '',
-        configured: false,
-        errorCode: 'redirect_uri_mismatch' as const,
-        error: `Redirect URI mismatch: GOOGLE_REDIRECT_URI path must match ${GOOGLE_OAUTH_CALLBACK_PATH}.`,
-        authUrl: 'https://accounts.google.com/o/oauth2/v2/auth',
-        tokenUrl: 'https://oauth2.googleapis.com/token',
-        userInfoUrl: 'https://www.googleapis.com/oauth2/v2/userinfo',
-        scope: 'openid email profile',
-      };
-    }
-
-    // If APP_URL is also provided in process.env, validate it is a valid HTTPS production domain on the same site
-    if (rawAppUrl) {
-      const prodBase = resolveProductionBaseUrl();
-      if (!prodBase) {
-        return {
-          id: 'google' as const,
-          name: 'Google',
-          clientId: undefined,
-          clientSecret: undefined,
-          appUrl: '',
-          redirectUri: '',
-          configured: false,
-          errorCode: 'redirect_uri_mismatch' as const,
-          error: 'Google OAuth configuration error: APP_URL must be a valid HTTPS production domain (development, preview container, localhost, and dynamic container hosts are prohibited).',
-          authUrl: 'https://accounts.google.com/o/oauth2/v2/auth',
-          tokenUrl: 'https://oauth2.googleapis.com/token',
-          userInfoUrl: 'https://www.googleapis.com/oauth2/v2/userinfo',
-          scope: 'openid email profile',
-        };
-      }
-
-      const appHostNormalized = new URL(prodBase).hostname.toLowerCase().replace(/^www\./, '');
-      const redirectHostNormalized = redirectParsed.hostname.toLowerCase().replace(/^www\./, '');
-      if (appHostNormalized !== redirectHostNormalized) {
-        return {
-          id: 'google' as const,
-          name: 'Google',
-          clientId: undefined,
-          clientSecret: undefined,
-          appUrl: prodBase,
-          redirectUri: '',
-          configured: false,
-          errorCode: 'redirect_uri_mismatch' as const,
-          error: `Redirect URI mismatch: GOOGLE_REDIRECT_URI domain (${redirectParsed.origin}) does not match APP_URL (${prodBase}).`,
-          authUrl: 'https://accounts.google.com/o/oauth2/v2/auth',
-          tokenUrl: 'https://oauth2.googleapis.com/token',
-          userInfoUrl: 'https://www.googleapis.com/oauth2/v2/userinfo',
-          scope: 'openid email profile',
-        };
-      }
-    }
-
-    const effectiveAppUrl = resolveProductionBaseUrl() || redirectParsed.origin;
 
     return {
       id: 'google' as const,
       name: 'Google',
       clientId,
       clientSecret,
-      appUrl: effectiveAppUrl,
-      redirectUri: explicitRedirectUri,
+      appUrl: prodBase,
+      redirectUri: expectedRedirectUri,
       configured: true,
+      missingVars: [] as string[],
       errorCode: null,
       error: null,
       authUrl: 'https://accounts.google.com/o/oauth2/v2/auth',
@@ -1582,25 +1578,29 @@ export async function createApp(options: CreateAppOptions = {}) {
 
   // 2. META / INSTAGRAM OAUTH CONFIGURATION (Separate from Google; uses official Meta OAuth dialog & Graph API)
   function getInstagramOAuthConfig() {
-    const clientId = cleanEnvValue(process.env.INSTAGRAM_CLIENT_ID) || undefined;
-    const clientSecret = cleanEnvValue(process.env.INSTAGRAM_CLIENT_SECRET) || undefined;
+    const clientId = readRuntimeEnv('INSTAGRAM_CLIENT_ID') || undefined;
+    const clientSecret = readRuntimeEnv('INSTAGRAM_CLIENT_SECRET') || undefined;
+    const explicitRedirect = readRuntimeEnv('INSTAGRAM_REDIRECT_URI').replace(/\/+$/, '');
+    const rawAppUrl = getRuntimeAppUrl();
     const prodBase = resolveProductionBaseUrl();
-    const explicitRedirect = cleanEnvValue(process.env.INSTAGRAM_REDIRECT_URI).replace(/\/+$/, '');
+
+    const missingVars: string[] = [];
+    if (!clientId) missingVars.push('INSTAGRAM_CLIENT_ID');
+    if (!clientSecret) missingVars.push('INSTAGRAM_CLIENT_SECRET');
+    if (!explicitRedirect && !rawAppUrl) missingVars.push('INSTAGRAM_REDIRECT_URI');
+
     const candidateRedirect = explicitRedirect || (prodBase ? `${prodBase}/api/auth/callback/instagram` : '');
     const isRedirectValid = candidateRedirect.length > 0 && !isForbiddenProductionUrl(candidateRedirect);
     const configured = Boolean(clientId && clientSecret && isRedirectValid);
 
     let error: string | null = null;
-    if (!clientId || !clientSecret) {
-      const missing: string[] = [];
-      if (!clientId) missing.push('INSTAGRAM_CLIENT_ID');
-      if (!clientSecret) missing.push('INSTAGRAM_CLIENT_SECRET');
-      error = `Missing Meta/Instagram OAuth credentials: Required environment variable(s) not set: ${missing.join(', ')}.`;
+    if (missingVars.length > 0) {
+      error = `Missing Meta/Instagram OAuth credentials: ${missingVars.join(', ')}`;
     } else if (!isRedirectValid) {
-      error = 'Meta/Instagram OAuth configuration error: Set INSTAGRAM_REDIRECT_URI to a valid HTTPS production callback URL.';
+      error = 'Meta/Instagram OAuth configuration error: Set INSTAGRAM_REDIRECT_URI and APP_URL to a valid HTTPS live domain.';
     }
 
-    const useInstagramBusinessLogin = cleanEnvValue(process.env.INSTAGRAM_OAUTH_FLOW) === 'instagram_business';
+    const useInstagramBusinessLogin = readRuntimeEnv('INSTAGRAM_OAUTH_FLOW') === 'instagram_business';
 
     return {
       id: 'instagram' as const,
@@ -1609,6 +1609,7 @@ export async function createApp(options: CreateAppOptions = {}) {
       clientSecret,
       redirectUri: isRedirectValid ? candidateRedirect : '',
       configured,
+      missingVars,
       error,
       useInstagramBusinessLogin,
       authUrl: useInstagramBusinessLogin
@@ -1620,7 +1621,7 @@ export async function createApp(options: CreateAppOptions = {}) {
       userInfoUrl: useInstagramBusinessLogin
         ? 'https://graph.instagram.com/v21.0/me?fields=id,username,name,profile_picture_url'
         : 'https://graph.facebook.com/v21.0/me?fields=id,name,email,picture',
-      scope: cleanEnvValue(process.env.INSTAGRAM_OAUTH_SCOPES) || (
+      scope: readRuntimeEnv('INSTAGRAM_OAUTH_SCOPES') || (
         useInstagramBusinessLogin
           ? 'instagram_business_basic'
           : 'public_profile,email'
@@ -1798,6 +1799,12 @@ export async function createApp(options: CreateAppOptions = {}) {
     }
 
     if (existingUser) {
+      logSafeOAuthEvent('oauth_user_lookup', {
+        provider: providerLabel.toLowerCase(),
+        result: 'found_existing',
+        userId: existingUser.id,
+        role: existingUser.role,
+      });
       return { user: existingUser, created: false };
     }
 
@@ -1832,8 +1839,15 @@ export async function createApp(options: CreateAppOptions = {}) {
 
     if (options.oauthUserRepo?.createUser) {
       const createdRecord = await options.oauthUserRepo.createUser(newUserRecord);
-      memoryStore.setUser(createdRecord || newUserRecord);
-      return { user: createdRecord || newUserRecord, created: true };
+      const resolvedCreated = createdRecord || newUserRecord;
+      memoryStore.setUser(resolvedCreated);
+      logSafeOAuthEvent('oauth_user_lookup', {
+        provider: providerLabel.toLowerCase(),
+        result: 'created_new_student',
+        userId: resolvedCreated.id,
+        role: resolvedCreated.role,
+      });
+      return { user: resolvedCreated, created: true };
     }
 
     if (dbConfiguredAtRuntime) {
@@ -1848,6 +1862,13 @@ export async function createApp(options: CreateAppOptions = {}) {
     memoryStore.setUser(newUserRecord);
     savePersistedUserUpdate(newUserId, newUserRecord);
     await logAudit('OAUTH_REGISTER', `New student account created via ${providerLabel}: ${cleanEmail}`, newUserId, newUserRecord.name, 'student', req);
+
+    logSafeOAuthEvent('oauth_user_lookup', {
+      provider: providerLabel.toLowerCase(),
+      result: 'created_new_student',
+      userId: newUserId,
+      role: 'student',
+    });
 
     return { user: newUserRecord, created: true };
   }
@@ -1870,6 +1891,10 @@ export async function createApp(options: CreateAppOptions = {}) {
         verifiedAvatar
       );
     } catch {
+      logSafeOAuthEvent('oauth_user_lookup', {
+        provider: providerLabel.toLowerCase(),
+        result: 'lookup_or_create_failed',
+      });
       return sendOAuthErrorResponse(
         req,
         res,
@@ -1881,6 +1906,10 @@ export async function createApp(options: CreateAppOptions = {}) {
 
     const targetUser = userLookupResult.user;
     if (!targetUser || !targetUser.id) {
+      logSafeOAuthEvent('oauth_user_lookup', {
+        provider: providerLabel.toLowerCase(),
+        result: 'empty_user_record',
+      });
       return sendOAuthErrorResponse(
         req,
         res,
@@ -1909,6 +1938,7 @@ export async function createApp(options: CreateAppOptions = {}) {
       email: targetUser.email,
       role: targetUser.role,
     });
+    const isHttps = isSecureCookieRequest(req);
     setSecureSessionCookie(req, res, sessionToken);
 
     let targetRedirectUrl = '/student/dashboard';
@@ -1918,11 +1948,20 @@ export async function createApp(options: CreateAppOptions = {}) {
       targetRedirectUrl = '/tutor/dashboard';
     }
 
+    logSafeOAuthEvent('oauth_session_created', {
+      provider: providerLabel.toLowerCase(),
+      userId: targetUser.id,
+      role: targetUser.role,
+      httpOnly: true,
+      secureCookie: isHttps,
+      redirectTo: targetRedirectUrl,
+    });
+
     return res.redirect(302, targetRedirectUrl);
   }
 
   // GET /api/auth/providers
-  // Reports provider readiness without exposing any client IDs or secrets
+  // Reports provider readiness and missing variable names ONLY (never exposes values, client IDs, or secrets)
   app.get('/api/auth/providers', (_req, res) => {
     const googleCfg = getGoogleOAuthConfig();
     const instagramCfg = getInstagramOAuthConfig();
@@ -1937,7 +1976,9 @@ export async function createApp(options: CreateAppOptions = {}) {
           configured: googleCfg.configured,
           name: 'Google',
           authUrl: '/api/auth/google/url',
+          callbackPath: GOOGLE_OAUTH_CALLBACK_PATH,
           redirectUri: googleCfg.redirectUri,
+          missingVars: googleCfg.missingVars,
           errorCode: googleCfg.errorCode,
           error: googleCfg.error,
         },
@@ -1951,7 +1992,9 @@ export async function createApp(options: CreateAppOptions = {}) {
           configured: instagramCfg.configured,
           name: 'Instagram',
           authUrl: '/api/auth/instagram/url',
+          callbackPath: '/api/auth/callback/instagram',
           redirectUri: instagramCfg.redirectUri,
+          missingVars: instagramCfg.missingVars,
           error: instagramCfg.error,
         },
         x: {
@@ -1978,9 +2021,16 @@ export async function createApp(options: CreateAppOptions = {}) {
   app.get('/api/auth/google/url', (req, res) => {
     const cfg = getGoogleOAuthConfig();
     if (!cfg.configured || !cfg.clientId || !cfg.clientSecret || !cfg.redirectUri) {
+      logSafeOAuthEvent('oauth_start', {
+        provider: 'google',
+        status: 'rejected_unconfigured',
+        errorCode: cfg.errorCode,
+        missingVars: cfg.missingVars,
+      });
       return res.status(400).json({
         success: false,
         code: cfg.errorCode || 'missing_oauth_credentials',
+        missingVars: cfg.missingVars,
         error: cfg.error || 'Google OAuth is not configured on this server.',
       });
     }
@@ -2009,6 +2059,13 @@ export async function createApp(options: CreateAppOptions = {}) {
       prompt: 'select_account',
     });
 
+    logSafeOAuthEvent('oauth_start', {
+      provider: 'google',
+      status: 'initiated',
+      redirectUri: cfg.redirectUri,
+      statePrefix: state.slice(0, 8),
+    });
+
     return res.status(200).json({
       success: true,
       url: `${cfg.authUrl}?${params.toString()}`,
@@ -2018,6 +2075,15 @@ export async function createApp(options: CreateAppOptions = {}) {
   const handleGoogleOAuthCallback = async (req: express.Request, res: express.Response) => {
     const cfg = getGoogleOAuthConfig();
     const isHttps = isSecureCookieRequest(req);
+
+    logSafeOAuthEvent('oauth_callback_received', {
+      provider: 'google',
+      path: req.path,
+      configured: cfg.configured,
+      hasCode: Boolean(req.query.code),
+      hasState: Boolean(req.query.state),
+      hasProviderError: Boolean(req.query.error),
+    });
 
     // Always clear one-time state cookie on callback execution
     const rawStateCookie = req.cookies?.oauth_state_google;
@@ -2040,21 +2106,14 @@ export async function createApp(options: CreateAppOptions = {}) {
       );
     }
 
-    const expectedCallbackPath = new URL(cfg.redirectUri).pathname;
-    if (req.path.replace(/\/+$/, '') !== expectedCallbackPath) {
-      return sendOAuthErrorResponse(
-        req,
-        res,
-        400,
-        'redirect_uri_mismatch',
-        `Redirect URI mismatch: Use the configured callback route ${expectedCallbackPath}.`
-      );
-    }
-
     const errorParam = (req.query.error || req.query.error_description) as string | undefined;
     if (errorParam) {
       const normalizedErr = String(errorParam).toLowerCase();
       if (normalizedErr.includes('redirect_uri_mismatch')) {
+        logSafeOAuthEvent('oauth_token_exchange_failure', {
+          provider: 'google',
+          reason: 'provider_redirect_uri_mismatch',
+        });
         return sendOAuthErrorResponse(
           req,
           res,
@@ -2063,6 +2122,10 @@ export async function createApp(options: CreateAppOptions = {}) {
           `Redirect URI mismatch: Google rejected the callback URL. Verify Google Cloud Console matches ${cfg.redirectUri}.`
         );
       }
+      logSafeOAuthEvent('oauth_token_exchange_failure', {
+        provider: 'google',
+        reason: 'provider_authorization_error',
+      });
       return sendOAuthErrorResponse(
         req,
         res,
@@ -2171,6 +2234,11 @@ export async function createApp(options: CreateAppOptions = {}) {
 
       const tokenData: any = await tokenRes.json().catch(() => ({}));
       if (tokenData?.error === 'redirect_uri_mismatch') {
+        logSafeOAuthEvent('oauth_token_exchange_failure', {
+          provider: 'google',
+          status: tokenRes.status,
+          reason: 'redirect_uri_mismatch',
+        });
         return sendOAuthErrorResponse(
           req,
           res,
@@ -2181,6 +2249,11 @@ export async function createApp(options: CreateAppOptions = {}) {
       }
 
       if (!tokenRes.ok || typeof tokenData?.access_token !== 'string' || !tokenData.access_token) {
+        logSafeOAuthEvent('oauth_token_exchange_failure', {
+          provider: 'google',
+          status: tokenRes.status,
+          reason: typeof tokenData?.error === 'string' ? tokenData.error : 'invalid_token_response',
+        });
         return sendOAuthErrorResponse(
           req,
           res,
@@ -2191,7 +2264,16 @@ export async function createApp(options: CreateAppOptions = {}) {
       }
 
       accessToken = tokenData.access_token;
+      logSafeOAuthEvent('oauth_token_exchange_success', {
+        provider: 'google',
+        status: tokenRes.status,
+      });
     } catch {
+      logSafeOAuthEvent('oauth_token_exchange_failure', {
+        provider: 'google',
+        status: 502,
+        reason: 'network_error',
+      });
       return sendOAuthErrorResponse(
         req,
         res,
@@ -2240,10 +2322,10 @@ export async function createApp(options: CreateAppOptions = {}) {
     return await finalizeOAuthUserSession(req, res, 'Google', profileEmail, profileName, profileAvatar);
   };
 
-  app.get(['/api/auth/callback/google', '/api/auth/google/callback'], handleGoogleOAuthCallback);
+  app.get(GOOGLE_OAUTH_CALLBACK_PATH, handleGoogleOAuthCallback);
 
-  // Explicit redirect URI mismatch diagnostic for invalid non-API Google callback paths
-  app.get(['/auth/google/callback', '/auth/callback/google'], (req, res) => {
+  // Explicit redirect URI mismatch diagnostic for non-canonical Google callback paths
+  app.get(['/api/auth/google/callback', '/auth/google/callback', '/auth/callback/google'], (req, res) => {
     return sendOAuthErrorResponse(
       req,
       res,
@@ -5503,11 +5585,20 @@ export async function createApp(options: CreateAppOptions = {}) {
 
 export async function startServer() {
   const app = await createApp();
+  const missingGoogleVars: string[] = [];
+  for (const key of ['GOOGLE_CLIENT_ID', 'GOOGLE_CLIENT_SECRET', 'GOOGLE_REDIRECT_URI', 'APP_URL'] as const) {
+    if (!readRuntimeEnv(key)) missingGoogleVars.push(key);
+  }
+  logSafeOAuthEvent('server_startup_oauth_check', {
+    googleConfigured: missingGoogleVars.length === 0 && !isForbiddenProductionUrl(getRuntimeAppUrl()) && !isForbiddenProductionUrl(readRuntimeEnv('GOOGLE_REDIRECT_URI')),
+    callbackRoute: GOOGLE_OAUTH_CALLBACK_PATH,
+    missingVars: missingGoogleVars,
+  });
   app.listen(PORT, '0.0.0.0', () => {
     console.log(`[FULLSTACK] Server running on http://0.0.0.0:${PORT} in ${NODE_ENV} mode.`);
   });
 }
 
-if (process.env.SKIP_AUTO_SERVER_START !== 'true') {
+if (readRuntimeEnv('SKIP_AUTO_SERVER_START') !== 'true') {
   startServer();
 }

@@ -167,6 +167,16 @@ export function isShakaEmail(email: string | undefined | null): boolean {
   return normalized === 'shaka.ahmadd@gmail.com' || normalized === 'shaka.ahmad@gmail.com';
 }
 
+export function apiFetch(endpoint: string, init: RequestInit = {}): Promise<Response> {
+  if (!endpoint.startsWith('/api/')) {
+    throw new Error(`Invalid API endpoint "${endpoint}": requests must target same-origin /api/* routes.`);
+  }
+  return fetch(endpoint, {
+    ...init,
+    credentials: 'include',
+  });
+}
+
 export class AppStore {
   users: User[] = [
     ...INITIAL_TUTORS,
@@ -245,13 +255,7 @@ export class AppStore {
       return null;
     }
     try {
-      const token = localStorage.getItem('auth_token');
-      const res = await fetch('/api/auth/me', {
-        credentials: 'include',
-        headers: {
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
-      });
+      const res = await apiFetch('/api/auth/me');
       if (res.ok) {
         const data = await res.json();
         if (data?.user?.id) {
@@ -292,7 +296,7 @@ export class AppStore {
   public async fetchData() {
     try {
       // 1. Fetch public users/tutors list and educational blogs (needed for public landing and blog pages)
-      const usersPromise = fetch('/api/users').then(async (res) => {
+      const usersPromise = apiFetch('/api/users').then(async (res) => {
         if (res.ok) {
           const uData = await res.json();
           if (Array.isArray(uData.users)) {
@@ -326,7 +330,7 @@ export class AppStore {
         }
       }).catch(() => {});
 
-      const tutorsPromise = fetch('/api/tutors?limit=1000').then(async (res) => {
+      const tutorsPromise = apiFetch('/api/tutors?limit=1000').then(async (res) => {
         if (res.ok) {
           const tData = await res.json();
           if (Array.isArray(tData.tutors)) {
@@ -341,7 +345,7 @@ export class AppStore {
         }
       }).catch(() => {});
 
-      const blogsPromise = fetch('/api/blogs').then(async (res) => {
+      const blogsPromise = apiFetch('/api/blogs').then(async (res) => {
         if (res.ok) {
           const bData = await res.json();
           if (Array.isArray(bData.blogs) && bData.blogs.length > 0) {
@@ -366,7 +370,7 @@ export class AppStore {
       }
 
       // 2. For logged-in users, run all private requests in parallel
-      const ordersPromise = fetch('/api/orders').then(async (res) => {
+      const ordersPromise = apiFetch('/api/orders').then(async (res) => {
         if (res.ok) {
           const oData = await res.json();
           if (Array.isArray(oData.orders)) {
@@ -380,7 +384,7 @@ export class AppStore {
         }
       }).catch(() => {});
 
-      const roomsPromise = fetch('/api/chat-rooms').then(async (res) => {
+      const roomsPromise = apiFetch('/api/chat-rooms').then(async (res) => {
         if (res.ok) {
           const rData = await res.json();
           if (Array.isArray(rData.rooms) && rData.rooms.length > 0) {
@@ -411,7 +415,7 @@ export class AppStore {
         }
       }).catch(() => {});
 
-      const msgsPromise = fetch('/api/messages').then(async (res) => {
+      const msgsPromise = apiFetch('/api/messages').then(async (res) => {
         if (res.ok) {
           const mData = await res.json();
           if (Array.isArray(mData.messages)) {
@@ -423,7 +427,7 @@ export class AppStore {
         }
       }).catch(() => {});
 
-      const quotesPromise = fetch('/api/quotes').then(async (res) => {
+      const quotesPromise = apiFetch('/api/quotes').then(async (res) => {
         if (res.ok) {
           const qData = await res.json();
           if (Array.isArray(qData.quotes)) {
@@ -433,7 +437,7 @@ export class AppStore {
       }).catch(() => {});
 
       const isStaff = this.currentUser?.role === UserRole.ADMIN || (this.currentUser?.role as string) === 'admin';
-      const auditPromise = isStaff ? fetch('/api/audit-logs').then(async (res) => {
+      const auditPromise = isStaff ? apiFetch('/api/audit-logs').then(async (res) => {
         if (res.ok) {
           const lData = await res.json();
           if (Array.isArray(lData.logs)) {
@@ -450,7 +454,7 @@ export class AppStore {
         }
       }).catch(() => {}) : Promise.resolve();
 
-      const paymentsPromise = fetch('/api/payments').then(async (res) => {
+      const paymentsPromise = apiFetch('/api/payments').then(async (res) => {
         if (res.ok) {
           const pData = await res.json();
           if (Array.isArray(pData.payments)) {
@@ -459,7 +463,7 @@ export class AppStore {
         }
       }).catch(() => {});
 
-      const invoicesPromise = fetch('/api/invoices').then(async (res) => {
+      const invoicesPromise = apiFetch('/api/invoices').then(async (res) => {
         if (res.ok) {
           const iData = await res.json();
           if (Array.isArray(iData.invoices)) {
@@ -468,7 +472,7 @@ export class AppStore {
         }
       }).catch(() => {});
 
-      const notifsPromise = fetch(`/api/notifications?userId=${encodeURIComponent(this.currentUser?.id || '')}`).then(async (res) => {
+      const notifsPromise = apiFetch(`/api/notifications?userId=${encodeURIComponent(this.currentUser?.id || '')}`).then(async (res) => {
         if (res.ok) {
           const nData = await res.json();
           if (Array.isArray(nData.notifications) && nData.notifications.length > 0) {
@@ -520,9 +524,9 @@ export class AppStore {
     this.notify();
     try {
       // Query room messages from new endpoint with fallback
-      let res = await fetch(`/api/chat-rooms/${encodeURIComponent(chatId)}/messages`);
+      let res = await apiFetch(`/api/chat-rooms/${encodeURIComponent(chatId)}/messages`);
       if (!res.ok && res.status !== 401 && res.status !== 403) {
-        res = await fetch(`/api/messages?chatId=${encodeURIComponent(chatId)}`);
+        res = await apiFetch(`/api/messages?chatId=${encodeURIComponent(chatId)}`);
       }
       if (res.ok) {
         const data = await res.json();
@@ -685,7 +689,7 @@ export class AppStore {
     if (user) {
       user.verified = true;
       this.notify();
-      fetch(`/api/users/${userId}`, {
+      apiFetch(`/api/users/${userId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ verified: true })
@@ -698,7 +702,7 @@ export class AppStore {
     if (user) {
       user.suspended = !user.suspended;
       this.notify();
-      fetch(`/api/users/${userId}`, {
+      apiFetch(`/api/users/${userId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ suspended: user.suspended })
@@ -711,7 +715,7 @@ export class AppStore {
     if (user) {
       user.role = targetRole;
       this.notify();
-      fetch(`/api/users/${userId}`, {
+      apiFetch(`/api/users/${userId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ role: targetRole })
@@ -730,11 +734,10 @@ export class AppStore {
       this.users[userIndex] = { ...this.users[userIndex], ...data };
       if (this.currentUser?.id === userId) {
         this.currentUser = { ...this.currentUser, ...data };
-        localStorage.setItem('ut_current_user', JSON.stringify(this.currentUser));
       }
       this.notify();
       try {
-        await fetch(`/api/users/${userId}`, {
+        await apiFetch(`/api/users/${userId}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(data)
@@ -752,9 +755,8 @@ export class AppStore {
   // Password reset methods - connected strictly to server API endpoints (never receives or logs reset tokens)
   async requestPasswordReset(email: string): Promise<boolean> {
     const cleanEmail = email.toLowerCase().trim();
-    const res = await fetch('/api/auth/forgot-password', {
+    const res = await apiFetch('/api/auth/forgot-password', {
       method: 'POST',
-      credentials: 'include',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email: cleanEmail })
     });
@@ -767,9 +769,8 @@ export class AppStore {
 
   async resetPassword(email: string, token: string, newPassword: string): Promise<boolean> {
     const cleanEmail = email.toLowerCase().trim();
-    const res = await fetch('/api/auth/reset-password', {
+    const res = await apiFetch('/api/auth/reset-password', {
       method: 'POST',
-      credentials: 'include',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email: cleanEmail, token, newPassword })
     });
@@ -779,10 +780,6 @@ export class AppStore {
     }
     if (data.user) {
       this.currentUser = data.user;
-      localStorage.setItem('ut_current_user', JSON.stringify(data.user));
-    }
-    if (data.token) {
-      localStorage.setItem('auth_token', data.token);
     }
     this.notify();
     return true;
@@ -811,7 +808,7 @@ export class AppStore {
     this.notify();
 
     // Persist room to backend
-    fetch('/api/chat-rooms', {
+    apiFetch('/api/chat-rooms', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -867,7 +864,7 @@ export class AppStore {
     this.notify();
 
     try {
-      const res = await fetch(`/api/chat-rooms/${encodeURIComponent(chatId)}/messages`, {
+      const res = await apiFetch(`/api/chat-rooms/${encodeURIComponent(chatId)}/messages`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -884,7 +881,7 @@ export class AppStore {
 
       if (!res.ok) {
         // Fallback to /api/messages if /api/chat-rooms/:id not matched
-        const fallbackRes = await fetch('/api/messages', {
+        const fallbackRes = await apiFetch('/api/messages', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -988,7 +985,7 @@ export class AppStore {
     this.quotes.push(newQuote);
     this.notify();
 
-    fetch('/api/quotes', {
+    apiFetch('/api/quotes', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -1018,7 +1015,7 @@ export class AppStore {
       quote.status = status;
       this.notify();
 
-      fetch(`/api/quotes/${quoteId}`, {
+      apiFetch(`/api/quotes/${quoteId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status })
@@ -1065,7 +1062,7 @@ export class AppStore {
     this.assignments.unshift(newAssignment);
     this.notify();
 
-    fetch('/api/orders', {
+    apiFetch('/api/orders', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -1107,7 +1104,7 @@ export class AppStore {
     assign.status = AssignmentStatus.AWAITING_PAYMENT;
     this.notify();
 
-    fetch(`/api/orders/${assign.id}`, {
+    apiFetch(`/api/orders/${assign.id}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ quoteAmount, status: assign.status })
@@ -1121,7 +1118,7 @@ export class AppStore {
     if (assign) {
       assign.status = status;
       this.notify();
-      fetch(`/api/orders/${assignmentId}`, {
+      apiFetch(`/api/orders/${assignmentId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status })
@@ -1135,7 +1132,7 @@ export class AppStore {
       assign.tutorId = tutorId;
       assign.status = AssignmentStatus.IN_PROGRESS;
       this.notify();
-      fetch(`/api/orders/${assignmentId}`, {
+      apiFetch(`/api/orders/${assignmentId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ tutorId, status: assign.status })
@@ -1152,7 +1149,7 @@ export class AppStore {
     if (assign) {
       assign.progressPercent = progressPercent;
       this.notify();
-      fetch(`/api/orders/${assignmentId}`, {
+      apiFetch(`/api/orders/${assignmentId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ progressPercent })
@@ -1165,7 +1162,7 @@ export class AppStore {
     if (assign) {
       assign.quoteAmount = price;
       this.notify();
-      fetch(`/api/orders/${assignmentId}`, {
+      apiFetch(`/api/orders/${assignmentId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ quoteAmount: price })
@@ -1181,7 +1178,7 @@ export class AppStore {
       assign.tutorWorkFileUrl = fileUrl;
       assign.tutorWorkFileName = fileName;
       this.notify();
-      fetch(`/api/orders/${assignmentId}`, {
+      apiFetch(`/api/orders/${assignmentId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -1199,7 +1196,7 @@ export class AppStore {
     if (assign) {
       assign.reviewed = true;
       this.notify();
-      fetch(`/api/orders/${assignmentId}`, {
+      apiFetch(`/api/orders/${assignmentId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ reviewed: true, escrowStatus: 'released' })
@@ -1225,7 +1222,7 @@ export class AppStore {
     if (assign) {
       assign.status = AssignmentStatus.REVISION;
       this.notify();
-      fetch(`/api/orders/${assignmentId}`, {
+      apiFetch(`/api/orders/${assignmentId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status: AssignmentStatus.REVISION, instructions: assign.instructions + '\n\n[REVISION NOTES]: ' + revisionNotes })
@@ -1240,7 +1237,7 @@ export class AppStore {
       this.notify();
     }
     try {
-      const res = await fetch(`/api/orders/${assignmentId}`, {
+      const res = await apiFetch(`/api/orders/${assignmentId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(updates)
@@ -1255,7 +1252,7 @@ export class AppStore {
     this.assignments = this.assignments.filter(a => a.id !== assignmentId);
     this.notify();
     try {
-      const res = await fetch(`/api/orders/${assignmentId}`, {
+      const res = await apiFetch(`/api/orders/${assignmentId}`, {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' }
       });
@@ -1312,7 +1309,7 @@ export class AppStore {
     this.notify();
 
     try {
-      const res = await fetch('/api/orders', {
+      const res = await apiFetch('/api/orders', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -1337,7 +1334,7 @@ export class AppStore {
     if (assign) {
       assign.escrowStatus = 'released';
       this.notify();
-      fetch(`/api/orders/${assignmentId}`, {
+      apiFetch(`/api/orders/${assignmentId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ escrowStatus: 'released' })
@@ -1367,7 +1364,7 @@ export class AppStore {
     this.invoices.push(newInvoice);
     this.notify();
 
-    fetch('/api/invoices', {
+    apiFetch('/api/invoices', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(newInvoice)
@@ -1385,7 +1382,7 @@ export class AppStore {
     notes?: string;
   }): Promise<Payment | null> {
     try {
-      const res = await fetch('/api/payments', {
+      const res = await apiFetch('/api/payments', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(paymentData)
@@ -1445,7 +1442,7 @@ export class AppStore {
     this.appNotifications.unshift(newNotif);
     this.notify();
 
-    fetch('/api/notifications', {
+    apiFetch('/api/notifications', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(newNotif)
@@ -1460,7 +1457,7 @@ export class AppStore {
       notif.read = true;
       this.notify();
 
-      fetch(`/api/notifications/${notifId}/read`, {
+      apiFetch(`/api/notifications/${notifId}/read`, {
         method: 'PUT'
       }).catch(() => {});
     }
@@ -1472,7 +1469,7 @@ export class AppStore {
     );
     this.notify();
 
-    fetch('/api/notifications/mark-all-read', {
+    apiFetch('/api/notifications/mark-all-read', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ userId })
@@ -1489,7 +1486,7 @@ export class AppStore {
     this.activityLogs.unshift(newLog);
     this.notify();
 
-    fetch('/api/audit-logs', {
+    apiFetch('/api/audit-logs', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -1577,11 +1574,10 @@ export class AppStore {
     this.notify();
 
     try {
-      const res = await fetch('/api/blogs', {
+      const res = await apiFetch('/api/blogs', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          ...(localStorage.getItem('auth_token') ? { 'Authorization': `Bearer ${localStorage.getItem('auth_token')}` } : {})
         },
         body: JSON.stringify(blogPayload)
       });
@@ -1612,11 +1608,8 @@ export class AppStore {
     this.notify();
 
     try {
-      await fetch(`/api/blogs/${encodeURIComponent(blogId)}`, {
+      await apiFetch(`/api/blogs/${encodeURIComponent(blogId)}`, {
         method: 'DELETE',
-        headers: {
-          ...(localStorage.getItem('auth_token') ? { 'Authorization': `Bearer ${localStorage.getItem('auth_token')}` } : {})
-        }
       });
     } catch (e) {
       console.warn('[STORE] Network notice deleting blog from server:', e);
@@ -1647,11 +1640,10 @@ export class AppStore {
     }
 
     try {
-      await fetch(`/api/blogs/${encodeURIComponent(blogId)}`, {
+      await apiFetch(`/api/blogs/${encodeURIComponent(blogId)}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
-          ...(localStorage.getItem('auth_token') ? { 'Authorization': `Bearer ${localStorage.getItem('auth_token')}` } : {})
         },
         body: JSON.stringify(updates)
       });
@@ -1662,11 +1654,10 @@ export class AppStore {
 
   async syncDefaultBlogs(): Promise<boolean> {
     try {
-      const res = await fetch('/api/blogs/sync-defaults', {
+      const res = await apiFetch('/api/blogs/sync-defaults', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          ...(localStorage.getItem('auth_token') ? { 'Authorization': `Bearer ${localStorage.getItem('auth_token')}` } : {})
         }
       });
       if (res.ok) {
@@ -1882,7 +1873,7 @@ export class AppStore {
     if (assign) {
       assign.status = AssignmentStatus.PENDING;
       this.notify();
-      fetch(`/api/orders/${assignmentId}`, {
+      apiFetch(`/api/orders/${assignmentId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ escrowStatus: 'refunded', status: AssignmentStatus.PENDING })

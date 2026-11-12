@@ -236,7 +236,7 @@ export default function AdminDashboard({
     setAuditError(null);
     try {
       console.log("[DIAGNOSTICS] Beginning PostgreSQL users cross-reference audit...");
-      const res = await fetch('/api/users');
+      const res = await fetch('/api/users', { credentials: 'include' });
       const data = await res.json();
       const fetchedUsers = (data.users || []) as User[];
       setDbUsers(fetchedUsers);
@@ -274,7 +274,7 @@ export default function AdminDashboard({
       console.log(`[DIAGNOSTICS] Running live PostgreSQL messages test query for chat: ${chatId}`);
       
       const hasLocalMessages = messages.some(m => m.chatId === chatId);
-      const res = await fetch(`/api/messages?chatId=${encodeURIComponent(chatId)}`);
+      const res = await fetch(`/api/messages?chatId=${encodeURIComponent(chatId)}`, { credentials: 'include' });
       const data = await res.json();
       const chatMessages = (data.messages || []) as Message[];
       

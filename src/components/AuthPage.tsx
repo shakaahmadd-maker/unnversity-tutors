@@ -67,7 +67,12 @@ type SocialProviderKey = 'google' | 'apple' | 'instagram' | 'x' | 'linkedin';
 export default function AuthPage({ onLogin, onRegister, onNavigate }: AuthPageProps) {
   const [activeTab, setActiveTab] = useState<'signin' | 'signup'>('signin');
   const [providersLoaded, setProvidersLoaded] = useState(false);
-  const [providers, setProviders] = useState<Record<SocialProviderKey, { configured: boolean; name: string; redirectUri?: string; error?: string | null }>>({
+  const [providers, setProviders] = useState<
+    Record<
+      SocialProviderKey,
+      { configured: boolean; name: string; redirectUri?: string; missingVars?: string[]; error?: string | null }
+    >
+  >({
     google: { configured: false, name: 'Google' },
     apple: { configured: false, name: 'Apple' },
     instagram: { configured: false, name: 'Instagram' },
@@ -356,11 +361,16 @@ export default function AuthPage({ onLogin, onRegister, onNavigate }: AuthPagePr
       return;
     }
 
-    setErrorMsg('');
-    setSuccessMsg('');
-
     const p = providers[providerKey];
     const providerName = p?.name || providerKey.toUpperCase();
+
+    // Do not initiate OAuth if backend reports provider is not configured
+    if (!providersLoaded || !p?.configured) {
+      return;
+    }
+
+    setErrorMsg('');
+    setSuccessMsg('');
 
     authRequestLockRef.current = true;
     setIsSubmitting(true);
@@ -729,18 +739,29 @@ export default function AuthPage({ onLogin, onRegister, onNavigate }: AuthPagePr
 
             <div className="flex flex-wrap items-center justify-center gap-2.5">
               {visibleProviderKeys.map((providerKey) => {
-                const providerName = providers[providerKey]?.name || providerKey;
+                const providerInfo = providers[providerKey];
+                const providerName = providerInfo?.name || providerKey;
+                const isProviderConfigured = providersLoaded && providerInfo?.configured === true;
                 const isLoadingThis = activeOAuthProvider === providerKey && isSubmitting;
                 return (
                   <button
                     key={providerKey}
                     type="button"
                     id={`social-login-${providerKey}`}
-                    disabled={isSubmitting}
+                    disabled={!isProviderConfigured || isSubmitting}
+                    aria-disabled={!isProviderConfigured || isSubmitting}
                     onClick={() => handleSocialAuth(providerKey)}
-                    title={`Continue with ${providerName}`}
+                    title={
+                      isProviderConfigured
+                        ? `Continue with ${providerName}`
+                        : providerInfo?.error || `${providerName} login is not configured`
+                    }
                     aria-label={`Continue with ${providerName}`}
-                    className="flex-1 min-w-[130px] flex items-center justify-center gap-2 py-2.5 px-3.5 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-xl transition-all duration-150 hover:shadow-xs active:scale-95 text-slate-800 text-xs font-bold cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
+                    className={`flex-1 min-w-[130px] flex items-center justify-center gap-2 py-2.5 px-3.5 border rounded-xl transition-all duration-150 text-xs font-bold ${
+                      isProviderConfigured
+                        ? 'bg-slate-50 hover:bg-slate-100 border-slate-200 hover:shadow-xs active:scale-95 text-slate-800 cursor-pointer'
+                        : 'bg-slate-100/70 border-slate-200/70 text-slate-400 opacity-55 cursor-not-allowed'
+                    } disabled:cursor-not-allowed`}
                   >
                     {renderSocialProviderIcon(providerKey)}
                     <span>{isLoadingThis ? 'Redirecting...' : providerName}</span>
@@ -886,18 +907,29 @@ export default function AuthPage({ onLogin, onRegister, onNavigate }: AuthPagePr
 
             <div className="flex flex-wrap items-center justify-center gap-2.5">
               {visibleProviderKeys.map((providerKey) => {
-                const providerName = providers[providerKey]?.name || providerKey;
+                const providerInfo = providers[providerKey];
+                const providerName = providerInfo?.name || providerKey;
+                const isProviderConfigured = providersLoaded && providerInfo?.configured === true;
                 const isLoadingThis = activeOAuthProvider === providerKey && isSubmitting;
                 return (
                   <button
                     key={providerKey}
                     type="button"
                     id={`social-signup-${providerKey}`}
-                    disabled={isSubmitting}
+                    disabled={!isProviderConfigured || isSubmitting}
+                    aria-disabled={!isProviderConfigured || isSubmitting}
                     onClick={() => handleSocialAuth(providerKey)}
-                    title={`Continue with ${providerName}`}
+                    title={
+                      isProviderConfigured
+                        ? `Continue with ${providerName}`
+                        : providerInfo?.error || `${providerName} login is not configured`
+                    }
                     aria-label={`Continue with ${providerName}`}
-                    className="flex-1 min-w-[130px] flex items-center justify-center gap-2 py-2.5 px-3.5 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-xl transition-all duration-150 hover:shadow-xs active:scale-95 text-slate-800 text-xs font-bold cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
+                    className={`flex-1 min-w-[130px] flex items-center justify-center gap-2 py-2.5 px-3.5 border rounded-xl transition-all duration-150 text-xs font-bold ${
+                      isProviderConfigured
+                        ? 'bg-slate-50 hover:bg-slate-100 border-slate-200 hover:shadow-xs active:scale-95 text-slate-800 cursor-pointer'
+                        : 'bg-slate-100/70 border-slate-200/70 text-slate-400 opacity-55 cursor-not-allowed'
+                    } disabled:cursor-not-allowed`}
                   >
                     {renderSocialProviderIcon(providerKey)}
                     <span>{isLoadingThis ? 'Redirecting...' : providerName}</span>

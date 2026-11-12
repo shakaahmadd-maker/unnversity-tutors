@@ -89,7 +89,7 @@ export default function UserDataPage({
   const handleRefreshData = async () => {
     setIsRefreshing(true);
     try {
-      const res = await fetch('/api/users');
+      const res = await fetch('/api/users', { credentials: 'include' });
       if (res.ok) {
         const data = await res.json();
         if (data.users && Array.isArray(data.users)) {

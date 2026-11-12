@@ -1019,12 +1019,11 @@ export default function App() {
     }
 
     try {
-      const sessionToken = localStorage.getItem('auth_token') || '';
       const response = await fetch('/api/create-privileged-user', {
         method: 'POST',
+        credentials: 'include',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${sessionToken}`
         },
         body: JSON.stringify({
           name,
@@ -1271,12 +1270,12 @@ export default function App() {
             <div className="py-20 text-center bg-white m-8 rounded-3xl border shadow-xs max-w-sm mx-auto space-y-4">
               <span className="text-4xl">🔒</span>
               <h3 className="font-sans font-bold text-lg text-gray-950">Dashboard Locked</h3>
-              <p className="text-xs text-gray-500 px-6">Please authenticate using mock credentials or use the Quick Audit selectors in the header banner.</p>
+              <p className="text-xs text-gray-500 px-6">Please sign in to access your dashboard.</p>
               <button 
                 onClick={() => setActiveView('auth')} 
                 className="bg-orange-500 hover:bg-orange-650 text-white font-bold text-xs px-6 py-2.5 rounded-xl cursor-pointer"
               >
-                Authenticate Now
+                Sign In
               </button>
             </div>
           )

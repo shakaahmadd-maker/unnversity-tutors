@@ -352,13 +352,11 @@ export default function TutorsListAdmin({
     };
 
     try {
-      const token = localStorage.getItem('auth_token');
       const res = await fetch(`/api/admin/tutors/${editingTutor.id}`, {
         method: 'PUT',
         credentials: 'include',
         headers: {
           'Content-Type': 'application/json',
-          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
         },
         body: JSON.stringify(updatedData)
       });
@@ -444,6 +442,7 @@ export default function TutorsListAdmin({
 
       const res = await fetch('/api/admin/tutors', {
         method: 'POST',
+        credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
       });

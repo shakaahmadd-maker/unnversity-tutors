@@ -273,6 +273,7 @@ export default function StudentDashboard({
       }
       await fetch(`/api/users/${currentUser.id}`, {
         method: 'PUT',
+        credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ avatarUrl: customAvatarPreview })
       });
