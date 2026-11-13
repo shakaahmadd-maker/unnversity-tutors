@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo, lazy, Suspense } from 'react';
 import Header from './components/Header';
 const Footer = lazy(() => import('./components/Footer'));
-import CookieBanner from './components/CookieBanner';
+const CookieBanner = lazy(() => import('./components/CookieBanner'));
 import ErrorBoundary from './components/ErrorBoundary';
 import { apiFetch } from './lib/apiClient';
 
@@ -331,7 +331,7 @@ export default function App() {
   useEffect(() => {
     const handleOAuthMessage = async (event: MessageEvent) => {
       if (event.data?.type === 'OAUTH_AUTH_SUCCESS') {
-        const verifiedUser = await store.verifySession();
+        const verifiedUser = await store.verifySession(true, true);
         if (!verifiedUser) {
           return;
         }
@@ -353,6 +353,39 @@ export default function App() {
       store.subscribeToChatDetails(activeChat.id);
     }
   }, [activeChat]);
+
+  // Load & display an individual tutor profile by ID (works for both store users and live API tutors)
+  const openTutorProfileById = async (tutorId: string, pushUrl = true) => {
+    const cleanId = tutorId.trim();
+    if (!cleanId) return;
+    if (pushUrl) {
+      window.history.pushState(null, '', `/tutor/${encodeURIComponent(cleanId)}`);
+    }
+    const localMatch = store.users.find((u) => u.id === cleanId);
+    if (localMatch) {
+      setSelectedTutorProfile(localMatch);
+      setActiveView('tutor-profile');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
+    try {
+      const res = await apiFetch(`/api/tutors/${encodeURIComponent(cleanId)}`);
+      if (res.ok) {
+        const data = await res.json();
+        if (data?.tutor) {
+          setSelectedTutorProfile(data.tutor);
+          setActiveView('tutor-profile');
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+          return;
+        }
+      }
+    } catch {
+      // Fall back to tutors directory if profile lookup fails
+    }
+    setSelectedTutorProfile(null);
+    setActiveView('tutors-directory');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
 
   // Unified navigation handler that updates the window URL path and changes state
   const handleNavigate = (view: string) => {
@@ -472,6 +505,37 @@ export default function App() {
       return;
     }
 
+    if (
+      view.startsWith('tutor-profile:') ||
+      view.startsWith('/tutor-profile/') ||
+      (view.startsWith('/tutor/') && view !== '/tutor/dashboard')
+    ) {
+      const tutorId = decodeURIComponent(
+        view
+          .replace(/^tutor-profile:/, '')
+          .replace(/^\/tutor-profile\//, '')
+          .replace(/^\/tutor\//, '')
+          .split('?')[0]
+          .split('#')[0]
+          .trim()
+      );
+      if (tutorId) {
+        void openTutorProfileById(tutorId, true);
+        return;
+      }
+    }
+
+    if (view.startsWith('book-tutor:')) {
+      const tutorId = decodeURIComponent(view.replace('book-tutor:', '').trim());
+      if (tutorId) {
+        handleOpenChat(
+          tutorId,
+          'Hi! I found your profile on University-Tutors.com and would like to book a 1-on-1 tutoring session.'
+        );
+        return;
+      }
+    }
+
     if (view.startsWith('search-tutors:')) {
       const q = decodeURIComponent(view.replace('search-tutors:', ''));
       setSelectedTutorProfile(null);
@@ -589,6 +653,8 @@ export default function App() {
       view.startsWith('online-tutoring-')
     ) {
       void store.ensureFullDirectoryLoaded();
+    } else if (view === 'blog' || view.startsWith('blog-') || view === 'services' || view === 'about') {
+      void store.ensureCatalogDataLoaded();
     }
 
     window.history.pushState(null, '', path);
@@ -812,6 +878,15 @@ export default function App() {
       ) {
         setIsSopModalOpen(true);
       } else if (
+        (decodedPath.startsWith('/tutor/') && decodedPath !== '/tutor/dashboard') ||
+        decodedPath.startsWith('/tutor-profile/')
+      ) {
+        const rawSegments = rawPath.split('/').filter(Boolean);
+        const rawId = rawSegments.length >= 2 ? decodeURIComponent(rawSegments[1]) : '';
+        if (rawId) {
+          void openTutorProfileById(rawId, false);
+        }
+      } else if (
         decodedPath === '' || 
         decodedPath === '/' || 
         decodedPath === '/home' || 
@@ -983,6 +1058,16 @@ export default function App() {
             setActiveView('auth');
           }
           window.scrollTo({ top: 0, behavior: 'smooth' });
+        } else if (
+          (href.startsWith('/tutor/') && href !== '/tutor/dashboard') ||
+          href.startsWith('/tutor-profile/')
+        ) {
+          e.preventDefault();
+          const rawHref = anchor.getAttribute('href') || href;
+          const cleanId = decodeURIComponent(rawHref.replace(/^\/?(tutor-profile|tutor)\//i, '').split('?')[0].split('#')[0].trim());
+          if (cleanId) {
+            void openTutorProfileById(cleanId, true);
+          }
         }
       }
     };
@@ -1038,6 +1123,10 @@ export default function App() {
   const handleOpenChat = (tutorId: string, initialMessage?: string): Chat | undefined => {
     if (!storeState.currentUser) {
       setActiveView('auth');
+      if (typeof window !== 'undefined') {
+        window.history.pushState(null, '', '/auth');
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      }
       return undefined;
     }
     const chat = store.getOrCreateChat(storeState.currentUser.id, tutorId, 'Direct Consultation');
@@ -1292,16 +1381,41 @@ export default function App() {
   };
 
   // On-call consult tracker from main forms
-  const handleOnCallConsultInput = (msg: string) => {
+  const handleOnCallConsultInput = useCallback((msg: string) => {
     // Automatically find Clara Stirling and open a connection chat logs
-    if (storeState.currentUser) {
-      const chat = store.getOrCreateChat(storeState.currentUser.id, 'tutor_clara', 'General Inquiry');
-      store.sendMessage(chat.id, storeState.currentUser.id, msg);
+    const current = store.currentUser;
+    if (current) {
+      const chat = store.getOrCreateChat(current.id, 'tutor_clara', 'General Inquiry');
+      store.sendMessage(chat.id, current.id, msg);
       setActiveChat(chat);
     } else {
       setActiveView('auth');
     }
-  };
+  }, []);
+
+  const handleOpenBecomeTutor = useCallback(() => {
+    setIsBecomeTutorOpen(true);
+  }, []);
+
+  const handleMarketingTutorSelect = useCallback((tutorObj: User) => {
+    const current = store.currentUser;
+    if (!current) {
+      setActiveView('auth');
+      if (typeof window !== 'undefined') {
+        window.history.pushState(null, '', '/auth');
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      }
+      return;
+    }
+    const chat = store.getOrCreateChat(current.id, tutorObj.id, 'Direct Consultation');
+    setActiveChat(chat);
+  }, []);
+
+  const handleSelectTutorProfile = useCallback((tutorObj: User) => {
+    setSelectedTutorProfile(tutorObj);
+    setActiveView('tutor-profile');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }, []);
 
   // Separate tutors to pass to dropdown triggers (only approved tutors visible on public website)
   const mentorsList = useMemo(
@@ -1360,7 +1474,7 @@ export default function App() {
           onLogout={handleLogout}
           onQuickLogin={handleQuickLogin}
           studentsOnline={storeState.activeStudentsOnline}
-          onOpenBecomeTutor={() => setIsBecomeTutorOpen(true)}
+          onOpenBecomeTutor={handleOpenBecomeTutor}
         />
       )}
 
@@ -1666,14 +1780,8 @@ export default function App() {
             blogs={storeState.blogs}
             faqs={storeState.faqs}
             onNavigate={handleNavigate}
-            onTutorSelect={(tutorObj) => {
-              handleOpenChat(tutorObj.id);
-            }}
-            onSelectTutorProfile={(tutorObj) => {
-              setSelectedTutorProfile(tutorObj);
-              setActiveView('tutor-profile');
-              window.scrollTo({ top: 0, behavior: 'smooth' });
-            }}
+            onTutorSelect={handleMarketingTutorSelect}
+            onSelectTutorProfile={handleSelectTutorProfile}
             onRaisedConsult={handleOnCallConsultInput}
           />
         )}
@@ -1690,7 +1798,7 @@ export default function App() {
           <button
             id="trigger-whatsapp-chat-modal"
             onClick={() => setIsWhatsAppModalOpen(true)}
-            className="group bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white w-9.5 h-9.5 sm:w-auto sm:h-auto p-2 sm:px-4 sm:py-2.5 rounded-full shadow-md sm:shadow-2xl transition-all hover:scale-105 active:scale-95 cursor-pointer flex items-center justify-center font-bold gap-2 border border-emerald-400/40"
+            className="group bg-emerald-700 hover:bg-emerald-800 active:bg-emerald-900 text-white w-11 h-11 min-w-[44px] min-h-[44px] sm:w-auto sm:h-auto p-2.5 sm:px-4 sm:py-2.5 rounded-full shadow-md sm:shadow-2xl transition-all hover:scale-105 active:scale-95 cursor-pointer flex items-center justify-center font-bold gap-2 border border-emerald-400/40"
             title="Open WhatsApp Instant Chat"
           >
             <div className="relative flex items-center justify-center shrink-0">
@@ -1721,13 +1829,15 @@ export default function App() {
           >
             <Footer
               onNavigate={handleNavigate}
-              onOpenBecomeTutor={() => setIsBecomeTutorOpen(true)}
+              onOpenBecomeTutor={handleOpenBecomeTutor}
             />
           </Suspense>
         )}
 
       {/* 3. Consent cookie banner disclosure */}
-      <CookieBanner />
+      <Suspense fallback={null}>
+        <CookieBanner />
+      </Suspense>
 
       {/* Lazy Modals Suspense container — mounted only when actually opened so homepage skips downloading hidden modal chunks */}
       <Suspense fallback={null}>

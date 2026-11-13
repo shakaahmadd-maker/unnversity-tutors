@@ -1,14 +1,33 @@
 import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
 import path from 'path';
-import { defineConfig } from 'vite';
+import { defineConfig, type Plugin } from 'vite';
+
+function nonBlockingCssPlugin(): Plugin {
+  return {
+    name: 'non-blocking-css-links',
+    enforce: 'post',
+    apply: 'build',
+    transformIndexHtml(html) {
+      return html.replace(
+        /<link\b([^>]*\brel=["']stylesheet["'][^>]*)>/gi,
+        (fullMatch, attrs) => {
+          if (/fonts\.googleapis\.com/i.test(attrs) || /\bmedia=/i.test(attrs)) {
+            return fullMatch;
+          }
+          return `<link${attrs} media="print" onload="this.media='all'"><noscript><link${attrs}></noscript>`;
+        }
+      );
+    },
+  };
+}
 
 export default defineConfig(({ command }) => {
   if (command === 'build') {
     process.env.NODE_ENV = 'production';
   }
   return {
-    plugins: [react(), tailwindcss()],
+    plugins: [react(), tailwindcss(), nonBlockingCssPlugin()],
     resolve: {
       alias: {
         '@': path.resolve(__dirname, '.'),

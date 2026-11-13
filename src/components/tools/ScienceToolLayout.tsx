@@ -4,7 +4,6 @@ import {
   ChevronDown,
   ShieldCheck,
   Star,
-  CheckCircle2,
   ArrowRight,
   ArrowLeft,
   BookOpenCheck,
@@ -14,11 +13,10 @@ import {
   ScienceToolItem,
   SCIENCE_TOOLS_BY_SLUG,
   SCIENCE_TUTOR_BRANDING,
-  ScienceFeaturedTutor,
 } from '../../data/scienceToolsRegistry';
 import { isModifiedAnchorClick } from '../../data/dedicatedServiceRoutes';
 import { downloadAcademicReportPdf } from '../../utils/pdfReportGenerator';
-import { ResponsiveAvatar } from '../ResponsiveImage';
+import MeetOurExpertTutors from './MeetOurExpertTutors';
 import SiteFooter from '../SiteFooter';
 
 interface ScienceToolLayoutProps {
@@ -26,27 +24,6 @@ interface ScienceToolLayoutProps {
   onNavigate: (view: string) => void;
   onOpenBecomeTutor?: () => void;
   children: React.ReactNode;
-}
-
-function ScienceTutorAvatar({ tutor }: { tutor: ScienceFeaturedTutor }) {
-  const [failed, setFailed] = useState(false);
-  if (failed || !tutor.avatarUrl) {
-    return (
-      <div className="w-14 h-14 rounded-2xl bg-[#FFF7ED] border border-orange-200 text-[#EA580C] font-display font-bold text-base flex items-center justify-center shrink-0">
-        {tutor.initials}
-      </div>
-    );
-  }
-  return (
-    <ResponsiveAvatar
-      src={tutor.avatarUrl}
-      alt={tutor.name}
-      sizePx={64}
-      width={56}
-      height={56}
-      className="w-14 h-14 rounded-2xl object-cover border border-slate-200 shrink-0"
-    />
-  );
 }
 
 export default function ScienceToolLayout({
@@ -297,85 +274,6 @@ export default function ScienceToolLayout({
         </div>
       </section>
 
-      {/* 4. Subject-Matched Tutor Branding Section (Dynamic by Biology / Chemistry) */}
-      <section className="max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">
-        <div className="bg-[#FFFFFF] border border-slate-200 rounded-3xl p-6 sm:p-8 lg:p-10">
-          <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-6 pb-8 border-b border-slate-100">
-            <div className="max-w-2xl space-y-2">
-              <p className="text-xs font-bold text-[#EA580C]">{tutorBranding.kicker}</p>
-              <h2
-                className="text-xl sm:text-2xl lg:text-3xl font-display font-bold text-[#111827] tracking-tight"
-                style={{ textWrap: 'balance' }}
-              >
-                {tutorBranding.headline}
-              </h2>
-              <p className="text-sm text-slate-600 leading-relaxed">{tutorBranding.subtext}</p>
-            </div>
-
-            <div className="shrink-0">
-              <a
-                href="/tutors"
-                onClick={(e) => handleAnchor(e, tutorBranding.ctaView)}
-                className="inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-[#F97316] hover:bg-[#EA580C] text-white text-sm font-semibold shadow-xs transition-colors whitespace-nowrap cursor-pointer"
-              >
-                <span>{tutorBranding.ctaText}</span>
-              </a>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-5 pt-8">
-            {tutorBranding.tutors.map((tutor) => (
-              <div
-                key={tutor.id}
-                className="bg-[#F9FAFB] border border-slate-200/90 rounded-2xl p-5 flex flex-col justify-between gap-4 hover:border-orange-300 transition-colors"
-              >
-                <div className="space-y-3.5">
-                  <div className="flex items-start gap-3.5">
-                    <ScienceTutorAvatar tutor={tutor} />
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-1.5">
-                        <h3 className="text-base font-bold text-[#111827] truncate">{tutor.name}</h3>
-                        <CheckCircle2
-                          className="w-4 h-4 text-emerald-600 shrink-0"
-                          aria-label="Verified University Tutor"
-                        />
-                      </div>
-                      <p className="text-xs font-semibold text-[#EA580C] mt-0.5">
-                        {tutor.credential}
-                      </p>
-                      <p className="text-xs text-slate-500">{tutor.institution}</p>
-                    </div>
-                  </div>
-
-                  <p className="text-xs text-slate-600 leading-relaxed">
-                    {tutor.specialties.join('  ·  ')}
-                  </p>
-
-                  <div className="flex items-center gap-2 text-xs text-slate-500 tabular-nums">
-                    <span className="inline-flex items-center gap-1 font-bold text-[#111827]">
-                      <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
-                      {tutor.rating}★
-                    </span>
-                    <span aria-hidden="true">·</span>
-                    <span>{tutor.sessions}</span>
-                    <span aria-hidden="true">·</span>
-                    <span className="text-emerald-700 font-medium">Verified Faculty</span>
-                  </div>
-                </div>
-
-                <button
-                  type="button"
-                  onClick={() => onNavigate(`subject:${tutor.subjectQuery}`)}
-                  className="w-full py-2.5 px-4 rounded-xl bg-[#F97316] hover:bg-[#EA580C] text-white text-xs font-semibold transition-colors cursor-pointer whitespace-nowrap"
-                >
-                  Book 1-on-1 Session
-                </button>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
       {/* 5. Worked Example & Academic FAQs */}
       <section className="max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-10">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-10 items-start">
@@ -532,7 +430,10 @@ export default function ScienceToolLayout({
         </div>
       </section>
 
-      {/* 7. Global 5-Column Website Footer with All 30 Tool Links */}
+      {/* 7. Live Active Expert Tutors Directory Section Above Global Footer */}
+      <MeetOurExpertTutors onNavigate={onNavigate} subjectHint={tool.shortTitle} />
+
+      {/* 8. Global 5-Column Website Footer with All 30 Tool Links */}
       <div className="mt-auto">
         <SiteFooter onNavigate={onNavigate} onOpenBecomeTutor={onOpenBecomeTutor} />
       </div>

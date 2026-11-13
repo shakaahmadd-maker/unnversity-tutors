@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import {
   Pencil,
   Highlighter,
@@ -8,12 +8,16 @@ import {
   Circle as CircleIcon,
   MoveUpRight,
   Type,
+  Move,
   Undo2,
   Redo2,
   Trash2,
   Download,
   FileDown,
   Grid3X3,
+  Maximize2,
+  Minimize2,
+  RotateCcw,
 } from 'lucide-react';
 import { downloadCanvasFigurePdf } from '../../utils/pdfReportGenerator';
 
@@ -25,7 +29,8 @@ type DrawTool =
   | 'rect'
   | 'circle'
   | 'arrow'
-  | 'text';
+  | 'text'
+  | 'move';
 
 interface Point {
   x: number;
@@ -34,7 +39,7 @@ interface Point {
 
 interface StrokeAction {
   id: string;
-  tool: DrawTool;
+  tool: Exclude<DrawTool, 'move'>;
   color: string;
   size: number;
   points: Point[];
@@ -51,6 +56,19 @@ const ACADEMIC_COLORS = [
 
 const LOGICAL_WIDTH = 1200;
 const LOGICAL_HEIGHT = 650;
+
+const PENCIL_CURSOR_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none"><path d="M3 21l3.75-.75L20.25 6.75a2.121 2.121 0 0 0-3-3L3.75 17.25 3 21z" fill="#FFFFFF" stroke="#111827" stroke-width="1.8" stroke-linejoin="round"/><path d="M14.5 6.5l3 3" stroke="#F97316" stroke-width="2" stroke-linecap="round"/><path d="M3 21l2.2-0.45L3.45 18.8 3 21z" fill="#F97316"/></svg>`;
+const PENCIL_CURSOR = `url("data:image/svg+xml,${encodeURIComponent(PENCIL_CURSOR_SVG)}") 2 21, auto`;
+
+const ERASER_CURSOR_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none"><path d="M7 20h12M4.5 14.5l9.5-9.5a2.12 2.12 0 0 1 3 0l3 3a2.12 2.12 0 0 1 0 3l-8 8H7.5l-3-3a2.12 2.12 0 0 1 0-1.5z" fill="#FFF7ED" stroke="#111827" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round"/><path d="M10.5 8.5l5 5" stroke="#F97316" stroke-width="1.6"/></svg>`;
+const ERASER_CURSOR = `url("data:image/svg+xml,${encodeURIComponent(ERASER_CURSOR_SVG)}") 6 19, cell`;
+
+function getCursorForTool(tool: DrawTool): string {
+  if (tool === 'eraser') return ERASER_CURSOR;
+  if (tool === 'move') return 'move';
+  if (tool === 'text') return 'text';
+  return PENCIL_CURSOR;
+}
 
 function drawActionOnContext(ctx: CanvasRenderingContext2D, action: StrokeAction) {
   ctx.save();
@@ -152,21 +170,30 @@ function drawActionOnContext(ctx: CanvasRenderingContext2D, action: StrokeAction
   ctx.restore();
 }
 
-function drawStudyGrid(ctx: CanvasRenderingContext2D, width: number, height: number) {
+function drawStudyGrid(
+  ctx: CanvasRenderingContext2D,
+  minX: number,
+  minY: number,
+  maxX: number,
+  maxY: number
+) {
   ctx.save();
   ctx.strokeStyle = '#E5E7EB';
   ctx.lineWidth = 1;
   const step = 28;
-  for (let x = step; x < width; x += step) {
+  const startX = Math.floor(minX / step) * step;
+  const startY = Math.floor(minY / step) * step;
+
+  for (let x = startX; x <= maxX; x += step) {
     ctx.beginPath();
-    ctx.moveTo(x, 0);
-    ctx.lineTo(x, height);
+    ctx.moveTo(x, minY);
+    ctx.lineTo(x, maxY);
     ctx.stroke();
   }
-  for (let y = step; y < height; y += step) {
+  for (let y = startY; y <= maxY; y += step) {
     ctx.beginPath();
-    ctx.moveTo(0, y);
-    ctx.lineTo(width, y);
+    ctx.moveTo(minX, y);
+    ctx.lineTo(maxX, y);
     ctx.stroke();
   }
   ctx.restore();
@@ -181,28 +208,108 @@ export default function WhiteboardTool() {
   const [redoStack, setRedoStack] = useState<StrokeAction[]>([]);
   const [draftAction, setDraftAction] = useState<StrokeAction | null>(null);
   const [textDraft, setTextDraft] = useState<{ pos: Point; value: string } | null>(null);
+  const [isFullScreen, setIsFullScreen] = useState<boolean>(false);
+  const [panOffset, setPanOffset] = useState<Point>({ x: 0, y: 0 });
+  const [viewportSize, setViewportSize] = useState<{ width: number; height: number }>({
+    width: LOGICAL_WIDTH,
+    height: LOGICAL_HEIGHT,
+  });
 
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const boardContainerRef = useRef<HTMLDivElement | null>(null);
   const isDrawingRef = useRef(false);
+  const isPanningRef = useRef(false);
+  const panStartClientRef = useRef<Point>({ x: 0, y: 0 });
+  const panOriginRef = useRef<Point>({ x: 0, y: 0 });
+
+  // Lock background page scroll cleanly while full screen is active and support Escape key exit
+  useEffect(() => {
+    if (!isFullScreen) return;
+    const prevBodyOverflow = document.body.style.overflow;
+    const prevHtmlOverflow = document.documentElement.style.overflow;
+    const prevOverscroll = document.body.style.overscrollBehavior;
+
+    document.body.style.overflow = 'hidden';
+    document.documentElement.style.overflow = 'hidden';
+    document.body.style.overscrollBehavior = 'none';
+
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && !textDraft) {
+        setIsFullScreen(false);
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+
+    return () => {
+      document.body.style.overflow = prevBodyOverflow;
+      document.documentElement.style.overflow = prevHtmlOverflow;
+      document.body.style.overscrollBehavior = prevOverscroll;
+      window.removeEventListener('keydown', onKeyDown);
+    };
+  }, [isFullScreen, textDraft]);
+
+  // Track rendered container dimensions cleanly so full-screen mobile portrait & desktop stay sharp
+  useEffect(() => {
+    const el = boardContainerRef.current;
+    if (!el) return;
+
+    const updateSize = () => {
+      const rect = el.getBoundingClientRect();
+      if (rect.width > 0 && rect.height > 0) {
+        setViewportSize({
+          width: Math.round(rect.width),
+          height: Math.round(rect.height),
+        });
+      }
+    };
+
+    updateSize();
+
+    if (typeof ResizeObserver !== 'undefined') {
+      const ro = new ResizeObserver(() => updateSize());
+      ro.observe(el);
+      return () => ro.disconnect();
+    }
+
+    window.addEventListener('resize', updateSize);
+    return () => window.removeEventListener('resize', updateSize);
+  }, [isFullScreen]);
+
+  const uniformScale = useMemo(() => {
+    const w = Math.max(viewportSize.width, 1);
+    const h = Math.max(viewportSize.height, 1);
+    return Math.min(w / LOGICAL_WIDTH, h / LOGICAL_HEIGHT) || 1;
+  }, [viewportSize]);
 
   const renderBoard = useCallback(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const dpr = Math.min(window.devicePixelRatio || 1, 2);
-    if (canvas.width !== LOGICAL_WIDTH * dpr || canvas.height !== LOGICAL_HEIGHT * dpr) {
-      canvas.width = LOGICAL_WIDTH * dpr;
-      canvas.height = LOGICAL_HEIGHT * dpr;
+    const pixelW = Math.max(1, Math.round(viewportSize.width * dpr));
+    const pixelH = Math.max(1, Math.round(viewportSize.height * dpr));
+
+    if (canvas.width !== pixelW || canvas.height !== pixelH) {
+      canvas.width = pixelW;
+      canvas.height = pixelH;
     }
+
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
     ctx.save();
-    ctx.scale(dpr, dpr);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.fillStyle = '#FFFFFF';
-    ctx.fillRect(0, 0, LOGICAL_WIDTH, LOGICAL_HEIGHT);
+    ctx.fillRect(0, 0, viewportSize.width, viewportSize.height);
+
+    ctx.scale(uniformScale, uniformScale);
+    ctx.translate(panOffset.x, panOffset.y);
 
     if (showGrid) {
-      drawStudyGrid(ctx, LOGICAL_WIDTH, LOGICAL_HEIGHT);
+      const minX = -panOffset.x;
+      const minY = -panOffset.y;
+      const maxX = viewportSize.width / uniformScale - panOffset.x;
+      const maxY = viewportSize.height / uniformScale - panOffset.y;
+      drawStudyGrid(ctx, minX, minY, maxX, maxY);
     }
 
     actions.forEach((act) => drawActionOnContext(ctx, act));
@@ -210,7 +317,7 @@ export default function WhiteboardTool() {
       drawActionOnContext(ctx, draftAction);
     }
     ctx.restore();
-  }, [actions, draftAction, showGrid]);
+  }, [actions, draftAction, showGrid, viewportSize, uniformScale, panOffset]);
 
   useEffect(() => {
     renderBoard();
@@ -219,11 +326,10 @@ export default function WhiteboardTool() {
   const getLogicalCoords = (e: React.PointerEvent<HTMLCanvasElement>): Point => {
     const canvas = canvasRef.current!;
     const rect = canvas.getBoundingClientRect();
-    const scaleX = LOGICAL_WIDTH / rect.width;
-    const scaleY = LOGICAL_HEIGHT / rect.height;
+    const scale = Math.min(rect.width / LOGICAL_WIDTH, rect.height / LOGICAL_HEIGHT) || 1;
     return {
-      x: (e.clientX - rect.left) * scaleX,
-      y: (e.clientY - rect.top) * scaleY,
+      x: (e.clientX - rect.left) / scale - panOffset.x,
+      y: (e.clientY - rect.top) / scale - panOffset.y,
     };
   };
 
@@ -244,6 +350,14 @@ export default function WhiteboardTool() {
   };
 
   const handlePointerDown = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    if (activeTool === 'move') {
+      e.currentTarget.setPointerCapture(e.pointerId);
+      isPanningRef.current = true;
+      panStartClientRef.current = { x: e.clientX, y: e.clientY };
+      panOriginRef.current = { ...panOffset };
+      return;
+    }
+
     const pt = getLogicalCoords(e);
 
     if (activeTool === 'text') {
@@ -266,6 +380,16 @@ export default function WhiteboardTool() {
   };
 
   const handlePointerMove = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    if (isPanningRef.current && activeTool === 'move') {
+      const dx = (e.clientX - panStartClientRef.current.x) / (uniformScale || 1);
+      const dy = (e.clientY - panStartClientRef.current.y) / (uniformScale || 1);
+      setPanOffset({
+        x: panOriginRef.current.x + dx,
+        y: panOriginRef.current.y + dy,
+      });
+      return;
+    }
+
     if (!isDrawingRef.current || !draftAction) return;
     const pt = getLogicalCoords(e);
 
@@ -277,6 +401,10 @@ export default function WhiteboardTool() {
   };
 
   const handlePointerUp = () => {
+    if (isPanningRef.current) {
+      isPanningRef.current = false;
+      return;
+    }
     if (!isDrawingRef.current || !draftAction) return;
     isDrawingRef.current = false;
     setActions((prev) => [...prev, draftAction]);
@@ -300,18 +428,28 @@ export default function WhiteboardTool() {
 
   const buildExportCanvas = (): HTMLCanvasElement | null => {
     if (textDraft) commitTextDraft();
+
+    let maxLogicalX = LOGICAL_WIDTH;
+    let maxLogicalY = LOGICAL_HEIGHT;
+    actions.forEach((act) => {
+      act.points.forEach((p) => {
+        if (p.x + 60 > maxLogicalX) maxLogicalX = Math.ceil(p.x + 60);
+        if (p.y + 60 > maxLogicalY) maxLogicalY = Math.ceil(p.y + 60);
+      });
+    });
+
     const exportCanvas = document.createElement('canvas');
     const scale = 2;
-    exportCanvas.width = LOGICAL_WIDTH * scale;
-    exportCanvas.height = LOGICAL_HEIGHT * scale;
+    exportCanvas.width = maxLogicalX * scale;
+    exportCanvas.height = maxLogicalY * scale;
     const ctx = exportCanvas.getContext('2d');
     if (!ctx) return null;
 
     ctx.scale(scale, scale);
     ctx.fillStyle = '#FFFFFF';
-    ctx.fillRect(0, 0, LOGICAL_WIDTH, LOGICAL_HEIGHT);
+    ctx.fillRect(0, 0, maxLogicalX, maxLogicalY);
     if (showGrid) {
-      drawStudyGrid(ctx, LOGICAL_WIDTH, LOGICAL_HEIGHT);
+      drawStudyGrid(ctx, 0, 0, maxLogicalX, maxLogicalY);
     }
     actions.forEach((act) => drawActionOnContext(ctx, act));
     return exportCanvas;
@@ -358,161 +496,265 @@ export default function WhiteboardTool() {
     { id: 'rect', label: 'Box', icon: <Square className="w-4 h-4" /> },
     { id: 'circle', label: 'Circle', icon: <CircleIcon className="w-4 h-4" /> },
     { id: 'text', label: 'Text', icon: <Type className="w-4 h-4" /> },
+    { id: 'move', label: 'Move', icon: <Move className="w-4 h-4" /> },
   ];
 
+  const activeCursor = getCursorForTool(activeTool);
+  const isPanned = Math.abs(panOffset.x) > 1 || Math.abs(panOffset.y) > 1;
+
   return (
-    <div className="bg-[#FFFFFF] border border-slate-200 rounded-3xl shadow-xs overflow-hidden">
+    <div
+      id="whiteboard-workspace-root"
+      data-fullscreen={isFullScreen ? 'true' : 'false'}
+      className={
+        isFullScreen
+          ? 'fixed inset-0 w-screen h-[100dvh] z-[100] bg-[#FFFFFF] flex flex-col overflow-hidden rounded-none border-0 select-none'
+          : 'bg-[#FFFFFF] border border-slate-200 rounded-3xl shadow-xs overflow-hidden'
+      }
+    >
       {/* Top Controls Bar */}
-      <div className="bg-[#F9FAFB] border-b border-slate-200 p-4 flex flex-wrap items-center justify-between gap-4">
-        {/* Drawing Tools */}
-        <div className="flex flex-wrap items-center gap-1.5" role="toolbar" aria-label="Drawing Tools">
+      <div
+        className={`bg-[#F9FAFB] border-b border-slate-200 ${
+          isFullScreen ? 'px-2.5 py-2 sm:px-4 sm:py-2.5 shrink-0' : 'p-3 sm:p-4'
+        } flex flex-col xl:flex-row xl:items-center justify-between gap-2.5 sm:gap-3`}
+      >
+        {/* Drawing Tools (Scrollable cleanly on 360px-480px mobile without page horizontal overflow) */}
+        <div
+          className="flex items-center gap-1.5 overflow-x-auto pb-0.5 xl:pb-0 no-scrollbar"
+          role="toolbar"
+          aria-label="Drawing Tools"
+        >
           {toolButtons.map((t) => (
             <button
               key={t.id}
               type="button"
+              id={`wb-tool-${t.id}`}
               onClick={() => {
                 if (textDraft) commitTextDraft();
                 setActiveTool(t.id);
               }}
               title={t.label}
-              className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold transition-colors cursor-pointer ${
+              aria-pressed={activeTool === t.id}
+              className={`inline-flex items-center justify-center gap-1.5 min-h-[44px] min-w-[44px] px-2.5 sm:px-3 py-2 rounded-xl text-xs font-semibold transition-colors cursor-pointer whitespace-nowrap shrink-0 ${
                 activeTool === t.id
                   ? 'bg-[#F97316] text-white shadow-2xs'
                   : 'bg-white text-slate-700 border border-slate-200 hover:border-orange-300'
               }`}
             >
               {t.icon}
-              <span className="hidden sm:inline">{t.label}</span>
+              <span className={isFullScreen ? 'hidden md:inline' : 'hidden sm:inline'}>{t.label}</span>
             </button>
           ))}
         </div>
 
-        {/* Ink Palette + Brush Slider */}
-        <div className="flex flex-wrap items-center gap-4">
-          <div className="flex items-center gap-1.5" aria-label="Ink Colors">
-            {ACADEMIC_COLORS.map((c) => (
-              <button
-                key={c.hex}
-                type="button"
-                onClick={() => setColor(c.hex)}
-                title={c.name}
-                aria-label={c.name}
-                style={{ backgroundColor: c.hex }}
-                className={`w-7 h-7 rounded-lg transition-transform cursor-pointer ${
-                  color === c.hex ? 'ring-2 ring-offset-2 ring-[#F97316] scale-105' : 'opacity-85 hover:opacity-100'
-                }`}
+        {/* Ink Palette + Brush Slider + Actions */}
+        <div className="flex flex-wrap items-center justify-between xl:justify-end gap-2 sm:gap-3">
+          {/* Ink Colors & Brush Size */}
+          <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+            <div className="flex items-center gap-1.5" aria-label="Ink Colors">
+              {ACADEMIC_COLORS.map((c) => (
+                <button
+                  key={c.hex}
+                  type="button"
+                  onClick={() => setColor(c.hex)}
+                  title={c.name}
+                  aria-label={c.name}
+                  style={{ backgroundColor: c.hex }}
+                  className={`w-8 h-8 sm:w-7 sm:h-7 rounded-lg transition-transform cursor-pointer shrink-0 ${
+                    color === c.hex
+                      ? 'ring-2 ring-offset-2 ring-[#F97316] scale-105'
+                      : 'opacity-85 hover:opacity-100'
+                  }`}
+                />
+              ))}
+            </div>
+
+            <div className="flex items-center gap-2 bg-white border border-slate-200 rounded-xl px-2.5 py-1.5 min-h-[44px]">
+              <label htmlFor="wb-size-slider" className="text-xs font-semibold text-slate-600">
+                Stroke
+              </label>
+              <input
+                id="wb-size-slider"
+                type="range"
+                min={2}
+                max={24}
+                value={brushSize}
+                onChange={(e) => setBrushSize(Number(e.target.value))}
+                className="w-16 sm:w-20 accent-[#F97316] cursor-pointer"
               />
-            ))}
+              <span className="text-xs font-mono font-bold text-[#111827] w-8 text-right tabular-nums">
+                {brushSize}px
+              </span>
+            </div>
           </div>
 
-          <div className="flex items-center gap-2 bg-white border border-slate-200 rounded-xl px-3 py-1.5">
-            <label htmlFor="wb-size-slider" className="text-xs font-semibold text-slate-600">
-              Stroke
-            </label>
-            <input
-              id="wb-size-slider"
-              type="range"
-              min={2}
-              max={24}
-              value={brushSize}
-              onChange={(e) => setBrushSize(Number(e.target.value))}
-              className="w-20 accent-[#F97316] cursor-pointer"
-            />
-            <span className="text-xs font-mono font-bold text-[#111827] w-8 text-right tabular-nums">
-              {brushSize}px
-            </span>
+          {/* History, Grid, Full Screen & Export */}
+          <div className="flex flex-wrap items-center gap-1.5">
+            {isPanned && (
+              <button
+                type="button"
+                onClick={() => setPanOffset({ x: 0, y: 0 })}
+                title="Reset Canvas Pan"
+                className="inline-flex items-center gap-1 min-h-[44px] px-2.5 py-2 rounded-xl bg-[#FFF7ED] border border-orange-200 text-[#EA580C] text-xs font-semibold cursor-pointer whitespace-nowrap"
+              >
+                <RotateCcw className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Center</span>
+              </button>
+            )}
+
+            <button
+              type="button"
+              onClick={() => setShowGrid((g) => !g)}
+              title="Toggle Study Grid"
+              aria-pressed={showGrid}
+              className={`inline-flex items-center justify-center gap-1.5 min-h-[44px] min-w-[44px] px-2.5 sm:px-3 py-2 rounded-xl text-xs font-semibold border cursor-pointer ${
+                showGrid
+                  ? 'bg-[#FFF7ED] border-orange-300 text-[#EA580C]'
+                  : 'bg-white border-slate-200 text-slate-600'
+              }`}
+            >
+              <Grid3X3 className="w-4 h-4" />
+              <span className="hidden md:inline">Grid</span>
+            </button>
+
+            <button
+              type="button"
+              disabled={actions.length === 0}
+              onClick={handleUndo}
+              title="Undo"
+              aria-label="Undo"
+              className="min-h-[44px] min-w-[44px] inline-flex items-center justify-center p-2 rounded-xl bg-white border border-slate-200 text-slate-700 hover:border-orange-300 disabled:opacity-35 cursor-pointer"
+            >
+              <Undo2 className="w-4 h-4" />
+            </button>
+
+            <button
+              type="button"
+              disabled={redoStack.length === 0}
+              onClick={handleRedo}
+              title="Redo"
+              aria-label="Redo"
+              className="min-h-[44px] min-w-[44px] inline-flex items-center justify-center p-2 rounded-xl bg-white border border-slate-200 text-slate-700 hover:border-orange-300 disabled:opacity-35 cursor-pointer"
+            >
+              <Redo2 className="w-4 h-4" />
+            </button>
+
+            <button
+              type="button"
+              disabled={actions.length === 0}
+              onClick={() => {
+                setActions([]);
+                setRedoStack([]);
+                setTextDraft(null);
+              }}
+              title="Clear Board"
+              aria-label="Clear Board"
+              className="inline-flex items-center justify-center gap-1 min-h-[44px] min-w-[44px] px-2.5 sm:px-3 py-2 rounded-xl bg-white border border-slate-200 text-slate-600 hover:text-red-600 hover:border-red-200 disabled:opacity-35 text-xs font-semibold cursor-pointer"
+            >
+              <Trash2 className="w-4 h-4" />
+              <span className="hidden xl:inline">Clear</span>
+            </button>
+
+            {/* Full Screen / Expand Toggle Button */}
+            <button
+              type="button"
+              id="wb-fullscreen-toggle-btn"
+              onClick={() => setIsFullScreen((fs) => !fs)}
+              aria-pressed={isFullScreen}
+              title={isFullScreen ? 'Exit Full Screen' : 'Full Screen Canvas'}
+              className={`inline-flex items-center justify-center gap-1.5 min-h-[44px] px-3 py-2 rounded-xl text-xs font-semibold border transition-colors cursor-pointer whitespace-nowrap ${
+                isFullScreen
+                  ? 'bg-[#111827] border-[#111827] text-white hover:bg-slate-800'
+                  : 'bg-[#FFF7ED] border-orange-300 text-[#EA580C] hover:bg-[#F97316] hover:text-white hover:border-[#F97316]'
+              }`}
+            >
+              {isFullScreen ? (
+                <>
+                  <Minimize2 className="w-4 h-4 shrink-0" />
+                  <span>Exit Full Screen</span>
+                </>
+              ) : (
+                <>
+                  <Maximize2 className="w-4 h-4 shrink-0" />
+                  <span>Full Screen</span>
+                </>
+              )}
+            </button>
+
+            {!isFullScreen && (
+              <>
+                <button
+                  type="button"
+                  onClick={handleExportPng}
+                  className="inline-flex items-center justify-center gap-1.5 px-3.5 py-2 min-h-[44px] rounded-xl bg-white border border-slate-300 hover:border-[#F97316] text-[#111827] text-xs font-semibold transition-colors cursor-pointer whitespace-nowrap"
+                >
+                  <Download className="w-4 h-4 text-[#F97316]" />
+                  <span>Export PNG</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleExportPdf}
+                  className="inline-flex items-center justify-center gap-1.5 px-4 py-2 min-h-[44px] rounded-xl bg-[#F97316] hover:bg-[#EA580C] text-white text-xs sm:text-sm font-semibold shadow-2xs transition-colors cursor-pointer whitespace-nowrap"
+                >
+                  <FileDown className="w-4 h-4" />
+                  <span>Download PDF</span>
+                </button>
+              </>
+            )}
           </div>
-        </div>
-
-        {/* History, Grid & Export */}
-        <div className="flex flex-wrap items-center gap-1.5">
-          <button
-            type="button"
-            onClick={() => setShowGrid((g) => !g)}
-            title="Toggle Study Grid"
-            className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold border cursor-pointer ${
-              showGrid
-                ? 'bg-[#FFF7ED] border-orange-300 text-[#EA580C]'
-                : 'bg-white border-slate-200 text-slate-600'
-            }`}
-          >
-            <Grid3X3 className="w-4 h-4" />
-            <span className="hidden md:inline">Grid</span>
-          </button>
-
-          <button
-            type="button"
-            disabled={actions.length === 0}
-            onClick={handleUndo}
-            title="Undo"
-            className="p-2 rounded-xl bg-white border border-slate-200 text-slate-700 hover:border-orange-300 disabled:opacity-35 cursor-pointer"
-          >
-            <Undo2 className="w-4 h-4" />
-          </button>
-
-          <button
-            type="button"
-            disabled={redoStack.length === 0}
-            onClick={handleRedo}
-            title="Redo"
-            className="p-2 rounded-xl bg-white border border-slate-200 text-slate-700 hover:border-orange-300 disabled:opacity-35 cursor-pointer"
-          >
-            <Redo2 className="w-4 h-4" />
-          </button>
-
-          <button
-            type="button"
-            disabled={actions.length === 0}
-            onClick={() => {
-              setActions([]);
-              setRedoStack([]);
-              setTextDraft(null);
-            }}
-            title="Clear Board"
-            className="inline-flex items-center gap-1 px-3 py-2 rounded-xl bg-white border border-slate-200 text-slate-600 hover:text-red-600 hover:border-red-200 disabled:opacity-35 text-xs font-semibold cursor-pointer"
-          >
-            <Trash2 className="w-3.5 h-3.5" />
-            <span className="hidden xl:inline">Clear</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={handleExportPng}
-            className="inline-flex items-center gap-1.5 px-3.5 py-2 min-h-[44px] sm:min-h-0 rounded-xl bg-white border border-slate-300 hover:border-[#F97316] text-[#111827] text-xs font-semibold transition-colors cursor-pointer"
-          >
-            <Download className="w-4 h-4 text-[#F97316]" />
-            <span>Export PNG</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={handleExportPdf}
-            className="inline-flex items-center gap-1.5 px-4 py-2 min-h-[44px] sm:min-h-0 rounded-xl bg-[#F97316] hover:bg-[#EA580C] text-white text-xs sm:text-sm font-semibold shadow-2xs transition-colors cursor-pointer"
-          >
-            <FileDown className="w-4 h-4" />
-            <span>Download PDF</span>
-          </button>
         </div>
       </div>
 
       {/* High-DPI Canvas Area */}
-      <div className="relative bg-slate-100/70 p-2 sm:p-4">
-        <div className="relative w-full aspect-[1200/650] bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-2xs">
+      <div
+        className={
+          isFullScreen
+            ? 'relative flex-1 min-h-0 w-full bg-white overflow-hidden'
+            : 'relative bg-slate-100/70 p-2 sm:p-4'
+        }
+      >
+        {/* Floating Exit Full Screen CTA inside full-screen canvas corner */}
+        {isFullScreen && (
+          <div className="absolute top-3 right-3 z-30 flex items-center gap-2">
+            <button
+              type="button"
+              id="wb-floating-exit-fullscreen-btn"
+              onClick={() => setIsFullScreen(false)}
+              className="inline-flex items-center justify-center gap-1.5 min-h-[44px] px-3.5 py-2 rounded-xl bg-[#111827]/95 hover:bg-[#F97316] text-white text-xs font-bold shadow-lg border border-white/20 backdrop-blur-xs transition-colors cursor-pointer whitespace-nowrap"
+            >
+              <Minimize2 className="w-4 h-4 shrink-0" />
+              <span>Exit Full Screen</span>
+            </button>
+          </div>
+        )}
+
+        <div
+          ref={boardContainerRef}
+          className={
+            isFullScreen
+              ? 'relative w-full h-full bg-white overflow-hidden'
+              : 'relative w-full aspect-[1200/650] bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-2xs'
+          }
+        >
           <canvas
             ref={canvasRef}
+            id="whiteboard-drawing-canvas"
+            data-cursor-mode={activeTool}
             onPointerDown={handlePointerDown}
             onPointerMove={handlePointerMove}
             onPointerUp={handlePointerUp}
             onPointerCancel={handlePointerUp}
-            className="w-full h-full block touch-none cursor-crosshair"
+            style={{ cursor: activeCursor }}
+            className="w-full h-full block touch-none"
           />
 
           {/* Floating Inline Text Placement Input */}
           {textDraft && (
             <div
               style={{
-                left: `${Math.min(Math.max((textDraft.pos.x / LOGICAL_WIDTH) * 100, 3), 52)}%`,
-                top: `${Math.min(Math.max((textDraft.pos.y / LOGICAL_HEIGHT) * 100, 4), 80)}%`,
+                left: `${Math.min(Math.max((((textDraft.pos.x + panOffset.x) * uniformScale) / Math.max(viewportSize.width, 1)) * 100, 3), 52)}%`,
+                top: `${Math.min(Math.max((((textDraft.pos.y + panOffset.y) * uniformScale) / Math.max(viewportSize.height, 1)) * 100, 4), 80)}%`,
               }}
               className="absolute z-20 -translate-y-1 max-w-[92%] bg-white/95 border-2 border-[#F97316] rounded-xl shadow-lg p-2 flex items-center gap-2"
             >
@@ -535,7 +777,7 @@ export default function WhiteboardTool() {
               <button
                 type="button"
                 onClick={commitTextDraft}
-                className="px-2.5 py-1 rounded-lg bg-[#F97316] text-white text-xs font-bold cursor-pointer shrink-0"
+                className="px-2.5 py-1.5 min-h-[36px] rounded-lg bg-[#F97316] text-white text-xs font-bold cursor-pointer shrink-0"
               >
                 Place
               </button>
@@ -543,8 +785,8 @@ export default function WhiteboardTool() {
           )}
 
           {actions.length === 0 && !draftAction && !textDraft && (
-            <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-              <p className="text-xs sm:text-sm font-medium text-slate-400 bg-white/85 px-4 py-2 rounded-xl border border-slate-200/70">
+            <div className="pointer-events-none absolute inset-0 flex items-center justify-center p-4">
+              <p className="text-xs sm:text-sm font-medium text-slate-400 bg-white/85 px-4 py-2 rounded-xl border border-slate-200/70 text-center">
                 Draw equations, vectors, or mind maps anywhere — stylus, mouse &amp; touch supported
               </p>
             </div>

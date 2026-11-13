@@ -281,11 +281,11 @@ export default function FooterLocationsSubjects({
                 key={c.slug}
                 id={`footer-country-portal-${c.slug}`}
                 onClick={() => onNavigateCountry && onNavigateCountry(c.slug)}
-                className="bg-white border border-slate-200 hover:border-orange-500 hover:bg-orange-50/50 p-2.5 rounded-xl text-center transition-all shadow-2xs group cursor-pointer"
+                className="bg-white border border-slate-200 hover:border-orange-500 hover:bg-orange-50/50 p-2.5 min-h-[44px] rounded-xl text-center transition-all shadow-2xs group cursor-pointer"
               >
                 <div className="text-lg mb-1 group-hover:scale-115 transition-transform">{c.flag}</div>
-                <div className="text-[11px] font-bold text-slate-800 group-hover:text-orange-600 line-clamp-1 leading-tight">{c.name.replace(' Online Tutoring', '')}</div>
-                <div className="text-[9px] text-slate-500 font-medium">Online Tutoring</div>
+                <div className="text-[11px] font-bold text-slate-800 group-hover:text-orange-650 line-clamp-1 leading-tight">{c.name.replace(' Online Tutoring', '')}</div>
+                <div className="text-[9px] text-slate-600 font-medium">Online Tutoring</div>
               </button>
             ))}
           </div>
@@ -298,7 +298,7 @@ export default function FooterLocationsSubjects({
               <span>🎯</span>
               <span>Topical Academic Tutoring Services (Country Expansions)</span>
             </h3>
-            <span className="text-[11px] text-slate-500 font-medium">
+            <span className="text-[11px] text-slate-600 font-medium">
               1-on-1 Mentorship &bull; Ethical Guidance
             </span>
           </div>
@@ -312,15 +312,15 @@ export default function FooterLocationsSubjects({
                 <div className="flex items-center justify-between border-b border-slate-100 pb-2">
                   <button
                     onClick={() => onNavigateService && onNavigateService(cat.slugBase)}
-                    className="text-sm font-bold text-[#204070] hover:text-orange-600 hover:underline text-left cursor-pointer"
+                    className="text-sm font-bold text-[#204070] hover:text-orange-650 hover:underline text-left min-h-[32px] inline-flex items-center cursor-pointer"
                   >
                     {cat.title}
                   </button>
-                  <span className="text-[10px] text-orange-600 font-bold bg-orange-50 px-2 py-0.5 rounded-md">
+                  <span className="text-[10px] text-orange-700 font-bold bg-orange-50 px-2 py-0.5 rounded-md">
                     Global / All
                   </span>
                 </div>
-                <p className="text-[11px] text-slate-500">
+                <p className="text-[11px] text-slate-600">
                   {cat.desc}
                 </p>
                 <div className="grid grid-cols-2 gap-1.5 pt-1 text-xs">
@@ -328,7 +328,7 @@ export default function FooterLocationsSubjects({
                     <button
                       key={c.slug}
                       onClick={() => onNavigateService && onNavigateService(`${cat.slugBase}-${c.slug}`)}
-                      className="text-left text-slate-600 hover:text-orange-600 hover:underline py-1 px-1.5 rounded hover:bg-orange-50/50 transition-colors flex items-center gap-1.5 font-medium cursor-pointer"
+                      className="text-left text-slate-700 hover:text-orange-650 hover:underline py-1.5 px-1.5 min-h-[28px] w-full rounded hover:bg-orange-50/50 transition-colors flex items-center gap-1.5 font-medium cursor-pointer"
                     >
                       <span>{c.flag}</span>
                       <span className="truncate">{c.name}</span>
@@ -358,13 +358,13 @@ export default function FooterLocationsSubjects({
                     USA Cities
                   </span>
                 </h4>
-                <ul className="space-y-1 sm:space-y-1.5">
+                <ul className="space-y-0.5">
                   {usaCities.map((loc) => (
                     <li key={loc.name}>
                       <button
                         type="button"
                         onClick={() => onNavigateLocation(loc.city)}
-                        className="text-[10.5px] sm:text-xs md:text-[13px] leading-[1.4] sm:leading-[1.55] text-[#1d70b8] hover:text-[#0f4c81] hover:underline text-left block font-normal cursor-pointer transition-colors"
+                        className="text-[10.5px] sm:text-xs md:text-[13px] leading-[1.4] sm:leading-[1.55] text-[#155799] hover:text-[#0f4c81] hover:underline text-left min-h-[28px] py-1 w-full flex items-center font-normal cursor-pointer transition-colors"
                       >
                         {loc.name}
                       </button>
@@ -395,13 +395,13 @@ export default function FooterLocationsSubjects({
                         </>
                       )}
                     </h4>
-                    <ul className="space-y-1 sm:space-y-1.5">
+                    <ul className="space-y-0.5">
                       {group.cities.map((loc) => (
                         <li key={loc.name}>
                           <button
                             type="button"
                             onClick={() => onNavigateLocation(loc.city)}
-                            className="text-[10.5px] sm:text-xs md:text-[13px] leading-[1.4] sm:leading-[1.55] text-[#1d70b8] hover:text-[#0f4c81] hover:underline text-left block font-normal cursor-pointer transition-colors"
+                            className="text-[10.5px] sm:text-xs md:text-[13px] leading-[1.4] sm:leading-[1.55] text-[#155799] hover:text-[#0f4c81] hover:underline text-left min-h-[28px] py-1 w-full flex items-center font-normal cursor-pointer transition-colors"
                           >
                             {loc.name}
                           </button>
@@ -424,13 +424,13 @@ export default function FooterLocationsSubjects({
                         {group.label}
                       </span>
                     </h4>
-                    <ul className="space-y-1 sm:space-y-1.5">
+                    <ul className="space-y-0.5">
                       {group.cities.map((loc) => (
                         <li key={loc.name}>
                           <button
                             type="button"
                             onClick={() => onNavigateLocation(loc.city)}
-                            className="text-[10.5px] sm:text-xs md:text-[13px] leading-[1.4] sm:leading-[1.55] text-[#1d70b8] hover:text-[#0f4c81] hover:underline text-left block font-normal cursor-pointer transition-colors"
+                            className="text-[10.5px] sm:text-xs md:text-[13px] leading-[1.4] sm:leading-[1.55] text-[#155799] hover:text-[#0f4c81] hover:underline text-left min-h-[28px] py-1 w-full flex items-center font-normal cursor-pointer transition-colors"
                           >
                             {loc.name}
                           </button>
@@ -449,40 +449,40 @@ export default function FooterLocationsSubjects({
               Popular Online Subjects
             </h3>
 
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-4 sm:gap-x-8 gap-y-2 text-xs">
-              <div className="space-y-1.5 sm:space-y-2">
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-4 sm:gap-x-8 gap-y-1 text-xs">
+              <div className="space-y-0.5">
                 {subjectsCol1.map((subj, idx) => (
                   <button
                     key={idx}
                     type="button"
                     onClick={() => onNavigateSubject(subj)}
-                    className="text-[11px] sm:text-[13px] text-[#1d70b8] hover:text-[#0f4c81] hover:underline text-left block font-normal cursor-pointer transition-colors"
+                    className="text-[11px] sm:text-[13px] text-[#155799] hover:text-[#0f4c81] hover:underline text-left min-h-[28px] py-1 w-full flex items-center font-normal cursor-pointer transition-colors"
                   >
                     {subj}
                   </button>
                 ))}
               </div>
 
-              <div className="space-y-1.5 sm:space-y-2">
+              <div className="space-y-0.5">
                 {subjectsCol2.map((subj, idx) => (
                   <button
                     key={idx}
                     type="button"
                     onClick={() => onNavigateSubject(subj)}
-                    className="text-[11px] sm:text-[13px] text-[#1d70b8] hover:text-[#0f4c81] hover:underline text-left block font-normal cursor-pointer transition-colors"
+                    className="text-[11px] sm:text-[13px] text-[#155799] hover:text-[#0f4c81] hover:underline text-left min-h-[28px] py-1 w-full flex items-center font-normal cursor-pointer transition-colors"
                   >
                     {subj}
                   </button>
                 ))}
               </div>
 
-              <div className="space-y-1.5 sm:space-y-2 col-span-2 sm:col-span-1">
+              <div className="space-y-0.5 col-span-2 sm:col-span-1">
                 {subjectsCol3.map((subj, idx) => (
                   <button
                     key={idx}
                     type="button"
                     onClick={() => onNavigateSubject(subj)}
-                    className="text-[11px] sm:text-[13px] text-[#1d70b8] hover:text-[#0f4c81] hover:underline text-left block font-normal cursor-pointer transition-colors"
+                    className="text-[11px] sm:text-[13px] text-[#155799] hover:text-[#0f4c81] hover:underline text-left min-h-[28px] py-1 w-full flex items-center font-normal cursor-pointer transition-colors"
                   >
                     {subj}
                   </button>

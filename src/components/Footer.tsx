@@ -106,8 +106,8 @@ export default function Footer({ onNavigate, onOpenBecomeTutor }: FooterProps) {
 
           {/* Quick Nav Links */}
           <div className="space-y-4">
-            <h4 className="text-xs font-display font-bold text-[#331301] uppercase tracking-widest pb-1 border-b border-[#ffab85]/60 mb-2">Academic Portals</h4>
-            <ul className="text-xs space-y-2.5 font-semibold">
+            <h3 className="text-xs font-display font-bold text-[#331301] uppercase tracking-widest pb-1 border-b border-[#ffab85]/60 mb-2">Academic Portals</h3>
+            <ul className="text-xs space-y-1.5 font-semibold">
               {[
                 { name: 'All Tutoring Services Hub', view: 'services', href: '/services' },
                 { name: '1-on-1 Live Tutoring', view: 'service-1on1', href: '/services/1-on-1-live-tutoring' },
@@ -130,7 +130,7 @@ export default function Footer({ onNavigate, onOpenBecomeTutor }: FooterProps) {
                           if (link.view) onNavigate(link.view);
                         }
                       }}
-                      className="inline-block hover:text-orange-700 hover:translate-x-1.5 transition-all text-left cursor-pointer text-[#542104] hover:font-bold"
+                      className="inline-flex items-center min-h-[28px] py-1 hover:text-orange-700 hover:translate-x-1.5 transition-all text-left cursor-pointer text-[#542104] hover:font-bold"
                     >
                       {link.name}
                     </a>
@@ -142,7 +142,7 @@ export default function Footer({ onNavigate, onOpenBecomeTutor }: FooterProps) {
                           onOpenBecomeTutor();
                         }
                       }} 
-                      className="hover:text-orange-700 hover:translate-x-1.5 transition-all text-left cursor-pointer text-[#542104] hover:font-bold"
+                      className="inline-flex items-center min-h-[28px] py-1 hover:text-orange-700 hover:translate-x-1.5 transition-all text-left cursor-pointer text-[#542104] hover:font-bold"
                     >
                       {link.name}
                     </button>
@@ -154,8 +154,8 @@ export default function Footer({ onNavigate, onOpenBecomeTutor }: FooterProps) {
 
           {/* Trust Certifications */}
           <div className="space-y-4">
-            <h4 className="text-xs font-display font-bold text-[#331301] uppercase tracking-widest pb-1 border-b border-[#ffab85]/60 mb-2 font-display">Policy & Trust Links</h4>
-            <ul className="text-xs space-y-3 font-semibold">
+            <h3 className="text-xs font-display font-bold text-[#331301] uppercase tracking-widest pb-1 border-b border-[#ffab85]/60 mb-2 font-display">Policy & Trust Links</h3>
+            <ul className="text-xs space-y-1.5 font-semibold">
               {[
                 { name: 'Standard Operating Procedures (SOP)', view: 'sop' },
                 { name: 'Payments Escrow Guarantee', view: 'payments_info' },
@@ -170,7 +170,7 @@ export default function Footer({ onNavigate, onOpenBecomeTutor }: FooterProps) {
                   <button 
                     id={`footer-policy-link-${idx}`}
                     onClick={() => onNavigate(link.view)} 
-                    className="hover:text-orange-700 hover:translate-x-1.5 transition-all text-left cursor-pointer text-[#542104] hover:font-bold"
+                    className="inline-flex items-center min-h-[28px] py-1 hover:text-orange-700 hover:translate-x-1.5 transition-all text-left cursor-pointer text-[#542104] hover:font-bold"
                   >
                     {link.name}
                   </button>
@@ -181,16 +181,16 @@ export default function Footer({ onNavigate, onOpenBecomeTutor }: FooterProps) {
 
           {/* Platform Trust Badge */}
           <div className="space-y-4 bg-[#fffbf7] p-6 rounded-2xl border border-[#ffab85]/60 shadow-xs">
-            <h4 className="text-xs font-display font-bold text-[#331301] uppercase tracking-wider flex items-center gap-2">
+            <h3 className="text-xs font-display font-bold text-[#331301] uppercase tracking-wider flex items-center gap-2">
               <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
               Secure Custom Escrow
-            </h4>
+            </h3>
             <p className="text-[11px] text-[#542104]/90 leading-relaxed font-semibold">
               We leverage safe, administrator-monitored holding escrow to lock tuition fees securely. Tutors are only paid after successful deliverables are finalized and authorized by students.
             </p>
             <div className="flex gap-2 pt-1 font-mono text-[9px] font-bold">
-              <span className="bg-[#ffece1] text-orange-700 px-2.5 py-1 rounded-md border border-[#fed7aa]/50">Manual Checks</span>
-              <span className="bg-emerald-50 text-emerald-700 px-2.5 py-1 rounded-md border border-emerald-200 font-bold">SSL Encrypted</span>
+              <span className="bg-[#ffece1] text-orange-800 px-2.5 py-1 rounded-md border border-[#fed7aa]/50">Manual Checks</span>
+              <span className="bg-emerald-50 text-emerald-800 px-2.5 py-1 rounded-md border border-emerald-200 font-bold">SSL Encrypted</span>
             </div>
           </div>
 
@@ -200,10 +200,10 @@ export default function Footer({ onNavigate, onOpenBecomeTutor }: FooterProps) {
         <div className="mt-12 pt-8 border-t border-[#ffab85]/55">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4">
             <div>
-              <h4 className="text-xs font-display font-bold text-[#331301] uppercase tracking-widest">
+              <h3 className="text-xs font-display font-bold text-[#331301] uppercase tracking-widest">
                 Free University Mathematics &amp; Statistics Suite (27 Interactive Solvers)
-              </h4>
-              <p className="text-[11px] text-[#542104]/80 mt-0.5 font-medium">
+              </h3>
+              <p className="text-[11px] text-[#542104]/90 mt-0.5 font-medium">
                 100% browser-local Algebra, Trigonometry, Calculus, Linear Algebra, Statistics, ODE, and RSA calculators.
               </p>
             </div>
@@ -215,13 +215,13 @@ export default function Footer({ onNavigate, onOpenBecomeTutor }: FooterProps) {
                   onNavigate('tools/math');
                 }
               }}
-              className="text-xs font-bold text-orange-700 hover:text-orange-900 hover:underline whitespace-nowrap cursor-pointer"
+              className="inline-flex items-center min-h-[32px] py-1 text-xs font-bold text-orange-700 hover:text-orange-900 hover:underline whitespace-nowrap cursor-pointer"
             >
               Mathematics &amp; Stats Hub (27 Tools) →
             </a>
           </div>
 
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2 text-xs">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2.5 text-xs">
             {MATH_TOOLS_REGISTRY.map((mTool) => (
               <a
                 key={mTool.slug}
@@ -232,9 +232,9 @@ export default function Footer({ onNavigate, onOpenBecomeTutor }: FooterProps) {
                     onNavigate(mTool.viewKey);
                   }
                 }}
-                className="px-3 py-2 rounded-xl bg-[#fffbf7] border border-[#ffab85]/45 hover:border-orange-500 hover:bg-[#ffece1] text-[#542104] hover:text-orange-800 font-semibold transition-colors truncate cursor-pointer"
+                className="px-3 py-2.5 min-h-[40px] flex items-center rounded-xl bg-[#fffbf7] border border-[#ffab85]/45 hover:border-orange-500 hover:bg-[#ffece1] text-[#542104] hover:text-orange-800 font-semibold transition-colors truncate cursor-pointer"
               >
-                {mTool.shortTitle}
+                <span className="truncate">{mTool.shortTitle}</span>
               </a>
             ))}
           </div>
@@ -244,10 +244,10 @@ export default function Footer({ onNavigate, onOpenBecomeTutor }: FooterProps) {
         <div className="mt-10 pt-8 border-t border-[#ffab85]/55">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4">
             <div>
-              <h4 className="text-xs font-display font-bold text-[#331301] uppercase tracking-widest">
+              <h3 className="text-xs font-display font-bold text-[#331301] uppercase tracking-widest">
                 Free Student Tools Suite (100% Local Browser Utilities)
-              </h4>
-              <p className="text-[11px] text-[#542104]/80 mt-0.5 font-medium">
+              </h3>
+              <p className="text-[11px] text-[#542104]/90 mt-0.5 font-medium">
                 Zero-upload PDF, citation, chart, resume, image compression, OCR, and GPA tools for university students.
               </p>
             </div>
@@ -260,7 +260,7 @@ export default function Footer({ onNavigate, onOpenBecomeTutor }: FooterProps) {
                     onNavigate('tools/math');
                   }
                 }}
-                className="text-xs font-bold text-orange-700 hover:text-orange-900 hover:underline whitespace-nowrap cursor-pointer"
+                className="inline-flex items-center min-h-[32px] py-1 text-xs font-bold text-orange-700 hover:text-orange-900 hover:underline whitespace-nowrap cursor-pointer"
               >
                 Math Hub (27 Tools) →
               </a>
@@ -272,7 +272,7 @@ export default function Footer({ onNavigate, onOpenBecomeTutor }: FooterProps) {
                     onNavigate('tools/biology');
                   }
                 }}
-                className="text-xs font-bold text-orange-700 hover:text-orange-900 hover:underline whitespace-nowrap cursor-pointer"
+                className="inline-flex items-center min-h-[32px] py-1 text-xs font-bold text-orange-700 hover:text-orange-900 hover:underline whitespace-nowrap cursor-pointer"
               >
                 Biology Hub (14 Tools) →
               </a>
@@ -284,7 +284,7 @@ export default function Footer({ onNavigate, onOpenBecomeTutor }: FooterProps) {
                     onNavigate('tools/chemistry');
                   }
                 }}
-                className="text-xs font-bold text-orange-700 hover:text-orange-900 hover:underline whitespace-nowrap cursor-pointer"
+                className="inline-flex items-center min-h-[32px] py-1 text-xs font-bold text-orange-700 hover:text-orange-900 hover:underline whitespace-nowrap cursor-pointer"
               >
                 Chemistry Hub (16 Tools) →
               </a>
@@ -296,7 +296,7 @@ export default function Footer({ onNavigate, onOpenBecomeTutor }: FooterProps) {
                     onNavigate('tools');
                   }
                 }}
-                className="text-xs font-bold text-orange-700 hover:text-orange-900 hover:underline whitespace-nowrap cursor-pointer"
+                className="inline-flex items-center min-h-[32px] py-1 text-xs font-bold text-orange-700 hover:text-orange-900 hover:underline whitespace-nowrap cursor-pointer"
               >
                 All Student Tools →
               </a>
@@ -314,9 +314,9 @@ export default function Footer({ onNavigate, onOpenBecomeTutor }: FooterProps) {
                     onNavigate(tool.viewKey);
                   }
                 }}
-                className="px-3 py-2 rounded-xl bg-[#fffbf7] border border-[#ffab85]/45 hover:border-orange-500 hover:bg-[#ffece1] text-[#542104] hover:text-orange-800 font-semibold transition-colors truncate cursor-pointer"
+                className="px-3 py-2.5 min-h-[40px] flex items-center rounded-xl bg-[#fffbf7] border border-[#ffab85]/45 hover:border-orange-500 hover:bg-[#ffece1] text-[#542104] hover:text-orange-800 font-semibold transition-colors truncate cursor-pointer"
               >
-                {tool.shortName}
+                <span className="truncate">{tool.shortName}</span>
               </a>
             ))}
           </div>
@@ -325,10 +325,10 @@ export default function Footer({ onNavigate, onOpenBecomeTutor }: FooterProps) {
         {/* Gray Unethical Search Term Links Section */}
         <div className="mt-16 pt-8 border-t border-[#ffab85]/55" id="google-ads-keywords">
           <div className="flex items-center gap-2 mb-4">
-            <ShieldAlert className="w-4 h-4 text-orange-600/70" />
-            <h5 className="text-[10px] font-display font-bold text-[#331301]/70 uppercase tracking-widest">Students Also Ask For (SEO Search Index)</h5>
+            <ShieldAlert className="w-4 h-4 text-orange-700" />
+            <h3 className="text-[10px] font-display font-bold text-[#331301] uppercase tracking-widest">Students Also Ask For (SEO Search Index)</h3>
           </div>
-          <div className="flex flex-wrap gap-2 text-[11px]">
+          <div className="flex flex-wrap gap-2.5 text-[11px]">
             {seoKeywords.map((kw, idx) => (
               <a
                 key={idx}
@@ -341,7 +341,7 @@ export default function Footer({ onNavigate, onOpenBecomeTutor }: FooterProps) {
                   }
                 }}
                 rel="nofollow"
-                className="text-[#542104]/80 hover:text-orange-700 hover:bg-[#ffece1] hover:border-[#ffab85] transition-all duration-200 cursor-pointer block border border-[#ffab85]/35 px-3 py-1 rounded-lg bg-[#fffbf7]"
+                className="text-[#542104] hover:text-orange-800 hover:bg-[#ffece1] hover:border-[#ffab85] transition-all duration-200 cursor-pointer inline-flex items-center min-h-[32px] border border-[#ffab85]/45 px-3 py-1.5 rounded-lg bg-[#fffbf7]"
               >
                 {kw.text}
               </a>
@@ -357,7 +357,7 @@ export default function Footer({ onNavigate, onOpenBecomeTutor }: FooterProps) {
               onClick={() => setIsDisclosureOpen((prev) => !prev)}
               aria-expanded={isDisclosureOpen}
               aria-controls="footerDisclosurePanel"
-              className="group inline-flex items-center gap-2.5 px-5 py-2.5 rounded-full bg-white hover:bg-orange-50/80 border border-[#ffab85]/70 hover:border-orange-300 shadow-2xs hover:shadow-xs transition-all duration-200 text-xs sm:text-sm font-semibold text-[#542104] hover:text-orange-700 focus:outline-none focus:ring-2 focus:ring-orange-400 cursor-pointer"
+              className="group inline-flex items-center gap-2.5 px-5 py-2.5 min-h-[44px] rounded-full bg-white hover:bg-orange-50/80 border border-[#ffab85]/70 hover:border-orange-300 shadow-2xs hover:shadow-xs transition-all duration-200 text-xs sm:text-sm font-semibold text-[#542104] hover:text-orange-700 focus:outline-none focus:ring-2 focus:ring-orange-400 cursor-pointer"
             >
               <Shield className="w-4 h-4 text-orange-600 shrink-0" />
               <span id="btnText">
@@ -366,12 +366,12 @@ export default function Footer({ onNavigate, onOpenBecomeTutor }: FooterProps) {
                   : 'View Platform Identity & Academic Integrity Disclosures'}
               </span>
               <ChevronDown
-                className={`w-4 h-4 text-stone-400 group-hover:text-orange-600 transition-transform duration-300 ${
+                className={`w-4 h-4 text-stone-600 group-hover:text-orange-600 transition-transform duration-300 ${
                   isDisclosureOpen ? 'rotate-180 text-orange-600' : ''
                 }`}
               />
             </button>
-            <span className="text-[11px] text-[#542104]/60 mt-1.5 select-none font-medium">
+            <span className="text-[11px] text-[#542104]/85 mt-1.5 select-none font-medium">
               Click to {isDisclosureOpen ? 'close' : 'open'} legal, identity &amp; academic integrity disclosures
             </span>
           </div>
@@ -383,11 +383,13 @@ export default function Footer({ onNavigate, onOpenBecomeTutor }: FooterProps) {
               isDisclosureOpen ? 'max-h-[1400px] opacity-100 mt-4 space-y-4' : 'max-h-0 opacity-0 pointer-events-none mt-0 space-y-0'
             }`}
           >
+            {isDisclosureOpen && (
+            <>
             {/* Application Overview & Google API Disclosure */}
             <div className="p-6 bg-[#fffbf7] border border-[#ffab85]/55 rounded-3xl space-y-4 text-left shadow-2xs">
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 border-b border-[#ffab85]/35 pb-3">
                 <div className="space-y-1">
-                  <span className="text-[10px] font-bold text-orange-600 uppercase tracking-widest block font-sans">
+                  <span className="text-[10px] font-bold text-orange-700 uppercase tracking-widest block font-sans">
                     Platform Identity &amp; Services
                   </span>
                   <h4 className="text-sm font-extrabold text-[#331301] tracking-tight font-display">
@@ -424,11 +426,13 @@ export default function Footer({ onNavigate, onOpenBecomeTutor }: FooterProps) {
                 💬 <strong>Quotation & Transparency Note:</strong> All pricing is negotiated on a case‑by‑case basis between the student and the tutor. University-Tutors.com does not set standard rates. You will always see the final price before making any payment. Price is finalized only after you and your tutor agree on the scope – no hidden fees. Any enquiries can be sent directly to <a href="mailto:support@universitytutors.com" className="underline font-bold text-orange-700 hover:text-orange-850">support@universitytutors.com</a>.
               </p>
             </div>
+            </>
+            )}
           </div>
         </div>
 
         {/* Bottom copyright details & Legal Links */}
-        <div className="mt-10 pt-6 border-t border-[#ffab85]/40 flex flex-col md:flex-row items-center justify-between text-[11px] text-[#542104]/80 gap-4 text-center md:text-left">
+        <div className="mt-10 pt-6 border-t border-[#ffab85]/40 flex flex-col md:flex-row items-center justify-between text-[11px] text-[#542104]/90 gap-4 text-center md:text-left">
           <p className="font-medium max-w-xl">
             © 2026 universitytutors.com. All Rights Reserved. Created under educational technology guidelines for UK, US, CA, AU, NZ &amp; IE local curriculum support.
           </p>
@@ -436,7 +440,7 @@ export default function Footer({ onNavigate, onOpenBecomeTutor }: FooterProps) {
             <button 
               id="footer-cc-priv" 
               onClick={() => { onNavigate('privacy'); window.scrollTo({ top: 0, behavior: 'smooth' }); }} 
-              className="hover:underline hover:text-orange-800 hover:bg-[#ffd9be]/50 text-[#542104] transition-all cursor-pointer py-1.5 px-2.5 rounded-md active:scale-95 text-xs font-semibold"
+              className="inline-flex items-center min-h-[32px] hover:underline hover:text-orange-800 hover:bg-[#ffd9be]/50 text-[#542104] transition-all cursor-pointer py-1.5 px-2.5 rounded-md active:scale-95 text-xs font-semibold"
             >
               Privacy Policy
             </button>
@@ -444,7 +448,7 @@ export default function Footer({ onNavigate, onOpenBecomeTutor }: FooterProps) {
             <button 
               id="footer-cc-terms" 
               onClick={() => { onNavigate('terms'); window.scrollTo({ top: 0, behavior: 'smooth' }); }} 
-              className="hover:underline hover:text-orange-800 hover:bg-[#ffd9be]/50 text-[#542104] transition-all cursor-pointer py-1.5 px-2.5 rounded-md active:scale-95 text-xs font-semibold"
+              className="inline-flex items-center min-h-[32px] hover:underline hover:text-orange-800 hover:bg-[#ffd9be]/50 text-[#542104] transition-all cursor-pointer py-1.5 px-2.5 rounded-md active:scale-95 text-xs font-semibold"
             >
               Terms of Service
             </button>
@@ -452,7 +456,7 @@ export default function Footer({ onNavigate, onOpenBecomeTutor }: FooterProps) {
             <button 
               id="footer-cc-disclosure" 
               onClick={() => { onNavigate('google-disclosure'); window.scrollTo({ top: 0, behavior: 'smooth' }); }} 
-              className="hover:underline hover:text-orange-800 hover:bg-[#ffd9be]/50 text-[#542104] transition-all cursor-pointer py-1.5 px-2.5 rounded-md active:scale-95 text-xs font-semibold"
+              className="inline-flex items-center min-h-[32px] hover:underline hover:text-orange-800 hover:bg-[#ffd9be]/50 text-[#542104] transition-all cursor-pointer py-1.5 px-2.5 rounded-md active:scale-95 text-xs font-semibold"
             >
               Google Disclosure
             </button>
@@ -460,7 +464,7 @@ export default function Footer({ onNavigate, onOpenBecomeTutor }: FooterProps) {
             <button 
               id="footer-cc-contact" 
               onClick={() => { onNavigate('contact'); window.scrollTo({ top: 0, behavior: 'smooth' }); }} 
-              className="hover:underline hover:text-orange-800 hover:bg-[#ffd9be]/50 text-[#542104] transition-all cursor-pointer py-1.5 px-2.5 rounded-md active:scale-95 text-xs font-semibold"
+              className="inline-flex items-center min-h-[32px] hover:underline hover:text-orange-800 hover:bg-[#ffd9be]/50 text-[#542104] transition-all cursor-pointer py-1.5 px-2.5 rounded-md active:scale-95 text-xs font-semibold"
             >
               Contact Us
             </button>
@@ -468,7 +472,7 @@ export default function Footer({ onNavigate, onOpenBecomeTutor }: FooterProps) {
             <button 
               id="footer-cc-sop" 
               onClick={() => { onNavigate('sop'); }} 
-              className="hover:underline hover:text-orange-800 hover:bg-[#ffd9be]/50 text-[#542104] transition-all cursor-pointer py-1.5 px-2.5 rounded-md active:scale-95 text-xs font-semibold"
+              className="inline-flex items-center min-h-[32px] hover:underline hover:text-orange-800 hover:bg-[#ffd9be]/50 text-[#542104] transition-all cursor-pointer py-1.5 px-2.5 rounded-md active:scale-95 text-xs font-semibold"
             >
               System SOP
             </button>
@@ -476,7 +480,7 @@ export default function Footer({ onNavigate, onOpenBecomeTutor }: FooterProps) {
             <button 
               id="footer-cc-admin" 
               onClick={() => { onNavigate('admin-login'); window.scrollTo({ top: 0, behavior: 'smooth' }); }} 
-              className="hover:underline hover:text-orange-800 hover:bg-[#ffd9be]/50 text-[#542104] transition-all cursor-pointer py-1.5 px-2.5 rounded-md active:scale-95 text-xs font-semibold"
+              className="inline-flex items-center min-h-[32px] hover:underline hover:text-orange-800 hover:bg-[#ffd9be]/50 text-[#542104] transition-all cursor-pointer py-1.5 px-2.5 rounded-md active:scale-95 text-xs font-semibold"
             >
               Admin Portal
             </button>

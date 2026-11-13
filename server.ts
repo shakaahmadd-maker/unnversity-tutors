@@ -1330,12 +1330,25 @@ export async function createApp(options: CreateAppOptions = {}) {
       path: '/',
       maxAge: maxAgeMs,
     });
+    res.cookie('ut_session_active', '1', {
+      httpOnly: false,
+      secure: isHttps,
+      sameSite: 'lax',
+      path: '/',
+      maxAge: maxAgeMs,
+    });
   }
 
   function clearSecureSessionCookie(req: express.Request, res: express.Response) {
     const isHttps = isSecureCookieRequest(req);
     res.clearCookie(COOKIE_NAME, {
       httpOnly: true,
+      secure: isHttps,
+      sameSite: 'lax',
+      path: '/',
+    });
+    res.clearCookie('ut_session_active', {
+      httpOnly: false,
       secure: isHttps,
       sameSite: 'lax',
       path: '/',
@@ -4125,8 +4138,9 @@ export async function createApp(options: CreateAppOptions = {}) {
       const subjectQuery = (req.query.subject as string || '').toLowerCase().trim();
       const maxPriceQuery = req.query.max_price ? parseFloat(req.query.max_price as string) : undefined;
       const searchQuery = (req.query.search as string || req.query.q as string || '').toLowerCase().trim();
-      const page = parseInt(req.query.page as string || '1', 10);
-      const limit = parseInt(req.query.limit as string || '50', 10);
+      const activeOnly = req.query.activeOnly === 'true' || req.query.activeOnly === '1';
+      const page = Math.max(1, parseInt(req.query.page as string || '1', 10) || 1);
+      const limit = Math.min(600, Math.max(1, parseInt(req.query.limit as string || '50', 10) || 50));
 
       const tutorMap = new Map<string, any>();
 
@@ -4150,10 +4164,12 @@ export async function createApp(options: CreateAppOptions = {}) {
       }
 
       // 4. In-memory / dynamic tutors
+      const dbAndRegisteredIds = new Set<string>(SEED_TUTORS.map((s) => s.id));
       for (const u of memoryStore.getAllUsers()) {
         if (u.role === 'tutor' || u.id.startsWith('tutor_') || u.id.startsWith('tutor-') || u.hourlyRate) {
           const { passwordHash: _, ...safeU } = u as any;
           tutorMap.set(u.id, safeU);
+          dbAndRegisteredIds.add(u.id);
         }
       }
 
@@ -4191,9 +4207,11 @@ export async function createApp(options: CreateAppOptions = {}) {
               hobbies: t.hobbies,
               verificationStatus: t.verificationStatus,
               isVerified: true,
+              isApproved: true,
               avatarUrl: t.profileImageUrl,
               role: 'tutor'
             });
+            dbAndRegisteredIds.add(t.id);
           }
         } catch (dbErr) {
           console.warn('[API] Notice querying tutors table in /api/tutors:', dbErr);
@@ -4201,6 +4219,21 @@ export async function createApp(options: CreateAppOptions = {}) {
       }
 
       let allTutors = Array.from(tutorMap.values());
+
+      if (activeOnly) {
+        allTutors = allTutors.filter((t) => {
+          if (t.suspended === true || t.status === 'suspended' || t.status === 'rejected') return false;
+          if (t.isApproved === false || t.status === 'pending') return false;
+          return true;
+        });
+        // Put verified/registered/DB tutors first while keeping rating order cleanly balanced
+        allTutors.sort((a, b) => {
+          const aCore = dbAndRegisteredIds.has(a.id) ? 1 : 0;
+          const bCore = dbAndRegisteredIds.has(b.id) ? 1 : 0;
+          if (aCore !== bCore) return bCore - aCore;
+          return (Number(b.rating) || 4.9) - (Number(a.rating) || 4.9);
+        });
+      }
 
       // STRICT ZERO DUPLICATES ENFORCEMENT: Deduplicate by composite key: (name, primarySubject, cityLocation)
       const uniqueCompositeMap = new Map<string, any>();
@@ -4258,7 +4291,8 @@ export async function createApp(options: CreateAppOptions = {}) {
           const locMatch = (t.location || t.cityLocation || '').toLowerCase().includes(searchQuery);
           const kwMatch = (t.searchableKeywords || '').toLowerCase().includes(searchQuery);
           const subs = Array.isArray(t.subjectExpertise) ? t.subjectExpertise.join(' ').toLowerCase() : '';
-          return nameMatch || primMatch || tierMatch || eduMatch || bioMatch || countryMatch || locMatch || kwMatch || subs.includes(searchQuery);
+          const altSubs = Array.isArray(t.subjects) ? t.subjects.join(' ').toLowerCase() : (typeof t.subjects === 'string' ? t.subjects.toLowerCase() : '');
+          return nameMatch || primMatch || tierMatch || eduMatch || bioMatch || countryMatch || locMatch || kwMatch || subs.includes(searchQuery) || altSubs.includes(searchQuery);
         });
       }
 

@@ -161,7 +161,7 @@ export default function AuthPage({ onLogin, onRegister, onNavigate }: AuthPagePr
       }
 
       if (event.data?.type === 'OAUTH_AUTH_SUCCESS') {
-        const verifiedUser = await store.verifySession();
+        const verifiedUser = await store.verifySession(true, true);
         if (!verifiedUser) {
           authRequestLockRef.current = false;
           setActiveOAuthProvider(null);

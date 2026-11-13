@@ -82,6 +82,8 @@ const STUDENT_TOOL_SLUGS = new Set([
   'academic-paraphraser',
 ]);
 
+export const STUDENT_TOOLS_COUNT = STUDENT_TOOL_SLUGS.size;
+
 const STUDENT_TOOL_ALIASES: Record<string, string> = {
   'graph-theory': 'graph-theory-network-builder',
   'network-builder': 'graph-theory-network-builder',

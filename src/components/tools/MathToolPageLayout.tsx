@@ -4,7 +4,6 @@ import {
   ArrowLeft,
   ArrowRight,
   BookOpenCheck,
-  CheckCircle2,
   ChevronDown,
   ChevronRight,
   ShieldCheck,
@@ -16,6 +15,7 @@ import {
   MathToolItem,
 } from '../../data/mathToolsRegistry';
 import { isModifiedAnchorClick } from '../../data/dedicatedServiceRoutes';
+import MeetOurExpertTutors from './MeetOurExpertTutors';
 import SiteFooter from '../SiteFooter';
 
 interface MathToolPageLayoutProps {
@@ -365,85 +365,6 @@ export default function MathToolPageLayout({
         </div>
       </section>
 
-      {/* 5. Subject-Matched Mathematics Tutor Branding Section */}
-      <section className="max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="bg-[#FFFFFF] border border-slate-200 rounded-3xl p-6 sm:p-8 lg:p-10">
-          <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-6 pb-8 border-b border-slate-100">
-            <div className="max-w-2xl space-y-2">
-              <p className="text-xs font-bold text-[#EA580C]">{tutorBranding.kicker}</p>
-              <h2
-                className="text-xl sm:text-2xl lg:text-3xl font-display font-bold text-[#111827] tracking-tight"
-                style={{ textWrap: 'balance' }}
-              >
-                {tutorBranding.headline}
-              </h2>
-              <p className="text-sm text-slate-600 leading-relaxed">{tutorBranding.subtext}</p>
-            </div>
-
-            <div className="shrink-0">
-              <a
-                href="/tutors"
-                onClick={(e) => handleAnchor(e, tutorBranding.ctaView)}
-                className="inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-[#F97316] hover:bg-[#EA580C] text-white text-sm font-semibold shadow-xs transition-colors whitespace-nowrap cursor-pointer"
-              >
-                <span>{tutorBranding.ctaText}</span>
-              </a>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-5 pt-8">
-            {tutorBranding.tutors.map((tutor) => (
-              <div
-                key={tutor.id}
-                className="bg-[#F9FAFB] border border-slate-200/90 rounded-2xl p-5 flex flex-col justify-between gap-4 hover:border-orange-300 transition-colors"
-              >
-                <div className="space-y-3.5">
-                  <div className="flex items-start gap-3.5">
-                    <div className="w-14 h-14 rounded-2xl bg-[#FFF7ED] border border-orange-200 text-[#EA580C] font-display font-bold text-base flex items-center justify-center shrink-0">
-                      {tutor.initials}
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-1.5">
-                        <h3 className="text-base font-bold text-[#111827] truncate">{tutor.name}</h3>
-                        <CheckCircle2
-                          className="w-4 h-4 text-emerald-600 shrink-0"
-                          aria-label="Verified University Tutor"
-                        />
-                      </div>
-                      <p className="text-xs font-semibold text-[#EA580C] mt-0.5">{tutor.credential}</p>
-                      <p className="text-xs text-slate-500">{tutor.institution}</p>
-                    </div>
-                  </div>
-
-                  <p className="text-xs text-slate-600 leading-relaxed">
-                    {tutor.specialties.join('  ·  ')}
-                  </p>
-
-                  <div className="flex items-center gap-2 text-xs text-slate-500 tabular-nums">
-                    <span className="inline-flex items-center gap-1 font-bold text-[#111827]">
-                      <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
-                      {tutor.rating}★
-                    </span>
-                    <span aria-hidden="true">·</span>
-                    <span>{tutor.sessions}</span>
-                    <span aria-hidden="true">·</span>
-                    <span className="text-emerald-700 font-medium">Verified Mentor</span>
-                  </div>
-                </div>
-
-                <button
-                  type="button"
-                  onClick={() => onNavigate(`subject:${tutor.subjectQuery}`)}
-                  className="w-full py-2.5 px-4 rounded-xl bg-[#F97316] hover:bg-[#EA580C] text-white text-xs font-semibold transition-colors cursor-pointer whitespace-nowrap"
-                >
-                  Book 1-on-1 Math Session
-                </button>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
       {/* 6. Related Math Tools Grid (3 Sibling Solvers) */}
       <section className="max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 pt-2 pb-14">
         <div className="flex items-center justify-between gap-4 mb-5">
@@ -494,7 +415,10 @@ export default function MathToolPageLayout({
         </div>
       </section>
 
-      {/* 7. Global Website Footer */}
+      {/* 7. Live Active Expert Tutors Directory Section Above Global Footer */}
+      <MeetOurExpertTutors onNavigate={onNavigate} subjectHint={tool.shortTitle} />
+
+      {/* 8. Global Website Footer */}
       <div className="mt-auto">
         <SiteFooter onNavigate={onNavigate} onOpenBecomeTutor={onOpenBecomeTutor} />
       </div>

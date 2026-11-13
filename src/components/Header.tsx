@@ -29,7 +29,7 @@ import {
   resolveDedicatedServiceRoute,
   isModifiedAnchorClick,
 } from '../data/dedicatedServiceRoutes';
-import { STUDENT_TOOLS } from '../data/studentToolsData';
+import { STUDENT_TOOLS_COUNT } from '../data/toolRouteMatchers';
 import { getResponsiveAvatarProps } from '../utils/imageOptimization';
 
 interface HeaderProps {
@@ -83,8 +83,8 @@ export default function Header({
               <span className="truncate">{studentsOnline} students online</span>
             </div>
             <span className="hidden md:inline text-gray-500">|</span>
-            <div className="hidden md:flex items-center gap-2 text-gray-300">
-              <span className="text-gray-400">🔥 Regional Online Tutoring:</span>
+            <div className="hidden md:flex items-center gap-2 text-gray-200">
+              <span className="text-gray-300">🔥 Regional Online Tutoring:</span>
               {[
                 { code: 'usa', label: 'USA 🇺🇸' },
                 { code: 'canada', label: 'CA 🇨🇦' },
@@ -143,7 +143,9 @@ export default function Header({
                 alt="Uni Tutors" 
                 width={220}
                 height={84}
-                decoding="async"
+                loading="eager"
+                decoding="sync"
+                fetchPriority="high"
                 className="h-9 sm:h-12 md:h-14 w-auto max-w-[175px] sm:max-w-[250px] object-contain transition-transform group-hover:scale-102"
               />
             </picture>
@@ -156,8 +158,8 @@ export default function Header({
               onClick={() => handleLinkClick('home')}
               className={`text-sm font-semibold tracking-wide transition-colors cursor-pointer whitespace-nowrap shrink-0 ${
                 activeView === 'home'
-                  ? 'text-orange-500 border-b-2 border-orange-500 pb-1'
-                  : 'text-gray-650 hover:text-orange-500 pb-1'
+                  ? 'text-orange-650 border-b-2 border-orange-650 pb-1'
+                  : 'text-gray-700 hover:text-orange-650 pb-1'
               }`}
             >
               Home
@@ -176,8 +178,8 @@ export default function Header({
                   activeView.startsWith('assignment-guidance') ||
                   activeView.startsWith('coursework-tutoring') ||
                   activeView.startsWith('writing-tutoring')
-                    ? 'text-orange-500 border-b-2 border-orange-500'
-                    : 'text-gray-650 hover:text-orange-500'
+                    ? 'text-orange-650 border-b-2 border-orange-650'
+                    : 'text-gray-700 hover:text-orange-650'
                 }`}
               >
                 <span>Services</span>
@@ -204,10 +206,10 @@ export default function Header({
                       activeView === 'services' ? 'bg-orange-50/80' : ''
                     }`}
                   >
-                    <BookOpen className="w-4 h-4 text-orange-500 mt-0.5 shrink-0" />
+                    <BookOpen className="w-4 h-4 text-orange-650 mt-0.5 shrink-0" />
                     <div>
-                      <div className="text-xs font-bold text-slate-900 group-hover:text-orange-600">All Tutoring Services Hub</div>
-                      <div className="text-[10px] text-slate-500">Overview of all core academic services</div>
+                      <div className="text-xs font-bold text-slate-900 group-hover:text-orange-650">All Tutoring Services Hub</div>
+                      <div className="text-[10px] text-slate-600">Overview of all core academic services</div>
                     </div>
                   </a>
 
@@ -216,13 +218,13 @@ export default function Header({
                   {DEDICATED_SERVICE_ROUTES.map((route) => {
                     const icon =
                       route.id === '1on1' ? (
-                        <Video className="w-4 h-4 text-orange-500 mt-0.5 shrink-0" />
+                        <Video className="w-4 h-4 text-orange-650 mt-0.5 shrink-0" />
                       ) : route.id === 'assignment' ? (
-                        <FileCheck className="w-4 h-4 text-orange-500 mt-0.5 shrink-0" />
+                        <FileCheck className="w-4 h-4 text-orange-650 mt-0.5 shrink-0" />
                       ) : route.id === 'coursework' ? (
-                        <Calendar className="w-4 h-4 text-orange-500 mt-0.5 shrink-0" />
+                        <Calendar className="w-4 h-4 text-orange-650 mt-0.5 shrink-0" />
                       ) : (
-                        <FileText className="w-4 h-4 text-orange-500 mt-0.5 shrink-0" />
+                        <FileText className="w-4 h-4 text-orange-650 mt-0.5 shrink-0" />
                       );
                     const isItemActive = activeView === route.view;
                     return (
@@ -241,10 +243,10 @@ export default function Header({
                       >
                         {icon}
                         <div>
-                          <div className={`text-xs font-bold group-hover:text-orange-600 ${isItemActive ? 'text-orange-600' : 'text-slate-900'}`}>
+                          <div className={`text-xs font-bold group-hover:text-orange-650 ${isItemActive ? 'text-orange-650' : 'text-slate-900'}`}>
                             {route.label}
                           </div>
-                          <div className="text-[10px] text-slate-500">{route.shortDesc}</div>
+                          <div className="text-[10px] text-slate-600">{route.shortDesc}</div>
                         </div>
                       </a>
                     );
@@ -261,8 +263,8 @@ export default function Header({
                 onMouseEnter={() => setIsToolsDropdownOpen(true)}
                 className={`text-sm font-semibold tracking-wide transition-colors cursor-pointer flex items-center gap-1 pb-1 whitespace-nowrap shrink-0 ${
                   activeView === 'tools' || activeView.startsWith('tools/')
-                    ? 'text-orange-500 border-b-2 border-orange-500'
-                    : 'text-gray-650 hover:text-orange-500'
+                    ? 'text-orange-650 border-b-2 border-orange-650'
+                    : 'text-gray-700 hover:text-orange-650'
                 }`}
               >
                 <span>Free Tools</span>
@@ -292,10 +294,10 @@ export default function Header({
                   >
                     <Sigma className="w-4 h-4 text-orange-500 mt-0.5 shrink-0" />
                     <div>
-                      <div className="text-xs font-bold text-slate-900 group-hover:text-orange-600">
+                      <div className="text-xs font-bold text-slate-900 group-hover:text-orange-650">
                         Mathematics &amp; Stats Hub (27)
                       </div>
-                      <div className="text-[10px] text-slate-500">
+                      <div className="text-[10px] text-slate-600">
                         Algebra, Calculus, RREF, Eigenvalues, ANOVA, RK4 &amp; RSA
                       </div>
                     </div>
@@ -313,12 +315,12 @@ export default function Header({
                       activeView.startsWith('tools/biology') ? 'bg-orange-50/80 ring-1 ring-orange-200/70' : ''
                     }`}
                   >
-                    <Dna className="w-4 h-4 text-orange-500 mt-0.5 shrink-0" />
+                    <Dna className="w-4 h-4 text-orange-650 mt-0.5 shrink-0" />
                     <div>
-                      <div className="text-xs font-bold text-slate-900 group-hover:text-orange-600">
+                      <div className="text-xs font-bold text-slate-900 group-hover:text-orange-650">
                         Biology Knowledge Hub (14)
                       </div>
-                      <div className="text-[10px] text-slate-500">
+                      <div className="text-[10px] text-slate-600">
                         Punnett, DNA→Protein, PCR, CRISPR, Gel, CFU &amp; Ψ
                       </div>
                     </div>
@@ -336,12 +338,12 @@ export default function Header({
                       activeView.startsWith('tools/chemistry') ? 'bg-orange-50/80 ring-1 ring-orange-200/70' : ''
                     }`}
                   >
-                    <FlaskConical className="w-4 h-4 text-orange-500 mt-0.5 shrink-0" />
+                    <FlaskConical className="w-4 h-4 text-orange-650 mt-0.5 shrink-0" />
                     <div>
-                      <div className="text-xs font-bold text-slate-900 group-hover:text-orange-600">
+                      <div className="text-xs font-bold text-slate-900 group-hover:text-orange-650">
                         Chemistry Knowledge Hub (16)
                       </div>
-                      <div className="text-[10px] text-slate-500">
+                      <div className="text-[10px] text-slate-600">
                         Periodic Table, Stoichiometry, pH, Nernst &amp; NMR
                       </div>
                     </div>
@@ -361,12 +363,12 @@ export default function Header({
                       activeView === 'tools/academic-paraphraser' ? 'bg-orange-50/80 ring-1 ring-orange-200/70' : ''
                     }`}
                   >
-                    <BookCheck className="w-4 h-4 text-orange-500 mt-0.5 shrink-0" />
+                    <BookCheck className="w-4 h-4 text-orange-650 mt-0.5 shrink-0" />
                     <div>
-                      <div className="text-xs font-bold text-slate-900 group-hover:text-orange-600">
+                      <div className="text-xs font-bold text-slate-900 group-hover:text-orange-650">
                         Academic Paraphraser &amp; AI Checker
                       </div>
-                      <div className="text-[10px] text-slate-500">
+                      <div className="text-[10px] text-slate-600">
                         4 Rewrite Modes, Burstiness &amp; N-Gram Originality
                       </div>
                     </div>
@@ -384,12 +386,12 @@ export default function Header({
                       activeView === 'tools' ? 'bg-orange-50/80' : ''
                     }`}
                   >
-                    <Wrench className="w-4 h-4 text-orange-500 mt-0.5 shrink-0" />
+                    <Wrench className="w-4 h-4 text-orange-650 mt-0.5 shrink-0" />
                     <div>
-                      <div className="text-xs font-bold text-slate-900 group-hover:text-orange-600">
-                        All Student Utilities ({STUDENT_TOOLS.length})
+                      <div className="text-xs font-bold text-slate-900 group-hover:text-orange-650">
+                        All Student Utilities ({STUDENT_TOOLS_COUNT})
                       </div>
-                      <div className="text-[10px] text-slate-500">
+                      <div className="text-[10px] text-slate-600">
                         Grade Converter, Graph Theory, PDF, CV &amp; Citations
                       </div>
                     </div>
@@ -409,8 +411,8 @@ export default function Header({
                   onClick={() => handleLinkClick(link.view)}
                   className={`text-sm font-semibold tracking-wide transition-colors cursor-pointer whitespace-nowrap shrink-0 ${
                     isActive
-                      ? 'text-orange-500 border-b-2 border-orange-500 pb-1'
-                      : 'text-gray-650 hover:text-orange-500 pb-1'
+                      ? 'text-orange-650 border-b-2 border-orange-650 pb-1'
+                      : 'text-gray-700 hover:text-orange-650 pb-1'
                   }`}
                 >
                   {link.name}
@@ -426,16 +428,17 @@ export default function Header({
                 <button
                   id="dashboard-header-nav"
                   onClick={() => handleLinkClick('dashboard')}
-                  className="bg-gray-100 hover:bg-orange-50 text-gray-800 hover:text-orange-600 flex items-center gap-2 px-3.5 py-1.5 rounded-xl transition-all cursor-pointer border border-transparent hover:border-orange-100 text-xs font-semibold"
+                  className="bg-gray-100 hover:bg-orange-50 text-gray-800 hover:text-orange-650 flex items-center gap-2 px-3.5 py-2 min-h-[40px] rounded-xl transition-all cursor-pointer border border-transparent hover:border-orange-100 text-xs font-semibold"
                 >
-                  <UserIcon className="w-4 h-4 text-orange-500" />
+                  <UserIcon className="w-4 h-4 text-orange-650" />
                   <span>My Dashboard ({currentUser.role})</span>
                 </button>
                 <button
                   id="logout-header-btn"
                   onClick={onLogout}
-                  className="text-gray-500 hover:text-red-500 p-2 rounded-xl hover:bg-gray-150 transition-colors cursor-pointer"
+                  className="text-gray-600 hover:text-red-600 p-2 min-w-[40px] min-h-[40px] inline-flex items-center justify-center rounded-xl hover:bg-gray-150 transition-colors cursor-pointer"
                   title="Logout Session"
+                  aria-label="Logout Session"
                 >
                   <LogOut className="w-4 h-4" />
                 </button>
@@ -445,14 +448,14 @@ export default function Header({
                 <button
                   id="nav-join-login"
                   onClick={() => handleLinkClick('auth')}
-                  className="text-xs font-semibold text-gray-700 hover:text-orange-500 transition-colors cursor-pointer px-2 py-1.5"
+                  className="text-xs font-semibold text-gray-700 hover:text-orange-650 transition-colors cursor-pointer px-2.5 py-2 min-h-[40px]"
                 >
                   Sign In
                 </button>
                 <button
                   id="nav-join-find"
                   onClick={() => handleLinkClick('tutors')}
-                  className="bg-orange-500 text-white font-semibold text-xs tracking-wider uppercase px-3.5 py-2 rounded-xl shadow-md shadow-orange-500/15 hover:bg-orange-600 hover:shadow-orange-500/20 hover:-translate-y-0.5 transition-all duration-200 cursor-pointer"
+                  className="bg-orange-650 text-white font-semibold text-xs tracking-wider uppercase px-3.5 py-2 min-h-[40px] rounded-xl shadow-md shadow-orange-500/15 hover:bg-orange-700 hover:shadow-orange-500/20 hover:-translate-y-0.5 transition-all duration-200 cursor-pointer"
                 >
                   Find a Tutor
                 </button>
@@ -461,7 +464,7 @@ export default function Header({
                   onClick={() => {
                     if (onOpenBecomeTutor) onOpenBecomeTutor();
                   }}
-                  className="bg-slate-900 text-white font-semibold text-xs tracking-wider uppercase px-3.5 py-2 rounded-xl shadow-md hover:bg-slate-800 hover:-translate-y-0.5 transition-all duration-200 cursor-pointer flex items-center gap-1.5"
+                  className="bg-slate-900 text-white font-semibold text-xs tracking-wider uppercase px-3.5 py-2 min-h-[40px] rounded-xl shadow-md hover:bg-slate-800 hover:-translate-y-0.5 transition-all duration-200 cursor-pointer flex items-center gap-1.5"
                 >
                   <GraduationCap className="w-3.5 h-3.5 text-orange-400" />
                   <span>Become a Tutor</span>
@@ -476,7 +479,7 @@ export default function Header({
               <button
                 id="mob-nav-dash"
                 onClick={() => handleLinkClick('dashboard')}
-                className="bg-orange-50 text-orange-600 px-3 py-2 rounded-xl text-xs font-semibold min-h-[44px] flex items-center justify-center cursor-pointer"
+                className="bg-orange-50 text-orange-700 px-3 py-2 rounded-xl text-xs font-semibold min-h-[44px] flex items-center justify-center cursor-pointer"
               >
                 Dash
               </button>
@@ -503,8 +506,8 @@ export default function Header({
               onClick={() => handleLinkClick('home')}
               className={`flex w-full items-center px-4 py-3 text-base font-semibold rounded-xl min-h-[44px] ${
                 activeView === 'home'
-                  ? 'text-orange-500 bg-orange-50'
-                  : 'text-gray-750 hover:text-orange-500 hover:bg-gray-50'
+                  ? 'text-orange-650 bg-orange-50'
+                  : 'text-gray-750 hover:text-orange-650 hover:bg-gray-50'
               }`}
             >
               Home
@@ -512,7 +515,7 @@ export default function Header({
 
             {/* Specialized Services Mobile Accordion */}
             <div className="p-3 bg-slate-50 rounded-2xl border border-slate-200/80 space-y-2">
-              <div className="text-xs font-bold text-slate-500 uppercase tracking-wider px-1">
+              <div className="text-xs font-bold text-slate-600 uppercase tracking-wider px-1">
                 Academic Services
               </div>
               <div className="grid grid-cols-1 gap-1">
@@ -526,23 +529,23 @@ export default function Header({
                   }}
                   className={`flex items-center gap-2 text-left text-xs font-bold px-3 py-2.5 min-h-[44px] rounded-xl transition-colors ${
                     activeView === 'services'
-                      ? 'bg-orange-50 text-orange-600'
-                      : 'text-slate-800 hover:bg-orange-50 hover:text-orange-600'
+                      ? 'bg-orange-50 text-orange-650'
+                      : 'text-slate-800 hover:bg-orange-50 hover:text-orange-650'
                   }`}
                 >
-                  <BookOpen className="w-4 h-4 text-orange-500 shrink-0" />
+                  <BookOpen className="w-4 h-4 text-orange-650 shrink-0" />
                   <span>All Tutoring Services Hub</span>
                 </a>
                 {DEDICATED_SERVICE_ROUTES.map((route) => {
                   const icon =
                     route.id === '1on1' ? (
-                      <Video className="w-4 h-4 text-orange-500 shrink-0" />
+                      <Video className="w-4 h-4 text-orange-650 shrink-0" />
                     ) : route.id === 'assignment' ? (
-                      <FileCheck className="w-4 h-4 text-orange-500 shrink-0" />
+                      <FileCheck className="w-4 h-4 text-orange-650 shrink-0" />
                     ) : route.id === 'coursework' ? (
-                      <Calendar className="w-4 h-4 text-orange-500 shrink-0" />
+                      <Calendar className="w-4 h-4 text-orange-650 shrink-0" />
                     ) : (
-                      <FileText className="w-4 h-4 text-orange-500 shrink-0" />
+                      <FileText className="w-4 h-4 text-orange-650 shrink-0" />
                     );
                   const isItemActive = activeView === route.view;
                   return (
@@ -557,8 +560,8 @@ export default function Header({
                       }}
                       className={`flex items-center gap-2 text-left text-xs font-bold px-3 py-2.5 min-h-[44px] rounded-xl transition-colors ${
                         isItemActive
-                          ? 'bg-orange-50 text-orange-600'
-                          : 'text-slate-800 hover:bg-orange-50 hover:text-orange-600'
+                          ? 'bg-orange-50 text-orange-650'
+                          : 'text-slate-800 hover:bg-orange-50 hover:text-orange-650'
                       }`}
                     >
                       {icon}
@@ -588,7 +591,7 @@ export default function Header({
                     : 'text-slate-800 hover:bg-orange-100/70'
                 }`}
               >
-                <Sigma className="w-4 h-4 text-orange-500 shrink-0" />
+                <Sigma className="w-4 h-4 text-orange-650 shrink-0" />
                 <span>Mathematics &amp; Statistics Hub (27 Tools)</span>
               </a>
               <a
@@ -605,7 +608,7 @@ export default function Header({
                     : 'text-slate-800 hover:bg-orange-100/70'
                 }`}
               >
-                <Dna className="w-4 h-4 text-orange-500 shrink-0" />
+                <Dna className="w-4 h-4 text-orange-650 shrink-0" />
                 <span>Biology Knowledge Hub (14 Tools)</span>
               </a>
               <a
@@ -622,7 +625,7 @@ export default function Header({
                     : 'text-slate-800 hover:bg-orange-100/70'
                 }`}
               >
-                <FlaskConical className="w-4 h-4 text-orange-500 shrink-0" />
+                <FlaskConical className="w-4 h-4 text-orange-650 shrink-0" />
                 <span>Chemistry Knowledge Hub (16 Tools)</span>
               </a>
               <a
@@ -639,7 +642,7 @@ export default function Header({
                     : 'text-slate-800 hover:bg-orange-100/70'
                 }`}
               >
-                <BookCheck className="w-4 h-4 text-orange-500 shrink-0" />
+                <BookCheck className="w-4 h-4 text-orange-650 shrink-0" />
                 <span>Academic Paraphraser &amp; AI Checker</span>
               </a>
               <a
@@ -656,8 +659,8 @@ export default function Header({
                     : 'text-slate-800 hover:bg-orange-100/70'
                 }`}
               >
-                <Wrench className="w-4 h-4 text-orange-500 shrink-0" />
-                <span>All Student Utilities ({STUDENT_TOOLS.length} Tools)</span>
+                <Wrench className="w-4 h-4 text-orange-650 shrink-0" />
+                <span>All Student Utilities ({STUDENT_TOOLS_COUNT} Tools)</span>
               </a>
             </div>
 
@@ -672,8 +675,8 @@ export default function Header({
                   onClick={() => handleLinkClick(link.view)}
                   className={`flex w-full items-center px-4 py-3 text-base font-semibold rounded-xl min-h-[44px] cursor-pointer ${
                     isActive
-                      ? 'text-orange-500 bg-orange-50'
-                      : 'text-gray-750 hover:text-orange-500 hover:bg-gray-50'
+                      ? 'text-orange-650 bg-orange-50'
+                      : 'text-gray-750 hover:text-orange-650 hover:bg-gray-50'
                   }`}
                 >
                   {link.name}
@@ -712,7 +715,7 @@ export default function Header({
                     })()}
                     <div className="text-left">
                       <p className="text-xs font-bold text-gray-900 leading-tight">{currentUser.name}</p>
-                      <p className="text-[10px] text-gray-500 leading-none">{currentUser.role}</p>
+                      <p className="text-[10px] text-gray-600 leading-none">{currentUser.role}</p>
                     </div>
                   </div>
                   <button
@@ -721,7 +724,7 @@ export default function Header({
                       onLogout();
                       setIsMenuOpen(false);
                     }}
-                    className="flex w-full items-center gap-2 text-red-500 px-4 py-2.5 min-h-[44px] rounded-xl hover:bg-red-50 font-semibold cursor-pointer"
+                    className="flex w-full items-center gap-2 text-red-600 px-4 py-2.5 min-h-[44px] rounded-xl hover:bg-red-50 font-semibold cursor-pointer"
                   >
                     <LogOut className="w-4 h-4" />
                     <span>Log Out</span>
@@ -739,7 +742,7 @@ export default function Header({
                   <button
                     id="mob-nav-find"
                     onClick={() => handleLinkClick('tutors')}
-                    className="flex w-full items-center justify-center bg-orange-500 text-white font-semibold px-4 py-2.5 min-h-[44px] rounded-xl shadow-md hover:bg-orange-650 cursor-pointer"
+                    className="flex w-full items-center justify-center bg-orange-650 text-white font-semibold px-4 py-2.5 min-h-[44px] rounded-xl shadow-md hover:bg-orange-700 cursor-pointer"
                   >
                     Find a Tutor
                   </button>

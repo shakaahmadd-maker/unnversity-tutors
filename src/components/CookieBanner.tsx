@@ -47,12 +47,12 @@ export default function CookieBanner() {
     >
       <div className="flex items-start gap-2.5 relative">
         <div className="p-1.5 bg-orange-100 rounded-lg shrink-0 mt-0.5">
-          <ShieldCheck className="w-4 h-4 text-orange-600" />
+          <ShieldCheck className="w-4 h-4 text-orange-650" />
         </div>
-        <div className="flex-1 pr-6 sm:pr-0">
-          <h4 className="font-semibold text-xs text-gray-900 tracking-tight">
+        <div className="flex-1 pr-10 sm:pr-10">
+          <p className="font-semibold text-xs text-gray-900 tracking-tight">
             Privacy &amp; Cookie Consent
-          </h4>
+          </p>
           <p className="text-[10.5px] sm:text-xs text-gray-600 leading-snug mt-0.5 line-clamp-2 sm:line-clamp-none">
             We use essential cookies to keep chat sessions active and track tutor assignments securely.
           </p>
@@ -60,10 +60,10 @@ export default function CookieBanner() {
         <button 
           id="close-cookie-banner"
           onClick={closeBanner} 
-          className="text-gray-400 hover:text-gray-600 absolute top-0 right-0 p-1 hover:bg-gray-100 rounded-full cursor-pointer"
+          className="text-gray-600 hover:text-gray-800 absolute -top-1 -right-1 w-11 h-11 min-w-[44px] min-h-[44px] flex items-center justify-center hover:bg-gray-100 rounded-full cursor-pointer"
           aria-label="Dismiss cookie banner"
         >
-          <X className="w-3.5 h-3.5" />
+          <X className="w-4 h-4" />
         </button>
       </div>
 
@@ -71,14 +71,14 @@ export default function CookieBanner() {
         <button
           id="cookie-accept-all"
           onClick={approve}
-          className="flex-1 sm:flex-initial bg-orange-500 font-semibold hover:bg-orange-600 text-[10.5px] sm:text-xs text-white px-3.5 py-1.5 rounded-xl shadow-xs transition-colors cursor-pointer text-center"
+          className="flex-1 sm:flex-initial bg-orange-650 font-semibold hover:bg-orange-700 text-[10.5px] sm:text-xs text-white px-4 py-2 min-h-[44px] rounded-xl shadow-xs transition-colors cursor-pointer text-center"
         >
           Accept All
         </button>
         <button
           id="cookie-necessary"
           onClick={approve}
-          className="flex-1 sm:flex-initial bg-white hover:bg-gray-50 border border-gray-200 text-gray-700 font-semibold text-[10.5px] sm:text-xs px-3 py-1.5 rounded-xl transition-colors cursor-pointer text-center"
+          className="flex-1 sm:flex-initial bg-white hover:bg-gray-50 border border-gray-200 text-gray-700 font-semibold text-[10.5px] sm:text-xs px-4 py-2 min-h-[44px] rounded-xl transition-colors cursor-pointer text-center"
         >
           Necessary Only
         </button>

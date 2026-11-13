@@ -1,17 +1,16 @@
 import React, { useState, useEffect } from 'react';
-import { Search, ShieldCheck, Star, ArrowRight, CheckCircle2, Dna, FlaskConical, Sigma } from 'lucide-react';
+import { Search, ShieldCheck, Star, ArrowRight, Dna, FlaskConical, Sigma } from 'lucide-react';
 import {
   STUDENT_TOOLS,
   STUDENT_TOOLS_BY_SLUG,
   TOOL_CATEGORIES,
-  TUTOR_BRANDING_MAP,
   ToolCategory,
   ToolSlug,
   resolveStudentToolSlug,
 } from '../../data/studentToolsData';
 import { isModifiedAnchorClick } from '../../data/dedicatedServiceRoutes';
 import ToolPageLayout, { renderToolIcon } from './ToolPageLayout';
-import { ResponsiveAvatar } from '../ResponsiveImage';
+import MeetOurExpertTutors from './MeetOurExpertTutors';
 import SiteFooter from './SiteFooter';
 import PdfToolkit from './PdfToolkit';
 import WhiteboardTool from './WhiteboardTool';
@@ -160,12 +159,6 @@ export default function ToolsHub({
       onNavigate(view);
     }
   };
-
-  const featuredHubTutors = [
-    TUTOR_BRANDING_MAP.writing.tutors[0],
-    TUTOR_BRANDING_MAP.stem.tutors[0],
-    TUTOR_BRANDING_MAP.admissions.tutors[0],
-  ];
 
   return (
     <div className="min-h-screen bg-[#F9FAFB] text-[#111827] flex flex-col">
@@ -397,87 +390,7 @@ export default function ToolsHub({
         )}
       </section>
 
-      {/* Hub Tutor Mentorship Conversion Section */}
-      <section className="max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 pb-14">
-        <div className="bg-[#FFFFFF] border border-slate-200 rounded-3xl p-6 sm:p-8 lg:p-10 space-y-8">
-          <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-6 pb-6 border-b border-slate-100">
-            <div className="max-w-2xl space-y-2">
-              <p className="text-xs font-bold text-[#EA580C]">
-                Beyond Software — Verified Human Mentorship
-              </p>
-              <h2
-                className="text-2xl sm:text-3xl font-display font-bold text-[#111827] tracking-tight"
-                style={{ textWrap: 'balance' }}
-              >
-                Pair Free Study Tools with 1-on-1 Feedback from PhD &amp; Master’s Tutors
-              </h2>
-              <p className="text-sm text-slate-600 leading-relaxed">
-                Whether you are polishing a dissertation chapter, debugging statistical models, or
-                preparing graduate school applications, work directly with vetted university specialists.
-              </p>
-            </div>
-
-            <a
-              href="/tutors"
-              onClick={(e) => handleAnchorNav(e, 'tutors')}
-              className="inline-flex items-center justify-center gap-2 px-6 py-3 rounded-xl bg-[#F97316] hover:bg-[#EA580C] text-white text-sm font-semibold shadow-xs transition-colors whitespace-nowrap shrink-0 cursor-pointer"
-            >
-              <span>Browse All Verified Tutors</span>
-              <ArrowRight className="w-4 h-4" />
-            </a>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-            {featuredHubTutors.map((tutor) => (
-              <div
-                key={tutor.id}
-                className="bg-[#F9FAFB] border border-slate-200 rounded-2xl p-5 flex flex-col justify-between gap-4"
-              >
-                <div className="space-y-3">
-                  <div className="flex items-start gap-3.5">
-                    <ResponsiveAvatar
-                      src={tutor.avatarUrl}
-                      alt={tutor.name}
-                      sizePx={64}
-                      width={56}
-                      height={56}
-                      className="w-14 h-14 rounded-2xl object-cover border border-slate-200 shrink-0"
-                    />
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-1.5">
-                        <h3 className="text-base font-bold text-[#111827] truncate">{tutor.name}</h3>
-                        <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-                      </div>
-                      <p className="text-xs text-slate-600 leading-snug mt-0.5">{tutor.credential}</p>
-                    </div>
-                  </div>
-
-                  <span className="inline-block text-xs font-semibold text-[#EA580C] bg-[#FFF7ED] border border-orange-200/70 px-2.5 py-0.5 rounded-md">
-                    {tutor.specialty}
-                  </span>
-
-                  <div className="flex items-center gap-2 text-xs text-slate-500 tabular-nums">
-                    <span className="inline-flex items-center gap-1 font-bold text-[#111827]">
-                      <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
-                      {tutor.rating}★
-                    </span>
-                    <span>·</span>
-                    <span>{tutor.sessionsCompleted}</span>
-                  </div>
-                </div>
-
-                <button
-                  type="button"
-                  onClick={() => onNavigate(`subject:${tutor.subjectQuery}`)}
-                  className="w-full py-2.5 px-4 rounded-xl bg-[#F97316] hover:bg-[#EA580C] text-white text-xs font-semibold transition-colors cursor-pointer"
-                >
-                  Book 1-on-1 Session
-                </button>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
+      <MeetOurExpertTutors onNavigate={onNavigate} />
 
       <div className="mt-auto">
         <SiteFooter onNavigate={onNavigate} onOpenBecomeTutor={onOpenBecomeTutor} />

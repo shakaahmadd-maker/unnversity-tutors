@@ -1,19 +1,17 @@
 import React, { useEffect, useState } from 'react';
 import {
   ArrowRight,
-  CheckCircle2,
   ChevronRight,
   Search,
   ShieldCheck,
-  Star,
 } from 'lucide-react';
 import {
-  getMathTutorBranding,
   MATH_LEVELS,
   MATH_TOOLS_REGISTRY,
   MathLevelId,
 } from '../../data/mathToolsRegistry';
 import { isModifiedAnchorClick } from '../../data/dedicatedServiceRoutes';
+import MeetOurExpertTutors from './MeetOurExpertTutors';
 import SiteFooter from '../SiteFooter';
 
 interface MathMegaHubProps {
@@ -24,8 +22,6 @@ interface MathMegaHubProps {
 export default function MathMegaHub({ onNavigate, onOpenBecomeTutor }: MathMegaHubProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedLevel, setSelectedLevel] = useState<'all' | MathLevelId>('all');
-
-  const tutorBranding = getMathTutorBranding('University Mathematics & Statistics');
 
   useEffect(() => {
     if (typeof document === 'undefined') return;
@@ -256,78 +252,7 @@ export default function MathMegaHub({ onNavigate, onOpenBecomeTutor }: MathMegaH
         )}
       </section>
 
-      {/* Featured Mathematics & Statistics Tutors Section */}
-      <section className="max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 pb-14">
-        <div className="bg-[#FFFFFF] border border-slate-200 rounded-3xl p-6 sm:p-8 lg:p-10 space-y-8">
-          <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-6 pb-6 border-b border-slate-100">
-            <div className="max-w-2xl space-y-2">
-              <p className="text-xs font-bold text-[#EA580C]">{tutorBranding.kicker}</p>
-              <h2
-                className="text-2xl sm:text-3xl font-display font-bold text-[#111827] tracking-tight"
-                style={{ textWrap: 'balance' }}
-              >
-                {tutorBranding.headline}
-              </h2>
-              <p className="text-sm text-slate-600 leading-relaxed">{tutorBranding.subtext}</p>
-            </div>
-
-            <a
-              href="/tutors"
-              onClick={(e) => handleAnchor(e, 'subject:Mathematics')}
-              className="inline-flex items-center justify-center gap-2 px-6 py-3 rounded-xl bg-[#F97316] hover:bg-[#EA580C] text-white text-sm font-semibold shadow-xs transition-colors whitespace-nowrap shrink-0 cursor-pointer"
-            >
-              <span>Book 1-on-1 Math Session</span>
-              <ArrowRight className="w-4 h-4" />
-            </a>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-            {tutorBranding.tutors.map((tutor) => (
-              <div
-                key={tutor.id}
-                className="bg-[#F9FAFB] border border-slate-200 rounded-2xl p-5 flex flex-col justify-between gap-4"
-              >
-                <div className="space-y-3">
-                  <div className="flex items-start gap-3.5">
-                    <div className="w-14 h-14 rounded-2xl bg-[#FFF7ED] border border-orange-200 text-[#EA580C] font-display font-bold text-base flex items-center justify-center shrink-0">
-                      {tutor.initials}
-                    </div>
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-1.5">
-                        <h3 className="text-base font-bold text-[#111827] truncate">{tutor.name}</h3>
-                        <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-                      </div>
-                      <p className="text-xs font-semibold text-[#EA580C] mt-0.5">{tutor.credential}</p>
-                      <p className="text-xs text-slate-500">{tutor.institution}</p>
-                    </div>
-                  </div>
-
-                  <p className="text-xs text-slate-600 leading-relaxed">
-                    {tutor.specialties.join('  ·  ')}
-                  </p>
-
-                  <div className="flex items-center gap-2 text-xs text-slate-500 tabular-nums">
-                    <span className="inline-flex items-center gap-1 font-bold text-[#111827]">
-                      <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
-                      {tutor.rating}★
-                    </span>
-                    <span>·</span>
-                    <span>{tutor.sessions}</span>
-                  </div>
-                </div>
-
-                <button
-                  type="button"
-                  onClick={() => onNavigate(`subject:${tutor.subjectQuery}`)}
-                  className="w-full py-2.5 px-4 rounded-xl bg-[#F97316] hover:bg-[#EA580C] text-white text-xs font-semibold transition-colors cursor-pointer whitespace-nowrap"
-                >
-                  Book 1-on-1 Math Session
-                </button>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
+      <MeetOurExpertTutors onNavigate={onNavigate} subjectHint="University Mathematics & Statistics" />
 
       <div className="mt-auto">
         <SiteFooter onNavigate={onNavigate} onOpenBecomeTutor={onOpenBecomeTutor} />

@@ -4,7 +4,6 @@ import {
   ArrowRight,
   BookCheck,
   Check,
-  CheckCircle2,
   ChevronDown,
   ChevronRight,
   Copy,
@@ -34,76 +33,17 @@ import {
   segmentSentenceClichés,
 } from '../../utils/academicParaphraserEngine';
 import {
-  FeaturedTutorCardData,
   STUDENT_TOOLS,
   STUDENT_TOOLS_BY_SLUG,
-  TUTOR_BRANDING_MAP,
 } from '../../data/studentToolsData';
 import { isModifiedAnchorClick } from '../../data/dedicatedServiceRoutes';
 import { renderToolIcon } from './ToolPageLayout';
-import { ResponsiveAvatar } from '../ResponsiveImage';
+import MeetOurExpertTutors from './MeetOurExpertTutors';
 import SiteFooter from './SiteFooter';
 
 interface AcademicParaphraserProps {
   onNavigate?: (view: string) => void;
   onOpenBecomeTutor?: () => void;
-}
-
-const FEATURED_WRITING_COACHES: FeaturedTutorCardData[] = [
-  {
-    id: 'paraphraser-coach-1',
-    name: 'Dr. Eleanor Vance',
-    initials: 'EV',
-    credential: 'PhD English Literature & Rhetoric · University of Oxford',
-    specialty: 'Thesis Editing · APA / MLA · Turnitin Check',
-    rating: '5.0',
-    sessionsCompleted: '420+ essays coached',
-    avatarUrl: TUTOR_BRANDING_MAP.writing.tutors[0]?.avatarUrl || '',
-    subjectQuery: 'Academic Writing',
-  },
-  {
-    id: 'paraphraser-coach-2',
-    name: 'Prof. Marcus Sterling',
-    initials: 'MS',
-    credential: 'MPhil Research Methodology · UK',
-    specialty: 'Literature Reviews · Harvard Style · ESL Fluency',
-    rating: '5.0',
-    sessionsCompleted: '340+ papers mentored',
-    avatarUrl: TUTOR_BRANDING_MAP.writing.tutors[1]?.avatarUrl || '',
-    subjectQuery: 'Research Methods',
-  },
-  {
-    id: 'paraphraser-coach-3',
-    name: 'Dr. Zara Khalid',
-    initials: 'ZK',
-    credential: 'PhD Applied Linguistics & Admissions',
-    specialty: 'SOP & Essays · Peer-Review Polish · IEEE / Chicago',
-    rating: '5.0',
-    sessionsCompleted: '360+ theses reviewed',
-    avatarUrl: TUTOR_BRANDING_MAP.writing.tutors[2]?.avatarUrl || '',
-    subjectQuery: 'Dissertation',
-  },
-];
-
-function WritingCoachAvatar({ tutor }: { tutor: FeaturedTutorCardData }) {
-  const [failed, setFailed] = useState(false);
-  if (failed || !tutor.avatarUrl) {
-    return (
-      <div className="w-14 h-14 rounded-2xl bg-[#FFF7ED] border border-orange-200 text-[#EA580C] font-display font-bold text-base flex items-center justify-center shrink-0">
-        {tutor.initials}
-      </div>
-    );
-  }
-  return (
-    <ResponsiveAvatar
-      src={tutor.avatarUrl}
-      alt={tutor.name}
-      sizePx={64}
-      width={56}
-      height={56}
-      className="w-14 h-14 rounded-2xl object-cover border border-slate-200 shrink-0"
-    />
-  );
 }
 
 function ScoreComparisonCard({
@@ -1410,57 +1350,6 @@ export default function AcademicParaphraser({
               </button>
             </div>
           </div>
-
-          {/* 3 Featured Academic Writing & Editing Tutors */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-            {FEATURED_WRITING_COACHES.map((tutor) => (
-              <div
-                key={tutor.id}
-                className="bg-[#F9FAFB] border border-slate-200 hover:border-orange-300 rounded-2xl p-5 flex flex-col justify-between gap-4 transition-colors"
-              >
-                <div className="space-y-3.5">
-                  <div className="flex items-start gap-3.5">
-                    <WritingCoachAvatar tutor={tutor} />
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-1.5">
-                        <h3 className="text-base font-bold text-[#111827] truncate">{tutor.name}</h3>
-                        <CheckCircle2
-                          className="w-4 h-4 text-emerald-600 shrink-0"
-                          aria-label="Verified PhD Specialist"
-                        />
-                      </div>
-                      <p className="text-xs text-slate-600 leading-snug mt-0.5">
-                        {tutor.credential}
-                      </p>
-                    </div>
-                  </div>
-
-                  <p className="text-xs font-semibold text-[#EA580C] bg-[#FFF7ED] border border-orange-200/80 px-3 py-1.5 rounded-lg leading-snug">
-                    {tutor.specialty}
-                  </p>
-
-                  <div className="flex items-center gap-2 text-xs text-slate-500 tabular-nums">
-                    <span className="inline-flex items-center gap-1 font-bold text-[#111827]">
-                      <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
-                      {tutor.rating}★
-                    </span>
-                    <span aria-hidden="true">·</span>
-                    <span>{tutor.sessionsCompleted}</span>
-                    <span aria-hidden="true">·</span>
-                    <span className="text-emerald-700 font-medium">Verified PhD</span>
-                  </div>
-                </div>
-
-                <button
-                  type="button"
-                  onClick={() => onNavigate(`subject:${tutor.subjectQuery}`)}
-                  className="w-full py-2.5 px-4 rounded-xl bg-[#F97316] hover:bg-[#EA580C] text-white text-xs font-semibold transition-colors cursor-pointer whitespace-nowrap"
-                >
-                  Book 1-on-1 Writing Coach →
-                </button>
-              </div>
-            ))}
-          </div>
         </div>
       </section>
 
@@ -1601,7 +1490,10 @@ export default function AcademicParaphraser({
         </section>
       )}
 
-      {/* 7. University-Tutors.com Global Footer */}
+      {/* 7. Live Active Expert Tutors Directory Section Above Global Footer */}
+      <MeetOurExpertTutors onNavigate={onNavigate} subjectHint="Academic Writing & Research Editing" />
+
+      {/* 8. University-Tutors.com Global Footer */}
       <div className="mt-auto">
         <SiteFooter onNavigate={onNavigate} onOpenBecomeTutor={onOpenBecomeTutor} />
       </div>

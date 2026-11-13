@@ -19,8 +19,6 @@ import {
   Agreement,
   TriggeredEmail
 } from '../types';
-import { DEFAULT_20_BLOGS } from '../data/defaultBlogsData';
-import { CURATED_SPECIALIZED_TUTORS } from '../data/tutorsDirectoryData';
 import {
   apiFetch as centralizedApiFetch,
   isAbortError,
@@ -127,23 +125,6 @@ const INITIAL_TUTORS: User[] = [
   }
 ];
 
-const INITIAL_BLOGS: Blog[] = DEFAULT_20_BLOGS.map(b => ({
-  id: b.id,
-  adminId: b.adminId || 'admin_shaka',
-  title: b.title,
-  slug: b.id,
-  excerpt: b.title,
-  content: b.content,
-  author: 'Editorial Team',
-  image: b.image,
-  imageUrl: b.image,
-  category: b.category,
-  tags: b.tags,
-  readTime: '5 min read',
-  featured: false,
-  publishedAt: b.publishedAt,
-}));
-
 const INITIAL_FAQS: FAQ[] = [
   {
     id: 'faq_1',
@@ -185,7 +166,6 @@ export interface TabLoadState {
 export class AppStore {
   users: User[] = [
     ...INITIAL_TUTORS,
-    ...CURATED_SPECIALIZED_TUTORS,
     {
       id: 'student_alex',
       role: UserRole.STUDENT,
@@ -215,7 +195,7 @@ export class AppStore {
     }
   ];
   currentUser: User | null = null;
-  blogs: Blog[] = INITIAL_BLOGS;
+  blogs: Blog[] = [];
   faqs: FAQ[] = INITIAL_FAQS;
   chats: Chat[] = [];
   chatRooms: any[] = [];
@@ -252,6 +232,9 @@ export class AppStore {
   private trendingTutorsLoaded = false;
   private fullDirectoryLoaded = false;
   private inFlightDirectoryLoad: Promise<void> | null = null;
+  private curatedTutorsCache: User[] = [];
+  private catalogDataLoaded = false;
+  private inFlightCatalogLoad: Promise<void> | null = null;
   public isSessionInitialized: boolean = false;
   public sessionReadyPromise: Promise<User | null>;
 
@@ -268,8 +251,65 @@ export class AppStore {
     this.startPolling();
   }
 
+  public async ensureCatalogDataLoaded(): Promise<void> {
+    if (this.catalogDataLoaded) return;
+    if (this.inFlightCatalogLoad) return this.inFlightCatalogLoad;
+    this.inFlightCatalogLoad = (async () => {
+      try {
+        const [tutorsMod, blogsMod] = await Promise.all([
+          import('../data/tutorsDirectoryData'),
+          import('../data/defaultBlogsData'),
+        ]);
+        this.curatedTutorsCache = tutorsMod.CURATED_SPECIALIZED_TUTORS || [];
+        const mergedMap = new Map<string, User>();
+        for (const initial of INITIAL_TUTORS) mergedMap.set(initial.id, initial);
+        for (const curated of this.curatedTutorsCache) mergedMap.set(curated.id, curated);
+        for (const u of this.users) {
+          const existing = mergedMap.get(u.id);
+          mergedMap.set(u.id, existing ? { ...existing, ...u } : u);
+        }
+        this.users = Array.from(mergedMap.values());
+        if (this.blogs.length === 0 && Array.isArray(blogsMod.DEFAULT_20_BLOGS)) {
+          this.blogs = blogsMod.DEFAULT_20_BLOGS.map((b) => ({
+            id: b.id,
+            adminId: b.adminId || 'admin_shaka',
+            title: b.title,
+            slug: b.id,
+            excerpt: b.title,
+            content: b.content,
+            author: 'Editorial Team',
+            image: b.image,
+            imageUrl: b.image,
+            category: b.category,
+            tags: b.tags,
+            readTime: '5 min read',
+            featured: false,
+            publishedAt: b.publishedAt,
+          }));
+        }
+        this.catalogDataLoaded = true;
+        this.notify();
+      } catch {
+        // Ignore transient dynamic import failures
+      } finally {
+        this.inFlightCatalogLoad = null;
+      }
+    })();
+    return this.inFlightCatalogLoad;
+  }
+
   private async bootstrap(): Promise<User | null> {
     const user = await this.verifySession(false);
+    const pathname = typeof window !== 'undefined' ? window.location.pathname : '/';
+    if (!user && (pathname === '/' || pathname === '')) {
+      if (typeof window !== 'undefined') {
+        window.setTimeout(() => {
+          this.fetchData().catch(() => {});
+        }, 5500);
+      }
+      return null;
+    }
+    await this.ensureCatalogDataLoaded();
     // Single initial data fetch after session check completes
     await this.fetchData();
     return user;
@@ -333,6 +373,7 @@ export class AppStore {
     if (this.inFlightDirectoryLoad) return this.inFlightDirectoryLoad;
     this.inFlightDirectoryLoad = (async () => {
       try {
+        await this.ensureCatalogDataLoaded();
         const res = await apiFetch('/api/users?page=1&limit=100');
         if (res.ok) {
           const uData = await res.json();
@@ -370,11 +411,32 @@ export class AppStore {
     return this.users;
   }
 
-  public async verifySession(triggerFetch = true): Promise<User | null> {
+  public async verifySession(triggerFetch = true, forceNetwork = false): Promise<User | null> {
     if (typeof window === 'undefined') {
       this.isSessionInitialized = true;
       return null;
     }
+
+    const cookieStr = typeof document !== 'undefined' ? document.cookie || '' : '';
+    const hasCookieHint = /(?:^|;\s*)ut_session_active=1(?:;|$)/.test(cookieStr);
+    let hasStoredHint = false;
+    try {
+      hasStoredHint = Boolean(localStorage.getItem('ut_current_user') || localStorage.getItem('auth_token'));
+    } catch {
+      hasStoredHint = false;
+    }
+
+    // Avoid firing /api/auth/me (and logging a 401 console error) when visitor is clearly logged out
+    if (!forceNetwork && !hasCookieHint && !hasStoredHint) {
+      const hadUser = this.currentUser !== null;
+      this.currentUser = null;
+      this.isSessionInitialized = true;
+      if (hadUser) {
+        this.notify();
+      }
+      return null;
+    }
+
     try {
       const res = await apiFetch('/api/auth/me', { skipAuthEvent: true, dedupe: false });
       if (res.ok) {
@@ -383,6 +445,11 @@ export class AppStore {
           this.currentUser = data.user;
           this.sessionExpiredMessage = null;
           this.isSessionInitialized = true;
+          try {
+            document.cookie = 'ut_session_active=1; path=/; SameSite=Lax';
+          } catch {
+            // ignore cookie write errors
+          }
           this.notify();
           if (triggerFetch) {
             this.fetchData().catch(() => {});
@@ -391,15 +458,24 @@ export class AppStore {
         }
       }
       this.currentUser = null;
-      localStorage.removeItem('ut_current_user');
-      localStorage.removeItem('auth_token');
+      try {
+        localStorage.removeItem('ut_current_user');
+        localStorage.removeItem('auth_token');
+        document.cookie = 'ut_session_active=; Max-Age=0; path=/; SameSite=Lax';
+      } catch {
+        // ignore storage errors
+      }
       this.isSessionInitialized = true;
       this.notify();
       return null;
     } catch {
       this.currentUser = null;
-      localStorage.removeItem('ut_current_user');
-      localStorage.removeItem('auth_token');
+      try {
+        localStorage.removeItem('ut_current_user');
+        localStorage.removeItem('auth_token');
+      } catch {
+        // ignore storage errors
+      }
       this.isSessionInitialized = true;
       this.notify();
       return null;
@@ -430,7 +506,7 @@ export class AppStore {
     for (const initial of INITIAL_TUTORS) {
       mergedMap.set(initial.id, initial);
     }
-    for (const curated of CURATED_SPECIALIZED_TUTORS) {
+    for (const curated of this.curatedTutorsCache) {
       mergedMap.set(curated.id, curated);
     }
     for (const su of serverUsers) {
@@ -746,7 +822,10 @@ export class AppStore {
         const pathname = typeof window !== 'undefined' ? window.location.pathname.toLowerCase() : '/';
         const needsFullDirectoryImmediately =
           Boolean(this.currentUser) ||
-          /\/(tutors|tutors-directory|user-data|get-a-quote|online-tutoring|services\/|admin|student|tutor)/.test(pathname);
+          /\/(tutors|tutors-directory|user-data|get-a-quote|online-tutoring|services|our-blog|blog|admin|student|tutor)/.test(pathname);
+        if (needsFullDirectoryImmediately) {
+          await this.ensureCatalogDataLoaded();
+        }
         const usersUrl = needsFullDirectoryImmediately
           ? '/api/users?page=1&limit=100'
           : '/api/users?role=tutor&page=1&limit=12';
@@ -787,6 +866,8 @@ export class AppStore {
                   imageUrl: b.imageUrl || b.image,
                   tags: typeof b.tags === 'string' ? JSON.parse(b.tags || '[]') : (b.tags || []),
                 }));
+              } else if (this.blogs.length === 0) {
+                await this.ensureCatalogDataLoaded();
               }
             }
           })
@@ -2122,6 +2203,7 @@ export class AppStore {
     }
 
     // Local fallback: reload from DEFAULT_20_BLOGS
+    const { DEFAULT_20_BLOGS } = await import('../data/defaultBlogsData');
     this.blogs = DEFAULT_20_BLOGS.map(b => ({
       id: b.id,
       adminId: b.adminId || 'admin_shaka',

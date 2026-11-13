@@ -186,13 +186,13 @@ export default function HowItWorksSection({ onNavigate }: HowItWorksSectionProps
 
         {/* Top Pill Tag & Title (Compact on mobile) */}
         <div className="text-center max-w-3xl mx-auto mb-6 sm:mb-12">
-          <div className="inline-flex items-center gap-1.5 px-3 py-1 sm:px-4 sm:py-1.5 rounded-full bg-orange-50/90 border border-orange-200/80 text-orange-600 text-[10px] sm:text-xs font-semibold tracking-wider uppercase mb-3 sm:mb-4 shadow-xs select-none">
-            <Sparkles className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-orange-500" />
+          <div className="inline-flex items-center gap-1.5 px-3 py-1 sm:px-4 sm:py-1.5 rounded-full bg-orange-50/90 border border-orange-200/80 text-orange-700 text-[10px] sm:text-xs font-semibold tracking-wider uppercase mb-3 sm:mb-4 shadow-xs select-none">
+            <Sparkles className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-orange-650" />
             <span>Dynamic Flow Experience</span>
           </div>
 
           <h2 className="text-2xl sm:text-4xl md:text-5xl font-black italic tracking-tight text-gray-950 uppercase leading-snug font-heading">
-            HOW IT <span className="text-orange-500 not-italic">WORKS</span>
+            HOW IT <span className="text-orange-650 not-italic">WORKS</span>
           </h2>
 
           <p className="mt-2 text-xs sm:text-base text-gray-600 max-w-2xl mx-auto leading-relaxed px-2">
@@ -223,10 +223,10 @@ export default function HowItWorksSection({ onNavigate }: HowItWorksSectionProps
                   id={`mobile-step-pill-${step.id}`}
                   onClick={() => setActiveStage(step.id)}
                   type="button"
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs whitespace-nowrap transition-all duration-200 cursor-pointer ${
+                  className={`flex items-center gap-1.5 px-3.5 py-2 min-h-[44px] rounded-full text-xs whitespace-nowrap transition-all duration-200 cursor-pointer ${
                     isActive
-                      ? 'bg-orange-500 text-white font-bold shadow-xs'
-                      : 'bg-white text-gray-600 border border-slate-200 font-semibold hover:border-orange-200'
+                      ? 'bg-orange-650 text-white font-bold shadow-xs'
+                      : 'bg-white text-gray-700 border border-slate-200 font-semibold hover:border-orange-300'
                   }`}
                 >
                   <span className={`w-4 h-4 rounded-full flex items-center justify-center text-[10px] font-bold ${
@@ -257,7 +257,7 @@ export default function HowItWorksSection({ onNavigate }: HowItWorksSectionProps
               >
                 <div className="flex items-start gap-3">
                   <div className={`step-num w-8 h-8 sm:w-9 sm:h-9 rounded-xl font-black text-sm flex items-center justify-center shrink-0 transition-colors ${
-                    activeStage === 1 ? 'bg-orange-500 text-white shadow-xs' : 'bg-slate-100 text-gray-600'
+                    activeStage === 1 ? 'bg-orange-650 text-white shadow-xs' : 'bg-slate-100 text-gray-700'
                   }`}>
                     1
                   </div>
@@ -267,11 +267,11 @@ export default function HowItWorksSection({ onNavigate }: HowItWorksSectionProps
                       <strong className="text-emerald-700 font-semibold">You do:</strong> Choose project specs and estimate complexity.
                     </p>
                     <p className="mt-0.5 text-[11px] sm:text-xs text-gray-600 leading-snug">
-                      <strong className="text-orange-600 font-semibold">We do:</strong> Instantly calculate optimized pricing plans.
+                      <strong className="text-orange-700 font-semibold">We do:</strong> Instantly calculate optimized pricing plans.
                     </p>
                     <div className="step-progress-bar mt-2.5 h-1.5 w-full bg-slate-100 rounded-full overflow-hidden">
                       <div 
-                        className="h-full bg-orange-500 rounded-full transition-all duration-300 origin-left"
+                        className="h-full bg-orange-650 rounded-full transition-all duration-300 origin-left"
                         style={{ transform: activeStage === 1 ? 'scaleX(1)' : 'scaleX(0)' }}
                       />
                     </div>
@@ -291,7 +291,7 @@ export default function HowItWorksSection({ onNavigate }: HowItWorksSectionProps
               >
                 <div className="flex items-start gap-3">
                   <div className={`step-num w-8 h-8 sm:w-9 sm:h-9 rounded-xl font-black text-sm flex items-center justify-center shrink-0 transition-colors ${
-                    activeStage === 2 ? 'bg-orange-500 text-white shadow-xs' : 'bg-slate-100 text-gray-600'
+                    activeStage === 2 ? 'bg-orange-650 text-white shadow-xs' : 'bg-slate-100 text-gray-700'
                   }`}>
                     2
                   </div>
@@ -301,11 +301,11 @@ export default function HowItWorksSection({ onNavigate }: HowItWorksSectionProps
                       <strong className="text-emerald-700 font-semibold">You do:</strong> Securely approve spec constraints and quotes.
                     </p>
                     <p className="mt-0.5 text-[11px] sm:text-xs text-gray-600 leading-snug">
-                      <strong className="text-orange-600 font-semibold">We do:</strong> Launch direct syllabus matching expert matching.
+                      <strong className="text-orange-700 font-semibold">We do:</strong> Launch direct syllabus matching expert matching.
                     </p>
                     <div className="step-progress-bar mt-2.5 h-1.5 w-full bg-slate-100 rounded-full overflow-hidden">
                       <div 
-                        className="h-full bg-orange-500 rounded-full transition-all duration-300 origin-left"
+                        className="h-full bg-orange-650 rounded-full transition-all duration-300 origin-left"
                         style={{ transform: activeStage === 2 ? 'scaleX(1)' : 'scaleX(0)' }}
                       />
                     </div>
@@ -329,8 +329,8 @@ export default function HowItWorksSection({ onNavigate }: HowItWorksSectionProps
                     <div className="w-2.5 h-2.5 rounded-full bg-amber-400"></div>
                     <div className="w-2.5 h-2.5 rounded-full bg-emerald-400"></div>
                   </div>
-                  <div className="flex items-center gap-1 font-mono text-[9px] sm:text-[10px] text-slate-400 uppercase tracking-wider font-semibold">
-                    <span className="text-orange-500 font-bold">&gt;_</span>
+                  <div className="flex items-center gap-1 font-mono text-[9px] sm:text-[10px] text-slate-600 uppercase tracking-wider font-semibold">
+                    <span className="text-orange-650 font-bold">&gt;_</span>
                     <span id="terminal-sync-status">SYSTEM_SYNC</span>
                   </div>
                 </div>
@@ -339,7 +339,7 @@ export default function HowItWorksSection({ onNavigate }: HowItWorksSectionProps
                 {activeStage === 1 && (
                   <div id="screen-step-1" className="pt-3.5 space-y-3 animate-fade-in">
                     <div>
-                      <div className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-orange-600">
+                      <div className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-orange-700">
                         Configuration Wizard
                       </div>
                       <div className="text-xs sm:text-[13px] font-medium text-slate-700 mt-0.5">
@@ -352,16 +352,16 @@ export default function HowItWorksSection({ onNavigate }: HowItWorksSectionProps
                       <button 
                         type="button"
                         onClick={() => calculateWizard('analysis', 120)}
-                        className={`flex items-center justify-between p-2 sm:p-2.5 rounded-xl border text-[11px] transition-all text-left cursor-pointer ${
+                        className={`flex items-center justify-between p-2.5 min-h-[44px] rounded-xl border text-[11px] transition-all text-left cursor-pointer ${
                           wizardOption === 'analysis'
                             ? 'border-orange-500 bg-orange-50/60 font-bold text-gray-900 shadow-2xs'
-                            : 'border-slate-200 hover:border-slate-300 bg-white font-semibold text-gray-600'
+                            : 'border-slate-200 hover:border-slate-300 bg-white font-semibold text-gray-700'
                         }`}
                       >
                         <span>Analysis Task</span>
                         <span className={`w-4 h-4 rounded-full flex items-center justify-center text-[9px] ${
                           wizardOption === 'analysis'
-                            ? 'bg-orange-500 text-white font-bold'
+                            ? 'bg-orange-650 text-white font-bold'
                             : 'border border-slate-300'
                         }`}>
                           {wizardOption === 'analysis' ? '✓' : ''}
@@ -371,16 +371,16 @@ export default function HowItWorksSection({ onNavigate }: HowItWorksSectionProps
                       <button 
                         type="button"
                         onClick={() => calculateWizard('design', 95)}
-                        className={`flex items-center justify-between p-2 sm:p-2.5 rounded-xl border text-[11px] transition-all text-left cursor-pointer ${
+                        className={`flex items-center justify-between p-2.5 min-h-[44px] rounded-xl border text-[11px] transition-all text-left cursor-pointer ${
                           wizardOption === 'design'
                             ? 'border-orange-500 bg-orange-50/60 font-bold text-gray-900 shadow-2xs'
-                            : 'border-slate-200 hover:border-slate-300 bg-white font-semibold text-gray-600'
+                            : 'border-slate-200 hover:border-slate-300 bg-white font-semibold text-gray-700'
                         }`}
                       >
                         <span>UI Design</span>
                         <span className={`w-4 h-4 rounded-full flex items-center justify-center text-[9px] ${
                           wizardOption === 'design'
-                            ? 'bg-orange-500 text-white font-bold'
+                            ? 'bg-orange-650 text-white font-bold'
                             : 'border border-slate-300'
                         }`}>
                           {wizardOption === 'design' ? '✓' : ''}
@@ -391,14 +391,14 @@ export default function HowItWorksSection({ onNavigate }: HowItWorksSectionProps
                     {/* Calculated Output Card */}
                     <div className="mt-3 bg-white border border-slate-900 rounded-xl p-3 flex items-end justify-between shadow-xs">
                       <div>
-                        <span className="text-[9px] font-black uppercase tracking-wider text-slate-500 block">Estimated Query Price</span>
+                        <span className="text-[9px] font-black uppercase tracking-wider text-slate-600 block">Estimated Query Price</span>
                         <span id="calculated-price" className="text-xl sm:text-2xl font-black text-gray-950 tracking-tight font-sans">
                           ${wizardVal}.00
                         </span>
                       </div>
                       <div className="text-right">
-                        <span className="text-[9px] font-black uppercase tracking-wider text-slate-500 block">Work Scale Limit</span>
-                        <span className="text-xs sm:text-sm font-bold text-emerald-600">24-48 Hours</span>
+                        <span className="text-[9px] font-black uppercase tracking-wider text-slate-600 block">Work Scale Limit</span>
+                        <span className="text-xs sm:text-sm font-bold text-emerald-700">24-48 Hours</span>
                       </div>
                     </div>
                   </div>
@@ -408,7 +408,7 @@ export default function HowItWorksSection({ onNavigate }: HowItWorksSectionProps
                 {activeStage === 2 && (
                   <div id="screen-step-2" className="pt-3.5 space-y-3 animate-fade-in">
                     <div>
-                      <div className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-orange-600">
+                      <div className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-orange-700">
                         Radar Match Pipeline
                       </div>
                       <div className="text-xs sm:text-[13px] font-medium text-slate-700 mt-0.5">
@@ -438,7 +438,7 @@ export default function HowItWorksSection({ onNavigate }: HowItWorksSectionProps
                 {activeStage === 3 && (
                   <div id="screen-step-3" className="pt-3.5 space-y-3 animate-fade-in">
                     <div>
-                      <div className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-orange-600">
+                      <div className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-orange-700">
                         Live Collaboration Sync
                       </div>
                       <div className="text-xs sm:text-[13px] font-medium text-slate-700 mt-0.5">
@@ -455,9 +455,9 @@ export default function HowItWorksSection({ onNavigate }: HowItWorksSectionProps
                       </div>
                     </div>
 
-                    <div className="flex items-center justify-between text-[10px] text-slate-500 pt-1">
+                    <div className="flex items-center justify-between text-[10px] text-slate-600 pt-1">
                       <span>Milestone: <strong>3 of 4 Complete</strong></span>
-                      <span className="text-emerald-600 font-bold">Escrow Protected</span>
+                      <span className="text-emerald-700 font-bold">Escrow Protected</span>
                     </div>
                   </div>
                 )}
@@ -466,7 +466,7 @@ export default function HowItWorksSection({ onNavigate }: HowItWorksSectionProps
                 {activeStage === 4 && (
                   <div id="screen-step-4" className="pt-3.5 space-y-3 animate-fade-in">
                     <div>
-                      <div className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-orange-600">
+                      <div className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-orange-700">
                         Verification &amp; Release
                       </div>
                       <div className="text-xs sm:text-[13px] font-medium text-slate-700 mt-0.5">
@@ -483,7 +483,7 @@ export default function HowItWorksSection({ onNavigate }: HowItWorksSectionProps
                     <button 
                       type="button"
                       onClick={triggerConfettiExplosion}
-                      className="w-full py-2 px-3 rounded-lg bg-orange-600 hover:bg-orange-700 active:scale-[0.99] text-white text-xs font-bold shadow-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                      className="w-full py-2.5 px-3 min-h-[44px] rounded-lg bg-orange-650 hover:bg-orange-700 active:scale-[0.99] text-white text-xs font-bold shadow-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer"
                     >
                       <Download className="w-3.5 h-3.5" />
                       <span>Download Verified Assets</span>
@@ -509,7 +509,7 @@ export default function HowItWorksSection({ onNavigate }: HowItWorksSectionProps
               >
                 <div className="flex items-start gap-3">
                   <div className={`step-num w-8 h-8 sm:w-9 sm:h-9 rounded-xl font-black text-sm flex items-center justify-center shrink-0 transition-colors ${
-                    activeStage === 3 ? 'bg-orange-500 text-white shadow-xs' : 'bg-slate-100 text-gray-600'
+                    activeStage === 3 ? 'bg-orange-650 text-white shadow-xs' : 'bg-slate-100 text-gray-700'
                   }`}>
                     3
                   </div>
@@ -519,11 +519,11 @@ export default function HowItWorksSection({ onNavigate }: HowItWorksSectionProps
                       <strong className="text-emerald-700 font-semibold">You do:</strong> Discuss requirements in real-time &amp; evaluate mock draft templates.
                     </p>
                     <p className="mt-0.5 text-[11px] sm:text-xs text-gray-600 leading-snug">
-                      <strong className="text-orange-600 font-semibold">We do:</strong> Sync daily progress pipelines &amp; issue escrow release codes.
+                      <strong className="text-orange-700 font-semibold">We do:</strong> Sync daily progress pipelines &amp; issue escrow release codes.
                     </p>
                     <div className="step-progress-bar mt-2.5 h-1.5 w-full bg-slate-100 rounded-full overflow-hidden">
                       <div 
-                        className="h-full bg-orange-500 rounded-full transition-all duration-300 origin-left"
+                        className="h-full bg-orange-650 rounded-full transition-all duration-300 origin-left"
                         style={{ transform: activeStage === 3 ? 'scaleX(1)' : 'scaleX(0)' }}
                       />
                     </div>
@@ -543,7 +543,7 @@ export default function HowItWorksSection({ onNavigate }: HowItWorksSectionProps
               >
                 <div className="flex items-start gap-3">
                   <div className={`step-num w-8 h-8 sm:w-9 sm:h-9 rounded-xl font-black text-sm flex items-center justify-center shrink-0 transition-colors ${
-                    activeStage === 4 ? 'bg-orange-500 text-white shadow-xs' : 'bg-slate-100 text-gray-600'
+                    activeStage === 4 ? 'bg-orange-650 text-white shadow-xs' : 'bg-slate-100 text-gray-700'
                   }`}>
                     4
                   </div>
@@ -553,11 +553,11 @@ export default function HowItWorksSection({ onNavigate }: HowItWorksSectionProps
                       <strong className="text-emerald-700 font-semibold">You do:</strong> Approve double-checked uniqueness metrics and download final assets.
                     </p>
                     <p className="mt-0.5 text-[11px] sm:text-xs text-gray-600 leading-snug">
-                      <strong className="text-orange-600 font-semibold">We do:</strong> Formally yield total copyright access details instantly.
+                      <strong className="text-orange-700 font-semibold">We do:</strong> Formally yield total copyright access details instantly.
                     </p>
                     <div className="step-progress-bar mt-2.5 h-1.5 w-full bg-slate-100 rounded-full overflow-hidden">
                       <div 
-                        className="h-full bg-orange-500 rounded-full transition-all duration-300 origin-left"
+                        className="h-full bg-orange-650 rounded-full transition-all duration-300 origin-left"
                         style={{ transform: activeStage === 4 ? 'scaleX(1)' : 'scaleX(0)' }}
                       />
                     </div>
@@ -594,7 +594,7 @@ export default function HowItWorksSection({ onNavigate }: HowItWorksSectionProps
           <button 
             type="button"
             onClick={() => onNavigate('get-a-quote')}
-            className="group relative px-8 sm:px-10 py-3.5 sm:py-4 rounded-2xl bg-gradient-to-r from-orange-600 to-[#F99B0C] hover:from-[#F99B0C] hover:to-orange-500 text-white font-bold tracking-wider text-xs sm:text-sm uppercase shadow-lg shadow-orange-500/15 hover:shadow-orange-500/25 active:scale-[0.98] transition-all duration-200 cursor-pointer"
+            className="group relative px-8 sm:px-10 py-3.5 sm:py-4 min-h-[44px] rounded-2xl bg-gradient-to-r from-orange-700 to-orange-650 hover:from-orange-650 hover:to-orange-700 text-white font-bold tracking-wider text-xs sm:text-sm uppercase shadow-lg shadow-orange-500/15 hover:shadow-orange-500/25 active:scale-[0.98] transition-all duration-200 cursor-pointer"
           >
             <span className="relative z-10 flex items-center justify-center gap-2 font-black italic">
               Launch Your Project
