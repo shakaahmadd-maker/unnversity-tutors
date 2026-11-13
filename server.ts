@@ -1368,7 +1368,7 @@ export async function createApp(options: CreateAppOptions = {}) {
       savePersistedVerificationToken(verificationTokenHash, newVerificationRecord);
 
       // Asynchronously deliver email verification
-      deliverEmailVerificationEmail(cleanEmail, rawVerificationToken, getRuntimeAppUrl()).catch((err: any) => {
+      deliverEmailVerificationEmail(cleanEmail, rawVerificationToken, getRuntimeAppUrl(), cleanName).catch((err: any) => {
         console.warn('[AUTH] Notice sending email verification:', err.message);
       });
 
@@ -1567,7 +1567,180 @@ export async function createApp(options: CreateAppOptions = {}) {
     } catch {}
   }
 
-  async function deliverPasswordResetEmail(toEmail: string, resetToken: string, appUrl: string): Promise<boolean> {
+  function renderEmailFooter(appUrl: string, emailLogoUrl?: string): string {
+    const liveDomain = appUrl || 'https://university-tutors.com';
+    const logoUrl = emailLogoUrl || 'https://firebasestorage.googleapis.com/v0/b/gen-lang-client-0303245370.firebasestorage.app/o/uni-tutors%20logo.png?alt=media&token=b2796c13-d74a-45d7-9dc7-4a9723aa9440';
+    return `
+      <!-- ========================================== -->
+      <!-- START OF EMAIL FOOTER DESIGN               -->
+      <!-- ========================================== -->
+      <tr>
+        <td style="padding: 32px 32px 36px 32px; background-color: #f8fafc; border-top: 1px solid #e2e8f0; text-align: center;">
+          
+          <!-- Security Reassurance Card -->
+          <table role="presentation" width="100%" border="0" cellspacing="0" cellpadding="0" style="background-color: #ffffff; border: 1px solid #fed7aa; border-left: 4px solid #f36514; border-radius: 8px; margin-bottom: 28px; box-shadow: 0 1px 3px rgba(20, 38, 76, 0.04);">
+            <tr>
+              <td style="padding: 14px 18px; font-size: 12.5px; line-height: 1.55; color: #475569; text-align: left;">
+                <div style="font-weight: 700; color: #14264c; margin-bottom: 4px; font-size: 13px;">
+                  &#128274; Didn't request this email?
+                </div>
+                If you did not initiate this email verification or password reset on <strong style="color: #14264c;">university-tutors.com</strong>, you can safely ignore this message. Your account remains secure and no changes have been made.
+              </td>
+            </tr>
+          </table>
+
+          <!-- Properly Proportioned Brand Logo -->
+          <div style="margin: 0 auto 14px auto; text-align: center;">
+            <a href="${liveDomain}" target="_blank" style="text-decoration: none; display: inline-block;">
+              <img src="${logoUrl}" alt="university tutors" width="185" style="display: block; width: 185px; max-width: 100%; height: auto; border: 0; margin: 0 auto; font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 20px; font-weight: 700; color: #14264c;">
+            </a>
+          </div>
+
+          <!-- Tagline -->
+          <p style="margin: 0 0 20px 0; font-size: 13px; color: #64748b; font-weight: 400;">
+            Connecting university students with expert academic tutors.
+          </p>
+
+          <!-- Navigation Links Pill Bar -->
+          <table role="presentation" border="0" cellspacing="0" cellpadding="0" align="center" style="margin: 0 auto 22px auto;">
+            <tr>
+              <td style="padding: 0 10px; font-size: 12px;">
+                <a href="${liveDomain}/help" style="color: #14264c; font-weight: 600; text-decoration: none;">Help Center</a>
+              </td>
+              <td style="color: #cbd5e1; font-size: 12px;">&bull;</td>
+              <td style="padding: 0 10px; font-size: 12px;">
+                <a href="${liveDomain}/contact" style="color: #14264c; font-weight: 600; text-decoration: none;">Contact Support</a>
+              </td>
+              <td style="color: #cbd5e1; font-size: 12px;">&bull;</td>
+              <td style="padding: 0 10px; font-size: 12px;">
+                <a href="${liveDomain}/privacy" style="color: #14264c; font-weight: 600; text-decoration: none;">Privacy Policy</a>
+              </td>
+            </tr>
+          </table>
+
+          <!-- Support & Admin Contacts -->
+          <p style="margin: 0 0 14px 0; font-size: 12px; color: #475569; line-height: 1.5;">
+            Support: <a href="mailto:support@university-tutors.com" style="color: #ea580c; text-decoration: none; font-weight: 600;">support@university-tutors.com</a>
+            &nbsp;|&nbsp;
+            Admin: <a href="mailto:admin@university-tutors.com" style="color: #ea580c; text-decoration: none; font-weight: 600;">admin@university-tutors.com</a>
+          </p>
+
+          <!-- Subtle Divider -->
+          <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 0 auto 18px auto; width: 80%;">
+
+          <!-- Automated Message Disclaimer & Copyright -->
+          <p style="margin: 0 0 6px 0; font-size: 11px; color: #94a3b8; line-height: 1.5;">
+            This is an automated security email from <span style="color: #64748b; font-weight: 500;">university-tutors.com</span>. Please do not reply directly to this message.
+          </p>
+          <p style="margin: 0; font-size: 11px; color: #94a3b8;">
+            &copy; ${new Date().getFullYear()} university-tutors.com. All rights reserved.
+          </p>
+
+        </td>
+      </tr>
+      <!-- ========================================== -->
+      <!-- END OF EMAIL FOOTER DESIGN                 -->
+      <!-- ========================================== -->
+    `;
+  }
+
+  function renderVerificationEmail(params: { userName?: string; emailLogoUrl?: string; verificationUrl: string; appUrl?: string }): { subject: string; text: string; html: string } {
+    const userName = params.userName || 'Student';
+    const liveDomain = params.appUrl || 'https://university-tutors.com';
+    const logoUrl = params.emailLogoUrl || 'https://firebasestorage.googleapis.com/v0/b/gen-lang-client-0303245370.firebasestorage.app/o/uni-tutors%20logo.png?alt=media&token=b2796c13-d74a-45d7-9dc7-4a9723aa9440';
+    const verificationUrl = params.verificationUrl;
+
+    const subject = 'Verify your University Tutors email address';
+    const text = `Hello ${userName},\n\nYour University Tutors account has been created successfully.\n\nPlease verify your email address by opening the link below:\n${verificationUrl}\n\nThis verification link expires after 24 hours and can only be used once.\n\nIf you did not register for an account, you can safely ignore this email.\n\nSupport: support@university-tutors.com\nAdmin: admin@university-tutors.com`;
+
+    const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Verify your University Tutors email address</title>
+</head>
+<body style="margin: 0; padding: 0; background-color: #f4f7f9; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;">
+  <table role="presentation" width="100%" border="0" cellspacing="0" cellpadding="0" style="background-color: #f4f7f9; padding: 20px 0;">
+    <tr>
+      <td align="center">
+        <table role="presentation" width="100%" border="0" cellspacing="0" cellpadding="0" style="max-width: 600px; background-color: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.05);">
+          <tr>
+            <td style="padding: 40px 30px 20px 30px; text-align: left; color: #334155; font-size: 15px; line-height: 1.6;">
+              <p style="margin: 0 0 16px 0;">Hello <strong>${userName}</strong>,</p>
+              <p style="margin: 0 0 20px 0;">Your University Tutors account has been created successfully. Please confirm your email address to activate your student portal access.</p>
+              <div style="text-align: center; margin: 32px 0;">
+                <a href="${verificationUrl}" target="_blank" style="background-color: #f36514; color: #ffffff; text-decoration: none; padding: 14px 32px; border-radius: 6px; font-size: 15px; font-weight: bold; display: inline-block; box-shadow: 0 2px 4px rgba(243, 101, 20, 0.2);">Verify my email</a>
+              </div>
+              <p style="margin: 0 0 12px 0; font-size: 13px; color: #64748b; text-align: center;">
+                This link expires after 24 hours and can only be used once.
+              </p>
+              <p style="margin: 0 0 16px 0; font-size: 12px; color: #94a3b8; word-break: break-all; text-align: center;">
+                If the button doesn't work, copy and paste this link into your browser:<br>
+                <a href="${verificationUrl}" style="color: #f36514; text-decoration: underline;">${verificationUrl}</a>
+              </p>
+            </td>
+          </tr>
+          ${renderEmailFooter(liveDomain, logoUrl)}
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`;
+
+    return { subject, text, html };
+  }
+
+  function renderPasswordResetEmail(params: { userName?: string; emailLogoUrl?: string; resetUrl: string; appUrl?: string }): { subject: string; text: string; html: string } {
+    const userName = params.userName || 'Student';
+    const liveDomain = params.appUrl || 'https://university-tutors.com';
+    const logoUrl = params.emailLogoUrl || 'https://firebasestorage.googleapis.com/v0/b/gen-lang-client-0303245370.firebasestorage.app/o/uni-tutors%20logo.png?alt=media&token=b2796c13-d74a-45d7-9dc7-4a9723aa9440';
+    const resetUrl = params.resetUrl;
+
+    const subject = 'Reset your University Tutors password';
+    const text = `Hello ${userName},\n\nWe received a request to reset your University Tutors password.\n\nPlease reset your password by opening the link below:\n${resetUrl}\n\nThis link expires in 30 minutes and can only be used once.\n\nIf you did not request this change, you can safely ignore this email.\n\nSupport: support@university-tutors.com\nAdmin: admin@university-tutors.com`;
+
+    const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Reset your University Tutors password</title>
+</head>
+<body style="margin: 0; padding: 0; background-color: #f4f7f9; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;">
+  <table role="presentation" width="100%" border="0" cellspacing="0" cellpadding="0" style="background-color: #f4f7f9; padding: 20px 0;">
+    <tr>
+      <td align="center">
+        <table role="presentation" width="100%" border="0" cellspacing="0" cellpadding="0" style="max-width: 600px; background-color: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.05);">
+          <tr>
+            <td style="padding: 40px 30px 20px 30px; text-align: left; color: #334155; font-size: 15px; line-height: 1.6;">
+              <p style="margin: 0 0 16px 0;">Hello <strong>${userName}</strong>,</p>
+              <p style="margin: 0 0 20px 0;">We received a request to reset your University Tutors password. Click the button below to create a new password:</p>
+              <div style="text-align: center; margin: 32px 0;">
+                <a href="${resetUrl}" target="_blank" style="background-color: #f36514; color: #ffffff; text-decoration: none; padding: 14px 32px; border-radius: 6px; font-size: 15px; font-weight: bold; display: inline-block; box-shadow: 0 2px 4px rgba(243, 101, 20, 0.2);">Reset my password</a>
+              </div>
+              <p style="margin: 0 0 12px 0; font-size: 13px; color: #64748b; text-align: center;">
+                This link expires in 30 minutes and can only be used once.
+              </p>
+              <p style="margin: 0 0 16px 0; font-size: 12px; color: #94a3b8; word-break: break-all; text-align: center;">
+                If the button doesn't work, copy and paste this link into your browser:<br>
+                <a href="${resetUrl}" style="color: #f36514; text-decoration: underline;">${resetUrl}</a>
+              </p>
+            </td>
+          </tr>
+          ${renderEmailFooter(liveDomain, logoUrl)}
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`;
+
+    return { subject, text, html };
+  }
+
+  async function deliverPasswordResetEmail(toEmail: string, resetToken: string, appUrl: string, userName?: string): Promise<boolean> {
     const host = readRuntimeEnv('SMTP_HOST');
     const portStr = readRuntimeEnv('SMTP_PORT');
     const user = readRuntimeEnv('SMTP_USER');
@@ -1593,18 +1766,14 @@ export async function createApp(options: CreateAppOptions = {}) {
 
       const liveDomain = appUrl || 'https://university-tutors.com';
       const resetUrl = `${liveDomain}/auth?reset_token=${encodeURIComponent(resetToken)}&email=${encodeURIComponent(toEmail)}`;
+      const emailContent = renderPasswordResetEmail({ userName: userName || 'Student', resetUrl, appUrl: liveDomain });
 
       await transporter.sendMail({
         from,
         to: toEmail,
-        subject: 'University Tutors - Password Recovery Request',
-        text: `A password reset was requested for your account.\n\nYour recovery token is:\n${resetToken}\n\nOr reset directly:\n${resetUrl}\n\nThis token will expire in 15 minutes. If you did not request this, please disregard this email.`,
-        html: `<div style="font-family:sans-serif;max-width:500px;margin:auto;padding:24px;border:1px solid #e2e8f0;border-radius:16px;">
-          <h2 style="color:#0f172a;">Password Recovery</h2>
-          <p style="color:#475569;">A password reset was requested for your University Tutors account.</p>
-          <div style="background:#f1f5f9;padding:16px;border-radius:8px;font-family:monospace;font-size:18px;font-weight:bold;letter-spacing:2px;text-align:center;color:#ea580c;">${resetToken}</div>
-          <p style="color:#64748b;font-size:12px;margin-top:16px;">This token expires in 15 minutes. If you did not request this, please disregard this email.</p>
-        </div>`,
+        subject: emailContent.subject,
+        text: emailContent.text,
+        html: emailContent.html,
       });
 
       logSafeAuthEvent('reset email sent', { email: toEmail });
@@ -1615,7 +1784,7 @@ export async function createApp(options: CreateAppOptions = {}) {
     }
   }
 
-  async function deliverEmailVerificationEmail(toEmail: string, verificationToken: string, appUrl: string): Promise<boolean> {
+  async function deliverEmailVerificationEmail(toEmail: string, verificationToken: string, appUrl: string, userName?: string): Promise<boolean> {
     const host = readRuntimeEnv('SMTP_HOST');
     const portStr = readRuntimeEnv('SMTP_PORT');
     const user = readRuntimeEnv('SMTP_USER');
@@ -1641,29 +1810,14 @@ export async function createApp(options: CreateAppOptions = {}) {
 
       const liveDomain = appUrl || 'https://university-tutors.com';
       const verificationUrl = `${liveDomain}/api/auth/verify-email?token=${encodeURIComponent(verificationToken)}&email=${encodeURIComponent(toEmail)}`;
+      const emailContent = renderVerificationEmail({ userName: userName || 'Student', verificationUrl, appUrl: liveDomain });
 
       await transporter.sendMail({
         from,
         to: toEmail,
-        subject: 'University Tutors - Verify Your Student Email Address',
-        text: `Welcome to University Tutors!\n\nPlease verify your email address to complete your registration.\n\nVerification Link:\n${verificationUrl}\n\nThis verification link expires in 24 hours. If you did not create this account, please ignore this email.`,
-        html: `<div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;max-width:520px;margin:auto;padding:32px 24px;border:1px solid #e2e8f0;border-radius:20px;background:#ffffff;">
-          <div style="text-align:center;margin-bottom:24px;">
-            <img src="${liveDomain}/logo.webp" alt="University Tutors" style="height:48px;max-width:200px;object-fit:contain;margin-bottom:12px;" />
-            <h2 style="color:#0f172a;margin:0 0 6px;font-size:22px;font-weight:800;">Verify Your Email Address</h2>
-            <p style="color:#64748b;font-size:13px;margin:0;">Student &amp; Academic Portal</p>
-          </div>
-          <div style="background:#f8fafc;padding:20px;border-radius:16px;border:1px solid #f1f5f9;margin-bottom:24px;">
-            <p style="color:#334155;font-size:14px;line-height:1.6;margin:0 0 16px;">
-              Thank you for signing up with University Tutors. Please confirm your email address (<strong>${toEmail}</strong>) to activate your account.
-            </p>
-            <div style="text-align:center;margin:24px 0 16px;">
-              <a href="${verificationUrl}" style="background:#ea580c;color:#ffffff;text-decoration:none;padding:12px 28px;border-radius:12px;font-size:13px;font-weight:bold;display:inline-block;">Confirm Email Address</a>
-            </div>
-            <p style="color:#64748b;font-size:11px;margin:0;text-align:center;">Or copy this link into your browser: <br/><a href="${verificationUrl}" style="color:#ea580c;word-break:break-all;">${verificationUrl}</a></p>
-          </div>
-          <p style="color:#94a3b8;font-size:11px;text-align:center;margin:0;">This verification link will expire in 24 hours.</p>
-        </div>`,
+        subject: emailContent.subject,
+        text: emailContent.text,
+        html: emailContent.html,
       });
 
       logSafeAuthEvent('verification email sent', { email: toEmail });
@@ -1710,7 +1864,7 @@ export async function createApp(options: CreateAppOptions = {}) {
       const rawToken = crypto.randomBytes(32).toString('hex');
       const tokenHash = hashResetToken(rawToken);
       const nowIso = new Date().toISOString();
-      const expiresAtIso = new Date(Date.now() + 15 * 60 * 1000).toISOString();
+      const expiresAtIso = new Date(Date.now() + 30 * 60 * 1000).toISOString();
       const recordId = 'prt_' + crypto.randomBytes(12).toString('hex');
 
       const resetRecord: PersistedResetTokenRecord = {
@@ -1739,7 +1893,7 @@ export async function createApp(options: CreateAppOptions = {}) {
       }
 
       // Deliver reset email via SMTP (using runtime SMTP_* variables without logging token)
-      await deliverPasswordResetEmail(cleanEmail, rawToken, getRuntimeAppUrl());
+      await deliverPasswordResetEmail(cleanEmail, rawToken, getRuntimeAppUrl(), foundUser.name);
 
       await logAudit('PASSWORD_RESET_REQUESTED', `Password recovery requested for: ${cleanEmail}`, foundUser.id, foundUser.name, foundUser.role, req);
 
