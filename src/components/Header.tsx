@@ -30,6 +30,7 @@ import {
   isModifiedAnchorClick,
 } from '../data/dedicatedServiceRoutes';
 import { STUDENT_TOOLS } from '../data/studentToolsData';
+import { getResponsiveAvatarProps } from '../utils/imageOptimization';
 
 interface HeaderProps {
   currentUser: User | null;
@@ -126,15 +127,26 @@ export default function Header({
             onClick={() => handleLinkClick('home')} 
             className="flex items-center gap-3 cursor-pointer p-1 group select-none text-left min-w-0 shrink"
           >
-            <img 
-              src="/logo.webp" 
-              alt="Uni Tutors" 
-              width={220}
-              height={84}
-              fetchPriority="high"
-              decoding="async"
-              className="h-9 sm:h-12 md:h-14 w-auto max-w-[175px] sm:max-w-[250px] object-contain transition-transform group-hover:scale-102"
-            />
+            <picture>
+              <source
+                type="image/avif"
+                srcSet="/logo-220.avif 220w, /logo-440.avif 440w"
+                sizes="(max-width: 640px) 140px, 220px"
+              />
+              <source
+                type="image/webp"
+                srcSet="/logo-220.webp 220w, /logo-440.webp 440w"
+                sizes="(max-width: 640px) 140px, 220px"
+              />
+              <img 
+                src="/logo.webp" 
+                alt="Uni Tutors" 
+                width={220}
+                height={84}
+                decoding="async"
+                className="h-9 sm:h-12 md:h-14 w-auto max-w-[175px] sm:max-w-[250px] object-contain transition-transform group-hover:scale-102"
+              />
+            </picture>
           </button>
 
           {/* Desktop Navigation Links */}
@@ -672,7 +684,32 @@ export default function Header({
               {currentUser ? (
                 <>
                   <div className="px-4 py-2 flex items-center gap-3">
-                    <img src={currentUser.avatarUrl} className="w-8 h-8 rounded-full border" alt="Avatar" />
+                    {(() => {
+                      const av = getResponsiveAvatarProps(
+                        currentUser.avatarUrl,
+                        'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=96&auto=format&fit=crop&q=75',
+                        32
+                      );
+                      return (
+                        <img
+                          src={av.src}
+                          srcSet={av.srcSet}
+                          sizes="32px"
+                          width={32}
+                          height={32}
+                          loading="lazy"
+                          decoding="async"
+                          onError={(e) => {
+                            if (av.fallbackSrc && e.currentTarget.src !== av.fallbackSrc) {
+                              e.currentTarget.srcSet = '';
+                              e.currentTarget.src = av.fallbackSrc;
+                            }
+                          }}
+                          className="w-8 h-8 rounded-full border object-cover"
+                          alt="Avatar"
+                        />
+                      );
+                    })()}
                     <div className="text-left">
                       <p className="text-xs font-bold text-gray-900 leading-tight">{currentUser.name}</p>
                       <p className="text-[10px] text-gray-500 leading-none">{currentUser.role}</p>

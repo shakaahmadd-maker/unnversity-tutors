@@ -7,9 +7,11 @@ import {
   TUTOR_BRANDING_MAP,
   ToolCategory,
   ToolSlug,
+  resolveStudentToolSlug,
 } from '../../data/studentToolsData';
 import { isModifiedAnchorClick } from '../../data/dedicatedServiceRoutes';
 import ToolPageLayout, { renderToolIcon } from './ToolPageLayout';
+import { ResponsiveAvatar } from '../ResponsiveImage';
 import SiteFooter from './SiteFooter';
 import PdfToolkit from './PdfToolkit';
 import WhiteboardTool from './WhiteboardTool';
@@ -25,15 +27,18 @@ import AcademicParaphraser from './AcademicParaphraser';
 
 interface ToolsHubProps {
   activeToolSlug?: ToolSlug | null;
+  activeView?: string;
   onNavigate: (view: string) => void;
   onOpenBecomeTutor?: () => void;
 }
 
 export default function ToolsHub({
-  activeToolSlug,
+  activeToolSlug: passedToolSlug,
+  activeView,
   onNavigate,
   onOpenBecomeTutor,
 }: ToolsHubProps) {
+  const activeToolSlug = passedToolSlug ?? (activeView ? resolveStudentToolSlug(activeView) : null);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<ToolCategory>('All');
 
@@ -430,10 +435,12 @@ export default function ToolsHub({
               >
                 <div className="space-y-3">
                   <div className="flex items-start gap-3.5">
-                    <img
+                    <ResponsiveAvatar
                       src={tutor.avatarUrl}
                       alt={tutor.name}
-                      referrerPolicy="no-referrer"
+                      sizePx={64}
+                      width={56}
+                      height={56}
                       className="w-14 h-14 rounded-2xl object-cover border border-slate-200 shrink-0"
                     />
                     <div className="min-w-0">

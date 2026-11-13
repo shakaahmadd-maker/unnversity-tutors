@@ -18,6 +18,7 @@ import {
   ScienceSubCategory,
 } from '../../data/scienceToolsRegistry';
 import { isModifiedAnchorClick } from '../../data/dedicatedServiceRoutes';
+import { ResponsiveAvatar } from '../ResponsiveImage';
 import SiteFooter from '../SiteFooter';
 
 interface ScienceMegaHubProps {
@@ -340,10 +341,12 @@ export default function ScienceMegaHub({
               >
                 <div className="space-y-3">
                   <div className="flex items-start gap-3.5">
-                    <img
+                    <ResponsiveAvatar
                       src={tutor.avatarUrl}
                       alt={tutor.name}
-                      referrerPolicy="no-referrer"
+                      sizePx={64}
+                      width={56}
+                      height={56}
                       className="w-14 h-14 rounded-2xl object-cover border border-slate-200 shrink-0"
                     />
                     <div className="min-w-0">

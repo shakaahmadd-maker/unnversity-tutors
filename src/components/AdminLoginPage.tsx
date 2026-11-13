@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { ShieldCheck, Lock, Mail, Key, ArrowLeft, AlertTriangle, CheckCircle2, Terminal } from 'lucide-react';
 import { store } from '../lib/store';
+import { apiFetch } from '../lib/apiClient';
 
 interface AdminLoginPageProps {
   onLogin: (email: string, password?: string) => Promise<boolean>;
@@ -29,7 +30,7 @@ export default function AdminLoginPage({ onLogin, onNavigate }: AdminLoginPagePr
     try {
       const success = await onLogin(trimmedEmail, password);
       if (success) {
-        const meRes = await fetch('/api/auth/me', { credentials: 'include' });
+        const meRes = await apiFetch('/api/auth/me', { credentials: 'include' });
         const meData = meRes.ok ? await meRes.json() : null;
         const verifiedRole = meData?.user?.role || store.currentUser?.role;
 

@@ -30,6 +30,7 @@ import {
 } from '../../../data/studentToolsData';
 import { isModifiedAnchorClick } from '../../../data/dedicatedServiceRoutes';
 import { renderToolIcon } from '../ToolPageLayout';
+import { ResponsiveAvatar } from '../../ResponsiveImage';
 import SiteFooter from '../SiteFooter';
 
 const LOCAL_STORAGE_KEY = 'ut_ats_cv_builder_v2';
@@ -49,11 +50,12 @@ function CoachAvatar({ tutor }: { tutor: FeaturedTutorCardData }) {
     );
   }
   return (
-    <img
+    <ResponsiveAvatar
       src={tutor.avatarUrl}
       alt={tutor.name}
-      referrerPolicy="no-referrer"
-      onError={() => setFailed(true)}
+      sizePx={64}
+      width={56}
+      height={56}
       className="w-14 h-14 rounded-2xl object-cover border border-slate-200 shrink-0"
     />
   );

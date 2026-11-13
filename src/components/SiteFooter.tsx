@@ -46,15 +46,27 @@ export default function SiteFooter({ onNavigate, onOpenBecomeTutor }: SiteFooter
               onClick={(e) => handleNav(e, 'home')}
               className="inline-flex items-center gap-2.5 group cursor-pointer"
             >
-              <img
-                src="/logo.webp"
-                alt="University-Tutors.com"
-                width={185}
-                height={68}
-                loading="lazy"
-                decoding="async"
-                className="h-10 w-auto object-contain"
-              />
+              <picture>
+                <source
+                  type="image/avif"
+                  srcSet="/logo-220.avif 220w, /logo-440.avif 440w"
+                  sizes="185px"
+                />
+                <source
+                  type="image/webp"
+                  srcSet="/logo-220.webp 220w, /logo-440.webp 440w"
+                  sizes="185px"
+                />
+                <img
+                  src="/logo.webp"
+                  alt="University-Tutors.com"
+                  width={185}
+                  height={68}
+                  loading="lazy"
+                  decoding="async"
+                  className="h-10 w-auto object-contain"
+                />
+              </picture>
             </a>
 
             <p className="text-xs text-slate-600 leading-relaxed">

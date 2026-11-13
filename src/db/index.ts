@@ -19,7 +19,11 @@ const shouldEnableSsl = Boolean(
 export const pool = hasDatabaseUrl
   ? new Pool({
       connectionString: process.env.DATABASE_URL,
-      connectionTimeoutMillis: 3000,
+      connectionTimeoutMillis: 4000,
+      idleTimeoutMillis: 30000,
+      statement_timeout: 12000,
+      query_timeout: 12000,
+      idle_in_transaction_session_timeout: 15000,
       max: 20,
       ssl: shouldEnableSsl ? { rejectUnauthorized: false } : undefined,
     })
@@ -35,11 +39,16 @@ export const db = pool ? drizzle(pool, { schema }) : null;
 export { schema };
 
 let isConnectedState: boolean | null = null;
+let lastDbCheckAt = 0;
 
 export async function checkDbConnection(): Promise<boolean> {
-  if (isConnectedState !== null) return isConnectedState;
+  if (isConnectedState === true) return true;
+  if (isConnectedState === false && Date.now() - lastDbCheckAt < 30000) {
+    return false;
+  }
   if (!pool || !hasDatabaseUrl) {
     isConnectedState = false;
+    lastDbCheckAt = Date.now();
     return false;
   }
   try {
@@ -47,10 +56,12 @@ export async function checkDbConnection(): Promise<boolean> {
     await client.query('SELECT 1');
     client.release();
     isConnectedState = true;
+    lastDbCheckAt = Date.now();
     console.log('[DB] Connected to PostgreSQL successfully.');
     return true;
-  } catch (err: any) {
+  } catch {
     isConnectedState = false;
+    lastDbCheckAt = Date.now();
     console.log('[DB] PostgreSQL is unreachable. Operating with resilient in-memory fallback.');
     return false;
   }
@@ -58,4 +69,23 @@ export async function checkDbConnection(): Promise<boolean> {
 
 export function isDbConnected(): boolean {
   return isConnectedState === true;
+}
+
+export async function withDbTimeout<T>(promise: Promise<T>, timeoutMs = 12000, label = 'Database query'): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      promise,
+      new Promise<never>((_, reject) => {
+        timer = setTimeout(() => {
+          const err: any = new Error(`${label} timed out after ${timeoutMs}ms`);
+          err.code = 'DB_TIMEOUT';
+          err.statusCode = 504;
+          reject(err);
+        }, timeoutMs);
+      }),
+    ]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
 }

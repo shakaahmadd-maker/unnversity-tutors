@@ -21,7 +21,14 @@ import {
 } from '../types';
 import { DEFAULT_20_BLOGS } from '../data/defaultBlogsData';
 import { CURATED_SPECIALIZED_TUTORS } from '../data/tutorsDirectoryData';
-import { TRENDING_TUTORS_500, TRENDING_TUTORS_200 } from '../data/trendingTutors500Data';
+import {
+  apiFetch as centralizedApiFetch,
+  isAbortError,
+  getFriendlyErrorMessage,
+  recordTabDiagnosticError,
+  clearTabDiagnosticError,
+  SESSION_EXPIRED_EVENT,
+} from './apiClient';
 
 // Standard Initial Mock Data
 const INITIAL_TUTORS: User[] = [
@@ -167,21 +174,18 @@ export function isShakaEmail(email: string | undefined | null): boolean {
   return normalized === 'shaka.ahmadd@gmail.com' || normalized === 'shaka.ahmad@gmail.com';
 }
 
-export function apiFetch(endpoint: string, init: RequestInit = {}): Promise<Response> {
-  if (!endpoint.startsWith('/api/')) {
-    throw new Error(`Invalid API endpoint "${endpoint}": requests must target same-origin /api/* routes.`);
-  }
-  return fetch(endpoint, {
-    ...init,
-    credentials: 'include',
-  });
+export const apiFetch = centralizedApiFetch;
+
+export interface TabLoadState {
+  loading: boolean;
+  error: string | null;
+  loadedAt: number | null;
 }
 
 export class AppStore {
   users: User[] = [
     ...INITIAL_TUTORS,
     ...CURATED_SPECIALIZED_TUTORS,
-    ...((TRENDING_TUTORS_500 as unknown) as User[]),
     {
       id: 'student_alex',
       role: UserRole.STUDENT,
@@ -236,33 +240,153 @@ export class AppStore {
   connectionStatus: 'connected' | 'offline' | 'error' | 'syncing' = 'connected';
   lastSyncTime: string | null = new Date().toLocaleTimeString();
   syncError: string | null = null;
+  sessionExpiredMessage: string | null = null;
+  tabStates: Record<string, TabLoadState> = {};
 
   private listeners: (() => void)[] = [];
   private pollTimer: any = null;
+  private tabAbortControllers = new Map<string, AbortController>();
+  private chatAbortController: AbortController | null = null;
+  private fetchDataAbortController: AbortController | null = null;
+  private inFlightFetchData: Promise<void> | null = null;
+  private trendingTutorsLoaded = false;
+  private fullDirectoryLoaded = false;
+  private inFlightDirectoryLoad: Promise<void> | null = null;
   public isSessionInitialized: boolean = false;
   public sessionReadyPromise: Promise<User | null>;
 
   constructor() {
     this.startLiveStudentCounter();
-    this.sessionReadyPromise = this.verifySession();
-    this.fetchData();
+    if (typeof window !== 'undefined') {
+      window.addEventListener(SESSION_EXPIRED_EVENT, () => {
+        if (this.currentUser) {
+          this.handleSessionExpired();
+        }
+      });
+    }
+    this.sessionReadyPromise = this.bootstrap();
     this.startPolling();
   }
 
-  public async verifySession(): Promise<User | null> {
+  private async bootstrap(): Promise<User | null> {
+    const user = await this.verifySession(false);
+    // Single initial data fetch after session check completes
+    await this.fetchData();
+    return user;
+  }
+
+  public handleSessionExpired(message = 'Your session expired. Please sign in again to continue.') {
+    this.cancelAllPendingRequests();
+    this.currentUser = null;
+    this.sessionExpiredMessage = message;
+    this.syncError = message;
+    if (typeof window !== 'undefined') {
+      try {
+        localStorage.removeItem('ut_current_user');
+        localStorage.removeItem('auth_token');
+      } catch {
+        // ignore storage errors
+      }
+    }
+    this.notify();
+  }
+
+  public clearSessionExpiredMessage() {
+    if (this.sessionExpiredMessage) {
+      this.sessionExpiredMessage = null;
+      this.notify();
+    }
+  }
+
+  public cancelAllPendingRequests() {
+    this.tabAbortControllers.forEach((ctrl) => ctrl.abort());
+    this.tabAbortControllers.clear();
+    if (this.chatAbortController) {
+      this.chatAbortController.abort();
+      this.chatAbortController = null;
+    }
+    if (this.fetchDataAbortController) {
+      this.fetchDataAbortController.abort();
+      this.fetchDataAbortController = null;
+    }
+  }
+
+  public cancelTabRequests(tabKey?: string) {
+    if (tabKey) {
+      const existing = this.tabAbortControllers.get(tabKey);
+      if (existing) {
+        existing.abort();
+        this.tabAbortControllers.delete(tabKey);
+      }
+    } else {
+      this.tabAbortControllers.forEach((ctrl) => ctrl.abort());
+      this.tabAbortControllers.clear();
+    }
+  }
+
+  public getTabState(role: string, tab: string): TabLoadState {
+    return this.tabStates[`${role}:${tab}`] || { loading: false, error: null, loadedAt: null };
+  }
+
+  public async ensureFullDirectoryLoaded(): Promise<void> {
+    if (this.fullDirectoryLoaded) return;
+    if (this.inFlightDirectoryLoad) return this.inFlightDirectoryLoad;
+    this.inFlightDirectoryLoad = (async () => {
+      try {
+        const res = await apiFetch('/api/users?page=1&limit=100');
+        if (res.ok) {
+          const uData = await res.json();
+          if (Array.isArray(uData.users)) {
+            this.mergeServerUsers(uData.users);
+            this.fullDirectoryLoaded = true;
+            this.notify();
+          }
+        }
+      } catch {
+        // Ignore transient directory prefetch failures
+      } finally {
+        this.inFlightDirectoryLoad = null;
+      }
+    })();
+    return this.inFlightDirectoryLoad;
+  }
+
+  public async loadTrendingTutorsFallback(): Promise<User[]> {
+    if (this.trendingTutorsLoaded) return this.users;
+    try {
+      const mod = await import('../data/trendingTutors500Data');
+      const extra = (mod.TRENDING_TUTORS_500 as unknown) as User[];
+      const merged = new Map<string, User>();
+      for (const u of this.users) merged.set(u.id, u);
+      for (const t of extra) {
+        if (!merged.has(t.id)) merged.set(t.id, t);
+      }
+      this.users = Array.from(merged.values());
+      this.trendingTutorsLoaded = true;
+      this.notify();
+    } catch {
+      // ignore fallback load failure
+    }
+    return this.users;
+  }
+
+  public async verifySession(triggerFetch = true): Promise<User | null> {
     if (typeof window === 'undefined') {
       this.isSessionInitialized = true;
       return null;
     }
     try {
-      const res = await apiFetch('/api/auth/me');
+      const res = await apiFetch('/api/auth/me', { skipAuthEvent: true, dedupe: false });
       if (res.ok) {
         const data = await res.json();
         if (data?.user?.id) {
           this.currentUser = data.user;
+          this.sessionExpiredMessage = null;
           this.isSessionInitialized = true;
           this.notify();
-          this.fetchData().catch(() => {});
+          if (triggerFetch) {
+            this.fetchData().catch(() => {});
+          }
           return data.user;
         }
       }
@@ -284,221 +408,521 @@ export class AppStore {
 
   private startPolling() {
     if (typeof window !== 'undefined') {
+      if (this.pollTimer) clearInterval(this.pollTimer);
       this.pollTimer = setInterval(() => {
-        // Only background poll if logged in and tab is active
-        if (this.currentUser && !document.hidden) {
-          this.fetchData();
+        // Only background poll if logged in, session is active, and tab is visible
+        if (this.currentUser && !this.sessionExpiredMessage && !document.hidden) {
+          this.fetchData().catch(() => {});
         }
-      }, 8000);
+      }, 15000);
+    }
+  }
+
+  private mergeServerUsers(serverUsersRaw: any[]) {
+    const serverUsers = serverUsersRaw.map((u: any) => ({
+      ...u,
+      role: u.role || UserRole.TUTOR,
+      subjects: typeof u.subjects === 'string' ? JSON.parse(u.subjects || '[]') : (u.subjects || []),
+      subjectExpertise: typeof u.subjectExpertise === 'string' ? JSON.parse(u.subjectExpertise || '[]') : (u.subjectExpertise || []),
+    }));
+
+    const mergedMap = new Map<string, User>();
+    for (const initial of INITIAL_TUTORS) {
+      mergedMap.set(initial.id, initial);
+    }
+    for (const curated of CURATED_SPECIALIZED_TUTORS) {
+      mergedMap.set(curated.id, curated);
+    }
+    for (const su of serverUsers) {
+      const existing = mergedMap.get(su.id);
+      mergedMap.set(su.id, existing ? { ...existing, ...su } : su);
+    }
+    for (const u of this.users) {
+      if (!mergedMap.has(u.id)) {
+        mergedMap.set(u.id, u);
+      }
+    }
+    this.users = Array.from(mergedMap.values());
+  }
+
+  private applyRoomsData(rooms: any[]) {
+    if (!Array.isArray(rooms)) return;
+    this.chatRooms = rooms;
+    if (rooms.length === 0) {
+      this.chats = [];
+      return;
+    }
+    this.chats = rooms.map((r: any) => {
+      const members = r.members || [];
+      const memberIds = members.map((m: any) => m.userId);
+      const studentMember = members.find((m: any) => m.role === 'student' || m.user?.role === 'student');
+      const tutorMember = members.find(
+        (m: any) =>
+          m.role === 'tutor' ||
+          m.user?.role === 'tutor' ||
+          (!m.userId?.startsWith('admin_') && m.userId !== (studentMember?.userId || r.createdBy))
+      );
+
+      const studentId = r.studentId || r.student?.id || studentMember?.userId || memberIds[0] || r.createdBy;
+      const tutorId =
+        r.tutorId ||
+        r.tutor?.id ||
+        tutorMember?.userId ||
+        memberIds.find((id: string) => id !== studentId) ||
+        r.order?.tutorId ||
+        'tutor_clara';
+
+      return {
+        id: r.id,
+        studentId,
+        tutorId,
+        orderId: r.orderId,
+        subject: r.title || (r.order?.title ? `${r.order.subject} - ${r.order.title}` : 'Academic Mentorship'),
+        createdAt: r.createdAt,
+        updatedAt: r.updatedAt,
+        pairedTutor: r.tutor || null,
+        pairedStudent: r.student || null,
+        order: r.order || null,
+      };
+    });
+  }
+
+  public async loadDashboardTabData(
+    role: string,
+    tab: string,
+    options?: { force?: boolean; page?: number; limit?: number; search?: string }
+  ): Promise<void> {
+    if (!this.currentUser) return;
+
+    const key = `${role}:${tab}`;
+    const existingState = this.tabStates[key];
+    if (!options?.force && existingState?.loadedAt && Date.now() - existingState.loadedAt < 12_000) {
+      return;
+    }
+
+    // Cancel any previous in-flight fetch for the same tab
+    this.cancelTabRequests(key);
+    const controller = new AbortController();
+    this.tabAbortControllers.set(key, controller);
+    const { signal } = controller;
+
+    this.tabStates = {
+      ...this.tabStates,
+      [key]: { loading: true, error: null, loadedAt: existingState?.loadedAt ?? null },
+    };
+    this.notify();
+
+    const page = options?.page ?? 1;
+    const limit = options?.limit ?? 50;
+    const searchQ = options?.search ? `&search=${encodeURIComponent(options.search.trim())}` : '';
+
+    const isStaff =
+      this.currentUser.role === UserRole.ADMIN ||
+      this.currentUser.role === UserRole.SUBADMIN ||
+      (this.currentUser.role as string) === 'admin' ||
+      (this.currentUser.role as string) === 'subadmin';
+
+    try {
+      const tasks: Promise<void>[] = [];
+
+      const safeGet = async (url: string, apply: (data: any) => void) => {
+        const res = await apiFetch(url, { signal });
+        if (!res.ok) {
+          const errJson = await res.json().catch(() => ({}));
+          throw new Error(errJson.error || `Failed to load ${url.split('?')[0]} (HTTP ${res.status})`);
+        }
+        const data = await res.json();
+        apply(data);
+      };
+
+      // Map tab -> minimal required API calls (strictly honoring role permissions)
+      if (role === 'student') {
+        if (['dashboard', 'assignments', 'submit', 'progress', 'deadlines', 'files'].includes(tab)) {
+          tasks.push(
+            safeGet(`/api/orders?page=${page}&limit=${limit}${searchQ}`, (oData) => {
+              if (Array.isArray(oData.orders)) {
+                this.assignments = oData.orders.map((o: any) => ({
+                  ...o,
+                  wordCount: o.wordCount || 250,
+                  fileUrls: typeof o.fileUrls === 'string' ? JSON.parse(o.fileUrls || '[]') : (o.fileUrls || []),
+                  fileNames: typeof o.fileNames === 'string' ? JSON.parse(o.fileNames || '[]') : (o.fileNames || []),
+                }));
+              }
+            })
+          );
+          tasks.push(
+            safeGet(`/api/quotes?page=${page}&limit=${limit}`, (qData) => {
+              if (Array.isArray(qData.quotes)) this.quotes = qData.quotes;
+            })
+          );
+        }
+        if (['dashboard', 'chat', 'messages', 'support'].includes(tab)) {
+          tasks.push(
+            safeGet(`/api/chat-rooms?page=${page}&limit=${limit}`, (rData) => {
+              if (Array.isArray(rData.rooms)) this.applyRoomsData(rData.rooms);
+            })
+          );
+        }
+        if (['dashboard', 'tutors', 'submit'].includes(tab)) {
+          tasks.push(
+            safeGet(`/api/users?role=tutor&page=1&limit=100`, (uData) => {
+              if (Array.isArray(uData.users)) this.mergeServerUsers(uData.users);
+            })
+          );
+        }
+        if (['dashboard', 'notifications'].includes(tab)) {
+          tasks.push(
+            safeGet(`/api/notifications?userId=${encodeURIComponent(this.currentUser.id)}&page=${page}&limit=${limit}`, (nData) => {
+              if (Array.isArray(nData.notifications)) this.appNotifications = nData.notifications;
+            })
+          );
+        }
+        if (['payments', 'invoices', 'escrow'].includes(tab)) {
+          tasks.push(
+            safeGet(`/api/payments?page=${page}&limit=${limit}`, (pData) => {
+              if (Array.isArray(pData.payments)) this.payments = pData.payments;
+            }),
+            safeGet(`/api/invoices?page=${page}&limit=${limit}`, (iData) => {
+              if (Array.isArray(iData.invoices)) this.invoices = iData.invoices;
+            })
+          );
+        }
+      } else if (role === 'tutor') {
+        if (['assignments', 'reports'].includes(tab)) {
+          tasks.push(
+            safeGet(`/api/orders?page=${page}&limit=${limit}`, (oData) => {
+              if (Array.isArray(oData.orders)) {
+                this.assignments = oData.orders.map((o: any) => ({
+                  ...o,
+                  wordCount: o.wordCount || 250,
+                  fileUrls: typeof o.fileUrls === 'string' ? JSON.parse(o.fileUrls || '[]') : (o.fileUrls || []),
+                  fileNames: typeof o.fileNames === 'string' ? JSON.parse(o.fileNames || '[]') : (o.fileNames || []),
+                }));
+              }
+            }),
+            safeGet(`/api/payments?page=${page}&limit=${limit}`, (pData) => {
+              if (Array.isArray(pData.payments)) this.payments = pData.payments;
+            })
+          );
+        }
+        if (['chats'].includes(tab)) {
+          tasks.push(
+            safeGet(`/api/chat-rooms?page=${page}&limit=${limit}`, (rData) => {
+              if (Array.isArray(rData.rooms)) this.applyRoomsData(rData.rooms);
+            })
+          );
+        }
+      } else if (role === 'admin' && isStaff) {
+        if (['tutors_list', 'users', 'user_data', 'student_profiles'].includes(tab)) {
+          tasks.push(
+            safeGet(`/api/users?page=${page}&limit=100${searchQ}`, (uData) => {
+              if (Array.isArray(uData.users)) this.mergeServerUsers(uData.users);
+            })
+          );
+        }
+        if (['assignments', 'student_profiles', 'disputes', 'reports'].includes(tab)) {
+          tasks.push(
+            safeGet(`/api/orders?page=${page}&limit=${limit}`, (oData) => {
+              if (Array.isArray(oData.orders)) {
+                this.assignments = oData.orders.map((o: any) => ({
+                  ...o,
+                  wordCount: o.wordCount || 250,
+                  fileUrls: typeof o.fileUrls === 'string' ? JSON.parse(o.fileUrls || '[]') : (o.fileUrls || []),
+                  fileNames: typeof o.fileNames === 'string' ? JSON.parse(o.fileNames || '[]') : (o.fileNames || []),
+                }));
+              }
+            })
+          );
+        }
+        if (['chats'].includes(tab)) {
+          tasks.push(
+            safeGet(`/api/chat-rooms?page=${page}&limit=${limit}`, (rData) => {
+              if (Array.isArray(rData.rooms)) this.applyRoomsData(rData.rooms);
+            })
+          );
+        }
+        if (['payments_ledger', 'create_invoice', 'disputes', 'student_profiles'].includes(tab)) {
+          tasks.push(
+            safeGet(`/api/payments?page=${page}&limit=${limit}`, (pData) => {
+              if (Array.isArray(pData.payments)) this.payments = pData.payments;
+            }),
+            safeGet(`/api/invoices?page=${page}&limit=${limit}`, (iData) => {
+              if (Array.isArray(iData.invoices)) this.invoices = iData.invoices;
+            })
+          );
+        }
+        if (['activity_log'].includes(tab)) {
+          tasks.push(
+            safeGet(`/api/audit-logs?page=${page}&limit=${limit}`, (lData) => {
+              if (Array.isArray(lData.logs)) {
+                this.activityLogs = lData.logs.map((l: any) => ({
+                  id: l.id,
+                  userId: l.userId || '',
+                  userName: l.userName || '',
+                  userRole: (l.userRole || 'student') as UserRole,
+                  action: l.action,
+                  details: l.details,
+                  timestamp: l.createdAt,
+                }));
+              }
+            })
+          );
+        }
+        if (['notifications'].includes(tab)) {
+          tasks.push(
+            safeGet(`/api/notifications?page=${page}&limit=${limit}`, (nData) => {
+              if (Array.isArray(nData.notifications)) this.appNotifications = nData.notifications;
+            })
+          );
+        }
+        if (['blogs'].includes(tab)) {
+          tasks.push(
+            safeGet(`/api/blogs?page=${page}&limit=${limit}`, (bData) => {
+              if (Array.isArray(bData.blogs) && bData.blogs.length > 0) {
+                this.blogs = bData.blogs.map((b: any) => ({
+                  ...b,
+                  image: b.imageUrl || b.image,
+                  imageUrl: b.imageUrl || b.image,
+                  tags: typeof b.tags === 'string' ? JSON.parse(b.tags || '[]') : (b.tags || []),
+                }));
+              }
+            })
+          );
+        }
+      }
+
+      if (tasks.length > 0) {
+        await Promise.all(tasks);
+      }
+
+      if (signal.aborted) return;
+      clearTabDiagnosticError(tab, role);
+      this.tabStates = {
+        ...this.tabStates,
+        [key]: { loading: false, error: null, loadedAt: Date.now() },
+      };
+      this.lastSyncTime = new Date().toLocaleTimeString();
+      this.syncError = null;
+    } catch (err: any) {
+      if (isAbortError(err) || signal.aborted) return;
+      const errMsg = getFriendlyErrorMessage(err, `Unable to load ${tab.replace(/_/g, ' ')} data.`);
+      recordTabDiagnosticError(tab, errMsg, role);
+      this.tabStates = {
+        ...this.tabStates,
+        [key]: { loading: false, error: errMsg, loadedAt: existingState?.loadedAt ?? null },
+      };
+      this.syncError = errMsg;
+    } finally {
+      if (this.tabAbortControllers.get(key) === controller) {
+        this.tabAbortControllers.delete(key);
+      }
+      if (!signal.aborted && this.tabStates[key]?.loading) {
+        this.tabStates = {
+          ...this.tabStates,
+          [key]: { ...this.tabStates[key], loading: false },
+        };
+      }
+      this.notify();
     }
   }
 
   public async fetchData() {
-    try {
-      // 1. Fetch public users/tutors list and educational blogs (needed for public landing and blog pages)
-      const usersPromise = apiFetch('/api/users').then(async (res) => {
-        if (res.ok) {
-          const uData = await res.json();
-          if (Array.isArray(uData.users)) {
-            const serverUsers = uData.users.map((u: any) => ({
-              ...u,
-              role: u.role || UserRole.TUTOR,
-              subjects: typeof u.subjects === 'string' ? JSON.parse(u.subjects || '[]') : (u.subjects || []),
-              subjectExpertise: typeof u.subjectExpertise === 'string' ? JSON.parse(u.subjectExpertise || '[]') : (u.subjectExpertise || []),
-            }));
-
-            // Merge serverUsers with INITIAL_TUTORS and CURATED_SPECIALIZED_TUTORS so all dummy profiles AND all new profiles are present
-            const mergedMap = new Map<string, User>();
-            for (const initial of INITIAL_TUTORS) {
-              mergedMap.set(initial.id, initial);
-            }
-            for (const curated of CURATED_SPECIALIZED_TUTORS) {
-              mergedMap.set(curated.id, curated);
-            }
-            for (const su of serverUsers) {
-              const existing = mergedMap.get(su.id);
-              mergedMap.set(su.id, existing ? { ...existing, ...su } : su);
-            }
-            // Preserve any newly created users already in local memory
-            for (const u of this.users) {
-              if (!mergedMap.has(u.id)) {
-                mergedMap.set(u.id, u);
-              }
-            }
-            this.users = Array.from(mergedMap.values());
-          }
-        }
-      }).catch(() => {});
-
-      const tutorsPromise = apiFetch('/api/tutors?limit=1000').then(async (res) => {
-        if (res.ok) {
-          const tData = await res.json();
-          if (Array.isArray(tData.tutors)) {
-            for (const t of tData.tutors) {
-              const match = this.users.find(u => u.id === t.id);
-              if (match && t.avatarUrl) {
-                match.avatarUrl = t.avatarUrl;
-                (match as any).profileImageUrl = t.avatarUrl;
-              }
-            }
-          }
-        }
-      }).catch(() => {});
-
-      const blogsPromise = apiFetch('/api/blogs').then(async (res) => {
-        if (res.ok) {
-          const bData = await res.json();
-          if (Array.isArray(bData.blogs) && bData.blogs.length > 0) {
-            this.blogs = bData.blogs.map((b: any) => ({
-              ...b,
-              image: b.imageUrl || b.image,
-              imageUrl: b.imageUrl || b.image,
-              tags: typeof b.tags === 'string' ? JSON.parse(b.tags || '[]') : (b.tags || []),
-            }));
-          }
-        }
-      }).catch(() => {});
-
-      // For public visitors who are not logged in, DO NOT make private dashboard requests
-      if (!this.currentUser) {
-        await Promise.all([usersPromise, tutorsPromise, blogsPromise]);
-        this.connectionStatus = 'connected';
-        this.lastSyncTime = new Date().toLocaleTimeString();
-        this.syncError = null;
-        this.notify();
-        return;
-      }
-
-      // 2. For logged-in users, run all private requests in parallel
-      const ordersPromise = apiFetch('/api/orders').then(async (res) => {
-        if (res.ok) {
-          const oData = await res.json();
-          if (Array.isArray(oData.orders)) {
-            this.assignments = oData.orders.map((o: any) => ({
-              ...o,
-              wordCount: o.wordCount || 250,
-              fileUrls: typeof o.fileUrls === 'string' ? JSON.parse(o.fileUrls || '[]') : (o.fileUrls || []),
-              fileNames: typeof o.fileNames === 'string' ? JSON.parse(o.fileNames || '[]') : (o.fileNames || []),
-            }));
-          }
-        }
-      }).catch(() => {});
-
-      const roomsPromise = apiFetch('/api/chat-rooms').then(async (res) => {
-        if (res.ok) {
-          const rData = await res.json();
-          if (Array.isArray(rData.rooms) && rData.rooms.length > 0) {
-            this.chatRooms = rData.rooms;
-            this.chats = rData.rooms.map((r: any) => {
-              const members = r.members || [];
-              const memberIds = members.map((m: any) => m.userId);
-              const studentMember = members.find((m: any) => m.role === 'student' || m.user?.role === 'student');
-              const tutorMember = members.find((m: any) => m.role === 'tutor' || m.user?.role === 'tutor' || (!m.userId.startsWith('admin_') && m.userId !== (studentMember?.userId || r.createdBy)));
-              
-              const studentId = r.studentId || r.student?.id || studentMember?.userId || memberIds[0] || r.createdBy;
-              const tutorId = r.tutorId || r.tutor?.id || tutorMember?.userId || memberIds.find((id: string) => id !== studentId) || r.order?.tutorId || 'tutor_clara';
-              
-              return {
-                id: r.id,
-                studentId,
-                tutorId,
-                orderId: r.orderId,
-                subject: r.title || (r.order?.title ? `${r.order.subject} - ${r.order.title}` : 'Academic Mentorship'),
-                createdAt: r.createdAt,
-                updatedAt: r.updatedAt,
-                pairedTutor: r.tutor || null,
-                pairedStudent: r.student || null,
-                order: r.order || null,
-              };
-            });
-          }
-        }
-      }).catch(() => {});
-
-      const msgsPromise = apiFetch('/api/messages').then(async (res) => {
-        if (res.ok) {
-          const mData = await res.json();
-          if (Array.isArray(mData.messages)) {
-            this.messages = mData.messages.map((m: any) => ({
-              ...m,
-              timestamp: m.createdAt,
-            }));
-          }
-        }
-      }).catch(() => {});
-
-      const quotesPromise = apiFetch('/api/quotes').then(async (res) => {
-        if (res.ok) {
-          const qData = await res.json();
-          if (Array.isArray(qData.quotes)) {
-            this.quotes = qData.quotes;
-          }
-        }
-      }).catch(() => {});
-
-      const isStaff = this.currentUser?.role === UserRole.ADMIN || (this.currentUser?.role as string) === 'admin';
-      const auditPromise = isStaff ? apiFetch('/api/audit-logs').then(async (res) => {
-        if (res.ok) {
-          const lData = await res.json();
-          if (Array.isArray(lData.logs)) {
-            this.activityLogs = lData.logs.map((l: any) => ({
-              id: l.id,
-              userId: l.userId || '',
-              userName: l.userName || '',
-              userRole: (l.userRole || 'student') as UserRole,
-              action: l.action,
-              details: l.details,
-              timestamp: l.createdAt,
-            }));
-          }
-        }
-      }).catch(() => {}) : Promise.resolve();
-
-      const paymentsPromise = apiFetch('/api/payments').then(async (res) => {
-        if (res.ok) {
-          const pData = await res.json();
-          if (Array.isArray(pData.payments)) {
-            this.payments = pData.payments;
-          }
-        }
-      }).catch(() => {});
-
-      const invoicesPromise = apiFetch('/api/invoices').then(async (res) => {
-        if (res.ok) {
-          const iData = await res.json();
-          if (Array.isArray(iData.invoices)) {
-            this.invoices = iData.invoices;
-          }
-        }
-      }).catch(() => {});
-
-      const notifsPromise = apiFetch(`/api/notifications?userId=${encodeURIComponent(this.currentUser?.id || '')}`).then(async (res) => {
-        if (res.ok) {
-          const nData = await res.json();
-          if (Array.isArray(nData.notifications) && nData.notifications.length > 0) {
-            this.appNotifications = nData.notifications;
-          }
-        }
-      }).catch(() => {});
-
-      await Promise.all([usersPromise, blogsPromise, ordersPromise, roomsPromise, msgsPromise, quotesPromise, auditPromise, notifsPromise, paymentsPromise, invoicesPromise]);
-
-      this.connectionStatus = 'connected';
-      this.lastSyncTime = new Date().toLocaleTimeString();
-      this.syncError = null;
-      this.notify();
-    } catch (err: any) {
-      this.connectionStatus = 'offline';
-      this.syncError = err?.message || 'Offline mode';
+    if (this.inFlightFetchData) {
+      return this.inFlightFetchData;
     }
+
+    if (this.fetchDataAbortController) {
+      this.fetchDataAbortController.abort();
+    }
+    const controller = new AbortController();
+    this.fetchDataAbortController = controller;
+    const { signal } = controller;
+
+    this.inFlightFetchData = (async () => {
+      let hadError = false;
+      let latestErrMsg: string | null = null;
+      try {
+        // 1. Fetch public users/tutors and blogs (lean payload for unauthenticated marketing landing, full directory otherwise)
+        const pathname = typeof window !== 'undefined' ? window.location.pathname.toLowerCase() : '/';
+        const needsFullDirectoryImmediately =
+          Boolean(this.currentUser) ||
+          /\/(tutors|tutors-directory|user-data|get-a-quote|online-tutoring|services\/|admin|student|tutor)/.test(pathname);
+        const usersUrl = needsFullDirectoryImmediately
+          ? '/api/users?page=1&limit=100'
+          : '/api/users?role=tutor&page=1&limit=12';
+        const blogsUrl = needsFullDirectoryImmediately
+          ? '/api/blogs?page=1&limit=30'
+          : '/api/blogs?page=1&limit=12';
+
+        const usersPromise = apiFetch(usersUrl, { signal })
+          .then(async (res) => {
+            if (res.ok) {
+              const uData = await res.json();
+              if (Array.isArray(uData.users)) {
+                this.mergeServerUsers(uData.users);
+                if (needsFullDirectoryImmediately) {
+                  this.fullDirectoryLoaded = true;
+                }
+              }
+            } else {
+              hadError = true;
+              latestErrMsg = `Failed to sync directory (${res.status})`;
+            }
+          })
+          .catch((err) => {
+            if (!isAbortError(err)) {
+              hadError = true;
+              latestErrMsg = getFriendlyErrorMessage(err, 'Unable to load tutors directory.');
+            }
+          });
+
+        const blogsPromise = apiFetch(blogsUrl, { signal })
+          .then(async (res) => {
+            if (res.ok) {
+              const bData = await res.json();
+              if (Array.isArray(bData.blogs) && bData.blogs.length > 0) {
+                this.blogs = bData.blogs.map((b: any) => ({
+                  ...b,
+                  image: b.imageUrl || b.image,
+                  imageUrl: b.imageUrl || b.image,
+                  tags: typeof b.tags === 'string' ? JSON.parse(b.tags || '[]') : (b.tags || []),
+                }));
+              }
+            }
+          })
+          .catch(() => {});
+
+        if (!this.currentUser) {
+          await Promise.all([usersPromise, blogsPromise]);
+          if (signal.aborted) return;
+          this.connectionStatus = hadError ? 'error' : 'connected';
+          this.lastSyncTime = new Date().toLocaleTimeString();
+          this.syncError = hadError ? latestErrMsg : null;
+          return;
+        }
+
+        // 2. For authenticated users, run role-scoped paginated requests in parallel
+        const isStaff =
+          this.currentUser.role === UserRole.ADMIN ||
+          this.currentUser.role === UserRole.SUBADMIN ||
+          (this.currentUser.role as string) === 'admin' ||
+          (this.currentUser.role as string) === 'subadmin';
+
+        const safePrivateFetch = async (url: string, handler: (data: any) => void) => {
+          try {
+            const res = await apiFetch(url, { signal });
+            if (res.ok) {
+              const data = await res.json();
+              handler(data);
+            } else if (res.status !== 401 && res.status !== 403) {
+              hadError = true;
+              const errData = await res.json().catch(() => ({}));
+              latestErrMsg = errData?.error || `Sync warning (${res.status})`;
+            }
+          } catch (err) {
+            if (!isAbortError(err)) {
+              hadError = true;
+              latestErrMsg = getFriendlyErrorMessage(err, 'Sync timeout or network error.');
+            }
+          }
+        };
+
+        const privateTasks: Promise<void>[] = [
+          safePrivateFetch('/api/orders?page=1&limit=50', (oData) => {
+            if (Array.isArray(oData.orders)) {
+              this.assignments = oData.orders.map((o: any) => ({
+                ...o,
+                wordCount: o.wordCount || 250,
+                fileUrls: typeof o.fileUrls === 'string' ? JSON.parse(o.fileUrls || '[]') : (o.fileUrls || []),
+                fileNames: typeof o.fileNames === 'string' ? JSON.parse(o.fileNames || '[]') : (o.fileNames || []),
+              }));
+            }
+          }),
+          safePrivateFetch('/api/chat-rooms?page=1&limit=50', (rData) => {
+            if (Array.isArray(rData.rooms)) {
+              this.applyRoomsData(rData.rooms);
+            }
+          }),
+          safePrivateFetch('/api/messages?page=1&limit=100', (mData) => {
+            if (Array.isArray(mData.messages)) {
+              this.messages = mData.messages.map((m: any) => ({
+                ...m,
+                timestamp: m.createdAt,
+              }));
+            }
+          }),
+          safePrivateFetch('/api/quotes?page=1&limit=50', (qData) => {
+            if (Array.isArray(qData.quotes)) {
+              this.quotes = qData.quotes;
+            }
+          }),
+          safePrivateFetch('/api/payments?page=1&limit=50', (pData) => {
+            if (Array.isArray(pData.payments)) {
+              this.payments = pData.payments;
+            }
+          }),
+          safePrivateFetch('/api/invoices?page=1&limit=50', (iData) => {
+            if (Array.isArray(iData.invoices)) {
+              this.invoices = iData.invoices;
+            }
+          }),
+          safePrivateFetch(
+            `/api/notifications?userId=${encodeURIComponent(this.currentUser.id)}&page=1&limit=50`,
+            (nData) => {
+              if (Array.isArray(nData.notifications)) {
+                this.appNotifications = nData.notifications;
+              }
+            }
+          ),
+        ];
+
+        if (isStaff) {
+          privateTasks.push(
+            safePrivateFetch('/api/audit-logs?page=1&limit=50', (lData) => {
+              if (Array.isArray(lData.logs)) {
+                this.activityLogs = lData.logs.map((l: any) => ({
+                  id: l.id,
+                  userId: l.userId || '',
+                  userName: l.userName || '',
+                  userRole: (l.userRole || 'student') as UserRole,
+                  action: l.action,
+                  details: l.details,
+                  timestamp: l.createdAt,
+                }));
+              }
+            })
+          );
+        }
+
+        await Promise.all([usersPromise, blogsPromise, ...privateTasks]);
+        if (signal.aborted) return;
+        this.connectionStatus = hadError ? 'error' : 'connected';
+        this.lastSyncTime = new Date().toLocaleTimeString();
+        this.syncError = hadError ? latestErrMsg : null;
+      } catch (err: any) {
+        if (isAbortError(err)) return;
+        this.connectionStatus = 'offline';
+        this.syncError = getFriendlyErrorMessage(err, 'Unable to reach server.');
+      } finally {
+        this.inFlightFetchData = null;
+        if (this.fetchDataAbortController === controller) {
+          this.fetchDataAbortController = null;
+        }
+        this.notify();
+      }
+    })();
+
+    return this.inFlightFetchData;
   }
 
   private startLiveStudentCounter() {
+    if (typeof window === 'undefined') return;
     setInterval(() => {
+      if (document.hidden) return;
       const delta = Math.floor(Math.random() * 5) - 2;
       this.activeStudentsOnline = Math.max(45, Math.min(140, this.activeStudentsOnline + delta));
       this.notify();
-    }, 12000);
+    }, 45000);
   }
 
   subscribe(listener: () => void) {
@@ -519,15 +943,23 @@ export class AppStore {
   }
 
   async subscribeToChatDetails(chatId: string) {
+    if (!chatId) return;
+    if (this.chatAbortController) {
+      this.chatAbortController.abort();
+    }
+    const controller = new AbortController();
+    this.chatAbortController = controller;
+    const { signal } = controller;
+
     this.isLoadingMessages = true;
     this.chatError = null;
     this.notify();
     try {
-      // Query room messages from new endpoint with fallback
-      let res = await apiFetch(`/api/chat-rooms/${encodeURIComponent(chatId)}/messages`);
+      let res = await apiFetch(`/api/chat-rooms/${encodeURIComponent(chatId)}/messages?limit=100`, { signal });
       if (!res.ok && res.status !== 401 && res.status !== 403) {
-        res = await apiFetch(`/api/messages?chatId=${encodeURIComponent(chatId)}`);
+        res = await apiFetch(`/api/messages?chatId=${encodeURIComponent(chatId)}&limit=100`, { signal });
       }
+      if (signal.aborted) return;
       if (res.ok) {
         const data = await res.json();
         if (Array.isArray(data.messages)) {
@@ -538,11 +970,15 @@ export class AppStore {
         }
       } else {
         const errJson = await res.json().catch(() => ({}));
-        this.chatError = errJson.error || 'Access to this chat room was denied.';
+        this.chatError = errJson.error || 'Unable to load messages for this chat room.';
       }
     } catch (err: any) {
-      this.chatError = err?.message || 'Error connecting to chat server.';
+      if (isAbortError(err) || signal.aborted) return;
+      this.chatError = getFriendlyErrorMessage(err, 'Error connecting to chat server.');
     } finally {
+      if (this.chatAbortController === controller) {
+        this.chatAbortController = null;
+      }
       this.isLoadingMessages = false;
       this.notify();
     }
@@ -555,14 +991,14 @@ export class AppStore {
   async login(email: string, password?: string): Promise<boolean> {
     const cleanEmail = email.toLowerCase().trim();
     try {
-      const res = await fetch('/api/auth/login', {
+      const res = await apiFetch('/api/auth/login', {
         method: 'POST',
-        credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: cleanEmail, password: password || '' })
+        body: JSON.stringify({ email: cleanEmail, password: password || '' }),
+        skipAuthEvent: true,
       });
 
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}));
       if (!res.ok) {
         throw new Error(data.error || 'Authentication rejected');
       }
@@ -572,8 +1008,9 @@ export class AppStore {
       }
 
       this.currentUser = data.user;
+      this.sessionExpiredMessage = null;
       this.isSessionInitialized = true;
-      this.fetchData();
+      this.fetchData().catch(() => {});
       this.notify();
       return true;
     } catch (err: any) {
@@ -591,6 +1028,7 @@ export class AppStore {
       const res = await apiFetch('/api/auth/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        skipAuthEvent: true,
         body: JSON.stringify({
           name: name.trim(),
           email: cleanEmail,
@@ -616,6 +1054,7 @@ export class AppStore {
       }
 
       this.currentUser = data.user;
+      this.sessionExpiredMessage = null;
       this.isSessionInitialized = true;
       this.users.push(data.user);
       this.notify();
@@ -627,12 +1066,14 @@ export class AppStore {
   }
 
   async logout(): Promise<void> {
+    this.cancelAllPendingRequests();
     try {
-      await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' });
+      await apiFetch('/api/auth/logout', { method: 'POST', skipAuthEvent: true });
     } catch {
       // ignore network failure while clearing client state
     }
     this.currentUser = null;
+    this.sessionExpiredMessage = null;
     this.assignments = [];
     this.chats = [];
     this.chatRooms = [];
@@ -641,19 +1082,21 @@ export class AppStore {
     this.payments = [];
     this.invoices = [];
     this.appNotifications = [];
-    localStorage.removeItem('ut_current_user');
-    localStorage.removeItem('auth_token');
+    this.tabStates = {};
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('ut_current_user');
+      localStorage.removeItem('auth_token');
+    }
     this.notify();
   }
 
   async createTutorProfile(tutorData: any): Promise<boolean> {
-    const res = await fetch('/api/tutors', {
+    const res = await apiFetch('/api/tutors', {
       method: 'POST',
-      credentials: 'include',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(tutorData)
     });
-    const data = await res.json();
+    const data = await res.json().catch(() => ({}));
     if (!res.ok) {
       throw new Error(data.error || 'Failed to create tutor profile');
     }

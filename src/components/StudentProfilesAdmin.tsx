@@ -24,6 +24,8 @@ import {
 } from 'lucide-react';
 import { User, Assignment, Chat, Message, Invoice, UserRole, AssignmentStatus } from '../types';
 import { getFallbackAvatar } from './TutorsDirectoryPage';
+import { PaginationBar } from './ui/StatePanels';
+import { ResponsiveAvatar } from './ResponsiveImage';
 
 interface StudentProfilesAdminProps {
   users: User[];
@@ -71,9 +73,20 @@ export default function StudentProfilesAdmin({
   initialStudentId = ''
 }: StudentProfilesAdminProps) {
   const [searchQuery, setSearchQuery] = useState(initialSearchQuery);
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState(initialSearchQuery);
   const [filterType, setFilterType] = useState<'all' | 'active_demands' | 'assigned' | 'unassigned' | 'verified'>('all');
   const [viewMode, setViewMode] = useState<'cards' | 'table'>('cards');
+  const [currentPage, setCurrentPage] = useState(1);
+  const pageSize = 18;
   const [selectedStudentForModal, setSelectedStudentForModal] = useState<StudentProfileData | null>(null);
+
+  React.useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearchQuery(searchQuery);
+      setCurrentPage(1);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
 
   // Sync initial query or student ID if updated externally
   React.useEffect(() => {
@@ -195,7 +208,7 @@ export default function StudentProfilesAdmin({
 
   // Filter students
   const filteredStudents = allStudentProfiles.filter(st => {
-    const q = searchQuery.toLowerCase().trim();
+    const q = debouncedSearchQuery.toLowerCase().trim();
     const matchesSearch = !q || 
       st.name.toLowerCase().includes(q) || 
       st.email.toLowerCase().includes(q) ||
@@ -218,6 +231,10 @@ export default function StudentProfilesAdmin({
     }
     return true;
   });
+
+  const totalPages = Math.max(1, Math.ceil(filteredStudents.length / pageSize));
+  const safePage = Math.min(currentPage, totalPages);
+  const paginatedStudents = filteredStudents.slice((safePage - 1) * pageSize, safePage * pageSize);
 
   const handleConfirmDirectAssign = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -390,8 +407,9 @@ export default function StudentProfilesAdmin({
         </div>
       ) : viewMode === 'cards' ? (
         /* GRID CARDS VIEW */
+        <div className="space-y-4">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-          {filteredStudents.map(student => {
+          {paginatedStudents.map(student => {
             const activeAssigns = student.assignments;
             const primaryAssign = activeAssigns[0];
             const assignedTutor = student.assignedTutors[0];
@@ -406,16 +424,11 @@ export default function StudentProfilesAdmin({
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex items-center gap-3 min-w-0">
                       <div className="relative shrink-0">
-                        <img
-                          src={student.avatarUrl || getFallbackAvatar(student.name)}
+                        <ResponsiveAvatar
+                          src={student.avatarUrl}
                           alt={student.name}
-                          loading="lazy"
-                          decoding="async"
-                          referrerPolicy="no-referrer"
-                          onError={(e) => {
-                            e.currentTarget.onerror = null;
-                            e.currentTarget.src = getFallbackAvatar(student.name);
-                          }}
+                          sizePx={48}
+                          fallbackSrc={getFallbackAvatar(student.name)}
                           className="w-12 h-12 rounded-2xl object-cover border border-gray-200 shadow-2xs bg-orange-50/50"
                         />
                         {student.verified && (
@@ -547,6 +560,14 @@ export default function StudentProfilesAdmin({
             );
           })}
         </div>
+        <PaginationBar
+          currentPage={safePage}
+          totalPages={totalPages}
+          totalItems={filteredStudents.length}
+          pageSize={pageSize}
+          onPageChange={setCurrentPage}
+        />
+        </div>
       ) : (
         /* TABLE VIEW */
         <div className="bg-white rounded-3xl border border-gray-150 overflow-hidden shadow-xs">
@@ -562,7 +583,7 @@ export default function StudentProfilesAdmin({
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100 font-medium">
-                {filteredStudents.map(student => {
+                {paginatedStudents.map(student => {
                   const primaryAssign = student.assignments[0];
                   const assignedTutor = student.assignedTutors[0];
 
@@ -570,16 +591,13 @@ export default function StudentProfilesAdmin({
                     <tr key={student.id} className="hover:bg-gray-50/70 transition-colors">
                       <td className="p-4">
                         <div className="flex items-center gap-3">
-                          <img
-                            src={student.avatarUrl || getFallbackAvatar(student.name)}
+                          <ResponsiveAvatar
+                            src={student.avatarUrl}
                             alt={student.name}
-                            loading="lazy"
-                            decoding="async"
-                            referrerPolicy="no-referrer"
-                            onError={(e) => {
-                              e.currentTarget.onerror = null;
-                              e.currentTarget.src = getFallbackAvatar(student.name);
-                            }}
+                            sizePx={48}
+                            width={40}
+                            height={40}
+                            fallbackSrc={getFallbackAvatar(student.name)}
                             className="w-10 h-10 rounded-xl object-cover border bg-orange-50/50"
                           />
                           <div>
@@ -607,7 +625,7 @@ export default function StudentProfilesAdmin({
                       <td className="p-4">
                         {assignedTutor ? (
                           <div className="flex items-center gap-2">
-                            <img src={assignedTutor.avatarUrl} className="w-6 h-6 rounded-full border" alt="" />
+                            <ResponsiveAvatar src={assignedTutor.avatarUrl} alt="" sizePx={32} width={24} height={24} className="w-6 h-6 rounded-full border object-cover" />
                             <div>
                               <span className="font-bold text-gray-800 block leading-tight">{assignedTutor.name}</span>
                               <span className="text-[9px] text-emerald-600 font-bold">★{assignedTutor.rating || '4.9'} Specialist</span>
@@ -663,6 +681,15 @@ export default function StudentProfilesAdmin({
               </tbody>
             </table>
           </div>
+          <div className="p-4 border-t border-gray-100">
+            <PaginationBar
+              currentPage={safePage}
+              totalPages={totalPages}
+              totalItems={filteredStudents.length}
+              pageSize={pageSize}
+              onPageChange={setCurrentPage}
+            />
+          </div>
         </div>
       )}
 
@@ -682,16 +709,12 @@ export default function StudentProfilesAdmin({
 
             {/* Profile Header */}
             <div className="flex items-center gap-4 border-b border-gray-100 pb-5">
-              <img
-                src={selectedStudentForModal.avatarUrl || getFallbackAvatar(selectedStudentForModal.name)}
+              <ResponsiveAvatar
+                src={selectedStudentForModal.avatarUrl}
                 alt={selectedStudentForModal.name}
-                loading="lazy"
-                decoding="async"
-                referrerPolicy="no-referrer"
-                onError={(e) => {
-                  e.currentTarget.onerror = null;
-                  e.currentTarget.src = getFallbackAvatar(selectedStudentForModal.name);
-                }}
+                sizePx={64}
+                loading="eager"
+                fallbackSrc={getFallbackAvatar(selectedStudentForModal.name)}
                 className="w-16 h-16 rounded-2xl object-cover border-2 border-orange-200 shadow-sm bg-orange-50/50"
               />
               <div>

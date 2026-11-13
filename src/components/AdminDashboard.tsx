@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { 
   Users as UsersIcon, 
   Settings, 
@@ -38,7 +38,8 @@ import {
   ShieldCheck,
   CreditCard,
   RotateCcw,
-  Copy
+  Copy,
+  Activity
 } from 'lucide-react';
 import { 
   User, Blog, FAQ, Assignment, Payment, SupportTicket, UserRole, Chat, Message,
@@ -49,7 +50,19 @@ import TutorsListAdmin from './TutorsListAdmin';
 import StudentProfilesAdmin from './StudentProfilesAdmin';
 import AssignmentLedgerView from './AssignmentLedgerView';
 import UserDataPage from './UserDataPage';
-import { store } from '../lib/store';
+import { store, TabLoadState } from '../lib/store';
+import {
+  apiFetch,
+  getApiDiagnostics,
+  subscribeApiDiagnostics,
+  clearApiDiagnostics,
+  getFriendlyErrorMessage,
+  isAbortError,
+  ApiDiagnosticsSnapshot
+} from '../lib/apiClient';
+import { ErrorBoundary } from './ErrorBoundary';
+import { TabLoadingSkeleton, ErrorStatePanel, EmptyStatePanel, PaginationBar } from './ui/StatePanels';
+import { ResponsiveAvatar, ResponsivePicture } from './ResponsiveImage';
 // Inline SVG Icon components to replace react-icons and ensure standalone compilation
 const IconFileText = () => (
   <svg className="w-4 h-4 inline-block" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
@@ -150,6 +163,10 @@ interface AdminDashboardProps {
   connectionStatus?: 'connected' | 'offline' | 'error' | 'syncing';
   lastSyncTime?: string | null;
   syncError?: string | null;
+  onLoadTab?: (tab: string, force?: boolean) => Promise<void> | void;
+  tabStates?: Record<string, TabLoadState>;
+  isLoadingMessages?: boolean;
+  chatError?: string | null;
 }
 
 export default function AdminDashboard({
@@ -207,7 +224,11 @@ export default function AdminDashboard({
   onSeedMockStudentData,
   connectionStatus = 'connected',
   lastSyncTime = 'Real-Time Sync Active',
-  syncError = null
+  syncError = null,
+  onLoadTab,
+  tabStates = {},
+  isLoadingMessages = false,
+  chatError = null,
 }: AdminDashboardProps) {
 
   const isSuperiorAdmin = currentUser.email.toLowerCase().trim() === 'shaka.ahmadd@gmail.com';
@@ -231,13 +252,26 @@ export default function AdminDashboard({
     error?: string;
   } | null>(null);
 
+  const auditAbortRef = useRef<AbortController | null>(null);
+  const testChatAbortRef = useRef<AbortController | null>(null);
+  const lastSubscribedChatIdRef = useRef<string | null>(null);
+
   const runUsersSyncAudit = async () => {
+    auditAbortRef.current?.abort();
+    const controller = new AbortController();
+    auditAbortRef.current = controller;
+
     setIsAuditingUsers(true);
     setAuditError(null);
     try {
-      console.log("[DIAGNOSTICS] Beginning PostgreSQL users cross-reference audit...");
-      const res = await fetch('/api/users', { credentials: 'include' });
-      const data = await res.json();
+      const res = await apiFetch('/api/users?limit=500', {
+        credentials: 'include',
+        signal: controller.signal,
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(data?.error || `HTTP ${res.status} auditing users`);
+      }
       const fetchedUsers = (data.users || []) as User[];
       setDbUsers(fetchedUsers);
       
@@ -253,11 +287,11 @@ export default function AdminDashboard({
       
       setUnsyncedUsers(unsynced);
       setLastAuditTime(new Date().toLocaleTimeString());
-      
-      console.log(`[DIAGNOSTICS] Audit complete. Found ${fetchedUsers.length} total users in PostgreSQL. ${unsynced.length} are unsynced in the local store.`);
     } catch (err: any) {
-      console.error("[DIAGNOSTICS] Audit failed:", err);
-      setAuditError(err.message || String(err));
+      if (isAbortError(err) && controller.signal.aborted && !err?.isTimeout) {
+        return;
+      }
+      setAuditError(getFriendlyErrorMessage(err));
     } finally {
       setIsAuditingUsers(false);
     }
@@ -265,17 +299,29 @@ export default function AdminDashboard({
 
   useEffect(() => {
     runUsersSyncAudit();
-  }, [users]);
+    return () => {
+      auditAbortRef.current?.abort();
+      testChatAbortRef.current?.abort();
+    };
+  }, []);
 
   const handleTestChatConnection = async (chatId: string) => {
+    testChatAbortRef.current?.abort();
+    const controller = new AbortController();
+    testChatAbortRef.current = controller;
+
     setTestingChatConnectionId(chatId);
     setChatConnectionResult(null);
     try {
-      console.log(`[DIAGNOSTICS] Running live PostgreSQL messages test query for chat: ${chatId}`);
-      
       const hasLocalMessages = messages.some(m => m.chatId === chatId);
-      const res = await fetch(`/api/messages?chatId=${encodeURIComponent(chatId)}`, { credentials: 'include' });
-      const data = await res.json();
+      const res = await apiFetch(`/api/messages?chatId=${encodeURIComponent(chatId)}&limit=50`, {
+        credentials: 'include',
+        signal: controller.signal,
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(data?.error || `HTTP ${res.status} querying messages`);
+      }
       const chatMessages = (data.messages || []) as Message[];
       
       setChatConnectionResult({
@@ -285,13 +331,15 @@ export default function AdminDashboard({
         lastMessages: chatMessages.slice(-5)
       });
     } catch (err: any) {
-      console.error(`[DIAGNOSTICS] Connection test failed for chat ${chatId}:`, err);
+      if (isAbortError(err) && controller.signal.aborted && !err?.isTimeout) {
+        return;
+      }
       setChatConnectionResult({
         chatId,
         active: false,
         messagesCount: 0,
         lastMessages: [],
-        error: err.message || String(err)
+        error: getFriendlyErrorMessage(err)
       });
     } finally {
       setTestingChatConnectionId(null);
@@ -303,6 +351,45 @@ export default function AdminDashboard({
     'assignments' | 'payments_ledger' | 'create_invoice' | 'activity_log' |
     'notifications' | 'feedback' | 'sops' | 'reports' | 'agreements' | 'trigger_emails'
   >('tutors_list');
+
+  // Performance diagnostics states (client + server)
+  const [clientDiagnostics, setClientDiagnostics] = useState<ApiDiagnosticsSnapshot>(() => getApiDiagnostics());
+  const [serverDiagnostics, setServerDiagnostics] = useState<any>(null);
+  const [isLoadingServerPerf, setIsLoadingServerPerf] = useState(false);
+  const [serverPerfError, setServerPerfError] = useState<string | null>(null);
+  const [usersPage, setUsersPage] = useState(1);
+  const [logsPage, setLogsPage] = useState(1);
+  const [notifsPage, setNotifsPage] = useState(1);
+
+  useEffect(() => {
+    return subscribeApiDiagnostics(() => setClientDiagnostics(getApiDiagnostics()));
+  }, []);
+
+  const fetchServerDiagnostics = async () => {
+    setIsLoadingServerPerf(true);
+    setServerPerfError(null);
+    try {
+      const res = await apiFetch('/api/admin/diagnostics/performance', { credentials: 'include' });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(data?.error || `HTTP ${res.status} fetching server performance metrics`);
+      }
+      setServerDiagnostics(data);
+    } catch (err: any) {
+      setServerPerfError(getFriendlyErrorMessage(err));
+    } finally {
+      setIsLoadingServerPerf(false);
+    }
+  };
+
+  useEffect(() => {
+    if (onLoadTab) {
+      onLoadTab(activeTab);
+    }
+    if (activeTab === 'activity_log') {
+      fetchServerDiagnostics();
+    }
+  }, [activeTab, onLoadTab]);
 
   // Student directory deep-link selection
   const [adminStudentDirectorySearch, setAdminStudentDirectorySearch] = useState<string>('');
@@ -357,8 +444,17 @@ export default function AdminDashboard({
 
   // Search & Filter state for the active platform users list
   const [userSearchQuery, setUserSearchQuery] = useState('');
+  const [debouncedUserSearchQuery, setDebouncedUserSearchQuery] = useState('');
   const [userFilterRole, setUserFilterRole] = useState<'all' | 'student' | 'tutor' | 'admin'>('all');
   const [expandedUserRowId, setExpandedUserRowId] = useState<string | null>(null);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedUserSearchQuery(userSearchQuery);
+      setUsersPage(1);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [userSearchQuery]);
 
   // 2. Payments Ledger
   const [invoiceTabFilter, setInvoiceTabFilter] = useState<'all' | 'due' | 'paid' | 'pending' | 'uninvoiced'>('all');
@@ -462,7 +558,12 @@ export default function AdminDashboard({
   }, [activeTab, chats, selectedChatId]);
 
   useEffect(() => {
-    if (selectedChatId && onSubscribeToChatDetails) {
+    if (!selectedChatId) {
+      lastSubscribedChatIdRef.current = null;
+      return;
+    }
+    if (onSubscribeToChatDetails && lastSubscribedChatIdRef.current !== selectedChatId) {
+      lastSubscribedChatIdRef.current = selectedChatId;
       onSubscribeToChatDetails(selectedChatId);
     }
   }, [selectedChatId, onSubscribeToChatDetails]);
@@ -1101,6 +1202,20 @@ export default function AdminDashboard({
 
         {/* Content switch displays */}
         <div className="lg:col-span-3 space-y-6 min-w-0">
+          <ErrorBoundary compact resetKey={activeTab} onReset={() => onLoadTab?.(activeTab, true)}>
+            {tabStates[`admin:${activeTab}`]?.error && (
+              <ErrorStatePanel
+                title="Unable to load tab data"
+                message={tabStates[`admin:${activeTab}`]?.error || 'Request failed or timed out after 30 seconds.'}
+                onRetry={() => onLoadTab?.(activeTab, true)}
+              />
+            )}
+
+            {tabStates[`admin:${activeTab}`]?.loading && !tabStates[`admin:${activeTab}`]?.loadedAt && (
+              <div className="mb-4">
+                <TabLoadingSkeleton rows={4} />
+              </div>
+            )}
           
           {/* STUDENT PROFILES DIRECTORY */}
           {activeTab === 'student_profiles' && (
@@ -1494,7 +1609,7 @@ export default function AdminDashboard({
                         {unsyncedUsers.map(u => (
                           <div key={u.id} className="bg-white rounded-xl border border-amber-200/50 p-3 flex items-center justify-between gap-3 shadow-2xs">
                             <div className="flex items-center gap-2.5 min-w-0">
-                              <img src={u.avatarUrl || 'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=150&auto=format&fit=crop&q=80'} className="w-8 h-8 rounded-full border border-gray-150 object-cover" alt="" />
+                              <ResponsiveAvatar src={u.avatarUrl} alt="" sizePx={32} fallbackSrc="https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=64&h=64&fit=crop&auto=format&q=75" className="w-8 h-8 rounded-full border border-gray-150 object-cover" />
                               <div className="min-w-0">
                                 <span className="font-bold text-gray-900 block truncate">{u.name}</span>
                                 <span className="text-[10px] text-gray-450 font-mono block truncate">{u.email}</span>
@@ -1558,17 +1673,23 @@ export default function AdminDashboard({
                     <tbody className="divide-y divide-gray-100 text-xs font-sans">
                       {(() => {
                         const baseUsers = [...users, ...unsyncedUsers.filter(u => !users.some(pu => pu.id === u.id || pu.email.toLowerCase().trim() === u.email.toLowerCase().trim()))];
+                        const qLower = debouncedUserSearchQuery.toLowerCase().trim();
                         const filteredUsers = baseUsers.filter(u => {
-                          const matchesQuery = 
-                            u.name.toLowerCase().includes(userSearchQuery.toLowerCase()) || 
-                            u.email.toLowerCase().includes(userSearchQuery.toLowerCase()) || 
-                            u.id.toLowerCase().includes(userSearchQuery.toLowerCase());
+                          const matchesQuery = !qLower ||
+                            u.name.toLowerCase().includes(qLower) || 
+                            u.email.toLowerCase().includes(qLower) || 
+                            u.id.toLowerCase().includes(qLower);
                           
                           if (userFilterRole === 'student') return (u.role === UserRole.STUDENT || (u.role as string)?.toLowerCase() === 'student') && matchesQuery;
                           if (userFilterRole === 'tutor') return (u.role === UserRole.TUTOR || (u.role as string)?.toLowerCase() === 'tutor' || u.id.startsWith('tutor_') || u.id.startsWith('tutor-') || !!u.hourlyRate) && matchesQuery;
                           if (userFilterRole === 'admin') return (u.role === UserRole.ADMIN || (u.role as string)?.toLowerCase() === 'admin') && matchesQuery;
                           return matchesQuery;
                         });
+
+                        const usersPageSize = 20;
+                        const totalUsersPages = Math.max(1, Math.ceil(filteredUsers.length / usersPageSize));
+                        const safeUsersPage = Math.min(usersPage, totalUsersPages);
+                        const pagedUsers = filteredUsers.slice((safeUsersPage - 1) * usersPageSize, safeUsersPage * usersPageSize);
 
                         if (filteredUsers.length === 0) {
                           return (
@@ -1581,7 +1702,7 @@ export default function AdminDashboard({
                           );
                         }
 
-                        return filteredUsers.map((u) => {
+                        return pagedUsers.map((u) => {
                           const studentAssignments = assignments.filter(a => a.studentId === u.id);
                           const isExpanded = expandedUserRowId === u.id;
                           
@@ -1592,7 +1713,7 @@ export default function AdminDashboard({
                                 <td className="p-4">
                                   <div className="flex items-center gap-3">
                                     <div className="relative">
-                                      <img src={u.avatarUrl} className="w-9 h-9 rounded-full object-cover border shadow-xs" alt="" />
+                                      <ResponsiveAvatar src={u.avatarUrl} alt="" sizePx={40} width={36} height={36} className="w-9 h-9 rounded-full object-cover border shadow-xs" />
                                       {/* Simulated green live indicator for all accounts who registered */}
                                       <span className="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full bg-emerald-500 border-2 border-white" title="Active Account Access" />
                                     </div>
@@ -1770,7 +1891,7 @@ export default function AdminDashboard({
                                                   <span>🎓 Tutor Assignee:</span>
                                                   {assignedTutor ? (
                                                     <span className="font-bold text-emerald-700 flex items-center gap-1">
-                                                      <img src={assignedTutor.avatarUrl} className="w-4 h-4 rounded-full border" alt="" />
+                                                      <ResponsiveAvatar src={assignedTutor.avatarUrl} alt="" sizePx={24} width={16} height={16} className="w-4 h-4 rounded-full border object-cover" />
                                                       {assignedTutor.name}
                                                     </span>
                                                   ) : (
@@ -1807,6 +1928,21 @@ export default function AdminDashboard({
                     </tbody>
                   </table>
                 </div>
+                {(() => {
+                  const baseUsersCount = users.length + unsyncedUsers.filter(u => !users.some(pu => pu.id === u.id || pu.email.toLowerCase().trim() === u.email.toLowerCase().trim())).length;
+                  const totalPages = Math.max(1, Math.ceil(baseUsersCount / 20));
+                  return totalPages > 1 ? (
+                    <div className="p-4 border-t border-gray-100">
+                      <PaginationBar
+                        currentPage={usersPage}
+                        totalPages={totalPages}
+                        totalItems={baseUsersCount}
+                        pageSize={20}
+                        onPageChange={setUsersPage}
+                      />
+                    </div>
+                  ) : null;
+                })()}
               </div>
             </div>
           )}
@@ -2608,25 +2744,34 @@ export default function AdminDashboard({
                       No notifications sent in this session hierarchy yet. Active live synchronization logs will record here.
                     </div>
                   ) : (
-                    <div className="space-y-3 max-h-[480px] overflow-y-auto">
-                      {appNotifications.map(notif => {
-                        const targetUser = users.find(u => u.id === notif.userId);
-                        return (
-                          <div key={notif.id} className="p-4 border rounded-2xl bg-gray-50/50 hover:bg-gray-50 transition-colors text-xs">
-                            <div className="flex justify-between items-start gap-3">
-                              <span className="font-bold text-gray-950 block text-sm">{notif.title}</span>
-                              <span className="bg-orange-50 text-orange-700 text-[8px] font-bold px-1.5 py-0.5 rounded-md shrink-0 uppercase tracking-widest font-mono">
-                                {notif.type}
-                              </span>
+                    <div className="space-y-3">
+                      <div className="space-y-3 max-h-[480px] overflow-y-auto pr-1">
+                        {appNotifications.slice((notifsPage - 1) * 15, notifsPage * 15).map(notif => {
+                          const targetUser = users.find(u => u.id === notif.userId);
+                          return (
+                            <div key={notif.id} className="p-4 border rounded-2xl bg-gray-50/50 hover:bg-gray-50 transition-colors text-xs">
+                              <div className="flex justify-between items-start gap-3">
+                                <span className="font-bold text-gray-950 block text-sm">{notif.title}</span>
+                                <span className="bg-orange-50 text-orange-700 text-[8px] font-bold px-1.5 py-0.5 rounded-md shrink-0 uppercase tracking-widest font-mono">
+                                  {notif.type}
+                                </span>
+                              </div>
+                              <p className="text-gray-600 mt-2 font-medium leading-relaxed font-sans">{notif.message}</p>
+                              <div className="flex justify-between items-center text-[10px] mt-4 border-t pt-2 border-dashed border-gray-200 text-gray-450 font-mono">
+                                <span>Recipient: <b>{notif.userId === 'all' ? '📢 All Audiences' : targetUser ? targetUser.name : notif.userId}</b></span>
+                                <span>{new Date(notif.createdAt).toLocaleString()}</span>
+                              </div>
                             </div>
-                            <p className="text-gray-600 mt-2 font-medium leading-relaxed font-sans">{notif.message}</p>
-                            <div className="flex justify-between items-center text-[10px] mt-4 border-t pt-2 border-dashed border-gray-200 text-gray-450 font-mono">
-                              <span>Recipient: <b>{notif.userId === 'all' ? '📢 All Audiences' : targetUser ? targetUser.name : notif.userId}</b></span>
-                              <span>{new Date(notif.createdAt).toLocaleString()}</span>
-                            </div>
-                          </div>
-                        );
-                      })}
+                          );
+                        })}
+                      </div>
+                      <PaginationBar
+                        currentPage={notifsPage}
+                        totalPages={Math.max(1, Math.ceil(appNotifications.length / 15))}
+                        totalItems={appNotifications.length}
+                        pageSize={15}
+                        onPageChange={setNotifsPage}
+                      />
                     </div>
                   )}
                 </div>
@@ -3035,12 +3180,151 @@ export default function AdminDashboard({
             </div>
           )}
 
-          {/* COMPREHENSIVE ACTIVITY SECURITY LOG TRACKER */}
+          {/* COMPREHENSIVE ACTIVITY SECURITY LOG & PERFORMANCE DIAGNOSTICS */}
           {activeTab === 'activity_log' && (
             <div className="space-y-6" id="admin-activity-logs">
-              <div className="bg-white rounded-3xl border border-gray-150 p-6 shadow-xs text-left">
-                <h3 className="font-bold text-base text-gray-955 font-sans tracking-tight">Corporate Audit Security Activity Logging</h3>
-                <p className="text-xs text-gray-400 mt-1">Real-time auditing of administrative, tutor, and student events. This system tracks manual interventions, payment settling, and tutor dispatches.</p>
+              <div className="bg-white rounded-3xl border border-gray-150 p-6 shadow-xs text-left flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div>
+                  <h3 className="font-bold text-base text-gray-955 font-sans tracking-tight">System Performance Diagnostics &amp; Audit Logs</h3>
+                  <p className="text-xs text-gray-400 mt-1">Monitor slowest API routes, requests &gt;2s / &gt;10s, failed API requests, failed dashboard tabs, and live audit events (no secrets or PII logged).</p>
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => clearApiDiagnostics()}
+                    className="px-3 py-1.5 rounded-xl border border-gray-200 text-xs font-bold text-gray-600 hover:bg-gray-50 cursor-pointer"
+                  >
+                    Reset Client Metrics
+                  </button>
+                  <button
+                    type="button"
+                    onClick={fetchServerDiagnostics}
+                    disabled={isLoadingServerPerf}
+                    className="px-3.5 py-1.5 rounded-xl bg-gray-900 hover:bg-black text-white text-xs font-bold flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                  >
+                    <RefreshCw className={`w-3.5 h-3.5 ${isLoadingServerPerf ? 'animate-spin' : ''}`} />
+                    <span>Refresh Telemetry</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Client & Server Performance Summary Cards */}
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 text-left">
+                <div className="bg-white rounded-2xl border border-gray-150 p-4 shadow-xs">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400 block">Client Requests (&gt;2s / &gt;10s)</span>
+                  <div className="text-2xl font-mono font-extrabold text-gray-900 mt-1">
+                    {clientDiagnostics.slowOver2sCount} <span className="text-xs font-normal text-gray-400">/ {clientDiagnostics.slowOver10sCount}</span>
+                  </div>
+                  <span className="text-[10px] text-gray-500 block mt-0.5">Out of {clientDiagnostics.totalRequests} requests</span>
+                </div>
+                <div className="bg-white rounded-2xl border border-gray-150 p-4 shadow-xs">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400 block">Failed Client Requests</span>
+                  <div className="text-2xl font-mono font-extrabold text-rose-600 mt-1">
+                    {clientDiagnostics.failedRequests.length}
+                  </div>
+                  <span className="text-[10px] text-gray-500 block mt-0.5">Timeouts, network &amp; 4xx/5xx</span>
+                </div>
+                <div className="bg-white rounded-2xl border border-gray-150 p-4 shadow-xs">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400 block">Failed Dashboard Tabs</span>
+                  <div className="text-2xl font-mono font-extrabold text-amber-600 mt-1">
+                    {clientDiagnostics.failedTabs.length}
+                  </div>
+                  <span className="text-[10px] text-gray-500 block mt-0.5">Tabs currently in error state</span>
+                </div>
+                <div className="bg-white rounded-2xl border border-gray-150 p-4 shadow-xs">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400 block">Server Requests (&gt;2s / Err)</span>
+                  <div className="text-2xl font-mono font-extrabold text-gray-900 mt-1">
+                    {serverDiagnostics?.summary?.slowOver2sCount ?? 0} <span className="text-xs font-normal text-rose-500">/ {serverDiagnostics?.summary?.errorCount ?? 0}</span>
+                  </div>
+                  <span className="text-[10px] text-gray-500 block mt-0.5">{serverDiagnostics?.summary?.totalTracked ?? 0} tracked API calls</span>
+                </div>
+              </div>
+
+              {serverPerfError && (
+                <ErrorStatePanel
+                  title="Server Telemetry Unavailable"
+                  message={serverPerfError}
+                  onRetry={fetchServerDiagnostics}
+                />
+              )}
+
+              {/* Slowest API Routes & Failed Tabs */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 text-left">
+                <div className="bg-white rounded-3xl p-5 border border-gray-150 shadow-xs space-y-3">
+                  <div className="flex items-center justify-between border-b border-gray-100 pb-3">
+                    <span className="text-xs font-bold text-gray-800 uppercase tracking-wider flex items-center gap-1.5">
+                      <Activity className="w-4 h-4 text-orange-500" />
+                      Slowest API Routes (Client + Server)
+                    </span>
+                    <span className="text-[10px] font-mono text-gray-400">Sorted by max ms</span>
+                  </div>
+                  {(() => {
+                    const combinedRoutes = [
+                      ...(serverDiagnostics?.slowestRoutes || []).map((r: any) => ({ ...r, source: 'server' })),
+                      ...clientDiagnostics.slowestRoutes.map(r => ({ ...r, source: 'client' })),
+                    ].sort((a, b) => b.maxMs - a.maxMs).slice(0, 10);
+
+                    if (combinedRoutes.length === 0) {
+                      return <p className="text-xs text-gray-400 py-6 text-center">No route timings recorded yet.</p>;
+                    }
+                    return (
+                      <div className="space-y-2 max-h-[260px] overflow-y-auto pr-1 text-xs font-mono">
+                        {combinedRoutes.map((r, idx) => (
+                          <div key={`${r.source}-${r.route}-${idx}`} className="p-2.5 rounded-xl bg-gray-50 border border-gray-100 flex items-center justify-between gap-2">
+                            <div className="min-w-0">
+                              <span className="font-bold text-gray-900 truncate block">{r.route}</span>
+                              <span className="text-[10px] text-gray-500">
+                                {r.source.toUpperCase()} • {r.count} calls • {r.errorCount} errs
+                              </span>
+                            </div>
+                            <div className="text-right shrink-0">
+                              <span className={`font-bold block ${r.maxMs >= 2000 ? 'text-rose-600' : 'text-emerald-700'}`}>
+                                max {r.maxMs}ms
+                              </span>
+                              <span className="text-[10px] text-gray-400">avg {r.avgMs}ms</span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    );
+                  })()}
+                </div>
+
+                <div className="bg-white rounded-3xl p-5 border border-gray-150 shadow-xs space-y-3">
+                  <div className="flex items-center justify-between border-b border-gray-100 pb-3">
+                    <span className="text-xs font-bold text-gray-800 uppercase tracking-wider flex items-center gap-1.5">
+                      <AlertTriangle className="w-4 h-4 text-rose-500" />
+                      Failed Requests &amp; Failed Tabs
+                    </span>
+                    <span className="text-[10px] font-mono text-gray-400">Recent 25</span>
+                  </div>
+                  {clientDiagnostics.failedTabs.length === 0 && clientDiagnostics.failedRequests.length === 0 ? (
+                    <div className="py-8 text-center text-xs text-emerald-700 bg-emerald-50/50 rounded-2xl border border-emerald-100 font-semibold">
+                      Zero failed tabs or failed API requests recorded in this session.
+                    </div>
+                  ) : (
+                    <div className="space-y-2 max-h-[260px] overflow-y-auto pr-1 text-xs">
+                      {clientDiagnostics.failedTabs.map(ft => (
+                        <div key={`ft-${ft.tab}`} className="p-2.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-900">
+                          <div className="flex justify-between font-bold">
+                            <span>Failed Tab: {ft.tab}</span>
+                            <span className="font-mono text-[10px]">{new Date(ft.timestamp).toLocaleTimeString()}</span>
+                          </div>
+                          <p className="text-[11px] mt-0.5">{ft.error}</p>
+                        </div>
+                      ))}
+                      {clientDiagnostics.failedRequests.slice(0, 15).map((fr, idx) => (
+                        <div key={`fr-${idx}`} className="p-2.5 rounded-xl bg-rose-50 border border-rose-150 text-rose-900">
+                          <div className="flex justify-between font-mono text-[11px] font-bold">
+                            <span className="truncate">{fr.method} {fr.route}</span>
+                            <span>{fr.status ?? 'ERR'} • {fr.durationMs}ms</span>
+                          </div>
+                          <p className="text-[11px] mt-0.5">{fr.error}</p>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
 
               <div className="bg-white rounded-3xl p-5 border border-gray-150 shadow-xs text-left">
@@ -3055,24 +3339,33 @@ export default function AdminDashboard({
                       No system events registered in this session yet. Events will record in real-time upon assignment pricing, contract edits, and notifications broadcasts!
                     </div>
                   ) : (
-                    <div className="space-y-3 font-mono text-[10.5px] max-h-[500px] overflow-y-auto pr-2">
-                      {activityLogs.map(log => (
-                        <div key={log.id} className="p-3 bg-gray-50/70 border border-gray-100 rounded-xl hover:bg-gray-55 transition-colors">
-                          <div className="flex justify-between text-[10px] pb-1 border-b border-dashed border-gray-200 text-gray-400 font-medium">
-                            <span>User: {log.userName} ({log.userRole.toUpperCase()}) • ID: {log.userId}</span>
-                            <span>{new Date(log.timestamp).toLocaleTimeString()}</span>
+                    <div className="space-y-3">
+                      <div className="space-y-3 font-mono text-[10.5px] max-h-[500px] overflow-y-auto pr-2">
+                        {activityLogs.slice((logsPage - 1) * 20, logsPage * 20).map(log => (
+                          <div key={log.id} className="p-3 bg-gray-50/70 border border-gray-100 rounded-xl hover:bg-gray-55 transition-colors">
+                            <div className="flex justify-between text-[10px] pb-1 border-b border-dashed border-gray-200 text-gray-400 font-medium">
+                              <span>User: {log.userName} ({log.userRole.toUpperCase()}) • ID: {log.userId}</span>
+                              <span>{new Date(log.timestamp).toLocaleTimeString()}</span>
+                            </div>
+                            <div className="mt-2 font-bold text-gray-900 flex items-center gap-1.5">
+                              <span className="w-1.5 h-1.5 rounded-full bg-orange-500"></span>
+                              {log.action}
+                            </div>
+                            {log.details && (
+                              <p className="text-[10px] text-gray-450 font-semibold mt-1 bg-white p-1 rounded border leading-relaxed">
+                                {log.details}
+                              </p>
+                            )}
                           </div>
-                          <div className="mt-2 font-bold text-gray-900 flex items-center gap-1.5">
-                            <span className="w-1.5 h-1.5 rounded-full bg-orange-500"></span>
-                            {log.action}
-                          </div>
-                          {log.details && (
-                            <p className="text-[10px] text-gray-450 font-semibold mt-1 bg-white p-1 rounded border leading-relaxed">
-                              {log.details}
-                            </p>
-                          )}
-                        </div>
-                      ))}
+                        ))}
+                      </div>
+                      <PaginationBar
+                        currentPage={logsPage}
+                        totalPages={Math.max(1, Math.ceil(activityLogs.length / 20))}
+                        totalItems={activityLogs.length}
+                        pageSize={20}
+                        onPageChange={setLogsPage}
+                      />
                     </div>
                   )}
                 </div>
@@ -3198,10 +3491,13 @@ export default function AdminDashboard({
                               <div className="space-y-1.5 block text-[11px] bg-slate-50/70 p-2 rounded-xl border border-slate-200/60">
                                 {/* Student */}
                                 <div className="flex items-center gap-2">
-                                  <img 
-                                    src={student?.avatarUrl || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=80&q=80'} 
-                                    alt="" 
-                                    className="w-5 h-5 rounded-full object-cover ring-1 ring-slate-200 shrink-0" 
+                                  <ResponsiveAvatar
+                                    src={student?.avatarUrl}
+                                    alt=""
+                                    sizePx={24}
+                                    width={20}
+                                    height={20}
+                                    className="w-5 h-5 rounded-full object-cover ring-1 ring-slate-200 shrink-0"
                                   />
                                   <div className="truncate flex-1 min-w-0">
                                     <span className="font-bold text-gray-900 truncate block leading-tight">{student?.name || 'Enrolled Student'}</span>
@@ -3214,12 +3510,16 @@ export default function AdminDashboard({
 
                                 {/* Assigned Tutor / CSR Desk */}
                                 <div className="flex items-center gap-2 pt-1 border-t border-slate-200/50">
-                                  <img 
-                                    src={isSupportChat 
-                                      ? 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=80&auto=format&fit=crop&q=80'
-                                      : (tutor?.avatarUrl || 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=80&auto=format&fit=crop&q=80')} 
-                                    alt="" 
-                                    className="w-5 h-5 rounded-full object-cover ring-1 ring-orange-200 shrink-0" 
+                                  <ResponsiveAvatar
+                                    src={isSupportChat
+                                      ? 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=64&h=64&auto=format&fit=crop&q=75'
+                                      : tutor?.avatarUrl}
+                                    alt=""
+                                    sizePx={24}
+                                    width={20}
+                                    height={20}
+                                    fallbackSrc="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=64&h=64&auto=format&fit=crop&q=75"
+                                    className="w-5 h-5 rounded-full object-cover ring-1 ring-orange-200 shrink-0"
                                   />
                                   <div className="truncate flex-1 min-w-0">
                                     <span className="font-bold text-gray-900 truncate block leading-tight">
@@ -3605,7 +3905,15 @@ export default function AdminDashboard({
 
                         {/* Interactive Message feed scroll */}
                         <div className="p-4 space-y-3.5 overflow-y-auto max-h-[350px] min-h-[300px] flex-1 bg-gray-50/40 text-xs text-left">
-                          {activeChatMessages.length === 0 ? (
+                          {chatError ? (
+                            <ErrorStatePanel
+                              title="Unable to load messages"
+                              message={chatError}
+                              onRetry={() => selectedChatId && onSubscribeToChatDetails?.(selectedChatId)}
+                            />
+                          ) : isLoadingMessages && activeChatMessages.length === 0 ? (
+                            <TabLoadingSkeleton rows={3} />
+                          ) : activeChatMessages.length === 0 ? (
                             <div className="py-20 text-center text-gray-400 italic">
                               No messages have been posted to this workspace room yet. Type below to send an admin moderation guide instruction.
                             </div>
@@ -4017,10 +4325,10 @@ export default function AdminDashboard({
                                 <tr key={b.id} className="hover:bg-gray-50/70 transition-all group">
                                   <td className="py-4 px-4 max-w-sm">
                                     <div className="flex items-start gap-3">
-                                      <img
-                                        referrerPolicy="no-referrer"
-                                        src={b.image || "https://images.unsplash.com/photo-1511629091441-ee46146481b6?w=400"}
+                                      <ResponsiveAvatar
+                                        src={b.image || 'https://images.unsplash.com/photo-1511629091441-ee46146481b6?w=120'}
                                         alt={b.title}
+                                        sizePx={48}
                                         className="w-12 h-12 rounded-xl object-cover border border-gray-150 shrink-0 shadow-xs"
                                       />
                                       <div className="space-y-0.5">
@@ -4092,7 +4400,16 @@ export default function AdminDashboard({
                             <div>
                               {/* Card Header Thumbnail & Tag */}
                               <div className="relative h-44 w-full bg-gray-100 overflow-hidden">
-                                <img referrerPolicy="no-referrer" src={b.image} alt={b.title} className="w-full h-full object-cover transition-transform duration-500 hover:scale-105" />
+                                <ResponsivePicture
+                                  src={b.image}
+                                  alt={b.title}
+                                  width={480}
+                                  height={176}
+                                  loading="lazy"
+                                  sizes="(max-width: 768px) 92vw, 480px"
+                                  widths={[360, 480]}
+                                  className="w-full h-full object-cover transition-transform duration-500 hover:scale-105"
+                                />
                                 <span className="absolute top-3 left-3 bg-gray-950/85 backdrop-blur-xs text-white text-[9px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-md">
                                   {b.category}
                                 </span>
@@ -4821,6 +5138,7 @@ export default function AdminDashboard({
             </div>
           )}
 
+          </ErrorBoundary>
         </div>
 
       </div>

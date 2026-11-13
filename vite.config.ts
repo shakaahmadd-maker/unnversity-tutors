@@ -3,7 +3,10 @@ import react from '@vitejs/plugin-react';
 import path from 'path';
 import { defineConfig } from 'vite';
 
-export default defineConfig(() => {
+export default defineConfig(({ command }) => {
+  if (command === 'build') {
+    process.env.NODE_ENV = 'production';
+  }
   return {
     plugins: [react(), tailwindcss()],
     resolve: {
@@ -23,7 +26,7 @@ export default defineConfig(() => {
         output: {
           manualChunks(id) {
             if (id.includes('node_modules')) {
-              if (id.includes('react') || id.includes('react-dom')) {
+              if (/node_modules\/(react|react-dom|scheduler)\//.test(id)) {
                 return 'vendor-react';
               }
               if (id.includes('lucide-react')) {

@@ -23,8 +23,11 @@ import {
   X
 } from 'lucide-react';
 import { User } from '../types';
-import { TRENDING_TUTORS_500, TRENDING_TUTORS_200 } from '../data/trendingTutors500Data';
+import { store } from '../lib/store';
+import { getFriendlyErrorMessage } from '../lib/apiClient';
+import { TabLoadingSkeleton, ErrorStatePanel } from './ui/StatePanels';
 import { getRelevantKeywordsForTutor } from '../data/subjectKeywordsData';
+import { ResponsiveAvatar } from './ResponsiveImage';
 
 interface TutorsDirectoryPageProps {
   locationFilter?: string;
@@ -107,13 +110,57 @@ export default function TutorsDirectoryPage({
   allStoreTutors = []
 }: TutorsDirectoryPageProps) {
   const [searchTerm, setSearchTerm] = useState('');
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
   const [selectedCountry, setSelectedCountry] = useState<string>('all');
   const [selectedSubject, setSelectedSubject] = useState<string>(subjectFilter || 'All Subjects');
   const [maxPrice, setMaxPrice] = useState<number>(180);
   const [sortBy, setSortBy] = useState<'rating' | 'reviews' | 'price_low' | 'price_high'>('rating');
   const [currentPage, setCurrentPage] = useState<number>(1);
   const [showMobileFilters, setShowMobileFilters] = useState<boolean>(false);
+  const [masterTutors, setMasterTutors] = useState<User[]>([]);
+  const [isLoadingDirectory, setIsLoadingDirectory] = useState<boolean>(true);
+  const [directoryError, setDirectoryError] = useState<string | null>(null);
   const pageSize = 15;
+
+  const loadDirectoryData = async () => {
+    setIsLoadingDirectory(true);
+    setDirectoryError(null);
+    try {
+      const list = await store.loadTrendingTutorsFallback();
+      setMasterTutors(list);
+    } catch (err: any) {
+      setDirectoryError(getFriendlyErrorMessage(err));
+    } finally {
+      setIsLoadingDirectory(false);
+    }
+  };
+
+  useEffect(() => {
+    let active = true;
+    setIsLoadingDirectory(true);
+    setDirectoryError(null);
+    store
+      .loadTrendingTutorsFallback()
+      .then((list) => {
+        if (active) setMasterTutors(list);
+      })
+      .catch((err) => {
+        if (active) setDirectoryError(getFriendlyErrorMessage(err));
+      })
+      .finally(() => {
+        if (active) setIsLoadingDirectory(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearchTerm(searchTerm);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
 
   // Sync URL search parameters and props on mount or change
   useEffect(() => {
@@ -143,7 +190,7 @@ export default function TutorsDirectoryPage({
   const unifiedTutors = useMemo(() => {
     const map = new Map<string, User>();
     // Seed the 500 trending master tutors
-    TRENDING_TUTORS_500.forEach(t => map.set(t.id, (t as unknown) as User));
+    masterTutors.forEach(t => map.set(t.id, t));
     // Then combine store tutors (override or add)
     allStoreTutors.forEach(st => {
       if (st.isApproved !== false) {
@@ -170,7 +217,7 @@ export default function TutorsDirectoryPage({
     });
 
     return Array.from(uniqueMap.values());
-  }, [allStoreTutors]);
+  }, [masterTutors, allStoreTutors]);
 
   // Extract all distinct primary subjects across all tutors
   const allDistinctPrimarySubjects = useMemo(() => {
@@ -202,8 +249,8 @@ export default function TutorsDirectoryPage({
       }
 
       // 4. Text Search against keywords, name, primary subject, location, expertise
-      if (searchTerm.trim()) {
-        const term = searchTerm.toLowerCase().trim();
+      if (debouncedSearchTerm.trim()) {
+        const term = debouncedSearchTerm.toLowerCase().trim();
         const subExp = Array.isArray(t.subjectExpertise) ? t.subjectExpertise.join(' ') : String(t.subjectExpertise || '');
         const keywords = String((t as any).searchableKeywords || '');
         const combinedSearchSpace = [
@@ -280,7 +327,7 @@ export default function TutorsDirectoryPage({
     }
 
     return basePool;
-  }, [unifiedTutors, selectedCountry, selectedSubject, maxPrice, searchTerm]);
+  }, [unifiedTutors, selectedCountry, selectedSubject, maxPrice, debouncedSearchTerm]);
 
   // Sort list
   const sortedTutors = useMemo(() => {
@@ -543,6 +590,16 @@ export default function TutorsDirectoryPage({
             </div>
 
             {/* Tutor Cards Grid */}
+            {directoryError && (
+              <ErrorStatePanel
+                title="Unable to load tutor catalog"
+                message={directoryError}
+                onRetry={loadDirectoryData}
+              />
+            )}
+            {isLoadingDirectory && unifiedTutors.length === 0 ? (
+              <TabLoadingSkeleton rows={6} />
+            ) : (
             <div className="space-y-5">
               {paginatedTutors.map((tutor) => {
                 const subjectsList = Array.isArray(tutor.subjectExpertise) && tutor.subjectExpertise.length > 0
@@ -587,16 +644,11 @@ export default function TutorsDirectoryPage({
                       <div className="flex items-start gap-3.5">
                         {/* Avatar with Verified Floating Badge */}
                         <div className="relative shrink-0">
-                          <img
-                            src={tutor.avatarUrl || getFallbackAvatar(tutor.name)}
+                          <ResponsiveAvatar
+                            src={tutor.avatarUrl}
                             alt={tutor.name}
-                            loading="lazy"
-                            decoding="async"
-                            referrerPolicy="no-referrer"
-                            onError={(e) => {
-                              e.currentTarget.onerror = null;
-                              e.currentTarget.src = getFallbackAvatar(tutor.name);
-                            }}
+                            sizePx={80}
+                            fallbackSrc={getFallbackAvatar(tutor.name)}
                             className="w-20 h-20 rounded-2xl object-cover ring-2 ring-slate-100 bg-slate-100 shadow-xs"
                           />
                           <span className="absolute -bottom-2.5 left-1/2 -translate-x-1/2 inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-600 text-white shadow-xs whitespace-nowrap z-10">
@@ -732,16 +784,11 @@ export default function TutorsDirectoryPage({
                         
                         {/* Avatar with Verified Status */}
                         <div className="relative shrink-0">
-                          <img
-                            src={tutor.avatarUrl || getFallbackAvatar(tutor.name)}
+                          <ResponsiveAvatar
+                            src={tutor.avatarUrl}
                             alt={tutor.name}
-                            loading="lazy"
-                            decoding="async"
-                            referrerPolicy="no-referrer"
-                            onError={(e) => {
-                              e.currentTarget.onerror = null;
-                              e.currentTarget.src = getFallbackAvatar(tutor.name);
-                            }}
+                            sizePx={96}
+                            fallbackSrc={getFallbackAvatar(tutor.name)}
                             className="w-20 h-20 sm:w-24 sm:h-24 rounded-2xl object-cover border border-slate-200 shadow-xs bg-orange-50/50"
                           />
                           <span className="absolute -bottom-2 -right-1 bg-emerald-600 text-white text-[9.5px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1 shadow-sm">
@@ -913,6 +960,7 @@ export default function TutorsDirectoryPage({
                 </div>
               )}
             </div>
+            )}
 
             {/* Pagination Controls */}
             {totalPages > 1 && (

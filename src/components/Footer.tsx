@@ -63,15 +63,27 @@ export default function Footer({ onNavigate, onOpenBecomeTutor }: FooterProps) {
           {/* Brand Col */}
           <div className="space-y-4">
             <div className="flex items-center">
-              <img 
-                src="/logo.webp" 
-                alt="Uni Tutors" 
-                width={220}
-                height={84}
-                loading="lazy"
-                decoding="async"
-                className="h-10 sm:h-12 md:h-14 w-auto max-w-[220px] sm:max-w-[250px] object-contain"
-              />
+              <picture>
+                <source
+                  type="image/avif"
+                  srcSet="/logo-220.avif 220w, /logo-440.avif 440w"
+                  sizes="220px"
+                />
+                <source
+                  type="image/webp"
+                  srcSet="/logo-220.webp 220w, /logo-440.webp 440w"
+                  sizes="220px"
+                />
+                <img 
+                  src="/logo.webp" 
+                  alt="Uni Tutors" 
+                  width={220}
+                  height={84}
+                  loading="lazy"
+                  decoding="async"
+                  className="h-10 sm:h-12 md:h-14 w-auto max-w-[220px] sm:max-w-[250px] object-contain"
+                />
+              </picture>
             </div>
             <p className="text-xs text-[#542104]/90 leading-relaxed font-medium">
               Your Global Partner for Academic Success. Connecting premium degree-seeking students with native certified subject experts across major English-speaking networks.

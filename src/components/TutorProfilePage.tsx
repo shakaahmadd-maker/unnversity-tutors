@@ -28,6 +28,7 @@ import { User } from '../types';
 import { getRelevantKeywordsForTutor } from '../data/subjectKeywordsData';
 import { getFallbackAvatar } from './TutorsDirectoryPage';
 import SEOKeywordLinksBlock from './SEOKeywordLinksBlock';
+import { ResponsiveAvatar } from './ResponsiveImage';
 
 interface TutorProfilePageProps {
   tutor: User;
@@ -168,14 +169,13 @@ export default function TutorProfilePage({
               {/* Profile Avatar with Online Status Indicator */}
               <div className="relative shrink-0">
                 <div className="w-20 h-20 rounded-2xl overflow-hidden shadow-inner ring-2 ring-slate-100 bg-slate-200">
-                  <img 
-                    src={tutor.avatarUrl || getFallbackAvatar(tutor.name)} 
-                    alt={tutor.name} 
+                  <ResponsiveAvatar
+                    src={tutor.avatarUrl}
+                    alt={tutor.name}
+                    sizePx={80}
+                    loading="eager"
+                    fallbackSrc={getFallbackAvatar(tutor.name)}
                     className="w-full h-full object-cover object-top"
-                    onError={(e) => {
-                      e.currentTarget.onerror = null;
-                      e.currentTarget.src = getFallbackAvatar(tutor.name);
-                    }}
                   />
                 </div>
                 {/* Online status green pulse dot */}
@@ -561,9 +561,12 @@ export default function TutorProfilePage({
               
               {/* Header Info */}
               <div className="flex flex-col sm:flex-row items-start gap-5">
-                <img
-                  src={tutor.avatarUrl || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=300&auto=format&fit=crop&q=80'}
+                <ResponsiveAvatar
+                  src={tutor.avatarUrl}
                   alt={tutor.name}
+                  sizePx={112}
+                  loading="eager"
+                  fallbackSrc={getFallbackAvatar(tutor.name)}
                   className="w-24 h-24 md:w-28 md:h-28 rounded-2xl object-cover border-2 border-slate-300 shadow-md shrink-0"
                 />
 

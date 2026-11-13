@@ -40,6 +40,7 @@ import hero1on1Img from '../assets/images/hero_1on1_tutoring_1787387369345.jpg';
 import heroAssignmentImg from '../assets/images/hero_assignment_guidance_1787387387028.jpg';
 import heroCourseworkImg from '../assets/images/hero_coursework_tracks_1787387403661.jpg';
 import heroEssayImg from '../assets/images/hero_essay_rhetoric_1787387419893.jpg';
+import { ResponsiveAvatar, ResponsivePicture } from './ResponsiveImage';
 import {
   resolveDedicatedServiceRoute,
   isModifiedAnchorClick,
@@ -515,7 +516,7 @@ const STATIC_FAQS: FAQ[] = [
   }
 ];
 
-export default function MarketingPages({ 
+function MarketingPages({ 
   activeView, 
   tutors, 
   blogs, 
@@ -1038,15 +1039,15 @@ export default function MarketingPages({
                 <div className="pt-4 sm:pt-6 border-t border-gray-100 flex items-center gap-3 sm:gap-4 text-xs font-semibold text-gray-500">
                   <div className="flex -space-x-1.5 shrink-0">
                     {tutors.slice(0,4).map((t, idx) => (
-                      <img 
-                        key={idx} 
-                        src={t.avatarUrl} 
+                      <ResponsiveAvatar
+                        key={idx}
+                        src={t.avatarUrl}
+                        sizePx={28}
                         width={28}
                         height={28}
                         loading="lazy"
-                        decoding="async"
-                        className="w-7 h-7 rounded-full border-2 border-white object-cover" 
-                        alt="Tutor Avatar" 
+                        className="w-7 h-7 rounded-full border-2 border-white object-cover"
+                        alt={t.name || 'Tutor Avatar'}
                       />
                     ))}
                   </div>
@@ -1062,13 +1063,14 @@ export default function MarketingPages({
               <div className="flex-1 relative w-full h-[320px] sm:h-[380px] lg:h-[400px] mt-6 lg:mt-0 max-w-[340px] sm:max-w-none mx-auto">
                 {/* Under/Overlapping rotative shapes */}
                 <div className="absolute top-6 sm:top-10 right-2 sm:right-4 w-64 sm:w-72 h-72 sm:h-80 bg-orange-600 rounded-3xl transform rotate-2 sm:rotate-3 shadow-2xl overflow-hidden group">
-                  <img 
-                    src={hero1on1Img} 
+                  <ResponsivePicture
+                    src={hero1on1Img}
                     alt="University students on tutoring simulation call"
                     width={400}
                     height={320}
+                    sizes="(max-width: 640px) 280px, 320px"
+                    loading="eager"
                     fetchPriority="high"
-                    decoding="async"
                     className="w-full h-full object-cover brightness-95 group-hover:scale-105 transition-transform duration-500"
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-gray-950/80 via-transparent to-transparent"></div>
@@ -1726,12 +1728,16 @@ export default function MarketingPages({
                 {/* Top Row: Compact Thumbnail (LEFT) + Heading Block */}
                 <div className="flex items-start gap-3.5 mb-3">
                   <div className="w-20 h-20 sm:w-24 sm:h-24 shrink-0 rounded-xl overflow-hidden bg-slate-100 shadow-xs border border-slate-100">
-                    <img 
-                      src="https://images.unsplash.com/photo-1522202176988-66273c2fd55f?auto=format&fit=crop&w=350&q=80" 
-                      alt="1-1 Academic Tutoring" 
-                      className="w-full h-full object-cover"
+                    <ResponsivePicture
+                      src="https://images.unsplash.com/photo-1522202176988-66273c2fd55f?auto=format&fit=crop&w=240&q=75"
+                      alt="1-1 Academic Tutoring"
+                      width={96}
+                      height={96}
+                      sizes="80px"
+                      widths={[80, 160]}
                       loading="lazy"
-                      onError={(e: any) => { e.currentTarget.onerror = null; e.currentTarget.src = 'https://placehold.co/200x200/1e293b/ffffff?text=1-1'; }}
+                      className="w-full h-full object-cover"
+                      fallbackSrc="https://placehold.co/200x200/1e293b/ffffff?text=1-1"
                     />
                   </div>
                   <div className="flex-1 min-w-0">
@@ -1791,12 +1797,16 @@ export default function MarketingPages({
                     </h3>
                   </div>
                   <div className="w-20 h-20 sm:w-24 sm:h-24 shrink-0 rounded-xl overflow-hidden bg-slate-100 shadow-xs border border-slate-100">
-                    <img 
-                      src="https://images.unsplash.com/photo-1497633762265-9d179a990aa6?auto=format&fit=crop&w=350&q=80" 
-                      alt="Assignment Guidance and Books" 
-                      className="w-full h-full object-cover"
+                    <ResponsivePicture
+                      src="https://images.unsplash.com/photo-1497633762265-9d179a990aa6?auto=format&fit=crop&w=240&q=75"
+                      alt="Assignment Guidance and Books"
+                      width={96}
+                      height={96}
+                      sizes="96px"
+                      widths={[128, 240]}
                       loading="lazy"
-                      onError={(e: any) => { e.currentTarget.onerror = null; e.currentTarget.src = 'https://placehold.co/200x200/1e293b/ffffff?text=Assgn'; }}
+                      className="w-full h-full object-cover"
+                      fallbackSrc="https://placehold.co/200x200/1e293b/ffffff?text=Assgn"
                     />
                   </div>
                 </div>
@@ -1834,12 +1844,16 @@ export default function MarketingPages({
                 {/* Top Row: Compact Thumbnail (LEFT) + Heading Block */}
                 <div className="flex items-start gap-3.5 mb-3">
                   <div className="w-20 h-20 sm:w-24 sm:h-24 shrink-0 rounded-xl overflow-hidden bg-slate-100 shadow-xs border border-slate-100">
-                    <img 
-                      src="https://images.unsplash.com/photo-1434030216411-0b793f4b4173?auto=format&fit=crop&w=350&q=80" 
-                      alt="Coursework writing & research" 
-                      className="w-full h-full object-cover"
+                    <ResponsivePicture
+                      src="https://images.unsplash.com/photo-1434030216411-0b793f4b4173?auto=format&fit=crop&w=240&q=75"
+                      alt="Coursework writing & research"
+                      width={96}
+                      height={96}
+                      sizes="96px"
+                      widths={[128, 240]}
                       loading="lazy"
-                      onError={(e: any) => { e.currentTarget.onerror = null; e.currentTarget.src = 'https://placehold.co/200x200/1e293b/ffffff?text=Course'; }}
+                      className="w-full h-full object-cover"
+                      fallbackSrc="https://placehold.co/200x200/1e293b/ffffff?text=Course"
                     />
                   </div>
                   <div className="flex-1 min-w-0">
@@ -1899,12 +1913,16 @@ export default function MarketingPages({
                     </h3>
                   </div>
                   <div className="w-20 h-20 sm:w-24 sm:h-24 shrink-0 rounded-xl overflow-hidden bg-slate-100 shadow-xs border border-slate-100">
-                    <img 
-                      src="https://images.unsplash.com/photo-1583521214690-73421a1829a9?auto=format&fit=crop&w=350&q=80" 
-                      alt="Scholarly Writing with Fountain Pen" 
-                      className="w-full h-full object-cover"
+                    <ResponsivePicture
+                      src="https://images.unsplash.com/photo-1583521214690-73421a1829a9?auto=format&fit=crop&w=240&q=75"
+                      alt="Scholarly Writing with Fountain Pen"
+                      width={96}
+                      height={96}
+                      sizes="96px"
+                      widths={[128, 240]}
                       loading="lazy"
-                      onError={(e: any) => { e.currentTarget.onerror = null; e.currentTarget.src = 'https://placehold.co/200x200/1e293b/ffffff?text=Writing'; }}
+                      className="w-full h-full object-cover"
+                      fallbackSrc="https://placehold.co/200x200/1e293b/ffffff?text=Writing"
                     />
                   </div>
                 </div>
@@ -1948,11 +1966,17 @@ export default function MarketingPages({
               <div className="grid grid-cols-1 md:grid-cols-12 overflow-hidden rounded-[2rem] bg-white border border-neutral-100 transition-all duration-500 ease-out shadow-[0_20px_50px_-12px_rgba(0,0,0,0.04)] hover:shadow-[0_25px_60px_-10px_rgba(255,90,0,0.08)] group">
                 {/* Left Image Column */}
                 <div className="md:col-span-12 lg:col-span-5 relative h-72 lg:h-auto min-h-[340px] overflow-hidden">
-                  <img src="https://images.unsplash.com/photo-1517245386807-bb43f82c33c4?auto=format&fit=crop&w=1000&q=80" 
-                       alt="Personalized 1-1 Academic Tutoring & Mentorship" 
-                       className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 ease-out group-hover:scale-[1.04]"
-                       referrerPolicy="no-referrer"
-                       onError={(e: any) => { e.currentTarget.onerror = null; e.currentTarget.src = 'https://placehold.co/800x800/fafafa/ff5a00?text=1-1+Tutoring'; }} />
+                  <ResponsivePicture
+                    src="https://images.unsplash.com/photo-1517245386807-bb43f82c33c4?auto=format&fit=crop&w=640&q=76"
+                    alt="Personalized 1-1 Academic Tutoring & Mentorship"
+                    width={480}
+                    height={340}
+                    sizes="(max-width: 1024px) 100vw, 480px"
+                    widths={[400, 640, 900]}
+                    loading="lazy"
+                    className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 ease-out group-hover:scale-[1.04]"
+                    fallbackSrc="https://placehold.co/800x800/fafafa/ff5a00?text=1-1+Tutoring"
+                  />
                   <div className="absolute inset-0 bg-gradient-to-t from-black/20 via-transparent to-transparent"></div>
                 </div>
                 {/* Right Content Column */}
@@ -2031,11 +2055,17 @@ export default function MarketingPages({
                 </div>
                 {/* Right Image Column */}
                 <div className="md:col-span-12 lg:col-span-5 relative h-72 lg:h-auto min-h-[340px] overflow-hidden order-1 md:order-2">
-                  <img src="https://images.unsplash.com/photo-1456513080510-7bf3a84b82f8?auto=format&fit=crop&w=400&q=80" 
-                       alt="Professional Academic Assignment Desk" 
-                       className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 ease-out group-hover:scale-[1.04]"
-                       referrerPolicy="no-referrer"
-                       onError={(e: any) => { e.currentTarget.onerror = null; e.currentTarget.src = 'https://placehold.co/800x800/fafafa/ff5a00?text=Assignment+Help'; }} />
+                  <ResponsivePicture
+                    src="https://images.unsplash.com/photo-1456513080510-7bf3a84b82f8?auto=format&fit=crop&w=640&q=76"
+                    alt="Professional Academic Assignment Desk"
+                    width={480}
+                    height={340}
+                    sizes="(max-width: 1024px) 100vw, 480px"
+                    widths={[400, 640, 800]}
+                    loading="lazy"
+                    className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 ease-out group-hover:scale-[1.04]"
+                    fallbackSrc="https://placehold.co/800x800/fafafa/ff5a00?text=Assignment+Help"
+                  />
                   <div className="absolute inset-0 bg-gradient-to-t from-black/20 via-transparent to-transparent"></div>
                 </div>
               </div>
@@ -2044,11 +2074,17 @@ export default function MarketingPages({
               <div className="grid grid-cols-1 md:grid-cols-12 overflow-hidden rounded-[2rem] bg-white border border-neutral-100 transition-all duration-500 ease-out shadow-[0_20px_50px_-12px_rgba(0,0,0,0.04)] hover:shadow-[0_25px_60px_-10px_rgba(255,90,0,0.08)] group">
                 {/* Left Image Column */}
                 <div className="md:col-span-12 lg:col-span-5 relative h-72 lg:h-auto min-h-[340px] overflow-hidden">
-                  <img src="https://images.unsplash.com/photo-1434030216411-0b793f4b4173?auto=format&fit=crop&w=1000&q=80" 
-                       alt="Comprehensive Coursework Tutoring Desk" 
-                       className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 ease-out group-hover:scale-[1.04]"
-                       referrerPolicy="no-referrer"
-                       onError={(e: any) => { e.currentTarget.onerror = null; e.currentTarget.src = 'https://placehold.co/800x800/fafafa/ff5a00?text=Coursework+Tutoring'; }} />
+                  <ResponsivePicture
+                    src="https://images.unsplash.com/photo-1434030216411-0b793f4b4173?auto=format&fit=crop&w=640&q=76"
+                    alt="Comprehensive Coursework Tutoring Desk"
+                    width={480}
+                    height={340}
+                    sizes="(max-width: 1024px) 100vw, 480px"
+                    widths={[400, 640, 900]}
+                    loading="lazy"
+                    className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 ease-out group-hover:scale-[1.04]"
+                    fallbackSrc="https://placehold.co/800x800/fafafa/ff5a00?text=Coursework+Tutoring"
+                  />
                   <div className="absolute inset-0 bg-gradient-to-t from-black/20 via-transparent to-transparent"></div>
                 </div>
                 {/* Right Content Column */}
@@ -2127,11 +2163,17 @@ export default function MarketingPages({
                 </div>
                 {/* Right Image Column */}
                 <div className="md:col-span-12 lg:col-span-5 relative h-72 lg:h-auto min-h-[340px] overflow-hidden order-1 md:order-2">
-                  <img src="https://images.unsplash.com/photo-1455390582262-044cdead277a?auto=format&fit=crop&w=400&q=80" 
-                       alt="Academic Content Writing" 
-                       className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 ease-out group-hover:scale-[1.04]"
-                       referrerPolicy="no-referrer"
-                       onError={(e: any) => { e.currentTarget.onerror = null; e.currentTarget.src = 'https://placehold.co/800x800/fafafa/ff5a00?text=Writing+Support'; }} />
+                  <ResponsivePicture
+                    src="https://images.unsplash.com/photo-1455390582262-044cdead277a?auto=format&fit=crop&w=640&q=76"
+                    alt="Academic Content Writing"
+                    width={480}
+                    height={340}
+                    sizes="(max-width: 1024px) 100vw, 480px"
+                    widths={[400, 640, 800]}
+                    loading="lazy"
+                    className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 ease-out group-hover:scale-[1.04]"
+                    fallbackSrc="https://placehold.co/800x800/fafafa/ff5a00?text=Writing+Support"
+                  />
                   <div className="absolute inset-0 bg-gradient-to-t from-black/20 via-transparent to-transparent"></div>
                 </div>
               </div>
@@ -2281,11 +2323,15 @@ export default function MarketingPages({
                   <div>
                     {/* Image Container with floating bubble icon */}
                     <div className="relative h-60 sm:h-64 overflow-hidden">
-                      <img 
-                        src="https://images.unsplash.com/photo-1506784983877-45594efa4cbe?auto=format&fit=crop&w=400&q=80" 
-                        alt="Not Enough Time" 
+                      <ResponsivePicture
+                        src="https://images.unsplash.com/photo-1506784983877-45594efa4cbe?auto=format&fit=crop&w=400&q=76"
+                        alt="Not Enough Time"
+                        width={400}
+                        height={256}
+                        sizes="(max-width: 768px) 92vw, 380px"
+                        widths={[360, 480, 680]}
+                        loading="lazy"
                         className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                        referrerPolicy="no-referrer"
                       />
                       {/* Floating Rounded Icon exactly mimicking layout */}
                       <div className="absolute top-4 left-4 w-12 h-12 bg-white rounded-2xl flex items-center justify-center shadow-md text-amber-500">
@@ -2314,11 +2360,15 @@ export default function MarketingPages({
                   <div>
                     {/* Image Container */}
                     <div className="relative h-60 sm:h-64 overflow-hidden">
-                      <img 
-                        src="https://images.unsplash.com/photo-1427504494785-3a9ca7044f45?auto=format&fit=crop&w=400&q=80" 
-                        alt="Subjects are Hard" 
+                      <ResponsivePicture
+                        src="https://images.unsplash.com/photo-1427504494785-3a9ca7044f45?auto=format&fit=crop&w=400&q=76"
+                        alt="Subjects are Hard"
+                        width={400}
+                        height={256}
+                        sizes="(max-width: 768px) 92vw, 380px"
+                        widths={[360, 480, 680]}
+                        loading="lazy"
                         className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                        referrerPolicy="no-referrer"
                       />
                       {/* Floating Rounded Icon */}
                       <div className="absolute top-4 left-4 w-12 h-12 bg-white rounded-2xl flex items-center justify-center shadow-md text-amber-500">
@@ -2347,11 +2397,15 @@ export default function MarketingPages({
                   <div>
                     {/* Image Container */}
                     <div className="relative h-60 sm:h-64 overflow-hidden">
-                      <img 
-                        src="https://images.unsplash.com/photo-1517486808906-6ca8b3f04846?auto=format&fit=crop&w=400&q=80" 
-                        alt="Less Stress" 
+                      <ResponsivePicture
+                        src="https://images.unsplash.com/photo-1517486808906-6ca8b3f04846?auto=format&fit=crop&w=400&q=76"
+                        alt="Less Stress"
+                        width={400}
+                        height={256}
+                        sizes="(max-width: 768px) 92vw, 380px"
+                        widths={[360, 480, 680]}
+                        loading="lazy"
                         className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                        referrerPolicy="no-referrer"
                       />
                       {/* Floating Rounded Icon */}
                       <div className="absolute top-4 left-4 w-12 h-12 bg-white rounded-2xl flex items-center justify-center shadow-md text-amber-500">
@@ -2380,11 +2434,15 @@ export default function MarketingPages({
                   <div>
                     {/* Image Container */}
                     <div className="relative h-60 sm:h-64 overflow-hidden">
-                      <img 
-                        src="https://images.unsplash.com/photo-1434030216411-0b793f4b4173?auto=format&fit=crop&w=400&q=80" 
-                        alt="Saving Grades" 
+                      <ResponsivePicture
+                        src="https://images.unsplash.com/photo-1434030216411-0b793f4b4173?auto=format&fit=crop&w=400&q=76"
+                        alt="Saving Grades"
+                        width={400}
+                        height={256}
+                        sizes="(max-width: 768px) 92vw, 380px"
+                        widths={[360, 480, 680]}
+                        loading="lazy"
                         className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                        referrerPolicy="no-referrer"
                       />
                       {/* Floating Rounded Icon */}
                       <div className="absolute top-4 left-4 w-12 h-12 bg-white rounded-2xl flex items-center justify-center shadow-md text-amber-500">
@@ -2413,11 +2471,15 @@ export default function MarketingPages({
                   <div>
                     {/* Image Container */}
                     <div className="relative h-60 sm:h-64 overflow-hidden">
-                      <img 
-                        src="https://images.unsplash.com/photo-1515378791036-0648a3ef77b2?auto=format&fit=crop&w=400&q=80" 
-                        alt="Temporary Problems" 
+                      <ResponsivePicture
+                        src="https://images.unsplash.com/photo-1515378791036-0648a3ef77b2?auto=format&fit=crop&w=400&q=76"
+                        alt="Temporary Problems"
+                        width={400}
+                        height={256}
+                        sizes="(max-width: 768px) 92vw, 380px"
+                        widths={[360, 480, 680]}
+                        loading="lazy"
                         className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                        referrerPolicy="no-referrer"
                       />
                       {/* Floating Rounded Icon */}
                       <div className="absolute top-4 left-4 w-12 h-12 bg-white rounded-2xl flex items-center justify-center shadow-md text-amber-500">
@@ -2518,20 +2580,16 @@ export default function MarketingPages({
                     <div>
                       {/* Compact Image Container: Reduced height to keep focus on text & prevent screen crowding */}
                       <div className="relative w-full h-28 sm:h-32 rounded-xl overflow-hidden bg-slate-100 mb-3">
-                        <img 
-                          src={card.image} 
-                          alt={card.title} 
-                          className="w-full h-full object-cover"
+                        <ResponsivePicture
+                          src={card.image}
+                          alt={card.title}
+                          width={360}
+                          height={128}
+                          sizes="(max-width: 640px) 90vw, 480px"
+                          widths={[320, 480, 700]}
                           loading="lazy"
-                          referrerPolicy="no-referrer"
-                          onError={(e: any) => { 
-                            e.currentTarget.onerror = null; 
-                            if (card.fallbackImage) {
-                              e.currentTarget.src = card.fallbackImage;
-                            } else {
-                              e.currentTarget.src = 'https://images.unsplash.com/photo-1522071820081-009f0129c71c?auto=format&fit=crop&w=700&q=80';
-                            }
-                          }}
+                          className="w-full h-full object-cover"
+                          fallbackSrc={card.fallbackImage || 'https://images.unsplash.com/photo-1522071820081-009f0129c71c?auto=format&fit=crop&w=480&q=75'}
                         />
                         
                         {/* Floating Icon Pill in top left (matching design) */}
@@ -2616,20 +2674,16 @@ export default function MarketingPages({
                         <div className="absolute inset-0 bg-slate-900/5 group-hover:bg-transparent transition-all duration-500 z-0" />
                         
                         {/* Cover Image */}
-                        <img
+                        <ResponsivePicture
                           src={card.image}
                           alt={card.title}
-                          className="w-full h-full object-cover select-none transform group-hover:scale-105 transition-transform duration-700 ease-out"
+                          width={400}
+                          height={300}
+                          sizes="(max-width: 1024px) 45vw, 380px"
+                          widths={[360, 560, 760]}
                           loading="lazy"
-                          referrerPolicy="no-referrer"
-                          onError={(e: any) => { 
-                            e.currentTarget.onerror = null; 
-                            if (card.fallbackImage) {
-                              e.currentTarget.src = card.fallbackImage;
-                            } else {
-                              e.currentTarget.src = 'https://images.unsplash.com/photo-1522071820081-009f0129c71c?auto=format&fit=crop&w=700&q=80';
-                            }
-                          }}
+                          className="w-full h-full object-cover select-none transform group-hover:scale-105 transition-transform duration-700 ease-out"
+                          fallbackSrc={card.fallbackImage || 'https://images.unsplash.com/photo-1522071820081-009f0129c71c?auto=format&fit=crop&w=560&q=75'}
                         />
                       </div>
 
@@ -2703,15 +2757,18 @@ export default function MarketingPages({
                       </div>
 
                       {/* Robust Unsplash Image */}
-                      <img 
-                        src={card.image} 
-                        alt={card.imageAlt} 
+                      <ResponsivePicture
+                        src={card.image}
+                        alt={card.imageAlt}
+                        width={320}
+                        height={176}
+                        sizes="(max-width: 640px) 90vw, (max-width: 1024px) 45vw, 280px"
+                        widths={[280, 420, 640]}
+                        loading="lazy"
                         className={`absolute inset-0 w-full h-full object-cover transition-transform duration-500 hover:scale-105 ${
                           loadedBenefitImages[card.id] ? 'opacity-100' : 'opacity-0'
                         }`}
                         onLoad={() => setLoadedBenefitImages(prev => ({ ...prev, [card.id]: true }))}
-                        loading="lazy"
-                        referrerPolicy="no-referrer"
                       />
                     </div>
 
@@ -2763,9 +2820,14 @@ export default function MarketingPages({
               {/* Smiling tutor side image */}
               <div className="flex-1">
                 <div className="relative rounded-2xl overflow-hidden shadow-2xl border border-gray-200">
-                  <img 
-                    src="https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=500&auto=format&fit=crop&q=80" 
-                    alt="Smiling senior university tutor reviewing assignment" 
+                  <ResponsivePicture
+                    src="https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=500&auto=format&fit=crop&q=76"
+                    alt="Smiling senior university tutor reviewing assignment"
+                    width={520}
+                    height={350}
+                    sizes="(max-width: 768px) 92vw, 520px"
+                    widths={[360, 520, 760]}
+                    loading="lazy"
                     className="w-full object-cover h-[350px]"
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-gray-900/40 to-transparent"></div>
@@ -2804,13 +2866,25 @@ export default function MarketingPages({
                     </div>
 
                     <div className="flex items-center gap-3 mt-6 pt-4 border-t border-gray-100">
-                      <img src={t.avatar} className="w-8 h-8 rounded-full object-cover border" alt="Avatar" />
+                      <ResponsiveAvatar
+                        src={t.avatar}
+                        alt={t.name || 'Student Avatar'}
+                        sizePx={32}
+                        width={32}
+                        height={32}
+                        loading="lazy"
+                        className="w-8 h-8 rounded-full object-cover border"
+                      />
                       <div>
                         <div className="flex items-center gap-1.5">
                           <span className="text-xs font-bold text-gray-950 block">{t.name}</span>
                           <img 
                             src={`https://flagcdn.com/w40/${t.flag === '🇬🇧' ? 'gb' : t.flag === '🇨🇦' ? 'ca' : t.flag === '🇺🇸' ? 'us' : t.flag === '🇮🇪' ? 'ie' : 'us'}.png`}
                             alt="Flag"
+                            width={16}
+                            height={12}
+                            loading="lazy"
+                            decoding="async"
                             className="w-4 h-3 object-cover rounded-sm border border-gray-200 inline"
                             referrerPolicy="no-referrer"
                           />
@@ -2870,7 +2944,16 @@ export default function MarketingPages({
             </div>
             
             <div className="relative rounded-2xl overflow-hidden shadow-xl border">
-              <img src="https://images.unsplash.com/photo-1522071820081-009f0129c71c?w=600&auto=format&fit=crop&q=80" alt="Remote educational team collage" className="w-full h-72 object-cover" />
+              <ResponsivePicture
+                src="https://images.unsplash.com/photo-1522071820081-009f0129c71c?w=600&auto=format&fit=crop&q=76"
+                alt="Remote educational team collage"
+                width={560}
+                height={288}
+                sizes="(max-width: 768px) 92vw, 560px"
+                widths={[360, 560, 800]}
+                loading="lazy"
+                className="w-full h-72 object-cover"
+              />
               <div className="absolute inset-0 bg-black/30 flex items-center justify-center">
                 <span className="bg-white/95 text-gray-900 px-4 py-2 rounded-xl text-xs font-semibold shadow-md">Oxford • Toronto • Boston • Sydney • Auckland</span>
               </div>
@@ -2907,13 +2990,25 @@ export default function MarketingPages({
                 >
                   <div className="p-5 space-y-4">
                     <div className="flex gap-4">
-                      <img src={t.avatarUrl} className="w-12 h-12 rounded-full border shadow-inner object-cover shrink-0" alt="Avatar" />
+                      <ResponsiveAvatar
+                        src={t.avatarUrl}
+                        sizePx={48}
+                        width={48}
+                        height={48}
+                        loading="lazy"
+                        className="w-12 h-12 rounded-full border shadow-inner object-cover shrink-0"
+                        alt={t.name || 'Avatar'}
+                      />
                       <div className="text-left">
                         <div className="flex items-center gap-1.5">
                           <h4 className="font-bold text-sm text-gray-950 block">{t.name}</h4>
                           <img 
                             src={`https://flagcdn.com/w40/${t.country ? t.country.toLowerCase() : 'us'}.png`}
                             alt={t.country || 'US'}
+                            width={18}
+                            height={12}
+                            loading="lazy"
+                            decoding="async"
                             title={`Based in ${t.country || 'US'}`}
                             className="w-4.5 h-3 shadow-xs object-cover rounded-sm border border-gray-150 inline"
                             referrerPolicy="no-referrer"
@@ -3012,11 +3107,14 @@ export default function MarketingPages({
                 {/* Right Hero Image Column */}
                 <div className="lg:col-span-5 relative">
                   <div className="relative rounded-2xl overflow-hidden shadow-2xl border border-gray-100">
-                    <img 
-                      src={hero1on1Img} 
+                    <ResponsivePicture
+                      src={hero1on1Img}
                       alt="University study collaboration group with expert tutor"
+                      width={800}
+                      height={533}
+                      loading="eager"
+                      sizes="(max-width: 1024px) 94vw, 420px"
                       className="w-full h-80 object-cover hover:scale-105 transition-transform duration-500"
-                      referrerPolicy="no-referrer"
                     />
                     
                     {/* Floating Trust Indicator overlays */}
@@ -3048,11 +3146,14 @@ export default function MarketingPages({
                   <div className="space-y-4">
                     {/* Relevant Hero Image Banner */}
                     <div className="relative rounded-2xl overflow-hidden h-44 w-full border border-gray-100 shadow-xs">
-                      <img 
-                        src={hero1on1Img} 
-                        alt="1-on-1 Live Online Tutoring with Interactive Digital Whiteboard" 
+                      <ResponsivePicture
+                        src={hero1on1Img}
+                        alt="1-on-1 Live Online Tutoring with Interactive Digital Whiteboard"
+                        width={600}
+                        height={352}
+                        loading="lazy"
+                        sizes="(max-width: 768px) 92vw, 540px"
                         className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                        referrerPolicy="no-referrer"
                       />
                       <div className="absolute inset-0 bg-gradient-to-t from-gray-950/70 via-transparent to-transparent"></div>
                       <div className="absolute top-3 left-3 bg-white/95 backdrop-blur-sm p-2 rounded-xl text-orange-600 shadow-xs">
@@ -3100,11 +3201,14 @@ export default function MarketingPages({
                   <div className="space-y-4">
                     {/* Relevant Hero Image Banner */}
                     <div className="relative rounded-2xl overflow-hidden h-44 w-full border border-gray-100 shadow-xs">
-                      <img 
-                        src={heroAssignmentImg} 
-                        alt="Assignment Guidance &amp; Reference Outlines" 
+                      <ResponsivePicture
+                        src={heroAssignmentImg}
+                        alt="Assignment Guidance &amp; Reference Outlines"
+                        width={600}
+                        height={352}
+                        loading="lazy"
+                        sizes="(max-width: 768px) 92vw, 540px"
                         className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                        referrerPolicy="no-referrer"
                       />
                       <div className="absolute inset-0 bg-gradient-to-t from-gray-950/70 via-transparent to-transparent"></div>
                       <div className="absolute top-3 left-3 bg-white/95 backdrop-blur-sm p-2 rounded-xl text-orange-600 shadow-xs">
@@ -3152,11 +3256,14 @@ export default function MarketingPages({
                   <div className="space-y-4">
                     {/* Relevant Hero Image Banner */}
                     <div className="relative rounded-2xl overflow-hidden h-44 w-full border border-gray-100 shadow-xs">
-                      <img 
-                        src={heroCourseworkImg} 
-                        alt="Semester-Long Coursework Tracks" 
+                      <ResponsivePicture
+                        src={heroCourseworkImg}
+                        alt="Semester-Long Coursework Tracks"
+                        width={600}
+                        height={352}
+                        loading="lazy"
+                        sizes="(max-width: 768px) 92vw, 540px"
                         className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                        referrerPolicy="no-referrer"
                       />
                       <div className="absolute inset-0 bg-gradient-to-t from-gray-950/70 via-transparent to-transparent"></div>
                       <div className="absolute top-3 left-3 bg-white/95 backdrop-blur-sm p-2 rounded-xl text-orange-600 shadow-xs">
@@ -3204,11 +3311,14 @@ export default function MarketingPages({
                   <div className="space-y-4">
                     {/* Relevant Hero Image Banner */}
                     <div className="relative rounded-2xl overflow-hidden h-44 w-full border border-gray-100 shadow-xs">
-                      <img 
-                        src={heroEssayImg} 
-                        alt="Essay Rhetoric &amp; Citations" 
+                      <ResponsivePicture
+                        src={heroEssayImg}
+                        alt="Essay Rhetoric &amp; Citations"
+                        width={600}
+                        height={352}
+                        loading="lazy"
+                        sizes="(max-width: 768px) 92vw, 540px"
                         className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                        referrerPolicy="no-referrer"
                       />
                       <div className="absolute inset-0 bg-gradient-to-t from-gray-950/70 via-transparent to-transparent"></div>
                       <div className="absolute top-3 left-3 bg-white/95 backdrop-blur-sm p-2 rounded-xl text-orange-600 shadow-xs">
@@ -3374,9 +3484,14 @@ export default function MarketingPages({
 
                   {/* Right Column (Visual) */}
                   <div className="relative rounded-2xl overflow-hidden border border-gray-200/60 shadow-xl h-[330px]">
-                    <img 
-                      src="https://images.unsplash.com/photo-1516321318423-f06f85e504b3?w=605&auto=format&fit=crop&q=80" 
-                      alt="Student working on assignment with tutor guide" 
+                    <ResponsivePicture
+                      src="https://images.unsplash.com/photo-1516321318423-f06f85e504b3?w=605&auto=format&fit=crop&q=80"
+                      alt="Student working on assignment with tutor guide"
+                      width={605}
+                      height={330}
+                      loading="lazy"
+                      sizes="(max-width: 1024px) 92vw, 540px"
+                      widths={[400, 605]}
                       className="w-full h-full object-cover"
                     />
                     <div className="absolute inset-0 bg-gradient-to-t from-gray-950/70 via-transparent to-transparent"></div>
@@ -3535,9 +3650,14 @@ export default function MarketingPages({
 
                   {/* Right Column (Visual) */}
                   <div className="relative rounded-2xl overflow-hidden border border-gray-200/60 shadow-xl h-[330px]">
-                    <img 
-                      src="https://images.unsplash.com/photo-1434030216411-0b793f4b4173?w=605&auto=format&fit=crop&q=80" 
-                      alt="Student desk with open textbooks and calculations" 
+                    <ResponsivePicture
+                      src="https://images.unsplash.com/photo-1434030216411-0b793f4b4173?w=605&auto=format&fit=crop&q=80"
+                      alt="Student desk with open textbooks and calculations"
+                      width={605}
+                      height={330}
+                      loading="lazy"
+                      sizes="(max-width: 1024px) 92vw, 540px"
+                      widths={[400, 605]}
                       className="w-full h-full object-cover"
                     />
                     <div className="absolute inset-0 bg-gradient-to-t from-gray-950/70 via-transparent to-transparent"></div>
@@ -4304,7 +4424,16 @@ export default function MarketingPages({
                         onClick={() => { setSelectedBlog(b); window.scrollTo({ top: 0, behavior: 'instant' }); }}
                       >
                         <div>
-                          <img src={b.imageUrl || b.image} alt={b.title} className="w-full h-56 object-cover" />
+                          <ResponsivePicture
+                            src={b.imageUrl || b.image}
+                            alt={b.title}
+                            width={600}
+                            height={224}
+                            loading="lazy"
+                            sizes="(max-width: 768px) 94vw, 560px"
+                            widths={[400, 600, 800]}
+                            className="w-full h-56 object-cover"
+                          />
                           <div className="p-6 space-y-3">
                             <div className="flex items-center gap-2.5">
                               <span className="text-[10px] font-semibold tracking-wider text-orange-600 bg-orange-100 px-2.5 py-1 rounded-full uppercase">
@@ -4389,9 +4518,12 @@ export default function MarketingPages({
 
                     {/* Author Widget */}
                     <div className="flex items-center gap-3 p-3 bg-white border border-gray-100 rounded-2xl max-w-sm">
-                      <img 
-                        src="https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=120&auto=format&fit=crop&q=80" 
-                        alt="Academic Coordinator" 
+                      <ResponsiveAvatar
+                        src="https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=120&auto=format&fit=crop&q=80"
+                        alt="Academic Coordinator"
+                        sizePx={48}
+                        width={40}
+                        height={40}
                         className="w-10 h-10 rounded-full border border-orange-200 object-cover"
                       />
                       <div>
@@ -4403,7 +4535,16 @@ export default function MarketingPages({
 
                   {/* Wide Display Banner Image */}
                   <div className="relative group overflow-hidden rounded-3xl border border-gray-200 shadow-lg">
-                    <img src={selectedBlog.imageUrl || selectedBlog.image} alt={selectedBlog.title} className="w-full h-[320px] md:h-[400px] object-cover transition-transform duration-500 group-hover:scale-102" />
+                    <ResponsivePicture
+                      src={selectedBlog.imageUrl || selectedBlog.image}
+                      alt={selectedBlog.title}
+                      width={800}
+                      height={400}
+                      loading="eager"
+                      sizes="(max-width: 1024px) 94vw, 760px"
+                      widths={[480, 768, 1024]}
+                      className="w-full h-[320px] md:h-[400px] object-cover transition-transform duration-500 group-hover:scale-102"
+                    />
                     <div className="absolute inset-0 bg-gradient-to-t from-black/25 to-transparent pointer-events-none" />
                   </div>
 
@@ -4470,7 +4611,14 @@ export default function MarketingPages({
                     <div className="space-y-4 max-h-[300px] overflow-y-auto pr-2">
                       {(blogComments[selectedBlog.id] || []).map((comm) => (
                         <div key={comm.id} className="p-4 bg-gray-50/50 border border-gray-100 rounded-2xl flex gap-3.5">
-                          <img src={comm.avatar} alt={comm.author} className="w-10 h-10 rounded-full object-cover border" />
+                          <ResponsiveAvatar
+                            src={comm.avatar}
+                            alt={comm.author}
+                            sizePx={48}
+                            width={40}
+                            height={40}
+                            className="w-10 h-10 rounded-full object-cover border"
+                          />
                           <div className="flex-1 space-y-1.5">
                             <div className="flex items-center justify-between">
                               <span className="text-xs font-bold text-gray-900">{comm.author}</span>
@@ -4577,7 +4725,14 @@ export default function MarketingPages({
                             onClick={() => { setSelectedBlog(ob); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
                             className="group flex gap-3 items-start cursor-pointer border-b border-gray-100 last:border-0 pb-3 last:pb-0 font-sans"
                           >
-                            <img src={ob.image} alt={ob.title} className="w-14 h-14 object-cover rounded-xl border border-gray-100 shrink-0" />
+                            <ResponsiveAvatar
+                              src={ob.image}
+                              alt={ob.title}
+                              sizePx={64}
+                              width={56}
+                              height={56}
+                              className="w-14 h-14 object-cover rounded-xl border border-gray-100 shrink-0"
+                            />
                             <div className="flex-1 min-w-0">
                               <span className="text-[8px] font-bold text-orange-650 uppercase tracking-widest block mb-0.5">{ob.category}</span>
                               <h5 className="text-[11px] font-bold text-gray-900 group-hover:text-orange-500 transition-colors line-clamp-2 leading-tight">
@@ -4940,7 +5095,11 @@ export default function MarketingPages({
               {modalFormStep === 'form' ? (
                 <div id="form-screen" className="p-8 sm:p-10">
                     <div className="flex items-center mb-6">
-                        <img src="/logo.webp" alt="Uni Tutors" referrerPolicy="no-referrer" className="h-10 sm:h-12 w-auto object-contain" />
+                      <picture>
+                        <source type="image/avif" srcSet="/logo-220.avif 220w, /logo-440.avif 440w" sizes="180px" />
+                        <source type="image/webp" srcSet="/logo-220.webp 220w, /logo-440.webp 440w" sizes="180px" />
+                        <img src="/logo.webp" alt="Uni Tutors" width={180} height={68} loading="lazy" decoding="async" className="h-10 sm:h-12 w-auto object-contain" />
+                      </picture>
                     </div>
 
                     <h3 className="text-2xl font-extrabold text-slate-900 mb-1 font-sans tracking-tight" id="modal-title-text">
@@ -5038,17 +5197,16 @@ export default function MarketingPages({
             
             {/* Modal Image Header */}
             <div className="relative h-48 sm:h-60 w-full overflow-hidden flex-shrink-0">
-              <img
+              <ResponsivePicture
                 src={activeCardForModal.image}
                 alt={activeCardForModal.title}
+                width={672}
+                height={240}
+                loading="eager"
+                sizes="(max-width: 640px) 92vw, 672px"
+                widths={[480, 672]}
+                fallbackSrc={activeCardForModal.fallbackImage}
                 className="w-full h-full object-cover"
-                referrerPolicy="no-referrer"
-                onError={(e: any) => { 
-                  e.currentTarget.onerror = null; 
-                  if (activeCardForModal.fallbackImage) {
-                    e.currentTarget.src = activeCardForModal.fallbackImage;
-                  }
-                }}
               />
               <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/40 to-transparent" />
               
@@ -5119,3 +5277,5 @@ export default function MarketingPages({
     </div>
   );
 }
+
+export default React.memo(MarketingPages);

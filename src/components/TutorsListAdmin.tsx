@@ -29,8 +29,10 @@ import {
 } from 'lucide-react';
 import { User, UserRole } from '../types';
 import { store } from '../lib/store';
+import { apiFetch, getFriendlyErrorMessage } from '../lib/apiClient';
 import TutorImageUploader from './TutorImageUploader';
 import { getFallbackAvatar } from './TutorsDirectoryPage';
+import { ResponsiveAvatar } from './ResponsiveImage';
 
 interface TutorsListAdminProps {
   users: User[];
@@ -71,8 +73,16 @@ export default function TutorsListAdmin({
   const [statusFilter, setStatusFilter] = useState<'all' | 'pending' | 'approved' | 'rejected'>('all');
   const [adminCountryFilter, setAdminCountryFilter] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
   const [adminPage, setAdminPage] = useState<number>(1);
   const adminPageSize = 25;
+
+  React.useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearchQuery(searchQuery);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
 
   // Modals state
   const [selectedTutorForDetail, setSelectedTutorForDetail] = useState<User | null>(null);
@@ -182,6 +192,7 @@ export default function TutorsListAdmin({
   });
 
   const [isSubmittingAdd, setIsSubmittingAdd] = useState(false);
+  const [isSavingEdit, setIsSavingEdit] = useState(false);
 
   // Count stats
   const pendingCount = allTutors.filter(t => t.status === 'pending' || (t.isApproved === false && t.status !== 'rejected')).length;
@@ -215,8 +226,8 @@ export default function TutorsListAdmin({
       if (!matchesCountry) return false;
     }
 
-    if (searchQuery.trim()) {
-      const q = searchQuery.toLowerCase().trim();
+    if (debouncedSearchQuery.trim()) {
+      const q = debouncedSearchQuery.toLowerCase().trim();
       const matchName = (tutor.name || '').toLowerCase().includes(q);
       const matchEmail = (tutor.email || '').toLowerCase().includes(q);
       const matchBio = (tutor.bio || '').toLowerCase().includes(q);
@@ -351,8 +362,9 @@ export default function TutorsListAdmin({
       status: editForm.isApproved ? 'approved' : editForm.status
     };
 
+    setIsSavingEdit(true);
     try {
-      const res = await fetch(`/api/admin/tutors/${editingTutor.id}`, {
+      const res = await apiFetch(`/api/admin/tutors/${editingTutor.id}`, {
         method: 'PUT',
         credentials: 'include',
         headers: {
@@ -374,7 +386,9 @@ export default function TutorsListAdmin({
       showNotification(`Tutor profile for ${editForm.name} updated successfully!`);
     } catch (e: any) {
       console.error('[Admin] Error updating tutor via API:', e);
-      setModalError(e.message || 'Failed to update tutor profile on server');
+      setModalError(getFriendlyErrorMessage(e));
+    } finally {
+      setIsSavingEdit(false);
     }
   };
 
@@ -440,7 +454,7 @@ export default function TutorsListAdmin({
         status: addForm.isApproved ? 'approved' : addForm.status
       };
 
-      const res = await fetch('/api/admin/tutors', {
+      const res = await apiFetch('/api/admin/tutors', {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
@@ -678,16 +692,13 @@ export default function TutorsListAdmin({
                     
                     {/* Left: Avatar & Main Profile info */}
                     <div className="flex items-start gap-4">
-                      <img 
-                        src={tutor.avatarUrl || getFallbackAvatar(tutor.name)} 
+                      <ResponsiveAvatar
+                        src={tutor.avatarUrl}
                         alt={tutor.name}
-                        loading="lazy"
-                        decoding="async"
-                        referrerPolicy="no-referrer"
-                        onError={(e) => {
-                          e.currentTarget.onerror = null;
-                          e.currentTarget.src = getFallbackAvatar(tutor.name);
-                        }}
+                        sizePx={64}
+                        width={56}
+                        height={56}
+                        fallbackSrc={getFallbackAvatar(tutor.name)}
                         className="w-14 h-14 rounded-2xl object-cover border border-slate-200 shadow-xs shrink-0 bg-orange-50/50"
                       />
 
@@ -920,17 +931,13 @@ export default function TutorsListAdmin({
           <div className="relative w-full max-w-2xl bg-white rounded-3xl shadow-2xl p-6 sm:p-8 my-8 space-y-6">
             <div className="flex items-center justify-between border-b pb-4">
               <div className="flex items-center gap-3">
-                <img 
-                  src={selectedTutorForDetail.avatarUrl || getFallbackAvatar(selectedTutorForDetail.name)} 
-                  loading="lazy"
-                  decoding="async"
-                  referrerPolicy="no-referrer"
-                  onError={(e) => {
-                    e.currentTarget.onerror = null;
-                    e.currentTarget.src = getFallbackAvatar(selectedTutorForDetail.name);
-                  }}
-                  className="w-12 h-12 rounded-xl object-cover border bg-orange-50/50" 
-                  alt={selectedTutorForDetail.name} 
+                <ResponsiveAvatar
+                  src={selectedTutorForDetail.avatarUrl}
+                  alt={selectedTutorForDetail.name}
+                  sizePx={48}
+                  loading="eager"
+                  fallbackSrc={getFallbackAvatar(selectedTutorForDetail.name)}
+                  className="w-12 h-12 rounded-xl object-cover border bg-orange-50/50"
                 />
                 <div>
                   <h3 className="text-xl font-bold text-slate-900">{selectedTutorForDetail.name}</h3>
@@ -1262,9 +1269,10 @@ export default function TutorsListAdmin({
                 </button>
                 <button
                   type="submit"
-                  className="bg-orange-500 hover:bg-orange-600 text-white font-bold px-5 py-2 rounded-xl text-xs shadow-md cursor-pointer transition-all"
+                  disabled={isSavingEdit}
+                  className="bg-orange-500 hover:bg-orange-600 disabled:opacity-60 text-white font-bold px-5 py-2 rounded-xl text-xs shadow-md cursor-pointer transition-all"
                 >
-                  Save Profile Changes
+                  {isSavingEdit ? 'Saving Changes...' : 'Save Profile Changes'}
                 </button>
               </div>
             </form>

@@ -31,6 +31,7 @@ import {
   FeaturedTutorCardData,
 } from '../../data/studentToolsData';
 import { isModifiedAnchorClick } from '../../data/dedicatedServiceRoutes';
+import { ResponsiveAvatar } from '../ResponsiveImage';
 import SiteFooter from './SiteFooter';
 
 interface ToolPageLayoutProps {
@@ -88,11 +89,12 @@ function TutorAvatar({ tutor }: { tutor: FeaturedTutorCardData }) {
   }
 
   return (
-    <img
+    <ResponsiveAvatar
       src={tutor.avatarUrl}
       alt={tutor.name}
-      referrerPolicy="no-referrer"
-      onError={() => setFailed(true)}
+      sizePx={64}
+      width={56}
+      height={56}
       className="w-14 h-14 rounded-2xl object-cover border border-slate-200 shrink-0"
     />
   );

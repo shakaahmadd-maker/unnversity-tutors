@@ -27,6 +27,7 @@ import {
 } from '../data/specializedTutoringServicesData';
 import { User } from '../types';
 import SEOKeywordLinksBlock from './SEOKeywordLinksBlock';
+import { ResponsiveAvatar } from './ResponsiveImage';
 
 interface SpecializedServicePageProps {
   pageSlug: string;
@@ -755,9 +756,12 @@ export default function SpecializedServicePage({
               >
                 <div className="space-y-4">
                   <div className="flex items-start gap-3.5">
-                    <img 
-                      src={tutor.avatarUrl || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150'} 
+                    <ResponsiveAvatar
+                      src={tutor.avatarUrl}
                       alt={tutor.name}
+                      sizePx={64}
+                      width={56}
+                      height={56}
                       className="w-14 h-14 rounded-xl object-cover border border-orange-200 shrink-0"
                     />
                     <div className="space-y-1">

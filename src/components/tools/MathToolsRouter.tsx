@@ -1,5 +1,5 @@
 import React from 'react';
-import { MathToolSlug, ResolvedMathRoute } from '../../data/mathToolsRegistry';
+import { MathToolSlug, ResolvedMathRoute, resolveMathRoute } from '../../data/mathToolsRegistry';
 import MathMegaHub from './MathMegaHub';
 import MathToolPageLayout from './MathToolPageLayout';
 import {
@@ -43,7 +43,8 @@ import {
 } from './math/Level6AdvancedMathTools';
 
 interface MathToolsRouterProps {
-  route: ResolvedMathRoute;
+  route?: ResolvedMathRoute;
+  activeView?: string;
   onNavigate: (view: string) => void;
   onOpenBecomeTutor?: () => void;
 }
@@ -119,10 +120,12 @@ function renderMathToolComponent(slug: MathToolSlug): React.ReactNode {
 }
 
 export default function MathToolsRouter({
-  route,
+  route: passedRoute,
+  activeView,
   onNavigate,
   onOpenBecomeTutor,
 }: MathToolsRouterProps) {
+  const route = passedRoute ?? (activeView ? resolveMathRoute(activeView) : null) ?? { kind: 'hub' as const };
   if (route.kind === 'hub') {
     return <MathMegaHub onNavigate={onNavigate} onOpenBecomeTutor={onOpenBecomeTutor} />;
   }

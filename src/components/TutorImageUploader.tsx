@@ -1,6 +1,8 @@
 import React, { useState, useRef } from 'react';
 import { Camera, Upload, Check, RefreshCw, X, Link as LinkIcon, User, Loader2, AlertCircle } from 'lucide-react';
 import { store } from '../lib/store';
+import { apiFetch, getFriendlyErrorMessage } from '../lib/apiClient';
+import { ResponsiveAvatar } from './ResponsiveImage';
 
 interface TutorImageUploaderProps {
   currentImageUrl?: string;
@@ -73,11 +75,12 @@ export default function TutorImageUploader({
         formData.append('tutorId', tutorId);
       }
 
-      const res = await fetch('/api/admin/tutors/upload-avatar', {
+      const res = await apiFetch('/api/admin/tutors/upload-avatar', {
         method: 'POST',
         credentials: 'include',
         body: formData,
         signal: controller.signal,
+        timeoutMs: 30000,
       });
 
       const data = await res.json().catch(() => ({}));
@@ -104,12 +107,7 @@ export default function TutorImageUploader({
       setUploadError(null);
     } catch (err: any) {
       console.error('[Uploader] Image upload error:', err);
-      // Frontend requirement 2: Display backend or timeout error
-      if (err.name === 'AbortError') {
-        setUploadError('Upload timed out after 30 seconds. Please check your connection and try again.');
-      } else {
-        setUploadError(err.message || 'Failed to upload photo. Please try again.');
-      }
+      setUploadError(getFriendlyErrorMessage(err));
     } finally {
       // Frontend requirement 5: Always set uploading=false inside a finally block
       clearTimeout(timeoutId);
@@ -166,9 +164,11 @@ export default function TutorImageUploader({
       {/* Preview Section */}
       <div className="flex items-center gap-4 bg-white p-3 rounded-xl border border-slate-200">
         <div className="relative shrink-0">
-          <img
+          <ResponsiveAvatar
             src={activeDisplayUrl}
             alt="Tutor Preview"
+            sizePx={64}
+            loading="eager"
             className="w-16 h-16 rounded-2xl object-cover border-2 border-orange-500 shadow-sm"
           />
           {isUploading ? (
@@ -295,7 +295,7 @@ export default function TutorImageUploader({
                   }`}
                   title={avatar.label}
                 >
-                  <img src={avatar.url} alt={avatar.label} className="w-full h-full object-cover" />
+                  <ResponsiveAvatar src={avatar.url} alt={avatar.label} sizePx={64} className="w-full h-full object-cover" />
                   {isSelected && (
                     <span className="absolute inset-0 bg-orange-500/20 flex items-center justify-center text-white">
                       <Check className="w-5 h-5 bg-orange-500 rounded-full p-0.5 shadow-md" />

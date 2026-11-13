@@ -277,11 +277,13 @@ export default function OcrTranslator({ initialTab = 'ocr', onNavigate }: OcrTra
 
     setIsTranslating(true);
     setTranslateError(null);
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 30_000);
     try {
       const endpoint = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(
         textToTranslate.slice(0, 500)
       )}&langpair=${encodeURIComponent(`${sLang}|${tLang}`)}`;
-      const res = await fetch(endpoint);
+      const res = await fetch(endpoint, { signal: controller.signal });
       if (!res.ok) throw new Error('Network error');
       const data = await res.json();
       const output = data?.responseData?.translatedText;
@@ -290,11 +292,14 @@ export default function OcrTranslator({ initialTab = 'ocr', onNavigate }: OcrTra
       } else {
         setTranslateError('Translation service returned an empty response. Please try a shorter passage.');
       }
-    } catch {
+    } catch (err: any) {
       setTranslateError(
-        'Could not reach the free public translation endpoint right now. Please check your connection and try again.'
+        err?.name === 'AbortError'
+          ? 'Translation request timed out after 30 seconds. Please try again.'
+          : 'Could not reach the free public translation endpoint right now. Please check your connection and try again.'
       );
     } finally {
+      clearTimeout(timeoutId);
       setIsTranslating(false);
     }
   };

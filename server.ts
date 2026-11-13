@@ -11,9 +11,9 @@ import multer from 'multer';
 import bcrypt from 'bcryptjs';
 import nodemailer from 'nodemailer';
 import { createServer as createViteServer } from 'vite';
-import { db, isDbConnected, checkDbConnection, hasDatabaseUrl } from './src/db/index';
-import { users, userProfiles, userSessions, orders, inquiries, messages, quotes, auditLogs, chatRooms, chatRoomMembers, blogs, tutors, passwordResetTokens as passwordResetTokensTable, emailVerificationTokens as emailVerificationTokensTable } from './src/db/schema';
-import { eq, desc, and, inArray, isNull } from 'drizzle-orm';
+import { db, isDbConnected, checkDbConnection, hasDatabaseUrl, withDbTimeout } from './src/db/index';
+import { users, userProfiles, userSessions, orders, inquiries, messages, quotes, auditLogs, chatRooms, chatRoomMembers, blogs, tutors, notifications, passwordResetTokens as passwordResetTokensTable, emailVerificationTokens as emailVerificationTokensTable } from './src/db/schema';
+import { eq, desc, and, inArray, isNull, or } from 'drizzle-orm';
 import { runMigrations, verifyUsersTableSchema } from './src/db/migrate';
 import { memoryStore, PrivateFileRecord } from './src/db/memoryStore';
 import { DEFAULT_20_BLOGS } from './src/data/defaultBlogsData';
@@ -215,6 +215,91 @@ try {
   console.warn(`[STORAGE] Warning initializing uploads directory: ${e.message}`);
 }
 
+export interface AvatarVariantUrls {
+  originalAvatarUrl: string;
+  optimizedAvatarUrl: string;
+  avatarVariants: {
+    smWebp: string;
+    smAvif: string;
+    mdWebp: string;
+    mdAvif: string;
+    original: string;
+  };
+}
+
+let sharpLoaderPromise: Promise<any> | null = null;
+async function getSharp(): Promise<any> {
+  if (!sharpLoaderPromise) {
+    sharpLoaderPromise = import('sharp')
+      .then((m) => m.default || m)
+      .catch(() => null);
+  }
+  return sharpLoaderPromise;
+}
+
+export function buildAvatarVariantMetadata(avatarUrl: string): AvatarVariantUrls | null {
+  if (!avatarUrl || typeof avatarUrl !== 'string' || !avatarUrl.includes('/uploads/avatars/')) {
+    return null;
+  }
+  const [cleanBase, rawQuery] = avatarUrl.split('?');
+  const qs = rawQuery ? `?${rawQuery}` : '';
+  const parsed = cleanBase.match(/^(.*\/uploads\/avatars\/)([^/]+)\.(jpe?g|png|webp)$/i);
+  if (!parsed) return null;
+  const [, prefix, stem] = parsed;
+  if (/-opt-\d+$/i.test(stem)) return null;
+  return {
+    originalAvatarUrl: avatarUrl,
+    optimizedAvatarUrl: `${prefix}${stem}-opt-96.webp${qs}`,
+    avatarVariants: {
+      smWebp: `${prefix}${stem}-opt-96.webp${qs}`,
+      smAvif: `${prefix}${stem}-opt-96.avif${qs}`,
+      mdWebp: `${prefix}${stem}-opt-256.webp${qs}`,
+      mdAvif: `${prefix}${stem}-opt-256.avif${qs}`,
+      original: avatarUrl,
+    },
+  };
+}
+
+export async function generateAvatarDerivatives(
+  fileBuffer: Buffer,
+  avatarsDir: string,
+  stem: string
+): Promise<boolean> {
+  try {
+    if (!fileBuffer || fileBuffer.length < 32) return false;
+    const sharpLib = await getSharp();
+    if (!sharpLib) return false;
+
+    const meta = await sharpLib(fileBuffer).rotate().metadata();
+    if (!meta?.width || !meta?.height) return false;
+
+    const targets = [
+      { size: 96, format: 'webp' as const },
+      { size: 96, format: 'avif' as const },
+      { size: 256, format: 'webp' as const },
+      { size: 256, format: 'avif' as const },
+    ];
+
+    await Promise.all(
+      targets.map(async ({ size, format }) => {
+        const outPath = path.join(avatarsDir, `${stem}-opt-${size}.${format}`);
+        const pipeline = sharpLib(fileBuffer)
+          .rotate()
+          .resize(size, size, { fit: 'inside', withoutEnlargement: true });
+        if (format === 'webp') {
+          await pipeline.webp({ quality: 80, effort: 4 }).toFile(outPath);
+        } else {
+          await pipeline.avif({ quality: 56, effort: 4 }).toFile(outPath);
+        }
+      })
+    );
+    return true;
+  } catch (err: any) {
+    // Graceful no-op for minimal/tiny buffers (keeps untouched original intact)
+    return false;
+  }
+}
+
 // Helper to save base64 image data URI to persistent disk and return public path
 export function saveBase64ImageToUploads(dataUriOrBase64: string, folder: string = 'avatars', prefix: string = 'avatar'): string {
   if (!dataUriOrBase64 || typeof dataUriOrBase64 !== 'string') return dataUriOrBase64;
@@ -238,9 +323,14 @@ export function saveBase64ImageToUploads(dataUriOrBase64: string, folder: string
       fs.mkdirSync(targetSubDir, { recursive: true });
     }
 
-    const filename = `${prefix}_${Date.now()}_${crypto.randomBytes(4).toString('hex')}.${ext}`;
+    const stem = `${prefix}_${Date.now()}_${crypto.randomBytes(4).toString('hex')}`;
+    const filename = `${stem}.${ext}`;
     const filePath = path.join(targetSubDir, filename);
     fs.writeFileSync(filePath, buffer);
+
+    if (folder === 'avatars' && ext !== 'svg') {
+      void generateAvatarDerivatives(buffer, targetSubDir, stem);
+    }
 
     console.info(`[UPLOADS] Saved uploaded asset to persistent disk: ${filePath}`);
     return `/uploads/${folder}/${filename}?v=${Date.now()}`;
@@ -574,7 +664,45 @@ export interface CreateAppOptions {
 }
 
 export async function createApp(options: CreateAppOptions = {}) {
-  const oauthFetch: typeof fetch = options.fetchImpl || fetch;
+  const rawOauthFetch: typeof fetch = options.fetchImpl || fetch;
+  const oauthFetch: typeof fetch = async (input: any, init?: RequestInit) => {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 12000);
+    const parentSignal = init?.signal;
+    const onParentAbort = () => controller.abort();
+    if (parentSignal) {
+      if (parentSignal.aborted) controller.abort();
+      else parentSignal.addEventListener('abort', onParentAbort, { once: true });
+    }
+    try {
+      return await rawOauthFetch(input, { ...init, signal: controller.signal });
+    } finally {
+      clearTimeout(timer);
+      if (parentSignal) parentSignal.removeEventListener('abort', onParentAbort);
+    }
+  };
+
+  // Safe non-sensitive API performance metrics ring buffer
+  interface ApiMetricEntry {
+    method: string;
+    route: string;
+    statusCode: number;
+    durationMs: number;
+    timestamp: string;
+    slow: boolean;
+    verySlow: boolean;
+    failed: boolean;
+  }
+  const apiMetricsRing: ApiMetricEntry[] = [];
+  const normalizeMetricRoute = (rawUrl: string): string => {
+    const cleanPath = (rawUrl || '/').split('?')[0];
+    return cleanPath
+      .replace(/\/[0-9a-f]{8,}/gi, '/:id')
+      .replace(/\/(ord|usr|tut|tutor|room|msg|qte|inv|pay|notif|log|file|doc)_[a-zA-Z0-9_-]+/gi, '/:id')
+      .replace(/\/tutor-\d+/gi, '/:id')
+      .replace(/\/\d+/g, '/:id');
+  };
+
   const app = express();
   app.set('trust proxy', 1);
 
@@ -582,6 +710,40 @@ export async function createApp(options: CreateAppOptions = {}) {
   app.use(express.json({ limit: '15mb' }));
   app.use(express.urlencoded({ extended: true, limit: '15mb' }));
   app.use(cookieParser());
+
+  // Request duration telemetry & slow-route warning logger (zero secrets/PII)
+  app.use('/api', (req, res, next) => {
+    const startMs = Date.now();
+    const method = req.method;
+    const rawPath = req.originalUrl || req.url || '/api';
+    res.on('finish', () => {
+      const durationMs = Date.now() - startMs;
+      const statusCode = res.statusCode;
+      const route = normalizeMetricRoute(rawPath);
+      const slow = durationMs >= 2000;
+      const verySlow = durationMs >= 10000;
+      const failed = statusCode >= 500 || statusCode === 408 || statusCode === 504;
+
+      apiMetricsRing.push({
+        method,
+        route,
+        statusCode,
+        durationMs,
+        timestamp: new Date().toISOString(),
+        slow,
+        verySlow,
+        failed,
+      });
+      if (apiMetricsRing.length > 300) {
+        apiMetricsRing.shift();
+      }
+
+      if (verySlow || slow || failed) {
+        console.warn(`[API-PERF] ${JSON.stringify({ method, route, statusCode, durationMs, slow, verySlow })}`);
+      }
+    });
+    next();
+  });
 
   // Strict Production CORS & Origin Headers
   // Do not use wildcard Access-Control-Allow-Origin: * for authenticated cookie requests.
@@ -614,26 +776,106 @@ export async function createApp(options: CreateAppOptions = {}) {
   // are strictly isolated and blocked from public static exposure.
   // =========================================================================
 
-  // 1. Public static directory: Avatars (Photos & Icons only)
-  app.use('/uploads/avatars', (req, res, next) => {
+  // 1. Public static directory: Avatars (Photos & Icons only) with on-the-fly optimized derivative support
+  const avatarsStaticDir = path.join(UPLOADS_DIR, 'avatars');
+  app.use('/uploads/avatars', async (req, res, next) => {
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
-    res.setHeader('Cache-Control', 'public, max-age=86400, stale-while-revalidate=604800');
+
+    const reqFile = decodeURIComponent(req.path || '').replace(/^\/+/, '');
+    const isOptFile = /^([a-zA-Z0-9_.-]+)-opt-(96|256)\.(webp|avif)$/i.exec(reqFile);
+    const hasVersion = Boolean(req.query && req.query.v);
+
+    if (isOptFile || hasVersion) {
+      res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+    } else {
+      res.setHeader('Cache-Control', 'public, max-age=604800, stale-while-revalidate=2592000');
+    }
+
+    if (isOptFile && req.method === 'GET') {
+      try {
+        const [, stem, sizeStr, fmt] = isOptFile;
+        const size = parseInt(sizeStr, 10);
+        const safeStem = path.basename(stem);
+        const derivPath = path.join(avatarsStaticDir, `${safeStem}-opt-${size}.${fmt.toLowerCase()}`);
+
+        if (fs.existsSync(derivPath)) {
+          return res.sendFile(derivPath, {
+            headers: {
+              'Content-Type': fmt.toLowerCase() === 'avif' ? 'image/avif' : 'image/webp',
+            },
+          });
+        }
+
+        const candidateExts = ['.jpg', '.jpeg', '.png', '.webp'];
+        const origFile = candidateExts
+          .map((e) => path.join(avatarsStaticDir, `${safeStem}${e}`))
+          .find((p) => fs.existsSync(p));
+
+        if (origFile) {
+          const sharpLib = await getSharp();
+          if (sharpLib) {
+            const origBuf = await fs.promises.readFile(origFile);
+            const meta = await sharpLib(origBuf).rotate().metadata();
+            if (meta?.width && meta?.height) {
+              const pipe = sharpLib(origBuf)
+                .rotate()
+                .resize(size, size, { fit: 'inside', withoutEnlargement: true });
+              if (fmt.toLowerCase() === 'avif') {
+                await pipe.avif({ quality: 56, effort: 4 }).toFile(derivPath);
+              } else {
+                await pipe.webp({ quality: 80, effort: 4 }).toFile(derivPath);
+              }
+              return res.sendFile(derivPath, {
+                headers: {
+                  'Content-Type': fmt.toLowerCase() === 'avif' ? 'image/avif' : 'image/webp',
+                },
+              });
+            }
+          }
+          // Tiny/non-convertible buffer fallback: serve untouched original gracefully
+          return res.sendFile(origFile);
+        }
+      } catch {
+        // Fall through cleanly to express.static / 404
+      }
+    }
+
     next();
-  }, express.static(path.join(UPLOADS_DIR, 'avatars'), {
-    maxAge: '1d',
+  }, express.static(avatarsStaticDir, {
+    maxAge: '7d',
     index: false,
+    setHeaders: (res, filePath) => {
+      if (filePath.toLowerCase().endsWith('.avif')) {
+        res.setHeader('Content-Type', 'image/avif');
+      } else if (filePath.toLowerCase().endsWith('.webp')) {
+        res.setHeader('Content-Type', 'image/webp');
+      }
+    },
   }));
 
   // 2. Public static directory: Blogs (Editorial header images only)
   app.use('/uploads/blogs', (req, res, next) => {
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
-    res.setHeader('Cache-Control', 'public, max-age=86400, stale-while-revalidate=604800');
+    const hasVersion = Boolean(req.query && req.query.v);
+    res.setHeader(
+      'Cache-Control',
+      hasVersion
+        ? 'public, max-age=31536000, immutable'
+        : 'public, max-age=604800, stale-while-revalidate=2592000'
+    );
     next();
   }, express.static(path.join(UPLOADS_DIR, 'blogs'), {
-    maxAge: '1d',
+    maxAge: '7d',
     index: false,
+    setHeaders: (res, filePath) => {
+      if (filePath.toLowerCase().endsWith('.avif')) {
+        res.setHeader('Content-Type', 'image/avif');
+      } else if (filePath.toLowerCase().endsWith('.webp')) {
+        res.setHeader('Content-Type', 'image/webp');
+      }
+    },
   }));
 
   // Persistent disk helpers for fallback mode when PostgreSQL is not provisioned
@@ -760,29 +1002,37 @@ export async function createApp(options: CreateAppOptions = {}) {
 
   // Helper middleware to extract user strictly from cryptographically verified session cookie/token
   // NEVER trusts X-User-Id, email, or role supplied by the frontend; resolves active role from PostgreSQL.
-  const extractUser = async (req: express.Request, res: express.Response, next: express.NextFunction) => {
-    let token = req.cookies?.[COOKIE_NAME];
-    if (!token && req.headers.authorization?.startsWith('Bearer ')) {
-      token = req.headers.authorization.split('Bearer ')[1];
-    }
-    if (!token && typeof req.headers['x-auth-token'] === 'string') {
-      token = req.headers['x-auth-token'];
-    }
-    if (token) {
-      const session = verifySessionToken(token);
-      if (session && session.id) {
-        const authoritativeUser = await resolveAuthoritativeUserById(session.id);
-        if (authoritativeUser && !authoritativeUser.suspended) {
-          (req as any).user = {
-            id: authoritativeUser.id,
-            email: authoritativeUser.email,
-            role: authoritativeUser.role,
-            name: authoritativeUser.name,
-          };
+  const extractUser = async (req: express.Request, _res: express.Response, next: express.NextFunction) => {
+    try {
+      let token = req.cookies?.[COOKIE_NAME];
+      if (!token && req.headers.authorization?.startsWith('Bearer ')) {
+        token = req.headers.authorization.split('Bearer ')[1];
+      }
+      if (!token && typeof req.headers['x-auth-token'] === 'string') {
+        token = req.headers['x-auth-token'];
+      }
+      if (token) {
+        const session = verifySessionToken(token);
+        if (session && session.id) {
+          const authoritativeUser = await withDbTimeout(
+            resolveAuthoritativeUserById(session.id),
+            8000,
+            'Session user lookup'
+          ).catch(() => null);
+          if (authoritativeUser && !authoritativeUser.suspended) {
+            (req as any).user = {
+              id: authoritativeUser.id,
+              email: authoritativeUser.email,
+              role: authoritativeUser.role,
+              name: authoritativeUser.name,
+            };
+          }
         }
       }
+      next();
+    } catch (err) {
+      next(err);
     }
-    next();
   };
 
   app.use(extractUser);
@@ -790,7 +1040,11 @@ export async function createApp(options: CreateAppOptions = {}) {
   // Authentication requirement helper - rejects unauthenticated requests with HTTP 401
   const requireAuth = (req: express.Request, res: express.Response, next: express.NextFunction) => {
     if (!(req as any).user) {
-      return res.status(401).json({ error: 'Unauthorized: Authentication required. Please log in.' });
+      return res.status(401).json({
+        error: 'Unauthorized: Authentication required. Please log in.',
+        code: 'UNAUTHORIZED',
+        status: 401,
+      });
     }
     next();
   };
@@ -800,10 +1054,18 @@ export async function createApp(options: CreateAppOptions = {}) {
     return (req: express.Request, res: express.Response, next: express.NextFunction) => {
       const user = (req as any).user;
       if (!user) {
-        return res.status(401).json({ error: 'Unauthorized: Authentication required. Please log in.' });
+        return res.status(401).json({
+          error: 'Unauthorized: Authentication required. Please log in.',
+          code: 'UNAUTHORIZED',
+          status: 401,
+        });
       }
       if (!allowedRoles.includes(user.role)) {
-        return res.status(403).json({ error: `Forbidden: Access requires ${allowedRoles.join(' or ')} privileges.` });
+        return res.status(403).json({
+          error: `Forbidden: Access requires ${allowedRoles.join(' or ')} privileges.`,
+          code: 'FORBIDDEN',
+          status: 403,
+        });
       }
       next();
     };
@@ -1758,6 +2020,9 @@ export async function createApp(options: CreateAppOptions = {}) {
         host,
         port,
         secure: port === 465,
+        connectionTimeout: 8000,
+        greetingTimeout: 8000,
+        socketTimeout: 10000,
         auth: {
           user,
           pass,
@@ -1768,13 +2033,17 @@ export async function createApp(options: CreateAppOptions = {}) {
       const resetUrl = `${liveDomain}/auth?reset_token=${encodeURIComponent(resetToken)}&email=${encodeURIComponent(toEmail)}`;
       const emailContent = renderPasswordResetEmail({ userName: userName || 'Student', resetUrl, appUrl: liveDomain });
 
-      await transporter.sendMail({
-        from,
-        to: toEmail,
-        subject: emailContent.subject,
-        text: emailContent.text,
-        html: emailContent.html,
-      });
+      await withDbTimeout(
+        transporter.sendMail({
+          from,
+          to: toEmail,
+          subject: emailContent.subject,
+          text: emailContent.text,
+          html: emailContent.html,
+        }),
+        12000,
+        'SMTP password reset delivery'
+      );
 
       logSafeAuthEvent('reset email sent', { email: toEmail });
       return true;
@@ -1806,6 +2075,9 @@ export async function createApp(options: CreateAppOptions = {}) {
         host,
         port,
         secure: port === 465,
+        connectionTimeout: 8000,
+        greetingTimeout: 8000,
+        socketTimeout: 10000,
         auth: {
           user,
           pass,
@@ -1816,13 +2088,17 @@ export async function createApp(options: CreateAppOptions = {}) {
       const verificationUrl = `${liveDomain}/api/auth/verify-email?token=${encodeURIComponent(verificationToken)}&email=${encodeURIComponent(toEmail)}`;
       const emailContent = renderVerificationEmail({ userName: userName || 'Student', verificationUrl, appUrl: liveDomain });
 
-      await transporter.sendMail({
-        from,
-        to: toEmail,
-        subject: emailContent.subject,
-        text: emailContent.text,
-        html: emailContent.html,
-      });
+      await withDbTimeout(
+        transporter.sendMail({
+          from,
+          to: toEmail,
+          subject: emailContent.subject,
+          text: emailContent.text,
+          html: emailContent.html,
+        }),
+        12000,
+        'SMTP verification delivery'
+      );
 
       logSafeAuthEvent('verification email sent', { email: toEmail });
       return true;
@@ -3546,6 +3822,65 @@ export async function createApp(options: CreateAppOptions = {}) {
     return res.status(200).json({ success: true, message: 'Admin dashboard authorized', user: (req as any).user });
   });
 
+  // Protected Admin Performance Diagnostics Endpoint (non-sensitive route timing metrics only)
+  app.get('/api/admin/diagnostics/performance', requireRole('admin', 'subadmin'), (_req, res) => {
+    const byRoute = new Map<string, { route: string; method: string; count: number; totalMs: number; maxMs: number; slowCount: number; verySlowCount: number; failedCount: number }>();
+    for (const m of apiMetricsRing) {
+      const key = `${m.method} ${m.route}`;
+      const cur = byRoute.get(key) || {
+        route: m.route,
+        method: m.method,
+        count: 0,
+        totalMs: 0,
+        maxMs: 0,
+        slowCount: 0,
+        verySlowCount: 0,
+        failedCount: 0,
+      };
+      cur.count += 1;
+      cur.totalMs += m.durationMs;
+      if (m.durationMs > cur.maxMs) cur.maxMs = m.durationMs;
+      if (m.slow) cur.slowCount += 1;
+      if (m.verySlow) cur.verySlowCount += 1;
+      if (m.failed) cur.failedCount += 1;
+      byRoute.set(key, cur);
+    }
+
+    const summaryByRoute = Array.from(byRoute.values())
+      .map((r) => ({
+        method: r.method,
+        route: r.route,
+        count: r.count,
+        avgMs: Math.round(r.totalMs / r.count),
+        maxMs: r.maxMs,
+        slowCount: r.slowCount,
+        verySlowCount: r.verySlowCount,
+        failedCount: r.failedCount,
+      }))
+      .sort((a, b) => b.maxMs - a.maxMs)
+      .slice(0, 25);
+
+    const slowRequests = apiMetricsRing.filter((m) => m.slow).slice(-30).reverse();
+    const verySlowRequests = apiMetricsRing.filter((m) => m.verySlow).slice(-20).reverse();
+    const failedRequests = apiMetricsRing.filter((m) => m.failed).slice(-30).reverse();
+
+    return res.status(200).json({
+      success: true,
+      totalTracked: apiMetricsRing.length,
+      summary: {
+        totalTracked: apiMetricsRing.length,
+        slowOver2sCount: apiMetricsRing.filter((m) => m.slow).length,
+        verySlowOver10sCount: apiMetricsRing.filter((m) => m.verySlow).length,
+        errorCount: apiMetricsRing.filter((m) => m.failed).length,
+      },
+      slowestRoutes: summaryByRoute,
+      summaryByRoute,
+      slowRequests,
+      verySlowRequests,
+      failedRequests,
+    });
+  });
+
   // ==========================================
   // USERS & PRIVILEGED ACCOUNTS ENDPOINTS
   // ==========================================
@@ -3597,86 +3932,98 @@ export async function createApp(options: CreateAppOptions = {}) {
 
   loadPersistedPrivateFiles();
 
-  // GET /api/users - returns all platform users including seed tutors, memory store, and PostgreSQL
+  // GET /api/users - role-scoped, paginated user directory
+  // Admins/subadmins receive all roles (students, tutors, admins) paginated;
+  // Unauthenticated / student / tutor callers receive ONLY public approved tutors (+ own self record if logged in).
   app.get('/api/users', async (req, res) => {
     try {
+      const caller = (req as any).user;
+      const isAdmin = Boolean(caller && (caller.role === 'admin' || caller.role === 'subadmin'));
+      const roleFilter = (req.query.role as string || '').toLowerCase().trim();
+      const searchFilter = (req.query.search as string || req.query.q as string || '').toLowerCase().trim();
+      const hasExplicitPageOrLimit = Boolean(req.query.limit || req.query.page);
+      const page = Math.max(1, parseInt((req.query.page as string) || '1', 10) || 1);
+      const limit = hasExplicitPageOrLimit
+        ? Math.min(500, Math.max(1, parseInt((req.query.limit as string) || '50', 10) || 50))
+        : 2000;
+
       let dbUsers: any[] = [];
       if (isDbConnected() && db) {
         try {
-          dbUsers = await db.select({
-            id: users.id,
-            role: users.role,
-            name: users.name,
-            email: users.email,
-            avatarUrl: users.avatarUrl,
-            createdAt: users.createdAt,
-            suspended: users.suspended,
-            verified: users.verified,
-            bio: users.bio,
-            hourlyRate: users.hourlyRate,
-            rating: users.rating,
-            reviewCount: users.reviewCount,
-            subjects: users.subjects,
-            country: users.country,
-            location: users.location,
-            phoneNumber: users.phoneNumber,
-            education: users.education,
-            experience: users.experience,
-            subjectExpertise: users.subjectExpertise,
-            availability: users.availability,
-            canMeet: users.canMeet,
-            hobbies: users.hobbies,
-            isApproved: users.isApproved,
-            status: users.status,
-          }).from(users);
+          dbUsers = await withDbTimeout(
+            db.select({
+              id: users.id,
+              role: users.role,
+              name: users.name,
+              email: users.email,
+              avatarUrl: users.avatarUrl,
+              createdAt: users.createdAt,
+              suspended: users.suspended,
+              verified: users.verified,
+              bio: users.bio,
+              hourlyRate: users.hourlyRate,
+              rating: users.rating,
+              reviewCount: users.reviewCount,
+              subjects: users.subjects,
+              country: users.country,
+              location: users.location,
+              phoneNumber: users.phoneNumber,
+              education: users.education,
+              experience: users.experience,
+              subjectExpertise: users.subjectExpertise,
+              availability: users.availability,
+              canMeet: users.canMeet,
+              hobbies: users.hobbies,
+              isApproved: users.isApproved,
+              status: users.status,
+            }).from(users),
+            10000,
+            'Select users directory'
+          );
         } catch (dbErr: any) {
           console.warn('[API] DB select failed for users:', dbErr.message);
         }
       }
 
-      // Memory store response
       const memUsers = memoryStore.getAllUsers();
-
-      // Combine map: seed tutors + memory store + dbUsers
       const userMap = new Map<string, any>();
 
-      // 1. Trending 500 Master Tutors dataset from PDF
-      for (const t of TRENDING_TUTORS_500) {
-        userMap.set(t.id, t);
-      }
-
-      // 2. Initial seed tutors
+      // 1. Initial seed tutors & Memory store users first (prioritized in directory)
       for (const t of SEED_TUTORS) {
         const { passwordHash: _, ...safeT } = t as any;
         userMap.set(t.id, safeT);
       }
 
-      // 3. Disk persisted user updates (ensures updated images and edits survive across any restarts)
+      for (const u of memUsers) {
+        const { passwordHash: _, ...safeU } = u as any;
+        userMap.set(u.id, { ...(userMap.get(u.id) || {}), ...safeU });
+      }
+
+      // 2. Trending 500 Master Tutors dataset
+      for (const t of TRENDING_TUTORS_500) {
+        userMap.set(t.id, { ...t, ...(userMap.get(t.id) || {}) });
+      }
+
+      // 3. Disk persisted user updates
       const persistedUpdates = getPersistedUserUpdates();
       for (const [uId, uUpdates] of Object.entries(persistedUpdates)) {
         if (userMap.has(uId)) {
           userMap.set(uId, { ...userMap.get(uId), ...uUpdates });
         } else {
-          userMap.set(uId, uUpdates);
+          userMap.set(uId, { id: uId, role: (uUpdates as any).role || 'tutor', ...uUpdates });
         }
       }
 
-      // 4. Memory store users
-      for (const u of memUsers) {
-        const { passwordHash: _, ...safeU } = u as any;
-        userMap.set(u.id, safeU);
-      }
-
-      // 5. PostgreSQL database users table (authoritative for persisted records)
+      // 4. PostgreSQL database users table
       for (const u of dbUsers) {
         const { passwordHash: _, ...safeU } = u as any;
-        userMap.set(u.id, safeU);
+        userMap.set(u.id, { ...(userMap.get(u.id) || {}), ...safeU });
       }
 
-      // 6. PostgreSQL tutors table (ensures updated tutor profile photos are reflected across all user APIs)
+      // 6. PostgreSQL tutors table
       if (isDbConnected() && db) {
         try {
-          const dbTutorsList = await db.select().from(tutors);
+          const dbTutorsList = await withDbTimeout(db.select().from(tutors), 10000, 'Select tutors overlay');
           for (const dt of dbTutorsList) {
             const existing = userMap.get(dt.id);
             if (existing) {
@@ -3704,9 +4051,66 @@ export async function createApp(options: CreateAppOptions = {}) {
         }
       }
 
-      return res.status(200).json({ users: Array.from(userMap.values()) });
+      let resultUsers = Array.from(userMap.values()).map((u) => {
+        const { passwordHash: _, ...safeU } = u;
+        return safeU;
+      });
+
+      // Strict role/privacy isolation:
+      // Non-admin callers only receive approved public tutors (and their own record if logged in) without sensitive contact fields
+      if (!isAdmin) {
+        resultUsers = resultUsers
+          .filter((u) => {
+            if (caller && u.id === caller.id) return true;
+            return u.role === 'tutor' && (u.isApproved === true || u.status === 'approved' || (u.isApproved === undefined && u.status === undefined));
+          })
+          .map((u) => {
+            if (caller && u.id === caller.id) return u;
+            const { email: _e, phoneNumber: _p, ...publicTutor } = u;
+            return publicTutor;
+          });
+      }
+
+      if (roleFilter && roleFilter !== 'all') {
+        resultUsers = resultUsers.filter((u) => String(u.role || '').toLowerCase() === roleFilter);
+      }
+
+      if (searchFilter) {
+        resultUsers = resultUsers.filter((u) => {
+          const name = String(u.name || '').toLowerCase();
+          const email = String(u.email || '').toLowerCase();
+          const loc = String(u.location || u.cityLocation || u.country || '').toLowerCase();
+          const subj = String(u.primarySubject || u.subjects || u.subjectExpertise || '').toLowerCase();
+          return name.includes(searchFilter) || email.includes(searchFilter) || loc.includes(searchFilter) || subj.includes(searchFilter);
+        });
+      }
+
+      const total = resultUsers.length;
+      const offset = (page - 1) * limit;
+      const paginated = resultUsers.slice(offset, offset + limit).map((u) => {
+        if (u?.avatarUrl && typeof u.avatarUrl === 'string' && !u.avatarVariants) {
+          const meta = buildAvatarVariantMetadata(u.avatarUrl);
+          if (meta) {
+            return { ...u, ...meta };
+          }
+        }
+        return u;
+      });
+
+      return res.status(200).json({
+        success: true,
+        users: paginated,
+        total,
+        page,
+        limit,
+        totalPages: Math.max(1, Math.ceil(total / limit)),
+      });
     } catch (err: any) {
-      return res.status(200).json({ users: memoryStore.getAllUsers() });
+      return res.status(500).json({
+        error: 'Failed to retrieve users directory.',
+        code: err?.code || 'USERS_FETCH_FAILED',
+        status: 500,
+      });
     }
   });
 
@@ -3860,7 +4264,15 @@ export async function createApp(options: CreateAppOptions = {}) {
 
       const total = allTutors.length;
       const startIndex = (page - 1) * limit;
-      const paginatedTutors = allTutors.slice(startIndex, startIndex + limit);
+      const paginatedTutors = allTutors.slice(startIndex, startIndex + limit).map((t) => {
+        if (t?.avatarUrl && typeof t.avatarUrl === 'string' && !t.avatarVariants) {
+          const meta = buildAvatarVariantMetadata(t.avatarUrl);
+          if (meta) {
+            return { ...t, ...meta };
+          }
+        }
+        return t;
+      });
 
       return res.status(200).json({
         success: true,
@@ -4033,14 +4445,17 @@ export async function createApp(options: CreateAppOptions = {}) {
         await fs.promises.access(avatarsDir, fs.constants.W_OK);
         console.log('[UPLOAD] directory ready');
 
-        // Backend requirement 5: Await the file write operation
+        // Backend requirement 5: Await the file write operation (preserve untouched original file)
         const cleanExt = ['.jpg', '.jpeg', '.png', '.webp'].includes(fileExt) ? fileExt : '.jpg';
-        const filename = `avatar_${Date.now()}_${crypto.randomBytes(6).toString('hex')}${cleanExt}`;
+        const stem = `avatar_${Date.now()}_${crypto.randomBytes(6).toString('hex')}`;
+        const filename = `${stem}${cleanExt}`;
         const filePath = path.join(avatarsDir, filename);
         await fs.promises.writeFile(filePath, fileBuffer);
+        await generateAvatarDerivatives(fileBuffer, avatarsDir, stem);
         console.log('[UPLOAD] file saved');
 
         const relativeUrl = `/uploads/avatars/${filename}`;
+        const variantMeta = buildAvatarVariantMetadata(relativeUrl);
 
         // Backend requirement 6 & 7: Save final relative path in PostgreSQL and await update
         const targetTutorId = (req.body?.tutorId || req.body?.userId || req.query?.tutorId || req.query?.userId as string)?.trim();
@@ -4106,8 +4521,16 @@ export async function createApp(options: CreateAppOptions = {}) {
             }
           }
 
-          savePersistedUserUpdate(targetTutorId, { avatarUrl: relativeUrl, profileImageUrl: relativeUrl });
-          memoryStore.updateUser(targetTutorId, { avatarUrl: relativeUrl, profileImageUrl: relativeUrl });
+          savePersistedUserUpdate(targetTutorId, {
+            avatarUrl: relativeUrl,
+            profileImageUrl: relativeUrl,
+            ...(variantMeta || {}),
+          });
+          memoryStore.updateUser(targetTutorId, {
+            avatarUrl: relativeUrl,
+            profileImageUrl: relativeUrl,
+            ...(variantMeta || {}),
+          } as any);
         }
         console.log('[UPLOAD] database updated');
 
@@ -4120,7 +4543,8 @@ export async function createApp(options: CreateAppOptions = {}) {
           relativeUrl,
           savedUrl: relativeUrl,
           filename,
-          tutorId: targetTutorId || null
+          tutorId: targetTutorId || null,
+          ...(variantMeta || {}),
         });
       } catch (uploadErr: any) {
         console.error('[UPLOAD] Error saving uploaded avatar:', uploadErr.message);
@@ -4402,6 +4826,11 @@ export async function createApp(options: CreateAppOptions = {}) {
       }
       if (updates.avatarUrl && updates.avatarUrl.includes('/uploads/avatars/') && !updates.avatarUrl.includes('?v=')) {
         updates.avatarUrl = `${updates.avatarUrl}?v=${Date.now()}`;
+      }
+
+      const persistedVariantMeta = buildAvatarVariantMetadata(updates.avatarUrl || updates.profileImageUrl || '');
+      if (persistedVariantMeta) {
+        Object.assign(updates, persistedVariantMeta);
       }
 
       // Update disk persistence (guarantees survival across any restarts)
@@ -4850,6 +5279,12 @@ export async function createApp(options: CreateAppOptions = {}) {
       if (updates.avatarUrl && typeof updates.avatarUrl === 'string' && updates.avatarUrl.startsWith('data:image/')) {
         updates.avatarUrl = saveBase64ImageToUploads(updates.avatarUrl, 'avatars', `user_${id}`);
       }
+      if (updates.avatarUrl && typeof updates.avatarUrl === 'string') {
+        const avatarMeta = buildAvatarVariantMetadata(updates.avatarUrl);
+        if (avatarMeta) {
+          Object.assign(updates, avatarMeta);
+        }
+      }
 
       // 1. Locate baseline user from memoryStore, trending tutors, or seed tutors
       let existingUser: any = memoryStore.getUser(id);
@@ -4986,11 +5421,13 @@ export async function createApp(options: CreateAppOptions = {}) {
         avatarUrl = saveBase64ImageToUploads(avatarUrl, 'avatars', `avatar_${targetUserId}`);
       }
 
+      const avatarVariantMeta = buildAvatarVariantMetadata(avatarUrl);
+
       // 1. Update disk persistence
-      savePersistedUserUpdate(targetUserId, { avatarUrl });
+      savePersistedUserUpdate(targetUserId, { avatarUrl, ...(avatarVariantMeta || {}) });
 
       // 2. Update memory store
-      memoryStore.updateUser(targetUserId, { avatarUrl });
+      memoryStore.updateUser(targetUserId, { avatarUrl, ...(avatarVariantMeta || {}) } as any);
 
       // 3. Update PostgreSQL
       if (isDbConnected() && db) {
@@ -5018,7 +5455,7 @@ export async function createApp(options: CreateAppOptions = {}) {
 
       await logAudit('AVATAR_UPLOAD', `Updated avatar image for ${targetUserId}`, targetUserId, undefined, currentUser.role, req);
 
-      return res.status(200).json({ success: true, avatarUrl });
+      return res.status(200).json({ success: true, avatarUrl, ...(avatarVariantMeta || {}) });
     } catch (err: any) {
       return res.status(500).json({ error: err.message });
     }
@@ -5153,50 +5590,103 @@ export async function createApp(options: CreateAppOptions = {}) {
   // ORDERS (Assignments & Tutoring Requests)
   // ==========================================
 
-  // GET /api/orders
-  app.get('/api/orders', async (req, res) => {
+  // GET /api/orders - Role-scoped and paginated
+  app.get('/api/orders', requireAuth, async (req, res) => {
     try {
-      const { studentId, tutorId } = req.query;
+      const caller = (req as any).user;
+      const isAdmin = caller.role === 'admin' || caller.role === 'subadmin';
+      const page = Math.max(1, parseInt((req.query.page as string) || '1', 10) || 1);
+      const limit = Math.min(200, Math.max(1, parseInt((req.query.limit as string) || '50', 10) || 50));
+      const offset = (page - 1) * limit;
+      const statusFilter = (req.query.status as string || '').trim();
+      const searchFilter = (req.query.search as string || '').toLowerCase().trim();
 
+      const requestedStudentId = isAdmin ? (req.query.studentId as string | undefined) : (caller.role === 'student' ? caller.id : undefined);
+      const requestedTutorId = isAdmin ? (req.query.tutorId as string | undefined) : (caller.role === 'tutor' ? caller.id : undefined);
+
+      let rows: any[] = [];
       if (isDbConnected() && db) {
         try {
-          if (studentId) {
-            const rows = await db.select().from(orders).where(eq(orders.studentId, String(studentId))).orderBy(desc(orders.createdAt));
-            return res.status(200).json({ orders: rows });
+          if (requestedStudentId) {
+            rows = await withDbTimeout(
+              db.select().from(orders).where(eq(orders.studentId, String(requestedStudentId))).orderBy(desc(orders.createdAt)),
+              10000,
+              'Query student orders'
+            );
+          } else if (requestedTutorId) {
+            rows = await withDbTimeout(
+              db.select().from(orders).where(eq(orders.tutorId, String(requestedTutorId))).orderBy(desc(orders.createdAt)),
+              10000,
+              'Query tutor orders'
+            );
+          } else if (isAdmin) {
+            rows = await withDbTimeout(
+              db.select().from(orders).orderBy(desc(orders.createdAt)),
+              10000,
+              'Query admin orders'
+            );
           }
-          if (tutorId) {
-            const rows = await db.select().from(orders).where(eq(orders.tutorId, String(tutorId))).orderBy(desc(orders.createdAt));
-            return res.status(200).json({ orders: rows });
-          }
-          const rows = await db.select().from(orders).orderBy(desc(orders.createdAt));
-          return res.status(200).json({ orders: rows });
         } catch (dbErr: any) {
           console.warn('[API] Notice querying orders from DB:', dbErr.message);
         }
       }
 
+      if (rows.length === 0) {
+        rows = memoryStore.getOrders(requestedStudentId, requestedTutorId);
+      }
+
+      if (statusFilter && statusFilter !== 'all') {
+        rows = rows.filter((o) => String(o.status || '').toLowerCase() === statusFilter.toLowerCase());
+      }
+      if (searchFilter) {
+        rows = rows.filter((o) =>
+          String(o.title || '').toLowerCase().includes(searchFilter) ||
+          String(o.subject || '').toLowerCase().includes(searchFilter) ||
+          String(o.id || '').toLowerCase().includes(searchFilter)
+        );
+      }
+
+      const total = rows.length;
+      const paginated = rows.slice(offset, offset + limit);
+
       return res.status(200).json({
-        orders: memoryStore.getOrders(studentId as string | undefined, tutorId as string | undefined)
+        success: true,
+        orders: paginated,
+        total,
+        page,
+        limit,
+        totalPages: Math.max(1, Math.ceil(total / limit)),
       });
     } catch (err: any) {
-      return res.status(200).json({ orders: [] });
+      return res.status(500).json({
+        error: err?.message || 'Failed to retrieve orders.',
+        code: err?.code || 'ORDERS_FETCH_FAILED',
+        status: 500,
+      });
     }
   });
 
   // POST /api/orders
-  app.post('/api/orders', async (req, res) => {
+  app.post('/api/orders', requireAuth, async (req, res) => {
     try {
-      const data = req.body;
+      const caller = (req as any).user;
+      const isAdmin = caller.role === 'admin' || caller.role === 'subadmin';
+      const data = req.body || {};
       const orderId = data.id || 'ord_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6);
+      const effectiveStudentId = isAdmin && data.studentId ? String(data.studentId) : caller.id;
+
+      if (!data.title || !data.subject) {
+        return res.status(400).json({ error: 'Order title and subject are required.', code: 'VALIDATION_ERROR', status: 400 });
+      }
 
       const newOrder = {
         id: orderId,
-        studentId: data.studentId,
+        studentId: effectiveStudentId,
         tutorId: data.tutorId || null,
-        title: data.title,
-        subject: data.subject,
+        title: String(data.title),
+        subject: String(data.subject),
         academicLevel: data.academicLevel || null,
-        deadline: data.deadline,
+        deadline: data.deadline || new Date(Date.now() + 7 * 86400000).toISOString().split('T')[0],
         pages: data.pages ? Number(data.pages) : 1,
         wordCount: data.wordCount ? Number(data.wordCount) : 250,
         referenceStyle: data.referenceStyle || null,
@@ -5220,24 +5710,32 @@ export async function createApp(options: CreateAppOptions = {}) {
 
       if (isDbConnected() && db) {
         try {
-          await db.insert(orders).values(newOrder);
+          await withDbTimeout(db.insert(orders).values(newOrder), 10000, 'Insert order');
         } catch (dbErr: any) {
           console.warn('[API] Notice inserting order into DB:', dbErr.message);
         }
       }
 
-      await logAudit('ORDER_CREATE', `Created order: ${orderId} (${data.title})`, data.studentId, undefined, undefined, req);
+      await logAudit('ORDER_CREATE', `Created order: ${orderId} (${newOrder.title})`, effectiveStudentId, caller.name, caller.role, req);
 
       return res.status(201).json({ success: true, order: newOrder });
     } catch (err: any) {
-      return res.status(500).json({ error: err.message });
+      return res.status(500).json({ error: err.message, code: 'ORDER_CREATE_FAILED', status: 500 });
     }
   });
 
   // PUT /api/orders/:id
-  app.put('/api/orders/:id', async (req, res) => {
+  app.put('/api/orders/:id', requireAuth, async (req, res) => {
     try {
+      const caller = (req as any).user;
+      const isAdmin = caller.role === 'admin' || caller.role === 'subadmin';
       const { id } = req.params;
+
+      const existing = await findOrderById(id);
+      if (!isAdmin && existing && existing.studentId !== caller.id && existing.tutorId !== caller.id) {
+        return res.status(403).json({ error: 'Forbidden: You are not authorized to update this order.', code: 'FORBIDDEN', status: 403 });
+      }
+
       const updates = { ...req.body, updatedAt: new Date().toISOString() };
       delete updates.id;
 
@@ -5270,39 +5768,47 @@ export async function createApp(options: CreateAppOptions = {}) {
               dbUpdates[col] = updates[col];
             }
           }
-          await db.update(orders).set(dbUpdates).where(eq(orders.id, id));
+          await withDbTimeout(db.update(orders).set(dbUpdates).where(eq(orders.id, id)), 10000, 'Update order');
         } catch (dbErr: any) {
           console.warn('[API] Notice updating order in DB:', dbErr.message);
         }
       }
 
-      await logAudit('ORDER_UPDATE', `Updated order: ${id}`, undefined, undefined, undefined, req);
+      await logAudit('ORDER_UPDATE', `Updated order: ${id}`, caller.id, caller.name, caller.role, req);
 
       return res.status(200).json({ success: true });
     } catch (err: any) {
-      return res.status(500).json({ error: err.message });
+      return res.status(500).json({ error: err.message, code: 'ORDER_UPDATE_FAILED', status: 500 });
     }
   });
 
   // DELETE /api/orders/:id
-  app.delete('/api/orders/:id', async (req, res) => {
+  app.delete('/api/orders/:id', requireAuth, async (req, res) => {
     try {
+      const caller = (req as any).user;
+      const isAdmin = caller.role === 'admin' || caller.role === 'subadmin';
       const { id } = req.params;
+
+      const existing = await findOrderById(id);
+      if (!isAdmin && (!existing || existing.studentId !== caller.id)) {
+        return res.status(403).json({ error: 'Forbidden: Only administrators or the order owner may delete this order.', code: 'FORBIDDEN', status: 403 });
+      }
+
       memoryStore.deleteOrder(id);
 
       if (isDbConnected() && db) {
         try {
-          await db.delete(orders).where(eq(orders.id, id));
+          await withDbTimeout(db.delete(orders).where(eq(orders.id, id)), 10000, 'Delete order');
         } catch (dbErr: any) {
           console.warn('[API] Notice deleting order from DB:', dbErr.message);
         }
       }
 
-      await logAudit('ORDER_DELETE', `Deleted order: ${id}`, undefined, undefined, undefined, req);
+      await logAudit('ORDER_DELETE', `Deleted order: ${id}`, caller.id, caller.name, caller.role, req);
 
       return res.status(200).json({ success: true, message: 'Order removed successfully' });
     } catch (err: any) {
-      return res.status(500).json({ error: err.message });
+      return res.status(500).json({ error: err.message, code: 'ORDER_DELETE_FAILED', status: 500 });
     }
   });
 
@@ -5310,21 +5816,41 @@ export async function createApp(options: CreateAppOptions = {}) {
   // INQUIRIES (Quotes & WhatsApp Submissions)
   // ==========================================
 
-  // GET /api/inquiries
-  app.get('/api/inquiries', async (req, res) => {
+  // GET /api/inquiries (Admin/Subadmin only, paginated)
+  app.get('/api/inquiries', requireRole('admin', 'subadmin'), async (req, res) => {
     try {
+      const page = Math.max(1, parseInt((req.query.page as string) || '1', 10) || 1);
+      const limit = Math.min(200, Math.max(1, parseInt((req.query.limit as string) || '50', 10) || 50));
+      const offset = (page - 1) * limit;
+
+      let rows: any[] = [];
       if (isDbConnected() && db) {
         try {
-          const rows = await db.select().from(inquiries).orderBy(desc(inquiries.createdAt));
-          return res.status(200).json({ inquiries: rows });
+          rows = await withDbTimeout(
+            db.select().from(inquiries).orderBy(desc(inquiries.createdAt)),
+            10000,
+            'Query inquiries'
+          );
         } catch (dbErr: any) {
           console.warn('[API] Notice querying inquiries from DB:', dbErr.message);
         }
       }
+      if (rows.length === 0) {
+        rows = memoryStore.getInquiries();
+      }
+      const total = rows.length;
+      const paginated = rows.slice(offset, offset + limit);
 
-      return res.status(200).json({ inquiries: memoryStore.getInquiries() });
+      return res.status(200).json({
+        success: true,
+        inquiries: paginated,
+        total,
+        page,
+        limit,
+        totalPages: Math.max(1, Math.ceil(total / limit)),
+      });
     } catch (err: any) {
-      return res.status(200).json({ inquiries: [] });
+      return res.status(500).json({ error: err?.message || 'Failed to load inquiries', code: 'INQUIRIES_FETCH_FAILED', status: 500 });
     }
   });
 
@@ -5443,86 +5969,171 @@ export async function createApp(options: CreateAppOptions = {}) {
     }
   });
 
-  // GET /api/chat-rooms - List user's accessible chat rooms
+  // GET /api/chat-rooms - List user's accessible chat rooms (Zero N+1 batched queries + pagination)
   app.get('/api/chat-rooms', requireAuth, async (req, res) => {
     try {
       const currentUser = (req as any).user;
       const isAdmin = currentUser.role === 'admin' || currentUser.role === 'subadmin';
+      const page = Math.max(1, parseInt((req.query.page as string) || '1', 10) || 1);
+      const limit = Math.min(200, Math.max(1, parseInt((req.query.limit as string) || '50', 10) || 50));
+      const offset = (page - 1) * limit;
 
       if (isDbConnected() && db) {
         try {
           let userRooms: any[] = [];
+          let totalRooms = 0;
+
           if (isAdmin) {
-            userRooms = await db.select().from(chatRooms).orderBy(desc(chatRooms.updatedAt));
+            const allRoomIds = await withDbTimeout(
+              db.select({ id: chatRooms.id }).from(chatRooms).orderBy(desc(chatRooms.updatedAt)),
+              10000,
+              'Count admin chat rooms'
+            );
+            totalRooms = allRoomIds.length;
+            const pageIds = allRoomIds.slice(offset, offset + limit).map((r) => r.id);
+            if (pageIds.length > 0) {
+              userRooms = await withDbTimeout(
+                db.select().from(chatRooms).where(inArray(chatRooms.id, pageIds)).orderBy(desc(chatRooms.updatedAt)),
+                10000,
+                'Select admin chat rooms page'
+              );
+            }
           } else {
-            const memberOf = await db.select().from(chatRoomMembers).where(eq(chatRoomMembers.userId, currentUser.id));
-            const roomIds = memberOf.map(m => m.roomId);
-            if (roomIds.length > 0) {
-              userRooms = await db.select().from(chatRooms).where(inArray(chatRooms.id, roomIds)).orderBy(desc(chatRooms.updatedAt));
+            const memberOf = await withDbTimeout(
+              db.select({ roomId: chatRoomMembers.roomId }).from(chatRoomMembers).where(eq(chatRoomMembers.userId, currentUser.id)),
+              10000,
+              'Select user room memberships'
+            );
+            const allRoomIds = Array.from(new Set(memberOf.map((m) => m.roomId)));
+            totalRooms = allRoomIds.length;
+            if (allRoomIds.length > 0) {
+              const allUserRooms = await withDbTimeout(
+                db.select().from(chatRooms).where(inArray(chatRooms.id, allRoomIds)).orderBy(desc(chatRooms.updatedAt)),
+                10000,
+                'Select user chat rooms'
+              );
+              userRooms = allUserRooms.slice(offset, offset + limit);
             }
           }
 
-          // Populate members, users, and latest message for each room
-          const populated = await Promise.all(userRooms.map(async (r) => {
-            const members = await db.select().from(chatRoomMembers).where(eq(chatRoomMembers.roomId, r.id));
-            const latestMsg = await db.select().from(messages).where(eq(messages.roomId, r.id)).orderBy(desc(messages.createdAt)).limit(1);
-            
-            // Fetch users for all members
-            const memberUserIds = members.map(m => m.userId);
-            let memberUsers: any[] = [];
-            if (memberUserIds.length > 0) {
-              memberUsers = await db.select().from(users).where(inArray(users.id, memberUserIds));
-            }
+          if (userRooms.length === 0) {
+            return res.status(200).json({
+              success: true,
+              rooms: [],
+              total: totalRooms,
+              page,
+              limit,
+              totalPages: Math.max(1, Math.ceil(totalRooms / limit)),
+            });
+          }
 
-            // Fetch associated order if any
-            let linkedOrder: any = null;
-            if (r.orderId) {
-              const oRes = await db.select().from(orders).where(eq(orders.id, r.orderId)).limit(1);
-              linkedOrder = oRes[0] || null;
-            }
+          const pageRoomIds = userRooms.map((r) => r.id);
+          const pageOrderIds = Array.from(new Set(userRooms.map((r) => r.orderId).filter(Boolean) as string[]));
 
-            const studentMember = memberUsers.find(u => u.role === 'student');
-            const tutorMember = memberUsers.find(u => u.role === 'tutor' || (!u.id.startsWith('admin_') && u.role !== 'admin' && u.id !== studentMember?.id));
+          // Batch 1 & 2 & 3 in parallel: all members, recent messages, and linked orders for these rooms
+          const [allMembers, recentRoomMessages, linkedOrdersList] = await Promise.all([
+            withDbTimeout(
+              db.select().from(chatRoomMembers).where(inArray(chatRoomMembers.roomId, pageRoomIds)),
+              10000,
+              'Batch load room members'
+            ),
+            withDbTimeout(
+              db.select().from(messages).where(inArray(messages.roomId, pageRoomIds)).orderBy(desc(messages.createdAt)).limit(Math.max(100, pageRoomIds.length * 5)),
+              10000,
+              'Batch load latest room messages'
+            ),
+            pageOrderIds.length > 0
+              ? withDbTimeout(db.select().from(orders).where(inArray(orders.id, pageOrderIds)), 10000, 'Batch load linked orders')
+              : Promise.resolve([] as any[]),
+          ]);
 
-            let tutorUser = tutorMember || null;
-            let studentUser = studentMember || null;
+          // Collect all user IDs needed across members + linked orders
+          const neededUserIdSet = new Set<string>();
+          for (const m of allMembers) neededUserIdSet.add(m.userId);
+          for (const o of linkedOrdersList) {
+            if (o.tutorId) neededUserIdSet.add(o.tutorId);
+            if (o.studentId) neededUserIdSet.add(o.studentId);
+          }
 
-            if (!tutorUser && linkedOrder?.tutorId) {
-              const tRes = await db.select().from(users).where(eq(users.id, linkedOrder.tutorId)).limit(1);
-              tutorUser = tRes[0] || null;
+          const neededUserIds = Array.from(neededUserIdSet);
+          const fetchedUsers = neededUserIds.length > 0
+            ? await withDbTimeout(
+                db.select({
+                  id: users.id,
+                  name: users.name,
+                  email: users.email,
+                  role: users.role,
+                  avatarUrl: users.avatarUrl,
+                  rating: users.rating,
+                  subjectExpertise: users.subjectExpertise,
+                }).from(users).where(inArray(users.id, neededUserIds)),
+                10000,
+                'Batch load room users'
+              )
+            : [];
+
+          // Build O(1) lookup maps
+          const userMap = new Map<string, any>();
+          for (const u of fetchedUsers) userMap.set(u.id, u);
+
+          const orderMap = new Map<string, any>();
+          for (const o of linkedOrdersList) orderMap.set(o.id, o);
+
+          const membersByRoom = new Map<string, any[]>();
+          for (const m of allMembers) {
+            const arr = membersByRoom.get(m.roomId) || [];
+            arr.push(m);
+            membersByRoom.set(m.roomId, arr);
+          }
+
+          const latestMsgByRoom = new Map<string, any>();
+          for (const msg of recentRoomMessages) {
+            if (msg.roomId && !latestMsgByRoom.has(msg.roomId)) {
+              latestMsgByRoom.set(msg.roomId, msg);
             }
-            if (!studentUser && linkedOrder?.studentId) {
-              const sRes = await db.select().from(users).where(eq(users.id, linkedOrder.studentId)).limit(1);
-              studentUser = sRes[0] || null;
-            }
+          }
+
+          const populated = userRooms.map((r) => {
+            const members = membersByRoom.get(r.id) || [];
+            const linkedOrder = r.orderId ? orderMap.get(r.orderId) || null : null;
+            const memberUsers = members.map((m) => userMap.get(m.userId)).filter(Boolean);
+
+            const studentMember = memberUsers.find((u) => u.role === 'student');
+            const tutorMember = memberUsers.find((u) => u.role === 'tutor' || (!String(u.id).startsWith('admin_') && u.role !== 'admin' && u.id !== studentMember?.id));
+
+            const tutorUser = tutorMember || (linkedOrder?.tutorId ? userMap.get(linkedOrder.tutorId) || null : null);
+            const studentUser = studentMember || (linkedOrder?.studentId ? userMap.get(linkedOrder.studentId) || null : null);
 
             return {
               ...r,
-              members: members.map(m => ({
-                ...m,
-                user: memberUsers.find(u => u.id === m.userId) ? {
-                  id: m.userId,
-                  name: memberUsers.find(u => u.id === m.userId).name,
-                  email: memberUsers.find(u => u.id === m.userId).email,
-                  role: memberUsers.find(u => u.id === m.userId).role,
-                  avatarUrl: memberUsers.find(u => u.id === m.userId).avatarUrl,
-                  rating: memberUsers.find(u => u.id === m.userId).rating,
-                  subjectExpertise: memberUsers.find(u => u.id === m.userId).subjectExpertise,
-                } : null
-              })),
-              latestMessage: latestMsg[0] || null,
+              members: members.map((m) => {
+                const mu = userMap.get(m.userId);
+                return {
+                  ...m,
+                  user: mu ? {
+                    id: mu.id,
+                    name: mu.name,
+                    email: isAdmin ? mu.email : undefined,
+                    role: mu.role,
+                    avatarUrl: mu.avatarUrl,
+                    rating: mu.rating,
+                    subjectExpertise: mu.subjectExpertise,
+                  } : null,
+                };
+              }),
+              latestMessage: latestMsgByRoom.get(r.id) || null,
               order: linkedOrder,
               student: studentUser ? {
                 id: studentUser.id,
                 name: studentUser.name,
-                email: studentUser.email,
+                email: isAdmin ? studentUser.email : undefined,
                 role: studentUser.role,
                 avatarUrl: studentUser.avatarUrl,
               } : null,
               tutor: tutorUser ? {
                 id: tutorUser.id,
                 name: tutorUser.name,
-                email: tutorUser.email,
+                email: isAdmin ? tutorUser.email : undefined,
                 role: tutorUser.role,
                 avatarUrl: tutorUser.avatarUrl,
                 rating: tutorUser.rating,
@@ -5531,18 +6142,34 @@ export async function createApp(options: CreateAppOptions = {}) {
               studentId: studentUser?.id || r.createdBy,
               tutorId: tutorUser?.id || null,
             };
-          }));
+          });
 
-          return res.status(200).json({ rooms: populated });
+          return res.status(200).json({
+            success: true,
+            rooms: populated,
+            total: totalRooms,
+            page,
+            limit,
+            totalPages: Math.max(1, Math.ceil(totalRooms / limit)),
+          });
         } catch (dbErr: any) {
           console.warn('[API] Notice fetching chat rooms from DB:', dbErr.message);
         }
       }
 
       const memoryRooms = memoryStore.getChatRoomsForUser(currentUser.id, isAdmin);
-      return res.status(200).json({ rooms: memoryRooms });
+      const total = memoryRooms.length;
+      const paginated = memoryRooms.slice(offset, offset + limit);
+      return res.status(200).json({
+        success: true,
+        rooms: paginated,
+        total,
+        page,
+        limit,
+        totalPages: Math.max(1, Math.ceil(total / limit)),
+      });
     } catch (err: any) {
-      return res.status(500).json({ error: err.message });
+      return res.status(500).json({ error: err.message, code: 'CHAT_ROOMS_FETCH_FAILED', status: 500 });
     }
   });
 
@@ -5576,7 +6203,7 @@ export async function createApp(options: CreateAppOptions = {}) {
 
       if (isDbConnected() && db) {
         try {
-          await db.insert(chatRoomMembers).values(newMember);
+          await withDbTimeout(db.insert(chatRoomMembers).values(newMember), 10000, 'Add room member');
         } catch (dbErr: any) {
           console.warn('[API] Notice adding room member in DB:', dbErr.message);
         }
@@ -5607,8 +6234,10 @@ export async function createApp(options: CreateAppOptions = {}) {
 
       if (isDbConnected() && db) {
         try {
-          await db.delete(chatRoomMembers).where(
-            and(eq(chatRoomMembers.roomId, roomId), eq(chatRoomMembers.userId, targetUserId))
+          await withDbTimeout(
+            db.delete(chatRoomMembers).where(and(eq(chatRoomMembers.roomId, roomId), eq(chatRoomMembers.userId, targetUserId))),
+            10000,
+            'Remove room member'
           );
         } catch (dbErr: any) {
           console.warn('[API] Notice removing room member from DB:', dbErr.message);
@@ -5621,33 +6250,51 @@ export async function createApp(options: CreateAppOptions = {}) {
     }
   });
 
-  // GET /api/chat-rooms/:id/messages - Retrieve messages for a specific room
+  // GET /api/chat-rooms/:id/messages - Retrieve messages for a specific room (paginated)
   app.get('/api/chat-rooms/:id/messages', requireAuth, async (req, res) => {
     try {
       const currentUser = (req as any).user;
       const roomId = req.params.id;
+      const page = Math.max(1, parseInt((req.query.page as string) || '1', 10) || 1);
+      const limit = Math.min(500, Math.max(1, parseInt((req.query.limit as string) || '200', 10) || 200));
 
       // Enforce room membership check (403 for unauthorized users)
       const hasAccess = await canUserAccessRoom(currentUser.id, currentUser.role, roomId);
       if (!hasAccess) {
-        return res.status(403).json({ error: 'Forbidden: You are not authorized to view messages in this chat room.' });
+        return res.status(403).json({ error: 'Forbidden: You are not authorized to view messages in this chat room.', code: 'FORBIDDEN', status: 403 });
       }
 
+      let rows: any[] = [];
       if (isDbConnected() && db) {
         try {
-          const rows = await db.select().from(messages).where(
-            eq(messages.roomId, roomId)
-          ).orderBy(messages.createdAt);
-          return res.status(200).json({ messages: rows });
+          rows = await withDbTimeout(
+            db.select().from(messages).where(eq(messages.roomId, roomId)).orderBy(messages.createdAt),
+            10000,
+            'Fetch room messages'
+          );
         } catch (dbErr: any) {
           console.warn('[API] Notice fetching room messages from DB:', dbErr.message);
+          rows = memoryStore.getRoomMessages(roomId);
         }
+      } else {
+        rows = memoryStore.getRoomMessages(roomId);
       }
 
-      const memMsgs = memoryStore.getRoomMessages(roomId);
-      return res.status(200).json({ messages: memMsgs });
+      const total = rows.length;
+      const sliceStart = Math.max(0, total - page * limit);
+      const sliceEnd = Math.max(0, total - (page - 1) * limit);
+      const paginated = rows.slice(sliceStart, sliceEnd);
+
+      return res.status(200).json({
+        success: true,
+        messages: paginated,
+        total,
+        page,
+        limit,
+        hasMore: sliceStart > 0,
+      });
     } catch (err: any) {
-      return res.status(500).json({ error: err.message });
+      return res.status(500).json({ error: err.message, code: 'ROOM_MESSAGES_FETCH_FAILED', status: 500 });
     }
   });
 
@@ -5660,23 +6307,21 @@ export async function createApp(options: CreateAppOptions = {}) {
       // Enforce room membership check (403 for non-members)
       const hasAccess = await canUserAccessRoom(currentUser.id, currentUser.role, roomId);
       if (!hasAccess) {
-        return res.status(403).json({ error: 'Forbidden: You are not a member of this chat room.' });
+        return res.status(403).json({ error: 'Forbidden: You are not a member of this chat room.', code: 'FORBIDDEN', status: 403 });
       }
 
       const { content, fileUrl, fileName, isSystem } = req.body;
 
       // Validation 1: Reject empty or whitespace-only messages
       if (!content || typeof content !== 'string' || content.trim().length === 0) {
-        return res.status(400).json({ error: 'Message content cannot be empty.' });
+        return res.status(400).json({ error: 'Message content cannot be empty.', code: 'VALIDATION_ERROR', status: 400 });
       }
 
       // Validation 2: Enforce 5,000 character limit
       if (content.length > 5000) {
-        return res.status(400).json({ error: 'Message length exceeds the 5,000 character limit.' });
+        return res.status(400).json({ error: 'Message length exceeds the 5,000 character limit.', code: 'VALIDATION_ERROR', status: 400 });
       }
 
-      // Security requirement: Regular users (students, tutors) can NEVER spoof senderId; session user ID is strictly enforced.
-      // Platform administrators have supervisory authority to send messages as Admin or as Assigned Tutor to assist students.
       const isAdmin = currentUser.role === 'admin' || currentUser.role === 'subadmin';
       let senderId = currentUser.id;
       if (isAdmin && (req.body.sendAsTutorId || req.body.senderId)) {
@@ -5687,7 +6332,7 @@ export async function createApp(options: CreateAppOptions = {}) {
 
       const newMsg = {
         id: msgId,
-        chatId: roomId, // backward-compatibility
+        chatId: roomId,
         roomId,
         orderId: req.body.orderId || null,
         senderId,
@@ -5705,9 +6350,8 @@ export async function createApp(options: CreateAppOptions = {}) {
 
       if (isDbConnected() && db) {
         try {
-          await db.insert(messages).values(newMsg);
-          // Update room's updatedAt timestamp
-          await db.update(chatRooms).set({ updatedAt: now }).where(eq(chatRooms.id, roomId));
+          await withDbTimeout(db.insert(messages).values(newMsg), 10000, 'Insert room message');
+          await withDbTimeout(db.update(chatRooms).set({ updatedAt: now }).where(eq(chatRooms.id, roomId)), 10000, 'Update room timestamp');
         } catch (dbErr: any) {
           console.warn('[API] Notice inserting room message into DB:', dbErr.message);
         }
@@ -5715,61 +6359,85 @@ export async function createApp(options: CreateAppOptions = {}) {
 
       return res.status(201).json({ success: true, message: newMsg });
     } catch (err: any) {
-      return res.status(500).json({ error: err.message });
+      return res.status(500).json({ error: err.message, code: 'MESSAGE_SEND_FAILED', status: 500 });
     }
   });
 
-  // GET /api/messages - Secure backward-compatible message retrieval
+  // GET /api/messages - Secure backward-compatible paginated message retrieval
   app.get('/api/messages', requireAuth, async (req, res) => {
     try {
       const currentUser = (req as any).user;
       const { chatId, orderId } = req.query;
+      const page = Math.max(1, parseInt((req.query.page as string) || '1', 10) || 1);
+      const limit = Math.min(500, Math.max(1, parseInt((req.query.limit as string) || '100', 10) || 100));
+      const offset = (page - 1) * limit;
 
       // If chatId is provided, enforce access check
       if (chatId) {
         const hasAccess = await canUserAccessRoom(currentUser.id, currentUser.role, String(chatId));
         if (!hasAccess) {
-          return res.status(403).json({ error: 'Forbidden: You do not have access to this conversation.' });
+          return res.status(403).json({ error: 'Forbidden: You do not have access to this conversation.', code: 'FORBIDDEN', status: 403 });
         }
       }
 
       if (isDbConnected() && db) {
         try {
           if (chatId) {
-            const rows = await db.select().from(messages).where(
-              eq(messages.chatId, String(chatId))
-            ).orderBy(messages.createdAt);
-            return res.status(200).json({ messages: rows });
+            const rows = await withDbTimeout(
+              db.select().from(messages).where(eq(messages.chatId, String(chatId))).orderBy(messages.createdAt),
+              10000,
+              'Select chat messages'
+            );
+            const paginated = rows.slice(Math.max(0, rows.length - page * limit), Math.max(0, rows.length - (page - 1) * limit));
+            return res.status(200).json({ success: true, messages: paginated, total: rows.length, page, limit });
           }
           if (orderId) {
-            const rows = await db.select().from(messages).where(
-              eq(messages.orderId, String(orderId))
-            ).orderBy(messages.createdAt);
-            return res.status(200).json({ messages: rows });
+            const rows = await withDbTimeout(
+              db.select().from(messages).where(eq(messages.orderId, String(orderId))).orderBy(messages.createdAt),
+              10000,
+              'Select order messages'
+            );
+            return res.status(200).json({ success: true, messages: rows.slice(offset, offset + limit), total: rows.length, page, limit });
           }
-          // If no specific chat/order, return only messages where the user is sender or receiver (or admin)
           if (currentUser.role === 'admin' || currentUser.role === 'subadmin') {
-            const rows = await db.select().from(messages).orderBy(desc(messages.createdAt)).limit(100);
-            return res.status(200).json({ messages: rows });
+            const rows = await withDbTimeout(
+              db.select().from(messages).orderBy(desc(messages.createdAt)).limit(limit).offset(offset),
+              10000,
+              'Select admin recent messages'
+            );
+            return res.status(200).json({ success: true, messages: rows, page, limit });
           } else {
-            const memberRooms = await db.select().from(chatRoomMembers).where(eq(chatRoomMembers.userId, currentUser.id));
-            const roomIds = memberRooms.map(m => m.roomId);
+            const memberRooms = await withDbTimeout(
+              db.select().from(chatRoomMembers).where(eq(chatRoomMembers.userId, currentUser.id)),
+              10000,
+              'Select user chat rooms for messages'
+            );
+            const roomIds = memberRooms.map((m) => m.roomId);
             if (roomIds.length > 0) {
-              const rows = await db.select().from(messages).where(inArray(messages.chatId, roomIds)).orderBy(desc(messages.createdAt)).limit(100);
-              return res.status(200).json({ messages: rows });
+              const rows = await withDbTimeout(
+                db.select().from(messages).where(inArray(messages.chatId, roomIds)).orderBy(desc(messages.createdAt)).limit(limit).offset(offset),
+                10000,
+                'Select user recent messages'
+              );
+              return res.status(200).json({ success: true, messages: rows, page, limit });
             }
-            return res.status(200).json({ messages: [] });
+            return res.status(200).json({ success: true, messages: [], page, limit });
           }
         } catch (dbErr: any) {
           console.warn('[API] Notice querying messages from DB:', dbErr.message);
         }
       }
 
+      const memRows = memoryStore.getMessages(chatId as string | undefined, orderId as string | undefined);
       return res.status(200).json({
-        messages: memoryStore.getMessages(chatId as string | undefined, orderId as string | undefined)
+        success: true,
+        messages: memRows.slice(offset, offset + limit),
+        total: memRows.length,
+        page,
+        limit,
       });
     } catch (err: any) {
-      return res.status(500).json({ error: err.message });
+      return res.status(500).json({ error: err.message, code: 'MESSAGES_FETCH_FAILED', status: 500 });
     }
   });
 
@@ -5781,26 +6449,22 @@ export async function createApp(options: CreateAppOptions = {}) {
       const targetRoomId = data.roomId || data.chatId;
 
       if (!targetRoomId || !data.content) {
-        return res.status(400).json({ error: 'Missing required parameters (chatId/roomId, content).' });
+        return res.status(400).json({ error: 'Missing required parameters (chatId/roomId, content).', code: 'VALIDATION_ERROR', status: 400 });
       }
 
-      // Check room membership authorization
       const hasAccess = await canUserAccessRoom(currentUser.id, currentUser.role, targetRoomId);
       if (!hasAccess) {
-        return res.status(403).json({ error: 'Forbidden: You are not authorized to post to this conversation.' });
+        return res.status(403).json({ error: 'Forbidden: You are not authorized to post to this conversation.', code: 'FORBIDDEN', status: 403 });
       }
 
-      // Content length validations
       const trimmedContent = String(data.content).trim();
       if (trimmedContent.length === 0) {
-        return res.status(400).json({ error: 'Message content cannot be empty.' });
+        return res.status(400).json({ error: 'Message content cannot be empty.', code: 'VALIDATION_ERROR', status: 400 });
       }
       if (data.content.length > 5000) {
-        return res.status(400).json({ error: 'Message length exceeds the 5,000 character limit.' });
+        return res.status(400).json({ error: 'Message length exceeds the 5,000 character limit.', code: 'VALIDATION_ERROR', status: 400 });
       }
 
-      // Security: Non-admins cannot impersonate another user (forced session user ID).
-      // Platform administrators have supervisory authority to send as Admin or on behalf of Tutor.
       const isAdmin = currentUser.role === 'admin' || currentUser.role === 'subadmin';
       let senderId = currentUser.id;
       if (isAdmin && (data.sendAsTutorId || data.senderId)) {
@@ -5829,7 +6493,7 @@ export async function createApp(options: CreateAppOptions = {}) {
 
       if (isDbConnected() && db) {
         try {
-          await db.insert(messages).values(newMsg);
+          await withDbTimeout(db.insert(messages).values(newMsg), 10000, 'Insert message');
         } catch (dbErr: any) {
           console.warn('[API] Notice inserting message into DB:', dbErr.message);
         }
@@ -5837,48 +6501,74 @@ export async function createApp(options: CreateAppOptions = {}) {
 
       return res.status(201).json({ success: true, message: newMsg });
     } catch (err: any) {
-      return res.status(500).json({ error: err.message });
+      return res.status(500).json({ error: err.message, code: 'MESSAGE_SEND_FAILED', status: 500 });
     }
   });
 
   // ==========================================
-  // QUOTES
+  // QUOTES (Authenticated, Role-Scoped & Paginated)
   // ==========================================
 
   // GET /api/quotes
-  app.get('/api/quotes', async (req, res) => {
+  app.get('/api/quotes', requireAuth, async (req, res) => {
     try {
+      const caller = (req as any).user;
+      const isAdmin = caller.role === 'admin' || caller.role === 'subadmin';
       const { chatId, orderId } = req.query;
+      const page = Math.max(1, parseInt((req.query.page as string) || '1', 10) || 1);
+      const limit = Math.min(200, Math.max(1, parseInt((req.query.limit as string) || '50', 10) || 50));
+      const offset = (page - 1) * limit;
 
+      let rows: any[] = [];
       if (isDbConnected() && db) {
         try {
           if (chatId) {
-            const rows = await db.select().from(quotes).where(eq(quotes.chatId, String(chatId))).orderBy(desc(quotes.createdAt));
-            return res.status(200).json({ quotes: rows });
+            rows = await withDbTimeout(db.select().from(quotes).where(eq(quotes.chatId, String(chatId))).orderBy(desc(quotes.createdAt)), 10000, 'Select quotes by chat');
+          } else if (orderId) {
+            rows = await withDbTimeout(db.select().from(quotes).where(eq(quotes.orderId, String(orderId))).orderBy(desc(quotes.createdAt)), 10000, 'Select quotes by order');
+          } else {
+            rows = await withDbTimeout(db.select().from(quotes).orderBy(desc(quotes.createdAt)).limit(250), 10000, 'Select recent quotes');
           }
-          if (orderId) {
-            const rows = await db.select().from(quotes).where(eq(quotes.orderId, String(orderId))).orderBy(desc(quotes.createdAt));
-            return res.status(200).json({ quotes: rows });
-          }
-          const rows = await db.select().from(quotes).orderBy(desc(quotes.createdAt));
-          return res.status(200).json({ quotes: rows });
         } catch (dbErr: any) {
           console.warn('[API] Notice querying quotes from DB:', dbErr.message);
         }
       }
 
+      if (rows.length === 0) {
+        rows = memoryStore.getQuotes(chatId as string | undefined, orderId as string | undefined);
+      }
+
+      if (!isAdmin) {
+        const userRooms = new Set(memoryStore.getChatRoomsForUser(caller.id, false).map((r) => r.id));
+        const userOrderIds = new Set(
+          memoryStore.getOrders(caller.role === 'student' ? caller.id : undefined, caller.role === 'tutor' ? caller.id : undefined).map((o) => o.id)
+        );
+        rows = rows.filter(
+          (q) =>
+            q.tutorId === caller.id ||
+            (q.chatId && userRooms.has(q.chatId)) ||
+            (q.orderId && userOrderIds.has(q.orderId))
+        );
+      }
+
+      const total = rows.length;
       return res.status(200).json({
-        quotes: memoryStore.getQuotes(chatId as string | undefined, orderId as string | undefined)
+        success: true,
+        quotes: rows.slice(offset, offset + limit),
+        total,
+        page,
+        limit,
       });
     } catch (err: any) {
-      return res.status(200).json({ quotes: [] });
+      return res.status(500).json({ error: err?.message || 'Failed to fetch quotes.', code: 'QUOTES_FETCH_FAILED', status: 500 });
     }
   });
 
   // POST /api/quotes
-  app.post('/api/quotes', async (req, res) => {
+  app.post('/api/quotes', requireAuth, async (req, res) => {
     try {
-      const data = req.body;
+      const caller = (req as any).user;
+      const data = req.body || {};
       const quoteId = data.id || 'qte_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6);
 
       const newQuote = {
@@ -5886,7 +6576,7 @@ export async function createApp(options: CreateAppOptions = {}) {
         chatId: data.chatId || null,
         orderId: data.orderId || null,
         inquiryId: data.inquiryId || null,
-        tutorId: data.tutorId || null,
+        tutorId: data.tutorId || caller.id,
         amount: Number(data.amount) || 0,
         currency: data.currency || 'USD',
         estimatedHours: data.estimatedHours ? Number(data.estimatedHours) : 1,
@@ -5905,23 +6595,24 @@ export async function createApp(options: CreateAppOptions = {}) {
 
       if (isDbConnected() && db) {
         try {
-          await db.insert(quotes).values(newQuote);
+          await withDbTimeout(db.insert(quotes).values(newQuote), 10000, 'Insert quote');
         } catch (dbErr: any) {
           console.warn('[API] Notice inserting quote into DB:', dbErr.message);
         }
       }
 
-      await logAudit('QUOTE_CREATE', `Quote issued: $${newQuote.amount} (${quoteId})`, data.tutorId, undefined, 'tutor', req);
+      await logAudit('QUOTE_CREATE', `Quote issued: $${newQuote.amount} (${quoteId})`, caller.id, caller.name, caller.role, req);
 
       return res.status(201).json({ success: true, quote: newQuote });
     } catch (err: any) {
-      return res.status(500).json({ error: err.message });
+      return res.status(500).json({ error: err.message, code: 'QUOTE_CREATE_FAILED', status: 500 });
     }
   });
 
   // PUT /api/quotes/:id
-  app.put('/api/quotes/:id', async (req, res) => {
+  app.put('/api/quotes/:id', requireAuth, async (req, res) => {
     try {
+      const caller = (req as any).user;
       const { id } = req.params;
       const updates = { ...req.body };
       delete updates.id;
@@ -5930,39 +6621,54 @@ export async function createApp(options: CreateAppOptions = {}) {
 
       if (isDbConnected() && db) {
         try {
-          await db.update(quotes).set(updates).where(eq(quotes.id, id));
+          await withDbTimeout(db.update(quotes).set(updates).where(eq(quotes.id, id)), 10000, 'Update quote');
         } catch (dbErr: any) {
           console.warn('[API] Notice updating quote in DB:', dbErr.message);
         }
       }
 
-      await logAudit('QUOTE_UPDATE', `Quote ${id} updated to status: ${updates.status}`, undefined, undefined, undefined, req);
+      await logAudit('QUOTE_UPDATE', `Quote ${id} updated to status: ${updates.status}`, caller.id, caller.name, caller.role, req);
 
       return res.status(200).json({ success: true });
     } catch (err: any) {
-      return res.status(500).json({ error: err.message });
+      return res.status(500).json({ error: err.message, code: 'QUOTE_UPDATE_FAILED', status: 500 });
     }
   });
 
   // ==========================================
-  // AUDIT LOGS
+  // AUDIT LOGS (Paginated Admin-Only)
   // ==========================================
 
   // GET /api/audit-logs
-  app.get('/api/audit-logs', requireRole('admin', 'subadmin'), async (_req, res) => {
+  app.get('/api/audit-logs', requireRole('admin', 'subadmin'), async (req, res) => {
     try {
+      const page = Math.max(1, parseInt((req.query.page as string) || '1', 10) || 1);
+      const limit = Math.min(200, Math.max(1, parseInt((req.query.limit as string) || '50', 10) || 50));
+      const offset = (page - 1) * limit;
+
       if (isDbConnected() && db) {
         try {
-          const rows = await db.select().from(auditLogs).orderBy(desc(auditLogs.createdAt)).limit(200);
-          return res.status(200).json({ logs: rows });
+          const rows = await withDbTimeout(
+            db.select().from(auditLogs).orderBy(desc(auditLogs.createdAt)).limit(limit).offset(offset),
+            10000,
+            'Query audit logs'
+          );
+          return res.status(200).json({ success: true, logs: rows, page, limit });
         } catch (dbErr: any) {
           console.warn('[API] Notice querying audit logs from DB:', dbErr.message);
         }
       }
 
-      return res.status(200).json({ logs: memoryStore.getAuditLogs() });
-    } catch {
-      return res.status(200).json({ logs: [] });
+      const allMemLogs = memoryStore.getAuditLogs();
+      return res.status(200).json({
+        success: true,
+        logs: allMemLogs.slice(offset, offset + limit),
+        total: allMemLogs.length,
+        page,
+        limit,
+      });
+    } catch (err: any) {
+      return res.status(500).json({ error: err?.message || 'Failed to fetch audit logs.', code: 'AUDIT_LOGS_FAILED', status: 500 });
     }
   });
 
@@ -5972,108 +6678,214 @@ export async function createApp(options: CreateAppOptions = {}) {
       const caller = (req as any).user;
       const { action, details } = req.body || {};
       if (!action || typeof action !== 'string') {
-        return res.status(400).json({ error: 'Action is required.' });
+        return res.status(400).json({ error: 'Action is required.', code: 'VALIDATION_ERROR', status: 400 });
       }
       await logAudit(action, details || '', caller.id, caller.name, caller.role, req);
       return res.status(201).json({ success: true });
     } catch (err: any) {
-      return res.status(500).json({ error: err.message });
+      return res.status(500).json({ error: err.message, code: 'AUDIT_LOG_CREATE_FAILED', status: 500 });
     }
   });
 
   // ==========================================
-  // NOTIFICATIONS
+  // NOTIFICATIONS (Authenticated, Persisted in PostgreSQL + Memory, Paginated)
   // ==========================================
 
   // GET /api/notifications
-  app.get('/api/notifications', async (req, res) => {
+  app.get('/api/notifications', requireAuth, async (req, res) => {
     try {
-      const { userId } = req.query;
-      const notifs = memoryStore.getNotifications(userId ? String(userId) : undefined);
-      return res.status(200).json({ notifications: notifs });
+      const caller = (req as any).user;
+      const isAdmin = caller.role === 'admin' || caller.role === 'subadmin';
+      const page = Math.max(1, parseInt((req.query.page as string) || '1', 10) || 1);
+      const limit = Math.min(200, Math.max(1, parseInt((req.query.limit as string) || '50', 10) || 50));
+      const offset = (page - 1) * limit;
+      const targetUserId = isAdmin && req.query.userId ? String(req.query.userId) : caller.id;
+
+      let rows: any[] = [];
+      if (isDbConnected() && db) {
+        try {
+          if (isAdmin && !req.query.userId) {
+            rows = await withDbTimeout(
+              db.select().from(notifications).orderBy(desc(notifications.createdAt)).limit(limit).offset(offset),
+              10000,
+              'Query all notifications'
+            );
+            return res.status(200).json({ success: true, notifications: rows, page, limit });
+          }
+          rows = await withDbTimeout(
+            db.select().from(notifications)
+              .where(or(eq(notifications.userId, targetUserId), eq(notifications.userId, 'all'), eq(notifications.userId, caller.role)))
+              .orderBy(desc(notifications.createdAt))
+              .limit(limit)
+              .offset(offset),
+            10000,
+            'Query user notifications'
+          );
+          if (rows.length > 0) {
+            return res.status(200).json({ success: true, notifications: rows, page, limit });
+          }
+        } catch (dbErr: any) {
+          console.warn('[API] Notice querying notifications from DB:', dbErr.message);
+        }
+      }
+
+      const memNotifs = memoryStore.getNotifications(isAdmin && !req.query.userId ? undefined : targetUserId);
+      return res.status(200).json({
+        success: true,
+        notifications: memNotifs.slice(offset, offset + limit),
+        total: memNotifs.length,
+        page,
+        limit,
+      });
     } catch (err: any) {
-      return res.status(200).json({ notifications: [] });
+      return res.status(500).json({ error: err?.message || 'Failed to load notifications.', code: 'NOTIFICATIONS_FETCH_FAILED', status: 500 });
     }
   });
 
   // POST /api/notifications
-  app.post('/api/notifications', async (req, res) => {
+  app.post('/api/notifications', requireAuth, async (req, res) => {
     try {
-      const { userId, title, message, type, sentBy } = req.body;
+      const caller = (req as any).user;
+      const isAdmin = caller.role === 'admin' || caller.role === 'subadmin';
+      const { userId, title, message, type, sentBy } = req.body || {};
       if (!userId || !title || !message) {
-        return res.status(400).json({ error: 'Missing required notification fields' });
+        return res.status(400).json({ error: 'Missing required notification fields', code: 'VALIDATION_ERROR', status: 400 });
       }
+      if (!isAdmin && userId !== caller.id && userId !== 'all') {
+        return res.status(403).json({ error: 'Forbidden: Only administrators can dispatch notifications to other users.', code: 'FORBIDDEN', status: 403 });
+      }
+
       const newNotif = {
         id: 'notif_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6),
-        userId,
-        title,
-        message,
-        type: type || 'webapp',
-        sentBy: sentBy || 'System',
+        userId: String(userId),
+        title: String(title),
+        message: String(message),
+        type: String(type || 'webapp'),
+        sentBy: String(sentBy || caller.name || 'System'),
         createdAt: new Date().toISOString(),
         read: false
       };
       memoryStore.addNotification(newNotif);
+
+      if (isDbConnected() && db) {
+        try {
+          await withDbTimeout(db.insert(notifications).values(newNotif), 10000, 'Insert notification');
+        } catch (dbErr: any) {
+          console.warn('[API] Notice inserting notification into DB:', dbErr.message);
+        }
+      }
+
       return res.status(201).json({ success: true, notification: newNotif });
     } catch (err: any) {
-      return res.status(500).json({ error: err.message });
+      return res.status(500).json({ error: err.message, code: 'NOTIFICATION_CREATE_FAILED', status: 500 });
     }
   });
 
   // PUT /api/notifications/:id/read
-  app.put('/api/notifications/:id/read', async (req, res) => {
+  app.put('/api/notifications/:id/read', requireAuth, async (req, res) => {
     try {
+      const caller = (req as any).user;
       const { id } = req.params;
       memoryStore.markNotificationRead(id);
+
+      if (isDbConnected() && db) {
+        try {
+          const isAdmin = caller.role === 'admin' || caller.role === 'subadmin';
+          if (isAdmin) {
+            await withDbTimeout(db.update(notifications).set({ read: true }).where(eq(notifications.id, id)), 8000, 'Mark notification read');
+          } else {
+            await withDbTimeout(
+              db.update(notifications).set({ read: true }).where(and(eq(notifications.id, id), or(eq(notifications.userId, caller.id), eq(notifications.userId, 'all')))),
+              8000,
+              'Mark user notification read'
+            );
+          }
+        } catch (dbErr: any) {
+          console.warn('[API] Notice updating notification read state:', dbErr.message);
+        }
+      }
       return res.status(200).json({ success: true });
     } catch (err: any) {
-      return res.status(500).json({ error: err.message });
+      return res.status(500).json({ error: err.message, code: 'NOTIFICATION_UPDATE_FAILED', status: 500 });
     }
   });
 
   // POST /api/notifications/mark-all-read
-  app.post('/api/notifications/mark-all-read', async (req, res) => {
+  app.post('/api/notifications/mark-all-read', requireAuth, async (req, res) => {
     try {
-      const { userId } = req.body;
-      if (userId) {
-        memoryStore.markAllNotificationsRead(String(userId));
+      const caller = (req as any).user;
+      const isAdmin = caller.role === 'admin' || caller.role === 'subadmin';
+      const targetUserId = isAdmin && req.body?.userId ? String(req.body.userId) : caller.id;
+      memoryStore.markAllNotificationsRead(targetUserId);
+
+      if (isDbConnected() && db) {
+        try {
+          await withDbTimeout(
+            db.update(notifications).set({ read: true }).where(eq(notifications.userId, targetUserId)),
+            8000,
+            'Mark all notifications read'
+          );
+        } catch (dbErr: any) {
+          console.warn('[API] Notice marking all notifications read:', dbErr.message);
+        }
       }
       return res.status(200).json({ success: true });
     } catch (err: any) {
-      return res.status(500).json({ error: err.message });
+      return res.status(500).json({ error: err.message, code: 'NOTIFICATIONS_MARK_ALL_FAILED', status: 500 });
     }
   });
 
   // ==========================================
-  // PAYMENTS & ESCROW LEDGER
+  // PAYMENTS & ESCROW LEDGER (Authenticated, Role-Scoped & Paginated)
   // ==========================================
 
   // GET /api/payments
-  app.get('/api/payments', async (req, res) => {
+  app.get('/api/payments', requireAuth, async (req, res) => {
     try {
+      const caller = (req as any).user;
+      const isAdmin = caller.role === 'admin' || caller.role === 'subadmin';
       const { studentId, assignmentId } = req.query;
-      const paymentRecords = memoryStore.getPayments(
-        studentId ? String(studentId) : undefined,
-        assignmentId ? String(assignmentId) : undefined
-      );
-      return res.status(200).json({ payments: paymentRecords });
+      const page = Math.max(1, parseInt((req.query.page as string) || '1', 10) || 1);
+      const limit = Math.min(200, Math.max(1, parseInt((req.query.limit as string) || '50', 10) || 50));
+      const offset = (page - 1) * limit;
+
+      const scopedStudentId = isAdmin ? (studentId ? String(studentId) : undefined) : (caller.role === 'student' ? caller.id : '__none__');
+      let paymentRecords = memoryStore.getPayments(scopedStudentId, assignmentId ? String(assignmentId) : undefined);
+
+      if (caller.role === 'tutor' && !isAdmin) {
+        const tutorOrderIds = new Set(memoryStore.getOrders(undefined, caller.id).map((o) => o.id));
+        paymentRecords = memoryStore.getPayments(undefined, assignmentId ? String(assignmentId) : undefined).filter((p) => tutorOrderIds.has(p.assignmentId));
+      }
+
+      const total = paymentRecords.length;
+      return res.status(200).json({
+        success: true,
+        payments: paymentRecords.slice(offset, offset + limit),
+        total,
+        page,
+        limit,
+      });
     } catch (err: any) {
-      return res.status(200).json({ payments: [] });
+      return res.status(500).json({ error: err?.message || 'Failed to load payments.', code: 'PAYMENTS_FETCH_FAILED', status: 500 });
     }
   });
 
   // POST /api/payments
-  app.post('/api/payments', async (req, res) => {
+  app.post('/api/payments', requireAuth, async (req, res) => {
     try {
-      const { assignmentId, studentId, amount, status, type, notes } = req.body;
+      const caller = (req as any).user;
+      const isAdmin = caller.role === 'admin' || caller.role === 'subadmin';
+      const { assignmentId, studentId, amount, status, type, notes } = req.body || {};
       if (!assignmentId || amount === undefined) {
-        return res.status(400).json({ error: 'Missing required assignmentId or amount.' });
+        return res.status(400).json({ error: 'Missing required assignmentId or amount.', code: 'VALIDATION_ERROR', status: 400 });
       }
+
+      const effectiveStudentId = isAdmin && studentId ? String(studentId) : caller.id;
       const paymentId = 'pay_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6);
       const newPayment = {
         id: paymentId,
         assignmentId,
-        studentId: studentId || null,
+        studentId: effectiveStudentId,
         amount: Number(amount),
         status: status || 'escrow',
         stripePaymentIntent: req.body.stripePaymentIntent || `pi_3Pqz_${Date.now()}_ut_escrow`,
@@ -6083,8 +6895,7 @@ export async function createApp(options: CreateAppOptions = {}) {
       };
       memoryStore.setPayment(newPayment as any);
 
-      // If advance payment was made, update assignment status
-      const existingOrder = memoryStore.getOrders().find(o => o.id === assignmentId);
+      const existingOrder = memoryStore.getOrders().find((o) => o.id === assignmentId);
       if (existingOrder) {
         const orderUpdates: any = { escrowStatus: newPayment.status };
         if (existingOrder.status === 'Pending Tutor Assignment' || existingOrder.status === 'pending') {
@@ -6093,16 +6904,16 @@ export async function createApp(options: CreateAppOptions = {}) {
         memoryStore.updateOrder(assignmentId, orderUpdates);
       }
 
-      await logAudit('PAYMENT_DEPOSIT', `Payment recorded: $${amount} for assignment #${assignmentId}`, studentId, undefined, 'student', req);
+      await logAudit('PAYMENT_DEPOSIT', `Payment recorded: $${amount} for assignment #${assignmentId}`, effectiveStudentId, caller.name, caller.role, req);
 
       return res.status(201).json({ success: true, payment: newPayment });
     } catch (err: any) {
-      return res.status(500).json({ error: err.message });
+      return res.status(500).json({ error: err.message, code: 'PAYMENT_CREATE_FAILED', status: 500 });
     }
   });
 
   // PUT /api/payments/:id
-  app.put('/api/payments/:id', async (req, res) => {
+  app.put('/api/payments/:id', requireRole('admin', 'subadmin'), async (req, res) => {
     try {
       const { id } = req.params;
       const updates = { ...req.body };
@@ -6110,29 +6921,42 @@ export async function createApp(options: CreateAppOptions = {}) {
       const updated = memoryStore.updatePayment(id, updates);
       return res.status(200).json({ success: true, payment: updated });
     } catch (err: any) {
-      return res.status(500).json({ error: err.message });
+      return res.status(500).json({ error: err.message, code: 'PAYMENT_UPDATE_FAILED', status: 500 });
     }
   });
 
   // ==========================================
-  // INVOICES & STATEMENTS
+  // INVOICES & STATEMENTS (Authenticated, Role-Scoped & Paginated)
   // ==========================================
 
   // GET /api/invoices
-  app.get('/api/invoices', async (req, res) => {
+  app.get('/api/invoices', requireAuth, async (req, res) => {
     try {
-      const { studentId } = req.query;
-      const invList = memoryStore.getInvoices(studentId ? String(studentId) : undefined);
-      return res.status(200).json({ invoices: invList });
+      const caller = (req as any).user;
+      const isAdmin = caller.role === 'admin' || caller.role === 'subadmin';
+      const page = Math.max(1, parseInt((req.query.page as string) || '1', 10) || 1);
+      const limit = Math.min(200, Math.max(1, parseInt((req.query.limit as string) || '50', 10) || 50));
+      const offset = (page - 1) * limit;
+
+      const scopedStudentId = isAdmin ? (req.query.studentId ? String(req.query.studentId) : undefined) : caller.id;
+      const invList = memoryStore.getInvoices(scopedStudentId);
+
+      return res.status(200).json({
+        success: true,
+        invoices: invList.slice(offset, offset + limit),
+        total: invList.length,
+        page,
+        limit,
+      });
     } catch (err: any) {
-      return res.status(200).json({ invoices: [] });
+      return res.status(500).json({ error: err?.message || 'Failed to load invoices.', code: 'INVOICES_FETCH_FAILED', status: 500 });
     }
   });
 
   // POST /api/invoices
-  app.post('/api/invoices', async (req, res) => {
+  app.post('/api/invoices', requireRole('admin', 'subadmin'), async (req, res) => {
     try {
-      const data = req.body;
+      const data = req.body || {};
       const invoiceId = data.id || 'inv_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6);
       const newInvoice = {
         id: invoiceId,
@@ -6154,12 +6978,12 @@ export async function createApp(options: CreateAppOptions = {}) {
       await logAudit('INVOICE_CREATE', `Invoice created: $${newInvoice.totalAmount} (${invoiceId})`, data.studentId, data.studentName, 'admin', req);
       return res.status(201).json({ success: true, invoice: newInvoice });
     } catch (err: any) {
-      return res.status(500).json({ error: err.message });
+      return res.status(500).json({ error: err.message, code: 'INVOICE_CREATE_FAILED', status: 500 });
     }
   });
 
   // PUT /api/invoices/:id
-  app.put('/api/invoices/:id', async (req, res) => {
+  app.put('/api/invoices/:id', requireRole('admin', 'subadmin'), async (req, res) => {
     try {
       const { id } = req.params;
       const updates = { ...req.body };
@@ -6167,29 +6991,39 @@ export async function createApp(options: CreateAppOptions = {}) {
       const updated = memoryStore.updateInvoice(id, updates);
       return res.status(200).json({ success: true, invoice: updated });
     } catch (err: any) {
-      return res.status(500).json({ error: err.message });
+      return res.status(500).json({ error: err.message, code: 'INVOICE_UPDATE_FAILED', status: 500 });
     }
   });
 
   // ==========================================
-  // BLOGS (Educational Guides & Academic Articles)
+  // BLOGS (Educational Guides & Academic Articles, Paginated)
   // ==========================================
 
   // GET /api/blogs (Public)
   app.get('/api/blogs', async (req, res) => {
     try {
       const { category } = req.query;
+      const page = Math.max(1, parseInt((req.query.page as string) || '1', 10) || 1);
+      const limit = Math.min(200, Math.max(1, parseInt((req.query.limit as string) || '50', 10) || 50));
+      const offset = (page - 1) * limit;
 
       if (isDbConnected() && db) {
         try {
           let rows: any[] = [];
           if (category && category !== 'All') {
-            rows = await db.select().from(blogs).where(eq(blogs.category, String(category))).orderBy(desc(blogs.publishedAt));
+            rows = await withDbTimeout(
+              db.select().from(blogs).where(eq(blogs.category, String(category))).orderBy(desc(blogs.publishedAt)),
+              10000,
+              'Query category blogs'
+            );
           } else {
-            rows = await db.select().from(blogs).orderBy(desc(blogs.publishedAt));
+            rows = await withDbTimeout(
+              db.select().from(blogs).orderBy(desc(blogs.publishedAt)),
+              10000,
+              'Query all blogs'
+            );
           }
 
-          // If DB table is empty, auto-seed default blogs into DB
           if (rows.length === 0 && (!category || category === 'All')) {
             for (const b of DEFAULT_20_BLOGS) {
               await db.insert(blogs).values({
@@ -6205,11 +7039,10 @@ export async function createApp(options: CreateAppOptions = {}) {
                 updatedAt: b.publishedAt,
               }).onConflictDoNothing();
             }
-            rows = await db.select().from(blogs).orderBy(desc(blogs.publishedAt));
+            rows = await withDbTimeout(db.select().from(blogs).orderBy(desc(blogs.publishedAt)), 10000, 'Re-select seeded blogs');
           }
 
           if (rows.length > 0) {
-            // Also sync to memoryStore cache
             for (const r of rows) {
               memoryStore.setBlog({
                 ...r,
@@ -6218,20 +7051,31 @@ export async function createApp(options: CreateAppOptions = {}) {
                 tags: typeof r.tags === 'string' ? JSON.parse(r.tags) : (r.tags || []),
               });
             }
-            return res.status(200).json({ blogs: rows });
+            return res.status(200).json({
+              success: true,
+              blogs: rows.slice(offset, offset + limit),
+              total: rows.length,
+              page,
+              limit,
+            });
           }
         } catch (dbErr: any) {
           console.warn('[API] Notice querying blogs from DB:', dbErr.message);
         }
       }
 
-      // Memory Store fallback
       let memBlogs = memoryStore.getBlogs(category as string | undefined);
       if (memBlogs.length === 0) {
         memBlogs = memoryStore.resetDefaultBlogs();
       }
 
-      return res.status(200).json({ blogs: memBlogs });
+      return res.status(200).json({
+        success: true,
+        blogs: memBlogs.slice(offset, offset + limit),
+        total: memBlogs.length,
+        page,
+        limit,
+      });
     } catch (err: any) {
       console.error('[API] Error in GET /api/blogs:', err);
       return res.status(200).json({ blogs: memoryStore.getBlogs() });
@@ -6438,10 +7282,19 @@ export async function createApp(options: CreateAppOptions = {}) {
   });
 
   // ==========================================
-  // HEALTH CHECK ROUTE
+  // HEALTH CHECK & STRUCTURED API FALLBACKS
   // ==========================================
   app.get("/health", (_req, res) => {
-    res.status(200).json({ status: "ok" });
+    res.status(200).json({ status: "ok", dbConnected: isDbConnected() });
+  });
+
+  // Unknown API route JSON 404 (never return HTML for missing /api/* routes)
+  app.all('/api/*', (req, res) => {
+    return res.status(404).json({
+      error: `API route not found: ${req.method} ${req.path}`,
+      code: 'NOT_FOUND',
+      status: 404,
+    });
   });
 
   // ==========================================
@@ -6474,15 +7327,31 @@ export async function createApp(options: CreateAppOptions = {}) {
         app.use('/assets', express.static(assetsDir, {
           maxAge: '1y',
           immutable: true,
+          setHeaders: (res, filePath) => {
+            if (filePath.toLowerCase().endsWith('.avif')) {
+              res.setHeader('Content-Type', 'image/avif');
+            } else if (filePath.toLowerCase().endsWith('.webp')) {
+              res.setHeader('Content-Type', 'image/webp');
+            }
+          },
         }));
       }
 
-      // Other static files (favicon, logo, icons) get 1 day cache
+      // Static files: long immutable caching for versioned logo variants, 7-day SWR for stable filenames, no-cache for HTML
       app.use(express.static(distPath, {
-        maxAge: '1d',
+        maxAge: '7d',
         setHeaders: (res, filePath) => {
+          if (filePath.toLowerCase().endsWith('.avif')) {
+            res.setHeader('Content-Type', 'image/avif');
+          } else if (filePath.toLowerCase().endsWith('.webp')) {
+            res.setHeader('Content-Type', 'image/webp');
+          }
           if (filePath.endsWith('.html')) {
             res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+          } else if (/(logo-\d+|logo_transparent-\d+)\.(avif|webp)$/i.test(filePath)) {
+            res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+          } else if (/\.(avif|webp|jpe?g|png|svg|ico|woff2?)$/i.test(filePath)) {
+            res.setHeader('Cache-Control', 'public, max-age=604800, stale-while-revalidate=2592000');
           }
         },
       }));
@@ -6493,6 +7362,20 @@ export async function createApp(options: CreateAppOptions = {}) {
       });
     }
   }
+
+  // Global Express Error Handler (4 args) - guarantees single structured JSON response on unhandled errors
+  app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
+    if (res.headersSent) {
+      return next(err);
+    }
+    const status = Number(err?.statusCode || err?.status) || 500;
+    const code = String(err?.code || (status === 504 ? 'TIMEOUT' : 'INTERNAL_ERROR'));
+    const safeMsg = status >= 500 && NODE_ENV === 'production'
+      ? (status === 504 ? 'The server took too long to respond. Please try again.' : 'An unexpected server error occurred.')
+      : (err?.message || 'Internal server error');
+    console.error(`[API-ERR] ${JSON.stringify({ method: req.method, path: normalizeMetricRoute(req.originalUrl || req.url), status, code })}`);
+    return res.status(status).json({ error: safeMsg, code, status });
+  });
 
   return app;
 }

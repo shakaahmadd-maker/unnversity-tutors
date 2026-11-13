@@ -30,8 +30,11 @@ import {
   Clock,
   Sparkles
 } from 'lucide-react';
+import { ResponsiveAvatar } from './ResponsiveImage';
 import { User, UserRole } from '../types';
 import { store } from '../lib/store';
+import { apiFetch, getFriendlyErrorMessage } from '../lib/apiClient';
+import { ErrorStatePanel } from './ui/StatePanels';
 
 interface UserDataPageProps {
   users?: User[];
@@ -48,6 +51,7 @@ export default function UserDataPage({
 }: UserDataPageProps) {
   const [usersList, setUsersList] = useState<User[]>(propUsers || store.users || []);
   const [searchQuery, setSearchQuery] = useState('');
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
   const [selectedRole, setSelectedRole] = useState<'all' | 'student' | 'tutor' | 'admin' | 'subadmin'>('all');
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'suspended'>('all');
   const [verificationFilter, setVerificationFilter] = useState<'all' | 'verified' | 'unverified'>('all');
@@ -55,10 +59,18 @@ export default function UserDataPage({
   const [pageSize, setPageSize] = useState<number>(20);
   const [currentPage, setCurrentPage] = useState<number>(1);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [refreshError, setRefreshError] = useState<string | null>(null);
   const [copiedText, setCopiedText] = useState<string | null>(null);
   const [selectedUserForDetail, setSelectedUserForDetail] = useState<User | null>(null);
   const [detailTab, setDetailTab] = useState<'overview' | 'academic' | 'json'>('overview');
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearchQuery(searchQuery);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
 
   // Sync propUsers or store updates
   useEffect(() => {
@@ -88,14 +100,15 @@ export default function UserDataPage({
   // Manual refresh from backend API
   const handleRefreshData = async () => {
     setIsRefreshing(true);
+    setRefreshError(null);
     try {
-      const res = await fetch('/api/users', { credentials: 'include' });
-      if (res.ok) {
-        const data = await res.json();
-        if (data.users && Array.isArray(data.users)) {
-          setUsersList(data.users);
-          showToast(`Successfully refreshed ${data.users.length} user records!`);
-        }
+      const res = await apiFetch('/api/users?limit=500', { credentials: 'include' });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok && data.users && Array.isArray(data.users)) {
+        setUsersList(data.users);
+        showToast(`Successfully refreshed ${data.users.length} user records!`);
+      } else if (!res.ok) {
+        throw new Error(data?.error || `HTTP ${res.status} loading user records`);
       } else {
         await store.fetchData();
         setUsersList(store.users);
@@ -103,6 +116,7 @@ export default function UserDataPage({
       }
     } catch (e: any) {
       console.error('Failed to refresh user data:', e);
+      setRefreshError(getFriendlyErrorMessage(e));
       showToast('Error syncing with database.');
     } finally {
       setIsRefreshing(false);
@@ -180,8 +194,8 @@ export default function UserDataPage({
       if (verificationFilter === 'unverified' && user.verified) return false;
 
       // Search Query
-      if (searchQuery.trim()) {
-        const q = searchQuery.toLowerCase().trim();
+      if (debouncedSearchQuery.trim()) {
+        const q = debouncedSearchQuery.toLowerCase().trim();
         const matchName = user.name?.toLowerCase().includes(q);
         const matchEmail = user.email?.toLowerCase().includes(q);
         const matchId = user.id?.toLowerCase().includes(q);
@@ -215,7 +229,7 @@ export default function UserDataPage({
       }
       return 0;
     });
-  }, [usersList, selectedRole, statusFilter, verificationFilter, searchQuery, sortBy]);
+  }, [usersList, selectedRole, statusFilter, verificationFilter, debouncedSearchQuery, sortBy]);
 
   // Pagination calculation
   const totalRecords = filteredUsers.length;
@@ -391,7 +405,14 @@ export default function UserDataPage({
       </section>
 
       {/* Main Filter & Table Content */}
-      <section className="container mx-auto px-4 md:px-8 max-w-7xl mt-8">
+      <section className="container mx-auto px-4 md:px-8 max-w-7xl mt-8 space-y-4">
+        {refreshError && (
+          <ErrorStatePanel
+            title="Unable to refresh users"
+            message={refreshError}
+            onRetry={handleRefreshData}
+          />
+        )}
         <div className="bg-white rounded-3xl border border-slate-200/90 shadow-sm overflow-hidden">
           
           {/* Controls Bar: Search, Role Selector, Filters */}
@@ -571,13 +592,13 @@ export default function UserDataPage({
                         <td className="py-3.5 px-4 sm:px-6">
                           <div className="flex items-center gap-3">
                             <div className="relative shrink-0">
-                              <img
-                                src={user.avatarUrl || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=120&auto=format&fit=crop&q=80'}
+                              <ResponsiveAvatar
+                                src={user.avatarUrl}
                                 alt={user.name || 'User'}
+                                sizePx={48}
+                                width={40}
+                                height={40}
                                 className="w-10 h-10 rounded-full object-cover border border-slate-200 shadow-2xs"
-                                onError={(e) => {
-                                  (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=120&auto=format&fit=crop&q=80';
-                                }}
                               />
                               {user.verified && (
                                 <span className="absolute -bottom-0.5 -right-0.5 bg-emerald-500 text-white rounded-full p-0.5 shadow-xs" title="Verified Account">
@@ -882,13 +903,12 @@ export default function UserDataPage({
               </button>
 
               <div className="flex items-center gap-4">
-                <img
-                  src={selectedUserForDetail.avatarUrl || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=120&auto=format&fit=crop&q=80'}
+                <ResponsiveAvatar
+                  src={selectedUserForDetail.avatarUrl}
                   alt={selectedUserForDetail.name}
+                  sizePx={64}
+                  loading="eager"
                   className="w-16 h-16 rounded-2xl object-cover border-2 border-white/20 shadow-md"
-                  onError={(e) => {
-                    (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=120&auto=format&fit=crop&q=80';
-                  }}
                 />
                 <div>
                   <div className="flex items-center gap-2 flex-wrap">

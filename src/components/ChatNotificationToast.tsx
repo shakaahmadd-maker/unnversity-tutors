@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { MessageSquare, X, Volume2, VolumeX, ArrowRight, Sparkles } from 'lucide-react';
 import { audioNotifier, ToastNotification } from '../utils/audioNotification';
+import { ResponsiveAvatar } from './ResponsiveImage';
 
 interface ChatNotificationToastProps {
   notifications: ToastNotification[];
@@ -43,9 +44,12 @@ export default function ChatNotificationToast({
         >
           {/* Avatar / Icon */}
           <div className="relative shrink-0">
-            <img
-              src={toast.senderAvatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=120'}
+            <ResponsiveAvatar
+              src={toast.senderAvatar}
               alt={toast.senderName}
+              sizePx={48}
+              width={40}
+              height={40}
               className="w-10 h-10 rounded-full object-cover border-2 border-orange-100 shadow-xs"
             />
             <span className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 bg-emerald-500 border-2 border-white rounded-full"></span>

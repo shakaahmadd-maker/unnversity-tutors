@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Calendar, 
   Clock, 
@@ -13,9 +13,14 @@ import {
   TrendingUp,
   Sliders,
   Inbox,
-  User as UserIcon
+  User as UserIcon,
+  Search
 } from 'lucide-react';
 import { User, Assignment, AssignmentStatus, Chat, Message, Payment, Review, AssignmentReport, UserRole } from '../types';
+import type { TabLoadState } from '../lib/store';
+import ErrorBoundary from './ErrorBoundary';
+import { TabLoadingSkeleton, ErrorStatePanel, PaginationBar } from './ui/StatePanels';
+import { ResponsiveAvatar } from './ResponsiveImage';
 
 interface TutorDashboardProps {
   currentUser: User;
@@ -30,6 +35,9 @@ interface TutorDashboardProps {
   assignmentReports: AssignmentReport[];
   onCreateReport: (reportData: Omit<AssignmentReport, 'id' | 'status' | 'createdAt'>) => Promise<string>;
   onUpdateReportStatus: (reportId: string, status: AssignmentReport['status'], feedback?: string) => Promise<boolean>;
+  onLoadTab?: (tab: string, force?: boolean) => Promise<void> | void;
+  tabStates?: Record<string, TabLoadState>;
+  syncError?: string | null;
 }
 
 export default function TutorDashboard({
@@ -44,16 +52,38 @@ export default function TutorDashboard({
   onSelectChat,
   assignmentReports = [],
   onCreateReport,
-  onUpdateReportStatus
+  onUpdateReportStatus,
+  onLoadTab,
+  tabStates = {},
+  syncError = null
 }: TutorDashboardProps) {
 
   const [activeTab, setActiveTab] = useState<'assignments' | 'chats' | 'reports' | 'calendar' | 'reviews'>('assignments');
   const [deliveryFile, setDeliveryFile] = useState<string>('');
   const [deliverySuccess, setDeliverySuccess] = useState<string | null>(null);
+  const [isSubmittingReport, setIsSubmittingReport] = useState(false);
+  const [reportNotice, setReportNotice] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [assignSearch, setAssignSearch] = useState('');
+  const [debouncedAssignSearch, setDebouncedAssignSearch] = useState('');
+  const [assignPage, setAssignPage] = useState(1);
   
   // Calendar states
   const [newSyllabusDate, setNewSyllabusDate] = useState('');
   const [slotsList, setSlotsList] = useState<string[]>(currentUser.availableSlots || []);
+
+  useEffect(() => {
+    if (onLoadTab) {
+      onLoadTab(activeTab);
+    }
+  }, [activeTab, onLoadTab]);
+
+  useEffect(() => {
+    const t = setTimeout(() => {
+      setDebouncedAssignSearch(assignSearch);
+      setAssignPage(1);
+    }, 300);
+    return () => clearTimeout(t);
+  }, [assignSearch]);
 
   // Filter values for current tutor (supports both ID and name assignments)
   const tutorAssignments = assignments.filter(a => 
@@ -124,6 +154,26 @@ export default function TutorDashboard({
     setSlotsList(prev => prev.filter((_, i) => i !== idx));
   };
 
+  const filteredTutorAssignments = tutorAssignments.filter(a =>
+    !debouncedAssignSearch.trim() ||
+    a.title.toLowerCase().includes(debouncedAssignSearch.toLowerCase()) ||
+    a.subject.toLowerCase().includes(debouncedAssignSearch.toLowerCase())
+  );
+  const TUTOR_PAGE_SIZE = 15;
+  const totalTutorAssignPages = Math.max(1, Math.ceil(filteredTutorAssignments.length / TUTOR_PAGE_SIZE));
+  const safeTutorAssignPage = Math.min(assignPage, totalTutorAssignPages);
+  const paginatedTutorAssignments = filteredTutorAssignments.slice(
+    (safeTutorAssignPage - 1) * TUTOR_PAGE_SIZE,
+    safeTutorAssignPage * TUTOR_PAGE_SIZE
+  );
+
+  const activeTabState = tabStates[`tutor:${activeTab}`];
+  const isInitialTabLoading =
+    Boolean(activeTabState?.loading) &&
+    !activeTabState?.loadedAt &&
+    ((activeTab === 'assignments' && tutorAssignments.length === 0) ||
+      (activeTab === 'chats' && tutorChats.length === 0));
+
   return (
     <div className="container mx-auto px-4 md:px-8 py-8 max-w-7xl font-sans text-left min-h-[75vh]" id="tutor-workspace">
       
@@ -165,7 +215,7 @@ export default function TutorDashboard({
                 key={tab.id}
                 id={`tutor-tab-${tab.id}`}
                 onClick={() => setActiveTab(tab.id as any)}
-                className={`flex w-full items-center gap-3 p-3 text-xs font-bold uppercase tracking-wider rounded-xl transition-all text-left ${
+                className={`flex w-full items-center gap-3 p-3 text-xs font-bold uppercase tracking-wider rounded-xl transition-all text-left cursor-pointer ${
                   activeTab === tab.id 
                     ? 'bg-orange-500 text-white shadow-sm' 
                     : 'text-gray-700 hover:bg-gray-100'
@@ -180,18 +230,43 @@ export default function TutorDashboard({
 
         {/* Content switch */}
         <div className="lg:col-span-3 space-y-6">
-          
+          <ErrorBoundary compact resetKey={activeTab} onReset={() => onLoadTab?.(activeTab, true)}>
+          {activeTabState?.error && (
+            <ErrorStatePanel
+              title="Could not sync workspace data"
+              message={activeTabState.error || syncError || 'Temporary network issue.'}
+              onRetry={() => onLoadTab?.(activeTab, true)}
+            />
+          )}
+
+          {isInitialTabLoading ? (
+            <TabLoadingSkeleton variant="cards" label={`Loading ${activeTab}...`} />
+          ) : (
+          <>
           {/* ASSIGNMENTS WORKLIST */}
           {activeTab === 'assignments' && (
             <div className="bg-white rounded-3xl border border-gray-150 overflow-hidden shadow-xs" id="tutor-assignments-block">
-              <div className="p-6 border-b border-gray-150">
-                <h3 className="font-bold text-base text-gray-955 font-sans tracking-tight">Assigned Homework & Dissertations</h3>
-                <p className="text-xs text-gray-400 mt-1 font-medium">Coordinate guidelines inside student chats, issue quotes, and upload finalized studies here.</p>
+              <div className="p-6 border-b border-gray-150 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div>
+                  <h3 className="font-bold text-base text-gray-955 font-sans tracking-tight">Assigned Homework & Dissertations</h3>
+                  <p className="text-xs text-gray-400 mt-1 font-medium">Coordinate guidelines inside student chats, issue quotes, and upload finalized studies here.</p>
+                </div>
+                <div className="relative w-full sm:w-64">
+                  <Search className="w-3.5 h-3.5 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                  <input
+                    type="text"
+                    value={assignSearch}
+                    onChange={(e) => setAssignSearch(e.target.value)}
+                    placeholder="Filter assignments..."
+                    className="w-full pl-8 pr-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs focus:outline-hidden focus:ring-1 focus:ring-orange-500"
+                  />
+                </div>
               </div>
 
-              {tutorAssignments.length > 0 ? (
+              {paginatedTutorAssignments.length > 0 ? (
+                <>
                 <div className="divide-y divide-gray-150">
-                  {tutorAssignments.map((a) => {
+                  {paginatedTutorAssignments.map((a) => {
                     const student = getStudent(a.studentId);
                     return (
                       <div key={a.id} id={`tutor-task-card-${a.id}`} className="p-6 space-y-4 hover:bg-gray-55/20 text-xs">
@@ -207,7 +282,7 @@ export default function TutorDashboard({
                           </div>
 
                           <div className="flex items-center gap-2 bg-gray-50 p-2.5 rounded-xl border">
-                            <img src={student?.avatarUrl} className="w-8 h-8 rounded-full border" alt="" />
+                            <ResponsiveAvatar src={student?.avatarUrl} alt="" sizePx={32} className="w-8 h-8 rounded-full border object-cover" />
                             <div className="text-left font-sans">
                               <span className="text-xs font-bold text-gray-800 block">{student?.name}</span>
                               <span className="text-[9.5px] text-orange-600 font-bold block uppercase tracking-wide">Pre-Selected Advisor</span>
@@ -260,6 +335,17 @@ export default function TutorDashboard({
                     );
                   })}
                 </div>
+                <div className="px-6 pb-4">
+                  <PaginationBar
+                    page={safeTutorAssignPage}
+                    totalPages={totalTutorAssignPages}
+                    totalItems={filteredTutorAssignments.length}
+                    pageSize={TUTOR_PAGE_SIZE}
+                    onPageChange={setAssignPage}
+                    itemLabel="assignments"
+                  />
+                </div>
+                </>
               ) : (
                 <div className="p-12 text-center bg-gray-50 rounded-2xl border border-dashed border-gray-200">
                   <FileCheck2 className="w-10 h-10 text-gray-300 mx-auto mb-3" />
@@ -331,7 +417,7 @@ export default function TutorDashboard({
                     return (
                       <div key={c.id} className="p-6 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 hover:bg-gray-50/50 transition-colors">
                         <div className="flex items-center gap-4 text-left">
-                          <img src={student?.avatarUrl || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150"} className="w-12 h-12 rounded-full border shadow-xs object-cover" alt="" />
+                          <ResponsiveAvatar src={student?.avatarUrl} alt="" sizePx={48} className="w-12 h-12 rounded-full border shadow-xs object-cover" />
                           <div className="space-y-1">
                             <h4 className="font-bold text-sm text-gray-955 font-sans">{student?.name || 'Academic Student'}</h4>
                             <p className="text-xs text-gray-450 truncate max-w-sm">
@@ -379,17 +465,20 @@ export default function TutorDashboard({
 
                 <form onSubmit={async (e) => {
                   e.preventDefault();
-                  const targetAssignId = (e.currentTarget.elements.namedItem('assignId') as HTMLSelectElement).value;
-                  const reportNotes = (e.currentTarget.elements.namedItem('notes') as HTMLTextAreaElement).value;
-                  const attachmentUrl = (e.currentTarget.elements.namedItem('attachmentUrl') as HTMLInputElement).value;
+                  const form = e.currentTarget;
+                  const targetAssignId = (form.elements.namedItem('assignId') as HTMLSelectElement).value;
+                  const reportNotes = (form.elements.namedItem('notes') as HTMLTextAreaElement).value;
+                  const attachmentUrl = (form.elements.namedItem('attachmentUrl') as HTMLInputElement).value;
 
                   const assignment = tutorAssignments.find(a => a.id === targetAssignId);
                   if (!assignment) {
-                    alert("Please select a valid assigned project.");
+                    setReportNotice({ type: 'error', text: 'Please select a valid assigned project.' });
                     return;
                   }
 
                   const student = getStudent(assignment.studentId);
+                  setIsSubmittingReport(true);
+                  setReportNotice(null);
                   try {
                     await onCreateReport({
                       assignmentId: assignment.id,
@@ -401,12 +490,26 @@ export default function TutorDashboard({
                       reportNotes,
                       attachmentUrl: attachmentUrl || undefined
                     });
-                    alert("Academic report submitted successfully to administrative panel for compliance check!");
-                    e.currentTarget.reset();
-                  } catch (err) {
-                    alert("Failed to submit assignment report. Please trace parameters and try again.");
+                    setReportNotice({ type: 'success', text: 'Academic report submitted successfully for administrative review!' });
+                    form.reset();
+                  } catch {
+                    setReportNotice({ type: 'error', text: 'Failed to submit assignment report. Please verify fields and retry.' });
+                  } finally {
+                    setIsSubmittingReport(false);
                   }
                 }} className="space-y-4 text-xs font-medium text-gray-700 text-left">
+                  {reportNotice && (
+                    <div
+                      role="status"
+                      className={`p-3 rounded-xl border text-xs font-semibold ${
+                        reportNotice.type === 'success'
+                          ? 'bg-emerald-50 border-emerald-200 text-emerald-800'
+                          : 'bg-red-50 border-red-200 text-red-700'
+                      }`}
+                    >
+                      {reportNotice.text}
+                    </div>
+                  )}
                   
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="space-y-2">
@@ -448,10 +551,11 @@ export default function TutorDashboard({
                   <div className="flex justify-end pt-2">
                     <button
                       type="submit"
+                      disabled={isSubmittingReport}
                       id="tutor-submit-report-btn"
-                      className="bg-orange-500 hover:bg-orange-650 text-white font-bold text-xs px-6 py-3 rounded-xl transition-all cursor-pointer shadow-sm"
+                      className="bg-orange-500 hover:bg-orange-650 disabled:opacity-55 text-white font-bold text-xs px-6 py-3 rounded-xl transition-all cursor-pointer shadow-sm"
                     >
-                      🚀 Submit to Admin for Approval
+                      {isSubmittingReport ? 'Submitting...' : 'Submit to Admin for Approval'}
                     </button>
                   </div>
                 </form>
@@ -497,16 +601,20 @@ export default function TutorDashboard({
                               <button
                                 id={`tutor-send-report-student-${rep.id}`}
                                 onClick={async () => {
-                                  const ok = await onUpdateReportStatus(rep.id, 'sent_to_student');
-                                  if (ok) {
-                                    alert("Report successfully dispatched directly to the student portal!");
-                                  } else {
-                                    alert("Failed to send report. Please try again.");
+                                  try {
+                                    const ok = await onUpdateReportStatus(rep.id, 'sent_to_student');
+                                    setReportNotice(
+                                      ok
+                                        ? { type: 'success', text: 'Report dispatched directly to the student portal!' }
+                                        : { type: 'error', text: 'Failed to send report. Please try again.' }
+                                    );
+                                  } catch {
+                                    setReportNotice({ type: 'error', text: 'Failed to send report. Please try again.' });
                                   }
                                 }}
                                 className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs px-4 py-2 rounded-xl cursor-pointer shadow-sm shrink-0 font-sans"
                               >
-                                🚀 Send to Student
+                                Send to Student
                               </button>
                             )}
                           </div>
@@ -550,7 +658,7 @@ export default function TutorDashboard({
                 <div className="space-y-4">
                   {tutorReviews.map((rev) => (
                     <div key={rev.id} className="p-4 border rounded-2xl bg-gray-50 flex items-start gap-3.5 text-left text-xs">
-                      <img src={rev.studentAvatar} className="w-8 h-8 rounded-full border object-cover shrink-0" alt="" />
+                      <ResponsiveAvatar src={rev.studentAvatar} alt="" sizePx={32} className="w-8 h-8 rounded-full border object-cover shrink-0" />
                       <div className="space-y-1.5 flex-1">
                         <div className="flex justify-between items-center">
                           <span className="font-bold text-xs text-gray-900 block leading-none">{rev.studentName}</span>
@@ -576,7 +684,9 @@ export default function TutorDashboard({
               )}
             </div>
           )}
-
+          </>
+          )}
+          </ErrorBoundary>
         </div>
 
       </div>

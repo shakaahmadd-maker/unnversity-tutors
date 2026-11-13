@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import { UserRole } from '../types';
 import { store } from '../lib/store';
+import { apiFetch, getFriendlyErrorMessage, isAbortError } from '../lib/apiClient';
 
 interface AuthPageProps {
   onLogin: (email: string, password?: string) => Promise<boolean>;
@@ -120,24 +121,35 @@ export default function AuthPage({ onLogin, onRegister, onNavigate }: AuthPagePr
     }
   }, []);
 
+  // Surface session expiry notice if redirected from dashboard
+  useEffect(() => {
+    if (store.sessionExpiredMessage) {
+      setErrorMsg(store.sessionExpiredMessage);
+    }
+  }, []);
+
   // Fetch configured OAuth providers from backend on mount
   useEffect(() => {
-    let cancelled = false;
-    fetch('/api/auth/providers', { credentials: 'include' })
+    const controller = new AbortController();
+    apiFetch('/api/auth/providers', { credentials: 'include', signal: controller.signal })
       .then(res => (res.ok ? res.json() : null))
       .then(data => {
-        if (!cancelled && data?.providers) {
+        if (!controller.signal.aborted && data?.providers) {
           setProviders(prev => ({ ...prev, ...data.providers }));
         }
       })
-      .catch(() => {})
+      .catch((err) => {
+        if (!isAbortError(err)) {
+          console.warn('OAuth providers lookup error:', err);
+        }
+      })
       .finally(() => {
-        if (!cancelled) {
+        if (!controller.signal.aborted) {
           setProvidersLoaded(true);
         }
       });
     return () => {
-      cancelled = true;
+      controller.abort();
     };
   }, []);
 
@@ -199,6 +211,7 @@ export default function AuthPage({ onLogin, onRegister, onNavigate }: AuthPagePr
 
   const handleForgotPasswordSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSubmitting) return;
     setErrorMsg('');
     setSuccessMsg('');
 
@@ -207,6 +220,7 @@ export default function AuthPage({ onLogin, onRegister, onNavigate }: AuthPagePr
       return;
     }
 
+    setIsSubmitting(true);
     try {
       await store.requestPasswordReset(resetEmail.trim());
       setSuccessMsg(`If an account exists for ${resetEmail.trim()}, a password reset token has been sent to that email address.`);
@@ -215,12 +229,15 @@ export default function AuthPage({ onLogin, onRegister, onNavigate }: AuthPagePr
       setIsResetPasswordView(true);
       setResetTokenInput('');
     } catch (err: any) {
-      setErrorMsg(err.message || 'Unable to process password reset request. Please try again later.');
+      setErrorMsg(getFriendlyErrorMessage(err));
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
   const handleResetPasswordSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSubmitting) return;
     setErrorMsg('');
     setSuccessMsg('');
 
@@ -234,6 +251,7 @@ export default function AuthPage({ onLogin, onRegister, onNavigate }: AuthPagePr
       return;
     }
 
+    setIsSubmitting(true);
     try {
       const success = await store.resetPassword(
         resetEmail.trim(),
@@ -252,7 +270,9 @@ export default function AuthPage({ onLogin, onRegister, onNavigate }: AuthPagePr
         setErrorMsg('Invalid or expired security token. Please request a new token.');
       }
     } catch (err: any) {
-      setErrorMsg(err.message || 'Invalid or expired security token. Please request a new token.');
+      setErrorMsg(getFriendlyErrorMessage(err));
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -366,7 +386,7 @@ export default function AuthPage({ onLogin, onRegister, onNavigate }: AuthPagePr
     setActiveOAuthProvider(providerKey);
 
     try {
-      const res = await fetch(`/api/auth/${providerKey}/url`, {
+      const res = await apiFetch(`/api/auth/${providerKey}/url`, {
         method: 'GET',
         credentials: 'include',
         headers: { Accept: 'application/json' },
@@ -438,13 +458,26 @@ export default function AuthPage({ onLogin, onRegister, onNavigate }: AuthPagePr
             className="inline-block cursor-pointer group transition-transform hover:scale-105 mb-1 focus:outline-none"
             aria-label="University Tutors Home"
           >
-            <img 
-              src="/logo.webp" 
-              alt="University Tutors" 
-              width={220}
-              height={84}
-              className="h-12 sm:h-14 w-auto max-w-[200px] sm:max-w-[230px] object-contain mx-auto"
-            />
+            <picture>
+              <source
+                type="image/avif"
+                srcSet="/logo-220.avif 220w, /logo-440.avif 440w"
+                sizes="220px"
+              />
+              <source
+                type="image/webp"
+                srcSet="/logo-220.webp 220w, /logo-440.webp 440w"
+                sizes="220px"
+              />
+              <img 
+                src="/logo.webp" 
+                alt="University Tutors" 
+                width={220}
+                height={84}
+                decoding="async"
+                className="h-12 sm:h-14 w-auto max-w-[200px] sm:max-w-[230px] object-contain mx-auto"
+              />
+            </picture>
           </button>
           <p className="text-xs text-slate-500 font-medium">
             Student &amp; Academic Portal

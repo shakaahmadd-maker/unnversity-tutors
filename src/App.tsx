@@ -1,13 +1,15 @@
-import React, { useState, useEffect, lazy, Suspense } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, lazy, Suspense } from 'react';
 import Header from './components/Header';
-import Footer from './components/Footer';
+const Footer = lazy(() => import('./components/Footer'));
 import CookieBanner from './components/CookieBanner';
+import ErrorBoundary from './components/ErrorBoundary';
+import { apiFetch } from './lib/apiClient';
 
 // Dynamic code splitting for performance and fast First Contentful Paint
 const SopModal = lazy(() => import('./components/SopModal'));
 const AuthPage = lazy(() => import('./components/AuthPage'));
 const AdminLoginPage = lazy(() => import('./components/AdminLoginPage'));
-const MarketingPages = lazy(() => import('./components/MarketingPages'));
+import MarketingPages from './components/MarketingPages';
 const StudentDashboard = lazy(() => import('./components/StudentDashboard'));
 const TutorDashboard = lazy(() => import('./components/TutorDashboard'));
 const AdminDashboard = lazy(() => import('./components/AdminDashboard'));
@@ -26,23 +28,25 @@ const DataDeletionPage = lazy(() => import('./components/DataDeletionPage'));
 const ToolsHub = lazy(() => import('./components/tools/ToolsHub'));
 const ScienceToolsRouter = lazy(() => import('./components/tools/ScienceToolsRouter'));
 const MathToolsRouter = lazy(() => import('./components/tools/MathToolsRouter'));
-import ChatNotificationToast from './components/ChatNotificationToast';
+const ChatNotificationToast = lazy(() => import('./components/ChatNotificationToast'));
 import { audioNotifier, ToastNotification } from './utils/audioNotification';
-import { COUNTRY_ONLINE_TUTORING_PAGES } from './data/countryOnlineTutoringData';
-import { SPECIALIZED_SERVICE_PAGES_MAP } from './data/specializedTutoringServicesData';
 import { resolveDedicatedServiceRoute } from './data/dedicatedServiceRoutes';
-import { STUDENT_TOOLS_BY_SLUG, resolveStudentToolSlug } from './data/studentToolsData';
-import { resolveScienceRoute } from './data/scienceToolsRegistry';
-import { resolveMathRoute } from './data/mathToolsRegistry';
+import {
+  matchMathRouteView,
+  matchScienceRouteView,
+  matchStudentToolRoute,
+  matchStudentToolSlug,
+  isSpecializedServiceSlug,
+} from './data/toolRouteMatchers';
 import { updatePageSeo } from './utils/seo';
 
 import { store } from './lib/store';
-import { UserRole, Chat, User, Assignment, Payment, Invoice, ActivityLog, AppNotification, SOP, AssignmentReport, Agreement } from './types';
-import { Sparkles, HelpCircle, MessageSquare } from 'lucide-react';
+import { UserRole, Chat, User } from './types';
+import { AlertCircle, X } from 'lucide-react';
 
 export default function App() {
   
-  // React render sync state for Local Storage changes
+  // React render sync state for Store updates
   const [storeState, setStoreState] = useState({
     currentUser: store.currentUser,
     users: store.users,
@@ -65,7 +69,11 @@ export default function App() {
     emails: store.emails || [],
     connectionStatus: store.connectionStatus || 'syncing',
     lastSyncTime: store.lastSyncTime || null,
-    syncError: store.syncError || null
+    syncError: store.syncError || null,
+    sessionExpiredMessage: store.sessionExpiredMessage || null,
+    tabStates: store.tabStates || {},
+    isLoadingMessages: store.isLoadingMessages || false,
+    chatError: store.chatError || null
   });
 
   const [activeView, setActiveView] = useState<string>('home');
@@ -144,109 +152,133 @@ export default function App() {
 
   // Automated Technical SEO: Canonicalization, parameter stripping, and dynamic metadata sync
   useEffect(() => {
-    let title = 'University Tutors - Expert Academic Mentorship & Tutoring';
-    let description = 'Verified 1-on-1 expert academic tutoring, assignment guidance, coursework support, and study consultations across major universities.';
-    let canonicalPath = '/';
+    let cancelled = false;
+    const defaultTitle = 'University Tutors - Expert Academic Mentorship & Tutoring';
+    const defaultDesc = 'Verified 1-on-1 expert academic tutoring, assignment guidance, coursework support, and study consultations across major universities.';
 
-    if (activeView === 'country-online-tutoring') {
-      const pageData = COUNTRY_ONLINE_TUTORING_PAGES[activeCountryTutoringSlug];
-      if (pageData) {
-        title = pageData.seoTitle || pageData.h1;
-        description = pageData.paragraphs?.[0] || description;
-        canonicalPath = `/online-tutoring-${activeCountryTutoringSlug}`;
-      }
-    } else if (activeView === 'specialized-service') {
-      const sPage = SPECIALIZED_SERVICE_PAGES_MAP[activeSpecializedServiceSlug] || SPECIALIZED_SERVICE_PAGES_MAP['/' + activeSpecializedServiceSlug];
-      if (sPage) {
-        title = sPage.seoTitle || sPage.h1;
-        description = sPage.summary || description;
-        canonicalPath = `/${activeSpecializedServiceSlug}`;
-      }
-    } else if (resolveDedicatedServiceRoute(activeView)) {
-      const dService = resolveDedicatedServiceRoute(activeView)!;
-      title = dService.seoTitle;
-      description = dService.seoDescription;
-      canonicalPath = dService.path;
-    } else if (activeView === 'services') {
-      title = 'Academic Tutoring Services - University Tutors';
-      canonicalPath = '/services';
-    } else if (activeView === 'about') {
-      title = 'About Us - University Tutors Founding Mission';
-      canonicalPath = '/about-us';
-    } else if (activeView === 'faqs') {
-      title = 'Frequently Asked Questions - University Tutors';
-      canonicalPath = '/faqs';
-    } else if (activeView === 'contact') {
-      title = 'Contact Advising Team - University Tutors';
-      canonicalPath = '/contact-us';
-    } else if (activeView === 'blog') {
-      title = 'Academic Integrity Blog & Study Guides - University Tutors';
-      canonicalPath = '/our-blog';
-    } else if (activeView === 'tutors-directory' || activeView === 'tutors') {
-      title = 'Find Verified University Mentors & Tutors - University Tutors';
-      canonicalPath = '/tutors';
-    } else if (activeView === 'get-a-quote') {
-      title = 'Get a Binding Milestone Quote - University Tutors';
-      canonicalPath = '/get-a-quote';
-    } else if (activeView === 'privacy') {
-      title = 'Privacy Policy & Data Compliance - University Tutors';
-      canonicalPath = '/privacy';
-    } else if (activeView === 'terms') {
-      title = 'Terms of Service & Escrow Safeguards - University Tutors';
-      canonicalPath = '/terms';
-    } else if (activeView === 'user-data') {
-      title = 'Platform User Data & Directory - University Tutors';
-      description = 'Complete platform user registry of students, credentialed tutors, and administrators with real-time verification status.';
-      canonicalPath = '/user-data';
-    } else if (activeView === 'data-deletion') {
-      title = 'User Data Deletion Instructions - University Tutors';
-      description = 'Instructions on how to request the permanent deletion of your account and personal data from University Tutors, compliant with Meta, GDPR, and global standards.';
-      canonicalPath = '/data-deletion';
-    } else if (activeView === 'tools') {
-      title = 'Free Online Student Tools Suite — PDF, Citations, Charts, CV & GPA | University Tutors';
-      description = 'Free, 100% private browser-based academic & STEM calculators for university students: Biology & Genetics Simulators, Chemistry & Spectroscopy Calculators, PDF Merger, Citations & CGPA.';
-      canonicalPath = '/tools';
-    } else if (resolveMathRoute(activeView)) {
-      const mRoute = resolveMathRoute(activeView)!;
-      if (mRoute.kind === 'hub') {
-        title = 'Free University Mathematics & Statistics Calculators (27 Tools) | University-Tutors.com';
-        description = '27 free interactive browser-based Mathematics & Statistics solvers: Algebra, Unit Circle, Symbolic Derivatives, Riemann Integrals, Matrix RREF, Eigenvalues, Hypothesis Testing, RK4 ODEs & RSA.';
-        canonicalPath = '/tools/math';
-      } else {
-        title = mRoute.tool.seoTitle;
-        description = mRoute.tool.seoDescription;
-        canonicalPath = mRoute.tool.path;
-      }
-    } else if (resolveScienceRoute(activeView)) {
-      const sciRoute = resolveScienceRoute(activeView)!;
-      if (sciRoute.kind === 'hub') {
-        if (sciRoute.category === 'Biology') {
-          title = 'Free Biology, Genetics & Molecular Lab Calculators (14 Tools) | University-Tutors.com';
-          description = '14 free interactive browser-based Biology calculators: Punnett Square, DNA/RNA/Protein Translator, PCR Master Mix, CRISPR gRNA, Agarose Gel Simulator, Hardy-Weinberg, CFU/mL & Water Potential.';
-          canonicalPath = '/tools/biology';
-        } else {
-          title = 'Free Chemistry, Stoichiometry & Spectroscopy Calculators (16 Tools) | University-Tutors.com';
-          description = '16 free interactive browser-based Chemistry calculators: Periodic Table, Molar Mass, Equation Balancer, Limiting Reagent, Henderson-Hasselbalch Buffer, Titration, Nernst, VSEPR & NMR/IR Lookup.';
-          canonicalPath = '/tools/chemistry';
+    const applySeo = async () => {
+      let title = defaultTitle;
+      let description = defaultDesc;
+      let canonicalPath = '/';
+
+      if (activeView === 'country-online-tutoring') {
+        const { COUNTRY_ONLINE_TUTORING_PAGES } = await import('./data/countryOnlineTutoringData');
+        const pageData = COUNTRY_ONLINE_TUTORING_PAGES[activeCountryTutoringSlug];
+        if (pageData) {
+          title = pageData.seoTitle || pageData.h1;
+          description = pageData.paragraphs?.[0] || description;
+          canonicalPath = `/online-tutoring-${activeCountryTutoringSlug}`;
         }
-      } else {
-        title = sciRoute.tool.seoTitle;
-        description = sciRoute.tool.seoDescription;
-        canonicalPath = sciRoute.tool.path;
+      } else if (activeView === 'specialized-service') {
+        const { SPECIALIZED_SERVICE_PAGES_MAP } = await import('./data/specializedTutoringServicesData');
+        const sPage = SPECIALIZED_SERVICE_PAGES_MAP[activeSpecializedServiceSlug] || SPECIALIZED_SERVICE_PAGES_MAP['/' + activeSpecializedServiceSlug];
+        if (sPage) {
+          title = sPage.seoTitle || sPage.h1;
+          description = sPage.summary || description;
+          canonicalPath = `/${activeSpecializedServiceSlug}`;
+        }
+      } else if (resolveDedicatedServiceRoute(activeView)) {
+        const dService = resolveDedicatedServiceRoute(activeView)!;
+        title = dService.seoTitle;
+        description = dService.seoDescription;
+        canonicalPath = dService.path;
+      } else if (activeView === 'services') {
+        title = 'Academic Tutoring Services - University Tutors';
+        canonicalPath = '/services';
+      } else if (activeView === 'about') {
+        title = 'About Us - University Tutors Founding Mission';
+        canonicalPath = '/about-us';
+      } else if (activeView === 'faqs') {
+        title = 'Frequently Asked Questions - University Tutors';
+        canonicalPath = '/faqs';
+      } else if (activeView === 'contact') {
+        title = 'Contact Advising Team - University Tutors';
+        canonicalPath = '/contact-us';
+      } else if (activeView === 'blog') {
+        title = 'Academic Integrity Blog & Study Guides - University Tutors';
+        canonicalPath = '/our-blog';
+      } else if (activeView === 'tutors-directory' || activeView === 'tutors') {
+        title = 'Find Verified University Mentors & Tutors - University Tutors';
+        canonicalPath = '/tutors';
+      } else if (activeView === 'get-a-quote') {
+        title = 'Get a Binding Milestone Quote - University Tutors';
+        canonicalPath = '/get-a-quote';
+      } else if (activeView === 'privacy') {
+        title = 'Privacy Policy & Data Compliance - University Tutors';
+        canonicalPath = '/privacy';
+      } else if (activeView === 'terms') {
+        title = 'Terms of Service & Escrow Safeguards - University Tutors';
+        canonicalPath = '/terms';
+      } else if (activeView === 'user-data') {
+        title = 'Platform User Data & Directory - University Tutors';
+        description = 'Complete platform user registry of students, credentialed tutors, and administrators with real-time verification status.';
+        canonicalPath = '/user-data';
+      } else if (activeView === 'data-deletion') {
+        title = 'User Data Deletion Instructions - University Tutors';
+        description = 'Instructions on how to request the permanent deletion of your account and personal data from University Tutors, compliant with Meta, GDPR, and global standards.';
+        canonicalPath = '/data-deletion';
+      } else if (activeView === 'tools') {
+        title = 'Free Online Student Tools Suite — PDF, Citations, Charts, CV & GPA | University Tutors';
+        description = 'Free, 100% private browser-based academic & STEM calculators for university students: Biology & Genetics Simulators, Chemistry & Spectroscopy Calculators, PDF Merger, Citations & CGPA.';
+        canonicalPath = '/tools';
+      } else if (matchMathRouteView(activeView)) {
+        const { resolveMathRoute } = await import('./data/mathToolsRegistry');
+        const mRoute = resolveMathRoute(activeView);
+        if (mRoute) {
+          if (mRoute.kind === 'hub') {
+            title = 'Free University Mathematics & Statistics Calculators (27 Tools) | University-Tutors.com';
+            description = '27 free interactive browser-based Mathematics & Statistics solvers: Algebra, Unit Circle, Symbolic Derivatives, Riemann Integrals, Matrix RREF, Eigenvalues, Hypothesis Testing, RK4 ODEs & RSA.';
+            canonicalPath = '/tools/math';
+          } else {
+            title = mRoute.tool.seoTitle;
+            description = mRoute.tool.seoDescription;
+            canonicalPath = mRoute.tool.path;
+          }
+        }
+      } else if (matchScienceRouteView(activeView)) {
+        const { resolveScienceRoute } = await import('./data/scienceToolsRegistry');
+        const sciRoute = resolveScienceRoute(activeView);
+        if (sciRoute) {
+          if (sciRoute.kind === 'hub') {
+            if (sciRoute.category === 'Biology') {
+              title = 'Free Biology, Genetics & Molecular Lab Calculators (14 Tools) | University-Tutors.com';
+              description = '14 free interactive browser-based Biology calculators: Punnett Square, DNA/RNA/Protein Translator, PCR Master Mix, CRISPR gRNA, Agarose Gel Simulator, Hardy-Weinberg, CFU/mL & Water Potential.';
+              canonicalPath = '/tools/biology';
+            } else {
+              title = 'Free Chemistry, Stoichiometry & Spectroscopy Calculators (16 Tools) | University-Tutors.com';
+              description = '16 free interactive browser-based Chemistry calculators: Periodic Table, Molar Mass, Equation Balancer, Limiting Reagent, Henderson-Hasselbalch Buffer, Titration, Nernst, VSEPR & NMR/IR Lookup.';
+              canonicalPath = '/tools/chemistry';
+            }
+          } else {
+            title = sciRoute.tool.seoTitle;
+            description = sciRoute.tool.seoDescription;
+            canonicalPath = sciRoute.tool.path;
+          }
+        }
+      } else if (matchStudentToolSlug(activeView)) {
+        const toolSlug = matchStudentToolSlug(activeView)!;
+        const { STUDENT_TOOLS_BY_SLUG } = await import('./data/studentToolsData');
+        const toolDef = STUDENT_TOOLS_BY_SLUG[toolSlug as keyof typeof STUDENT_TOOLS_BY_SLUG];
+        if (toolDef) {
+          title = toolDef.seoTitle;
+          description = toolDef.seoDescription;
+          canonicalPath = toolDef.path;
+        }
       }
-    } else if (resolveStudentToolSlug(activeView)) {
-      const toolSlug = resolveStudentToolSlug(activeView)!;
-      const toolDef = STUDENT_TOOLS_BY_SLUG[toolSlug];
-      title = toolDef.seoTitle;
-      description = toolDef.seoDescription;
-      canonicalPath = toolDef.path;
-    }
 
-    updatePageSeo({
-      title,
-      description,
-      canonicalPath
-    });
+      if (!cancelled) {
+        updatePageSeo({
+          title,
+          description,
+          canonicalPath
+        });
+      }
+    };
+
+    void applySeo();
+    return () => {
+      cancelled = true;
+    };
   }, [activeView, activeCountryTutoringSlug, activeSpecializedServiceSlug]);
 
   useEffect(() => {
@@ -274,11 +306,26 @@ export default function App() {
         emails: store.emails || [],
         connectionStatus: store.connectionStatus || 'syncing',
         lastSyncTime: store.lastSyncTime || null,
-        syncError: store.syncError || null
+        syncError: store.syncError || null,
+        sessionExpiredMessage: store.sessionExpiredMessage || null,
+        tabStates: store.tabStates || {},
+        isLoadingMessages: store.isLoadingMessages || false,
+        chatError: store.chatError || null
       });
     });
     return () => unsubscribe();
   }, []);
+
+  // Redirect to login cleanly if session expires while viewing dashboard
+  useEffect(() => {
+    if (storeState.sessionExpiredMessage && activeView === 'dashboard') {
+      setActiveChat(null);
+      setActiveView('auth');
+      if (typeof window !== 'undefined') {
+        window.history.replaceState(null, '', '/auth');
+      }
+    }
+  }, [storeState.sessionExpiredMessage, activeView]);
 
   // Global listener for OAuth popup completion — verifies backend session before redirecting
   useEffect(() => {
@@ -376,55 +423,34 @@ export default function App() {
       return;
     }
 
-    const matchedMathRoute = resolveMathRoute(view);
-    if (matchedMathRoute) {
+    const matchedMathView = matchMathRouteView(view);
+    if (matchedMathView) {
       setSelectedTutorProfile(null);
-      if (matchedMathRoute.kind === 'hub') {
-        setActiveView('tools/math');
-        window.history.pushState(null, '', '/tools/math');
-      } else {
-        setActiveView(matchedMathRoute.tool.viewKey);
-        window.history.pushState(null, '', matchedMathRoute.tool.path);
-      }
+      setActiveView(matchedMathView);
+      window.history.pushState(null, '', '/' + matchedMathView);
       window.scrollTo({ top: 0, behavior: 'smooth' });
       return;
     }
 
-    const matchedScienceRoute = resolveScienceRoute(view);
-    if (matchedScienceRoute) {
+    const matchedScienceView = matchScienceRouteView(view);
+    if (matchedScienceView) {
       setSelectedTutorProfile(null);
-      if (matchedScienceRoute.kind === 'hub') {
-        const hubKey = matchedScienceRoute.category === 'Biology' ? 'tools/biology' : 'tools/chemistry';
-        setActiveView(hubKey);
-        window.history.pushState(null, '', '/' + hubKey);
-      } else {
-        setActiveView(matchedScienceRoute.tool.viewKey);
-        window.history.pushState(null, '', matchedScienceRoute.tool.path);
-      }
+      setActiveView(matchedScienceView);
+      window.history.pushState(null, '', '/' + matchedScienceView);
       window.scrollTo({ top: 0, behavior: 'smooth' });
       return;
     }
 
-    const matchedToolSlug = resolveStudentToolSlug(view);
-    if (matchedToolSlug) {
-      const toolDef = STUDENT_TOOLS_BY_SLUG[matchedToolSlug];
+    const matchedTool = matchStudentToolRoute(view);
+    if (matchedTool) {
       setSelectedTutorProfile(null);
-      setActiveView(toolDef.viewKey);
-      window.history.pushState(null, '', toolDef.path);
+      setActiveView(matchedTool.viewKey);
+      window.history.pushState(null, '', matchedTool.path);
       window.scrollTo({ top: 0, behavior: 'smooth' });
       return;
     }
 
-    if (
-      view === 'assignment-guidance' ||
-      view.startsWith('assignment-guidance-') ||
-      view === 'coursework-tutoring' ||
-      view.startsWith('coursework-tutoring-') ||
-      view === 'writing-tutoring' ||
-      view.startsWith('writing-tutoring-') ||
-      Boolean(SPECIALIZED_SERVICE_PAGES_MAP[view]) ||
-      Boolean(SPECIALIZED_SERVICE_PAGES_MAP['/' + view])
-    ) {
+    if (isSpecializedServiceSlug(view)) {
       const cleanSlug = view.replace(/^\//, '').toLowerCase().trim();
       setActiveSpecializedServiceSlug(cleanSlug);
       setSelectedTutorProfile(null);
@@ -555,6 +581,16 @@ export default function App() {
       }
     }
     
+    if (
+      view === 'tutors' ||
+      view === 'tutors-directory' ||
+      view === 'user-data' ||
+      view === 'get-a-quote' ||
+      view.startsWith('online-tutoring-')
+    ) {
+      void store.ensureFullDirectoryLoaded();
+    }
+
     window.history.pushState(null, '', path);
     setActiveView(view);
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -579,34 +615,26 @@ export default function App() {
         setSelectedTutorProfile(null);
         setActiveView('tools');
       } else if (
-        resolveMathRoute(decodedPath) ||
-        resolveMathRoute(hash)
+        matchMathRouteView(decodedPath) ||
+        matchMathRouteView(hash)
       ) {
-        const mRoute = (resolveMathRoute(decodedPath) || resolveMathRoute(hash))!;
+        const mView = (matchMathRouteView(decodedPath) || matchMathRouteView(hash))!;
         setSelectedTutorProfile(null);
-        if (mRoute.kind === 'hub') {
-          setActiveView('tools/math');
-        } else {
-          setActiveView(mRoute.tool.viewKey);
-        }
+        setActiveView(mView);
       } else if (
-        resolveScienceRoute(decodedPath) ||
-        resolveScienceRoute(hash)
+        matchScienceRouteView(decodedPath) ||
+        matchScienceRouteView(hash)
       ) {
-        const sci = (resolveScienceRoute(decodedPath) || resolveScienceRoute(hash))!;
+        const sciView = (matchScienceRouteView(decodedPath) || matchScienceRouteView(hash))!;
         setSelectedTutorProfile(null);
-        if (sci.kind === 'hub') {
-          setActiveView(sci.category === 'Biology' ? 'tools/biology' : 'tools/chemistry');
-        } else {
-          setActiveView(sci.tool.viewKey);
-        }
+        setActiveView(sciView);
       } else if (
-        (decodedPath.startsWith('/tools/') && resolveStudentToolSlug(decodedPath)) ||
-        (hash.startsWith('#tools/') && resolveStudentToolSlug(hash))
+        (decodedPath.startsWith('/tools/') && matchStudentToolRoute(decodedPath)) ||
+        (hash.startsWith('#tools/') && matchStudentToolRoute(hash))
       ) {
-        const slug = (resolveStudentToolSlug(decodedPath) || resolveStudentToolSlug(hash))!;
+        const matched = (matchStudentToolRoute(decodedPath) || matchStudentToolRoute(hash))!;
         setSelectedTutorProfile(null);
-        setActiveView(STUDENT_TOOLS_BY_SLUG[slug].viewKey);
+        setActiveView(matched.viewKey);
       } else if (resolveDedicatedServiceRoute(decodedPath) || resolveDedicatedServiceRoute(hash)) {
         const matchedService = (resolveDedicatedServiceRoute(decodedPath) || resolveDedicatedServiceRoute(hash))!;
         setSelectedTutorProfile(null);
@@ -723,19 +751,8 @@ export default function App() {
         setActiveCountryTutoringSlug(cleanKey || 'usa');
         setActiveView('country-online-tutoring');
       } else if (
-        decodedPath === '/assignment-guidance' ||
-        decodedPath.startsWith('/assignment-guidance-') ||
-        hash === '#assignment-guidance' ||
-        hash.startsWith('#assignment-guidance-') ||
-        decodedPath === '/coursework-tutoring' ||
-        decodedPath.startsWith('/coursework-tutoring-') ||
-        hash === '#coursework-tutoring' ||
-        hash.startsWith('#coursework-tutoring-') ||
-        decodedPath === '/writing-tutoring' ||
-        decodedPath.startsWith('/writing-tutoring-') ||
-        hash === '#writing-tutoring' ||
-        hash.startsWith('#writing-tutoring-') ||
-        Boolean(SPECIALIZED_SERVICE_PAGES_MAP[decodedPath.replace(/^\//, '')])
+        isSpecializedServiceSlug(decodedPath) ||
+        isSpecializedServiceSlug(hash)
       ) {
         const rawSlug = decodedPath.startsWith('/') ? decodedPath.slice(1) : (hash.startsWith('#') ? hash.slice(1) : decodedPath);
         const cleanSlug = rawSlug.split('?')[0].split('#')[0].trim();
@@ -830,31 +847,22 @@ export default function App() {
           handleNavigate('tools');
         } else if (
           (href.startsWith('/tools/math') || href.startsWith('#tools/math') || href.includes('university-tutors.com/tools/math')) &&
-          resolveMathRoute(href)
+          matchMathRouteView(href)
         ) {
           e.preventDefault();
-          const mRoute = resolveMathRoute(href)!;
-          handleNavigate(mRoute.kind === 'hub' ? 'tools/math' : mRoute.tool.viewKey);
+          handleNavigate(matchMathRouteView(href)!);
         } else if (
           (href.startsWith('/tools/') || href.startsWith('#tools/') || href.includes('university-tutors.com/tools/')) &&
-          resolveScienceRoute(href)
+          matchScienceRouteView(href)
         ) {
           e.preventDefault();
-          const sci = resolveScienceRoute(href)!;
-          handleNavigate(
-            sci.kind === 'hub'
-              ? sci.category === 'Biology'
-                ? 'tools/biology'
-                : 'tools/chemistry'
-              : sci.tool.viewKey
-          );
+          handleNavigate(matchScienceRouteView(href)!);
         } else if (
           (href.startsWith('/tools/') || href.startsWith('#tools/') || href.includes('university-tutors.com/tools/')) &&
-          resolveStudentToolSlug(href)
+          matchStudentToolRoute(href)
         ) {
           e.preventDefault();
-          const slug = resolveStudentToolSlug(href)!;
-          handleNavigate(STUDENT_TOOLS_BY_SLUG[slug].viewKey);
+          handleNavigate(matchStudentToolRoute(href)!.viewKey);
         } else if (href === '/services' || href === '#services') {
           e.preventDefault();
           handleNavigate('services');
@@ -1042,24 +1050,60 @@ export default function App() {
 
   const liveChat = activeChat ? storeState.chats.find(c => c.id === activeChat.id) || activeChat : null;
 
-  const handleSelectChat = (chat: Chat) => {
+  const handleSelectChat = useCallback((chat: Chat) => {
     setActiveChat(chat);
-  };
+  }, []);
 
-  const handleSendMessage = (chatId: string, senderId: string, content: string, fileUrl?: string, fileName?: string) => {
+  const handleSubscribeToChatDetails = useCallback((chatId: string) => {
+    return store.subscribeToChatDetails(chatId);
+  }, []);
+
+  const handleRefreshData = useCallback(() => {
+    return store.fetchData();
+  }, []);
+
+  const handleLoadStudentTab = useCallback((tab: string, force = false) => {
+    return store.loadDashboardTabData('student', tab, { force });
+  }, []);
+
+  const handleLoadTutorTab = useCallback((tab: string, force = false) => {
+    return store.loadDashboardTabData('tutor', tab, { force });
+  }, []);
+
+  const handleLoadAdminTab = useCallback((tab: string, force = false) => {
+    return store.loadDashboardTabData('admin', tab, { force });
+  }, []);
+
+  const handleMarkNotificationRead = useCallback((id: string) => {
+    return store.markNotificationRead(id);
+  }, []);
+
+  const handleMarkAllNotificationsRead = useCallback((userId: string) => {
+    return store.markAllNotificationsRead(userId);
+  }, []);
+
+  const handlePayAdvance = useCallback((assignmentId: string, amount: number) => {
+    return store.processAdvancePayment(assignmentId, amount);
+  }, []);
+
+  const handlePayBalance = useCallback((assignmentId: string, amount: number) => {
+    return store.processBalancePayment(assignmentId, amount);
+  }, []);
+
+  const handleSendMessage = useCallback((chatId: string, senderId: string, content: string, fileUrl?: string, fileName?: string) => {
     audioNotifier.playSentSound();
     return store.sendMessage(chatId, senderId, content, fileUrl, fileName);
-  };
+  }, []);
 
-  const handleMarkMessagesAsRead = (chatId: string, userId: string) => {
+  const handleMarkMessagesAsRead = useCallback((chatId: string, userId: string) => {
     store.markMessagesAsRead(chatId, userId);
-  };
+  }, []);
 
-  const handleSetTypingStatus = (chatId: string, role: UserRole, isTyping: boolean) => {
+  const handleSetTypingStatus = useCallback((chatId: string, role: UserRole, isTyping: boolean) => {
     store.setTypingStatus(chatId, role, isTyping);
-  };
+  }, []);
 
-  const handleOfferQuote = (
+  const handleOfferQuote = useCallback((
     chatId: string, 
     amount: number, 
     estimatedHours: number, 
@@ -1081,11 +1125,11 @@ export default function App() {
       advanceAmount,
       balanceAmount
     );
-  };
+  }, []);
 
-  const handleAcceptQuote = (quoteId: string) => {
+  const handleAcceptQuote = useCallback((quoteId: string) => {
     store.acceptQuote(quoteId);
-  };
+  }, []);
 
   // Administration actions
   const handleDeleteUser = (userId: string) => {
@@ -1172,9 +1216,8 @@ export default function App() {
     }
 
     try {
-      const response = await fetch('/api/create-privileged-user', {
+      const response = await apiFetch('/api/create-privileged-user', {
         method: 'POST',
-        credentials: 'include',
         headers: {
           'Content-Type': 'application/json',
         },
@@ -1187,7 +1230,7 @@ export default function App() {
       });
 
       if (!response.ok) {
-        const errData = await response.json();
+        const errData = await response.json().catch(() => ({}));
         throw new Error(errData.error || 'Server rejected request');
       }
 
@@ -1261,8 +1304,14 @@ export default function App() {
   };
 
   // Separate tutors to pass to dropdown triggers (only approved tutors visible on public website)
-  const mentorsList = storeState.users.filter(u => u.role === UserRole.TUTOR && (u.isApproved === true || u.status === 'approved' || (u.isApproved === undefined && u.status === undefined)));
-  const studentsList = storeState.users.filter(u => u.role === UserRole.STUDENT);
+  const mentorsList = useMemo(
+    () => storeState.users.filter(u => u.role === UserRole.TUTOR && (u.isApproved === true || u.status === 'approved' || (u.isApproved === undefined && u.status === undefined))),
+    [storeState.users]
+  );
+  const studentsList = useMemo(
+    () => storeState.users.filter(u => u.role === UserRole.STUDENT),
+    [storeState.users]
+  );
 
   return (
     <div className="flex flex-col min-h-screen bg-gray-50 text-gray-800 relative overflow-x-clip" id="university-tutors-root">
@@ -1271,6 +1320,36 @@ export default function App() {
       <div className="absolute -top-24 -right-24 w-96 h-96 bg-orange-100 rounded-full blur-3xl opacity-60 pointer-events-none z-0"></div>
       <div className="absolute top-1/3 -left-24 w-64 h-64 bg-orange-200 rounded-full blur-3xl opacity-40 pointer-events-none z-0"></div>
       <div className="absolute bottom-1/4 right-0 w-80 h-80 bg-orange-100 rounded-full blur-3xl opacity-30 pointer-events-none z-0"></div>
+
+      {/* Session Expiry Notification Banner */}
+      {storeState.sessionExpiredMessage && (
+        <div role="alert" className="bg-amber-50 border-b border-amber-200 px-4 py-2.5 text-xs text-amber-900 flex items-center justify-between gap-3 z-50">
+          <div className="flex items-center gap-2 font-medium">
+            <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
+            <span>{storeState.sessionExpiredMessage}</span>
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              type="button"
+              onClick={() => {
+                store.clearSessionExpiredMessage();
+                handleNavigate('auth');
+              }}
+              className="bg-orange-500 hover:bg-orange-600 text-white font-semibold px-3 py-1 rounded-lg cursor-pointer"
+            >
+              Sign In
+            </button>
+            <button
+              type="button"
+              onClick={() => store.clearSessionExpiredMessage()}
+              className="p-1 text-amber-700 hover:text-amber-950 cursor-pointer"
+              aria-label="Dismiss notice"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      )}
       
       {/* 1. Header (Online indicator, Quick switcher, Main Navigation links) */}
       {!(activeView === 'dashboard' && storeState.currentUser?.role === UserRole.STUDENT) && (
@@ -1287,8 +1366,9 @@ export default function App() {
 
       {/* Main viewport displays */}
       <main className="flex-1">
+        <ErrorBoundary resetKey={activeView} onReset={handleRefreshData}>
         <Suspense fallback={
-          <div className="min-h-[50vh] flex flex-col items-center justify-center py-24 gap-3 text-orange-600" id="view-suspense-loader">
+          <div className="min-h-[92vh] flex flex-col items-center justify-center py-24 gap-3 text-orange-600" id="view-suspense-loader">
             <div className="w-8 h-8 border-3 border-orange-500 border-t-transparent rounded-full animate-spin"></div>
             <span className="text-xs font-semibold text-gray-400">Loading page...</span>
           </div>
@@ -1326,7 +1406,7 @@ export default function App() {
                   onOpenChat={handleOpenChat}
                   onSelectChat={handleSelectChat}
                   onSendMessage={handleSendMessage}
-                  onSubscribeToChatDetails={(chatId) => store.subscribeToChatDetails(chatId)}
+                  onSubscribeToChatDetails={handleSubscribeToChatDetails}
                   onApproveWork={handleApproveWork}
                   onRaiseRevision={handleRaiseRevision}
                   onRaiseTicket={handleRaiseTicket}
@@ -1336,14 +1416,19 @@ export default function App() {
                   quotes={storeState.quotes}
                   onAcceptQuote={handleAcceptQuote}
                   appNotifications={storeState.appNotifications}
-                  onMarkNotificationRead={(id) => store.markNotificationRead(id)}
-                  onMarkAllNotificationsRead={(userId) => store.markAllNotificationsRead(userId)}
+                  onMarkNotificationRead={handleMarkNotificationRead}
+                  onMarkAllNotificationsRead={handleMarkAllNotificationsRead}
                   onUpdateProfile={(data) => store.updateUserProfile(currentActiveUser.id, data)}
                   invoices={storeState.invoices}
-                  onRefreshData={() => store.fetchData()}
+                  onRefreshData={handleRefreshData}
+                  onLoadTab={handleLoadStudentTab}
+                  tabStates={storeState.tabStates}
+                  isLoadingMessages={storeState.isLoadingMessages}
+                  chatError={storeState.chatError}
+                  syncError={storeState.syncError}
                   lastSyncTime={storeState.lastSyncTime}
-                  onPayAdvance={(assignmentId, amount) => store.processAdvancePayment(assignmentId, amount)}
-                  onPayBalance={(assignmentId, amount) => store.processBalancePayment(assignmentId, amount)}
+                  onPayAdvance={handlePayAdvance}
+                  onPayBalance={handlePayBalance}
                 />
               ) : currentActiveUser.role === UserRole.TUTOR ? (
                 <TutorDashboard 
@@ -1359,6 +1444,9 @@ export default function App() {
                   assignmentReports={storeState.assignmentReports}
                   onCreateReport={store.createAssignmentReport.bind(store)}
                   onUpdateReportStatus={store.updateAssignmentReportStatus.bind(store)}
+                  onLoadTab={handleLoadTutorTab}
+                  tabStates={storeState.tabStates}
+                  syncError={storeState.syncError}
                 />
               ) : (
                 <AdminDashboard 
@@ -1393,7 +1481,7 @@ export default function App() {
                   onDeleteChat={handleDeleteChat}
                   onSelectChat={handleSelectChat}
                   onSendMessage={handleSendMessage}
-                  onSubscribeToChatDetails={(chatId) => store.subscribeToChatDetails(chatId)}
+                  onSubscribeToChatDetails={handleSubscribeToChatDetails}
                   onGetOrCreateChat={store.getOrCreateChat.bind(store)}
 
                   onAssignTutor={store.assignTutorToAssignment.bind(store)}
@@ -1403,7 +1491,7 @@ export default function App() {
                   onDeleteAssignment={store.deleteAssignment.bind(store)}
                   onCreateAssignmentOrder={store.createAssignmentOrder.bind(store)}
                   onReleaseEscrow={store.releaseEscrow.bind(store)}
-                  onRefreshData={store.fetchData.bind(store)}
+                  onRefreshData={handleRefreshData}
                   onSettleInvoice={store.settleInvoice.bind(store)}
                   onCreateInvoice={store.createInvoice.bind(store)}
                   onSendNotification={store.sendAppNotification.bind(store)}
@@ -1413,6 +1501,10 @@ export default function App() {
                   emails={storeState.emails || []}
                   onSendTriggerEmail={store.sendTriggerEmail.bind(store)}
                   onSeedMockStudentData={store.seedMockStudentData.bind(store)}
+                  onLoadTab={handleLoadAdminTab}
+                  tabStates={storeState.tabStates}
+                  isLoadingMessages={storeState.isLoadingMessages}
+                  chatError={storeState.chatError}
                   connectionStatus={storeState.connectionStatus}
                   lastSyncTime={storeState.lastSyncTime}
                   syncError={storeState.syncError}
@@ -1485,11 +1577,8 @@ export default function App() {
               window.scrollTo({ top: 0, behavior: 'smooth' });
             }}
           />
-        ) : activeView === 'specialized-service' || 
-            Boolean(SPECIALIZED_SERVICE_PAGES_MAP[activeView]) ||
-            activeView.startsWith('assignment-guidance') ||
-            activeView.startsWith('coursework-tutoring') ||
-            activeView.startsWith('writing-tutoring') ? (
+        ) : activeView === 'specialized-service' ||
+            isSpecializedServiceSlug(activeView) ? (
           <SpecializedServicePage
             pageSlug={activeSpecializedServiceSlug}
             tutors={mentorsList}
@@ -1551,21 +1640,21 @@ export default function App() {
             currentUser={storeState.currentUser}
             onNavigate={handleNavigate}
           />
-        ) : Boolean(resolveMathRoute(activeView)) ? (
+        ) : Boolean(matchMathRouteView(activeView)) ? (
           <MathToolsRouter
-            route={resolveMathRoute(activeView)!}
+            activeView={activeView}
             onNavigate={handleNavigate}
             onOpenBecomeTutor={() => setIsBecomeTutorOpen(true)}
           />
-        ) : Boolean(resolveScienceRoute(activeView)) ? (
+        ) : Boolean(matchScienceRouteView(activeView)) ? (
           <ScienceToolsRouter
-            route={resolveScienceRoute(activeView)!}
+            activeView={activeView}
             onNavigate={handleNavigate}
             onOpenBecomeTutor={() => setIsBecomeTutorOpen(true)}
           />
-        ) : activeView === 'tools' || Boolean(resolveStudentToolSlug(activeView)) ? (
+        ) : activeView === 'tools' || Boolean(matchStudentToolSlug(activeView)) ? (
           <ToolsHub
-            activeToolSlug={resolveStudentToolSlug(activeView)}
+            activeView={activeView}
             onNavigate={handleNavigate}
             onOpenBecomeTutor={() => setIsBecomeTutorOpen(true)}
           />
@@ -1589,6 +1678,7 @@ export default function App() {
           />
         )}
         </Suspense>
+        </ErrorBoundary>
       </main>
 
       {/* Floating WhatsApp Instant Chat Trigger (Bottom Left) */}
@@ -1614,49 +1704,65 @@ export default function App() {
         </div>
       )}
 
-      {/* 2. Footer (target flags, starting pricing, keyword no-follow links, academic disclaimers) */}
+      {/* 2. Footer (lazy-loaded below the fold so initial homepage bundle skips 260 KB+ of footer/tool registries) */}
       {activeView !== 'dashboard' &&
         activeView !== 'tools' &&
-        !resolveMathRoute(activeView) &&
-        !resolveScienceRoute(activeView) &&
-        !resolveStudentToolSlug(activeView) && (
-          <Footer 
-            onNavigate={handleNavigate} 
-            onOpenBecomeTutor={() => setIsBecomeTutorOpen(true)}
-          />
+        !matchMathRouteView(activeView) &&
+        !matchScienceRouteView(activeView) &&
+        !matchStudentToolSlug(activeView) && (
+          <Suspense
+            fallback={
+              <footer
+                id="main-footer"
+                className="min-h-[900px] bg-[#ffeedd] border-t-2 border-[#ffab85]"
+                aria-hidden="true"
+              />
+            }
+          >
+            <Footer
+              onNavigate={handleNavigate}
+              onOpenBecomeTutor={() => setIsBecomeTutorOpen(true)}
+            />
+          </Suspense>
         )}
 
       {/* 3. Consent cookie banner disclosure */}
       <CookieBanner />
 
-      {/* Lazy Modals Suspense container */}
+      {/* Lazy Modals Suspense container — mounted only when actually opened so homepage skips downloading hidden modal chunks */}
       <Suspense fallback={null}>
         {/* Become a Tutor Application Modal */}
-        <BecomeTutorModal
-          isOpen={isBecomeTutorOpen}
-          onClose={() => setIsBecomeTutorOpen(false)}
-          onSubmit={async (data) => {
-            return await store.submitTutorApplication({
-              ...data,
-              isApproved: false,
-              status: 'pending'
-            });
-          }}
-        />
+        {isBecomeTutorOpen && (
+          <BecomeTutorModal
+            isOpen={isBecomeTutorOpen}
+            onClose={() => setIsBecomeTutorOpen(false)}
+            onSubmit={async (data) => {
+              return await store.submitTutorApplication({
+                ...data,
+                isApproved: false,
+                status: 'pending'
+              });
+            }}
+          />
+        )}
 
         {/* 4. Interactive SOP walkthrough modal */}
-        <SopModal 
-          isOpen={isSopModalOpen}
-          onClose={() => setIsSopModalOpen(false)}
-        />
+        {isSopModalOpen && (
+          <SopModal 
+            isOpen={isSopModalOpen}
+            onClose={() => setIsSopModalOpen(false)}
+          />
+        )}
 
         {/* 5. WhatsApp Instant Chat Modal */}
-        <WhatsAppChatModal 
-          isOpen={isWhatsAppModalOpen}
-          onClose={() => setIsWhatsAppModalOpen(false)}
-          currentUser={storeState.currentUser}
-          whatsappNumber="19178094906"
-        />
+        {isWhatsAppModalOpen && (
+          <WhatsAppChatModal 
+            isOpen={isWhatsAppModalOpen}
+            onClose={() => setIsWhatsAppModalOpen(false)}
+            currentUser={storeState.currentUser}
+            whatsappNumber="19178094906"
+          />
+        )}
 
         {/* 5. Assignment submission parameters modal (only accessible to student accounts) */}
         {isAssignModalOpen && storeState.currentUser && (
@@ -1694,6 +1800,9 @@ export default function App() {
                 quotes={storeState.quotes}
                 tutors={mentorsList}
                 students={studentsList}
+                isLoading={storeState.isLoadingMessages}
+                error={storeState.chatError}
+                onRetry={() => store.subscribeToChatDetails(liveChat.id)}
               />
             </div>
           </div>
@@ -1701,16 +1810,20 @@ export default function App() {
       </Suspense>
 
       {/* Floating incoming chat message notification toasts with chime music */}
-      <ChatNotificationToast 
-        notifications={activeToasts}
-        onDismiss={(id) => setActiveToasts(prev => prev.filter(t => t.id !== id))}
-        onOpenChat={(chatId) => {
-          const targetChat = storeState.chats.find(c => c.id === chatId);
-          if (targetChat) {
-            setActiveChat(targetChat);
-          }
-        }}
-      />
+      {activeToasts.length > 0 && (
+        <Suspense fallback={null}>
+          <ChatNotificationToast 
+            notifications={activeToasts}
+            onDismiss={(id) => setActiveToasts(prev => prev.filter(t => t.id !== id))}
+            onOpenChat={(chatId) => {
+              const targetChat = storeState.chats.find(c => c.id === chatId);
+              if (targetChat) {
+                setActiveChat(targetChat);
+              }
+            }}
+          />
+        </Suspense>
+      )}
 
     </div>
   );

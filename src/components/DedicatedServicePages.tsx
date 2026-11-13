@@ -27,6 +27,7 @@ import hero1on1Img from '../assets/images/hero_1on1_tutoring_1787387369345.jpg';
 import heroAssignmentImg from '../assets/images/hero_assignment_guidance_1787387387028.jpg';
 import heroCourseworkImg from '../assets/images/hero_coursework_tracks_1787387403661.jpg';
 import heroEssayImg from '../assets/images/hero_essay_rhetoric_1787387419893.jpg';
+import { ResponsiveAvatar, ResponsivePicture } from './ResponsiveImage';
 import {
   DEDICATED_SERVICE_ROUTES,
   getDedicatedServiceById,
@@ -401,11 +402,14 @@ export default function DedicatedServicePages({
 
                 {/* Hero Visual Banner with Relevant Image & Live Overlays */}
                 <div className="relative rounded-3xl overflow-hidden border border-gray-200/80 shadow-xl group">
-                  <img 
-                    src={hero1on1Img} 
-                    alt="1-on-1 Live Online Academic Tutoring with Interactive Digital Whiteboard" 
+                  <ResponsivePicture
+                    src={hero1on1Img}
+                    alt="1-on-1 Live Online Academic Tutoring with Interactive Digital Whiteboard"
+                    width={800}
+                    height={384}
+                    loading="eager"
+                    sizes="(max-width: 1024px) 95vw, 680px"
                     className="w-full h-72 sm:h-96 object-cover group-hover:scale-102 transition-transform duration-700"
-                    referrerPolicy="no-referrer"
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-gray-950/85 via-gray-950/30 to-transparent pointer-events-none"></div>
 
@@ -734,11 +738,14 @@ export default function DedicatedServicePages({
 
                 {/* Hero Visual Banner with Relevant Image & Overlays */}
                 <div className="relative rounded-3xl overflow-hidden border border-gray-200/80 shadow-xl group">
-                  <img 
-                    src={heroAssignmentImg} 
-                    alt="University student reviewing structured assignment rubrics and research blueprints" 
+                  <ResponsivePicture
+                    src={heroAssignmentImg}
+                    alt="University student reviewing structured assignment rubrics and research blueprints"
+                    width={800}
+                    height={384}
+                    loading="eager"
+                    sizes="(max-width: 1024px) 95vw, 680px"
                     className="w-full h-72 sm:h-96 object-cover group-hover:scale-102 transition-transform duration-700"
-                    referrerPolicy="no-referrer"
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-gray-950/85 via-gray-950/30 to-transparent pointer-events-none"></div>
 
@@ -910,11 +917,14 @@ export default function DedicatedServicePages({
 
                 {/* Hero Visual Banner with Relevant Image & Overlays */}
                 <div className="relative rounded-3xl overflow-hidden border border-gray-200/80 shadow-xl group">
-                  <img 
-                    src={heroCourseworkImg} 
-                    alt="University student in library tracking semester coursework syllabus and milestone roadmap" 
+                  <ResponsivePicture
+                    src={heroCourseworkImg}
+                    alt="University student in library tracking semester coursework syllabus and milestone roadmap"
+                    width={800}
+                    height={384}
+                    loading="eager"
+                    sizes="(max-width: 1024px) 95vw, 680px"
                     className="w-full h-72 sm:h-96 object-cover group-hover:scale-102 transition-transform duration-700"
-                    referrerPolicy="no-referrer"
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-gray-950/85 via-gray-950/30 to-transparent pointer-events-none"></div>
 
@@ -1082,11 +1092,14 @@ export default function DedicatedServicePages({
 
                 {/* Hero Visual Banner with Relevant Image & Overlays */}
                 <div className="relative rounded-3xl overflow-hidden border border-gray-200/80 shadow-xl group">
-                  <img 
-                    src={heroEssayImg} 
-                    alt="University student editing academic essay draft and style guides on desk" 
+                  <ResponsivePicture
+                    src={heroEssayImg}
+                    alt="University student editing academic essay draft and style guides on desk"
+                    width={800}
+                    height={384}
+                    loading="eager"
+                    sizes="(max-width: 1024px) 95vw, 680px"
                     className="w-full h-72 sm:h-96 object-cover group-hover:scale-102 transition-transform duration-700"
-                    referrerPolicy="no-referrer"
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-gray-950/85 via-gray-950/30 to-transparent pointer-events-none"></div>
 
@@ -1264,14 +1277,12 @@ export default function DedicatedServicePages({
               {/* Mentor 1 (Evelyn) */}
               <div className="bg-white border rounded-2xl p-4 flex gap-4 hover:shadow-md transition-all">
                 <div className="relative shrink-0">
-                  <img 
-                    src="https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=150&q=80" 
-                    className="w-16 h-16 rounded-xl object-cover bg-orange-100" 
-                    alt="Dr. Evelyn Parker" 
-                    referrerPolicy="no-referrer"
-                    onError={(e) => {
-                      (e.currentTarget as HTMLImageElement).src = "https://api.dicebear.com/7.x/initials/svg?seed=EP&backgroundColor=ea580c";
-                    }}
+                  <ResponsiveAvatar
+                    src="https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=150&q=80"
+                    alt="Dr. Evelyn Parker"
+                    sizePx={64}
+                    fallbackSrc="https://api.dicebear.com/7.x/initials/svg?seed=EP&backgroundColor=ea580c"
+                    className="w-16 h-16 rounded-xl object-cover bg-orange-100"
                   />
                   <span className="absolute -bottom-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-orange-600 text-[10px] text-white font-bold border-2 border-white">★</span>
                 </div>
@@ -1292,14 +1303,12 @@ export default function DedicatedServicePages({
               {/* Mentor 2 (Marcus) */}
               <div className="bg-white border rounded-2xl p-4 flex gap-4 hover:shadow-md transition-all">
                 <div className="relative shrink-0">
-                  <img 
-                    src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&q=80" 
-                    className="w-16 h-16 rounded-xl object-cover bg-orange-100" 
-                    alt="Marcus Thompson" 
-                    referrerPolicy="no-referrer"
-                    onError={(e) => {
-                      (e.currentTarget as HTMLImageElement).src = "https://api.dicebear.com/7.x/initials/svg?seed=MT&backgroundColor=ea580c";
-                    }}
+                  <ResponsiveAvatar
+                    src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&q=80"
+                    alt="Marcus Thompson"
+                    sizePx={64}
+                    fallbackSrc="https://api.dicebear.com/7.x/initials/svg?seed=MT&backgroundColor=ea580c"
+                    className="w-16 h-16 rounded-xl object-cover bg-orange-100"
                   />
                   <span className="absolute -bottom-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-orange-600 text-[10px] text-white font-bold border-2 border-white">★</span>
                 </div>
@@ -1320,14 +1329,12 @@ export default function DedicatedServicePages({
               {/* Mentor 3 (Daniel) */}
               <div className="bg-white border rounded-2xl p-4 flex gap-4 hover:shadow-md transition-all">
                 <div className="relative shrink-0">
-                  <img 
-                    src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&q=80" 
-                    className="w-16 h-16 rounded-xl object-cover bg-orange-100" 
-                    alt="Daniel Reyes" 
-                    referrerPolicy="no-referrer"
-                    onError={(e) => {
-                      (e.currentTarget as HTMLImageElement).src = "https://api.dicebear.com/7.x/initials/svg?seed=DR&backgroundColor=ea580c";
-                    }}
+                  <ResponsiveAvatar
+                    src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&q=80"
+                    alt="Daniel Reyes"
+                    sizePx={64}
+                    fallbackSrc="https://api.dicebear.com/7.x/initials/svg?seed=DR&backgroundColor=ea580c"
+                    className="w-16 h-16 rounded-xl object-cover bg-orange-100"
                   />
                   <span className="absolute -bottom-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-orange-600 text-[10px] text-white font-bold border-2 border-white">★</span>
                 </div>
@@ -1348,14 +1355,12 @@ export default function DedicatedServicePages({
               {/* Mentor 4 (Sarah) */}
               <div className="bg-white border rounded-2xl p-4 flex gap-4 hover:shadow-md transition-all">
                 <div className="relative shrink-0">
-                  <img 
-                    src="https://images.unsplash.com/photo-1567532939604-b6b5b0db2604?w=150&q=80" 
-                    className="w-16 h-16 rounded-xl object-cover bg-orange-100" 
-                    alt="Dr. Sarah Jenkins" 
-                    referrerPolicy="no-referrer"
-                    onError={(e) => {
-                      (e.currentTarget as HTMLImageElement).src = "https://api.dicebear.com/7.x/initials/svg?seed=SJ&backgroundColor=ea580c";
-                    }}
+                  <ResponsiveAvatar
+                    src="https://images.unsplash.com/photo-1567532939604-b6b5b0db2604?w=150&q=80"
+                    alt="Dr. Sarah Jenkins"
+                    sizePx={64}
+                    fallbackSrc="https://api.dicebear.com/7.x/initials/svg?seed=SJ&backgroundColor=ea580c"
+                    className="w-16 h-16 rounded-xl object-cover bg-orange-100"
                   />
                   <span className="absolute -bottom-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-orange-600 text-[10px] text-white font-bold border-2 border-white">★</span>
                 </div>

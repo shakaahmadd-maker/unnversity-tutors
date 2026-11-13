@@ -64,7 +64,11 @@ import {
   Wallet,
   Copy
 } from 'lucide-react';
-import { jsPDF } from 'jspdf';
+import { apiFetch } from '../lib/apiClient';
+import type { TabLoadState } from '../lib/store';
+import ErrorBoundary from './ErrorBoundary';
+import { TabLoadingSkeleton, ErrorStatePanel, PaginationBar } from './ui/StatePanels';
+import { ResponsiveAvatar } from './ResponsiveImage';
 import { 
   User, 
   UserRole,
@@ -108,6 +112,11 @@ interface StudentDashboardProps {
   onUpdateProfile?: (data: Partial<User>) => void;
   invoices?: Invoice[];
   onRefreshData?: () => void;
+  onLoadTab?: (tab: string, force?: boolean) => Promise<void> | void;
+  tabStates?: Record<string, TabLoadState>;
+  isLoadingMessages?: boolean;
+  chatError?: string | null;
+  syncError?: string | null;
   lastSyncTime?: string | null;
   onPayAdvance?: (assignmentId: string, amount: number) => Promise<any>;
   onPayBalance?: (assignmentId: string, amount: number) => Promise<any>;
@@ -141,6 +150,11 @@ export default function StudentDashboard({
   onUpdateProfile,
   invoices = [],
   onRefreshData,
+  onLoadTab,
+  tabStates = {},
+  isLoadingMessages = false,
+  chatError = null,
+  syncError = null,
   lastSyncTime,
   onPayAdvance,
   onPayBalance
@@ -155,6 +169,13 @@ export default function StudentDashboard({
   const [chatAttachedFileName, setChatAttachedFileName] = useState('');
   const [showSafetyBanner, setShowSafetyBanner] = useState(true);
   const [isMobileChannelsOpen, setIsMobileChannelsOpen] = useState(false);
+  const lastSubscribedChatIdRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (onLoadTab) {
+      onLoadTab(activeTab);
+    }
+  }, [activeTab, onLoadTab]);
 
   useEffect(() => {
     if (activeTab === 'chat' && chats.length > 0) {
@@ -171,7 +192,8 @@ export default function StudentDashboard({
   }, [chats, activeTab, currentUser.id, localSelectedChatId]);
 
   useEffect(() => {
-    if (localSelectedChatId && onSubscribeToChatDetails) {
+    if (localSelectedChatId && onSubscribeToChatDetails && lastSubscribedChatIdRef.current !== localSelectedChatId) {
+      lastSubscribedChatIdRef.current = localSelectedChatId;
       onSubscribeToChatDetails(localSelectedChatId);
     }
   }, [localSelectedChatId, onSubscribeToChatDetails]);
@@ -194,7 +216,18 @@ export default function StudentDashboard({
   const [reviewContent, setReviewContent] = useState('');
   const [revisionDetails, setRevisionDetails] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
+  const [assignmentsPage, setAssignmentsPage] = useState(1);
+  const [notificationsPage, setNotificationsPage] = useState(1);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
+
+  useEffect(() => {
+    const t = setTimeout(() => {
+      setDebouncedSearchQuery(searchQuery);
+      setAssignmentsPage(1);
+    }, 300);
+    return () => clearTimeout(t);
+  }, [searchQuery]);
 
   // New Request Form states
   const [newReqTitle, setNewReqTitle] = useState('');
@@ -228,14 +261,14 @@ export default function StudentDashboard({
   const [avatarSuccessAlert, setAvatarSuccessAlert] = useState(false);
 
   const PRESET_AVATARS = [
-    'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=250&auto=format&fit=crop&q=80',
-    'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=250&auto=format&fit=crop&q=80',
-    'https://images.unsplash.com/photo-1517841905240-472988babdf9?w=250&auto=format&fit=crop&q=80',
-    'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=250&auto=format&fit=crop&q=80',
-    'https://images.unsplash.com/photo-1524504388940-b1c1722653e1?w=250&auto=format&fit=crop&q=80',
-    'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=250&auto=format&fit=crop&q=80',
-    'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=250&auto=format&fit=crop&q=80',
-    'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=250&auto=format&fit=crop&q=80',
+    'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=96&h=96&fit=crop&auto=format&q=75',
+    'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=96&h=96&fit=crop&auto=format&q=75',
+    'https://images.unsplash.com/photo-1517841905240-472988babdf9?w=96&h=96&fit=crop&auto=format&q=75',
+    'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=96&h=96&fit=crop&auto=format&q=75',
+    'https://images.unsplash.com/photo-1524504388940-b1c1722653e1?w=96&h=96&fit=crop&auto=format&q=75',
+    'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=96&h=96&fit=crop&auto=format&q=75',
+    'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=96&h=96&fit=crop&auto=format&q=75',
+    'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=96&h=96&fit=crop&auto=format&q=75',
   ];
 
   const handleAvatarFileSelected = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -271,9 +304,8 @@ export default function StudentDashboard({
       if (onUpdateProfile) {
         onUpdateProfile({ avatarUrl: customAvatarPreview });
       }
-      await fetch(`/api/users/${currentUser.id}`, {
+      await apiFetch(`/api/users/${currentUser.id}`, {
         method: 'PUT',
-        credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ avatarUrl: customAvatarPreview })
       });
@@ -535,10 +567,9 @@ export default function StudentDashboard({
   const handleResendVerification = async () => {
     setIsResendingVerification(true);
     try {
-      const res = await fetch('/api/auth/resend-verification', {
+      const res = await apiFetch('/api/auth/resend-verification', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
         body: JSON.stringify({ email: currentUser.email }),
       });
       const data = await res.json().catch(() => ({}));
@@ -685,9 +716,10 @@ export default function StudentDashboard({
     }
   };
 
-  const handleDownloadPDFStatement = () => {
+  const handleDownloadPDFStatement = async () => {
     try {
       setIsGeneratingPdf(true);
+      const { jsPDF } = await import('jspdf');
       const doc = new jsPDF({
         orientation: 'portrait',
         unit: 'mm',
@@ -1176,11 +1208,35 @@ CONTACT EMAIL COMPASS: ${studentEmail}
     executeMatchingPipeline();
   };
 
-  // Filter assignments by text search if provided
+  // Filter assignments by debounced text search if provided
   const searchedAssignments = studentAssignments.filter(a => 
-    a.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    a.subject.toLowerCase().includes(searchQuery.toLowerCase())
+    a.title.toLowerCase().includes(debouncedSearchQuery.toLowerCase()) ||
+    a.subject.toLowerCase().includes(debouncedSearchQuery.toLowerCase())
   );
+  const ASSIGNMENTS_PAGE_SIZE = 15;
+  const totalAssignmentsPages = Math.max(1, Math.ceil(searchedAssignments.length / ASSIGNMENTS_PAGE_SIZE));
+  const safeAssignmentsPage = Math.min(assignmentsPage, totalAssignmentsPages);
+  const paginatedAssignments = searchedAssignments.slice(
+    (safeAssignmentsPage - 1) * ASSIGNMENTS_PAGE_SIZE,
+    safeAssignmentsPage * ASSIGNMENTS_PAGE_SIZE
+  );
+
+  const NOTIFS_PAGE_SIZE = 15;
+  const totalNotifsPages = Math.max(1, Math.ceil(userNotifications.length / NOTIFS_PAGE_SIZE));
+  const safeNotifsPage = Math.min(notificationsPage, totalNotifsPages);
+  const paginatedNotifications = userNotifications.slice(
+    (safeNotifsPage - 1) * NOTIFS_PAGE_SIZE,
+    safeNotifsPage * NOTIFS_PAGE_SIZE
+  );
+
+  const activeTabState = tabStates[`student:${activeTab}`];
+  const isInitialTabLoading =
+    Boolean(activeTabState?.loading) &&
+    !activeTabState?.loadedAt &&
+    ((activeTab === 'assignments' && studentAssignments.length === 0) ||
+      (activeTab === 'payments' && studentPayments.length === 0 && studentInvoices.length === 0) ||
+      (activeTab === 'chat' && studentChats.length === 0) ||
+      (activeTab === 'notifications' && userNotifications.length === 0));
 
   return (
     <div className="flex min-h-screen bg-[#FDF8F6]/30 font-sans" id="student-portal-wrapper">
@@ -1188,7 +1244,11 @@ CONTACT EMAIL COMPASS: ${studentEmail}
       {/* MOBILE HEADER BAR */}
       <div className="lg:hidden fixed top-0 left-0 right-0 h-16 bg-white border-b border-gray-100 flex items-center justify-between px-4 z-40">
         <div className="flex items-center">
-          <img src="/logo.webp" alt="Uni Tutors" referrerPolicy="no-referrer" className="h-10 w-auto object-contain" />
+          <picture>
+            <source type="image/avif" srcSet="/logo-220.avif 220w, /logo-440.avif 440w" sizes="160px" />
+            <source type="image/webp" srcSet="/logo-220.webp 220w, /logo-440.webp 440w" sizes="160px" />
+            <img src="/logo.webp" alt="Uni Tutors" width={160} height={61} decoding="async" referrerPolicy="no-referrer" className="h-10 w-auto object-contain" />
+          </picture>
         </div>
         <button 
           onClick={() => setIsMobileSidebarOpen(!isMobileSidebarOpen)}
@@ -1210,7 +1270,11 @@ CONTACT EMAIL COMPASS: ${studentEmail}
         <div className="space-y-6">
           {/* Logo with uploaded logo image */}
           <div className="flex items-center justify-between pb-2 border-b border-orange-100/30">
-            <img src="/logo.webp" alt="Uni Tutors" referrerPolicy="no-referrer" className="h-12 w-auto object-contain" id="logo-mortarboard" />
+            <picture>
+              <source type="image/avif" srcSet="/logo-220.avif 220w, /logo-440.avif 440w" sizes="180px" />
+              <source type="image/webp" srcSet="/logo-220.webp 220w, /logo-440.webp 440w" sizes="180px" />
+              <img src="/logo.webp" alt="Uni Tutors" width={180} height={68} decoding="async" referrerPolicy="no-referrer" className="h-12 w-auto object-contain" id="logo-mortarboard" />
+            </picture>
             
             <button 
               onClick={() => setIsMobileSidebarOpen(false)}
@@ -1413,9 +1477,13 @@ CONTACT EMAIL COMPASS: ${studentEmail}
                   title="Click to change or upload profile photo"
                   id="student-header-avatar-btn"
                 >
-                  <img 
-                    src={currentUser.avatarUrl || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80'} 
-                    alt="Student Profile" 
+                  <ResponsiveAvatar
+                    src={currentUser.avatarUrl}
+                    alt="Student Profile"
+                    sizePx={48}
+                    width={40}
+                    height={40}
+                    loading="eager"
                     className="w-10 h-10 rounded-full bg-orange-100 object-cover border border-orange-200 shadow-3xs"
                   />
                   <div className="absolute inset-0 bg-black/40 rounded-full opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
@@ -1466,7 +1534,27 @@ CONTACT EMAIL COMPASS: ${studentEmail}
         {/* WORKSPACE AREA RENDERING VARIOUS VIEWS        */}
         {/* ============================================== */}
         <div className={`flex-1 ${activeTab === 'chat' ? 'p-3 sm:p-4 md:p-6 overflow-hidden flex flex-col' : 'p-5 md:p-8 overflow-y-auto space-y-8'}`} id="portal-content-body">
-          
+          <ErrorBoundary compact resetKey={activeTab} onReset={() => onLoadTab?.(activeTab, true)}>
+          {(activeTabState?.error || (activeTab === 'chat' && chatError)) && (
+            <ErrorStatePanel
+              title="Could not sync latest data"
+              message={activeTabState?.error || chatError || syncError || 'Temporary connection error.'}
+              onRetry={() => {
+                if (activeTab === 'chat' && localSelectedChatId && onSubscribeToChatDetails) {
+                  onSubscribeToChatDetails(localSelectedChatId);
+                }
+                onLoadTab?.(activeTab, true);
+              }}
+            />
+          )}
+
+          {isInitialTabLoading ? (
+            <TabLoadingSkeleton
+              variant={activeTab === 'chat' ? 'split' : activeTab === 'assignments' ? 'table' : 'cards'}
+              label={`Loading ${activeTab}...`}
+            />
+          ) : (
+          <>
           {/* ========================== */}
           {/* TAB 1: DASHBOARD (HOME VIEW) */}
           {/* ========================== */}
@@ -2672,7 +2760,7 @@ CONTACT EMAIL COMPASS: ${studentEmail}
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100 font-sans">
-                      {searchedAssignments.map((a) => {
+                      {paginatedAssignments.map((a) => {
                         const tutor = getTutor(a.tutorId);
                         return (
                           <tr key={a.id} id={`assignment-row-${a.id}`} className="hover:bg-gray-50/50">
@@ -2689,7 +2777,7 @@ CONTACT EMAIL COMPASS: ${studentEmail}
                               {tutor ? (
                                 <div className="space-y-1.5">
                                   <div className="flex items-center gap-2">
-                                    <img src={tutor.avatarUrl} className="w-6 h-6 rounded-full border object-cover" alt="" />
+                                    <ResponsiveAvatar src={tutor.avatarUrl} alt="" sizePx={32} width={24} height={24} className="w-6 h-6 rounded-full border object-cover" />
                                     <span className="font-bold text-gray-800">{tutor.name}</span>
                                   </div>
                                   <div className="flex items-center gap-1.5">
@@ -2793,6 +2881,16 @@ CONTACT EMAIL COMPASS: ${studentEmail}
                       })}
                     </tbody>
                   </table>
+                  <div className="px-4 pb-4">
+                    <PaginationBar
+                      page={safeAssignmentsPage}
+                      totalPages={totalAssignmentsPages}
+                      totalItems={searchedAssignments.length}
+                      pageSize={ASSIGNMENTS_PAGE_SIZE}
+                      onPageChange={setAssignmentsPage}
+                      itemLabel="assignments"
+                    />
+                  </div>
                 </div>
               ) : (
                 <div className="p-12 text-center bg-gray-50 rounded-3xl border border-dashed border-gray-200">
@@ -3477,10 +3575,14 @@ CONTACT EMAIL COMPASS: ${studentEmail}
                                     }`}
                                   >
                                     <div className="relative shrink-0">
-                                      <img 
-                                        src={tutor?.avatarUrl || 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=120&auto=format&fit=crop&q=80'} 
-                                        alt="" 
-                                        className="w-10 h-10 rounded-xl object-cover ring-2 ring-slate-100" 
+                                      <ResponsiveAvatar
+                                        src={tutor?.avatarUrl}
+                                        alt=""
+                                        sizePx={48}
+                                        width={40}
+                                        height={40}
+                                        fallbackSrc="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=96&h=96&fit=crop&auto=format&q=75"
+                                        className="w-10 h-10 rounded-xl object-cover ring-2 ring-slate-100"
                                       />
                                       <span className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 bg-emerald-500 border-2 border-white rounded-full"></span>
                                     </div>
@@ -3521,10 +3623,14 @@ CONTACT EMAIL COMPASS: ${studentEmail}
                                     className="p-3 rounded-xl cursor-pointer transition-all border border-orange-100 bg-orange-50/20 hover:bg-orange-50/60 flex items-start gap-3 relative group"
                                   >
                                     <div className="relative shrink-0">
-                                      <img 
-                                        src={tutor?.avatarUrl || 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=120&auto=format&fit=crop&q=80'} 
-                                        alt="" 
-                                        className="w-10 h-10 rounded-xl object-cover ring-2 ring-orange-200" 
+                                      <ResponsiveAvatar
+                                        src={tutor?.avatarUrl}
+                                        alt=""
+                                        sizePx={48}
+                                        width={40}
+                                        height={40}
+                                        fallbackSrc="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=96&h=96&fit=crop&auto=format&q=75"
+                                        className="w-10 h-10 rounded-xl object-cover ring-2 ring-orange-200"
                                       />
                                       <span className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 bg-emerald-500 border-2 border-white rounded-full"></span>
                                     </div>
@@ -3585,12 +3691,16 @@ CONTACT EMAIL COMPASS: ${studentEmail}
                             <MessageSquare className="w-4 h-4 text-orange-600" />
                           </button>
                           <div className="relative shrink-0">
-                            <img 
-                              src={selectedChat.tutorId.startsWith('admin_') 
-                                ? 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=120&auto=format&fit=crop&q=80' 
-                                : (getTutor(selectedChat.tutorId)?.avatarUrl || 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=120&auto=format&fit=crop&q=80')} 
-                              alt="Tutor" 
-                              className="w-10 h-10 sm:w-11 sm:h-11 rounded-xl object-cover ring-2 ring-slate-100" 
+                            <ResponsiveAvatar
+                              src={selectedChat.tutorId.startsWith('admin_')
+                                ? 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=96&h=96&fit=crop&auto=format&q=75'
+                                : getTutor(selectedChat.tutorId)?.avatarUrl}
+                              alt="Tutor"
+                              sizePx={48}
+                              width={44}
+                              height={44}
+                              fallbackSrc="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=96&h=96&fit=crop&auto=format&q=75"
+                              className="w-10 h-10 sm:w-11 sm:h-11 rounded-xl object-cover ring-2 ring-slate-100"
                             />
                             <span className="w-3.5 h-3.5 bg-emerald-500 border-2 border-white rounded-full absolute -bottom-0.5 -right-0.5"></span>
                           </div>
@@ -3687,10 +3797,14 @@ CONTACT EMAIL COMPASS: ${studentEmail}
                             <div key={m.id} className={`flex flex-col ${isSelf ? 'items-end' : 'items-start'} gap-1 my-2`}>
                               {!isSelf && (
                                 <div className="flex items-center gap-2">
-                                  <img 
-                                    src={senderObj?.avatarUrl || 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=120&auto=format&fit=crop&q=80'} 
-                                    alt="" 
-                                    className="w-6 h-6 rounded-lg object-cover" 
+                                  <ResponsiveAvatar
+                                    src={senderObj?.avatarUrl}
+                                    alt=""
+                                    sizePx={32}
+                                    width={24}
+                                    height={24}
+                                    fallbackSrc="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=64&h=64&fit=crop&auto=format&q=75"
+                                    className="w-6 h-6 rounded-lg object-cover"
                                   />
                                   <span className="text-[10px] font-bold text-slate-500">{senderName}</span>
                                 </div>
@@ -4125,8 +4239,9 @@ CONTACT EMAIL COMPASS: ${studentEmail}
               </div>
 
               <div className="space-y-3">
-                {userNotifications.length > 0 ? (
-                  userNotifications.map((notif) => (
+                {paginatedNotifications.length > 0 ? (
+                  <>
+                  {paginatedNotifications.map((notif) => (
                     <div 
                       key={notif.id} 
                       onClick={() => {
@@ -4164,7 +4279,16 @@ CONTACT EMAIL COMPASS: ${studentEmail}
                         </div>
                       </div>
                     </div>
-                  ))
+                  ))}
+                  <PaginationBar
+                    page={safeNotifsPage}
+                    totalPages={totalNotifsPages}
+                    totalItems={userNotifications.length}
+                    pageSize={NOTIFS_PAGE_SIZE}
+                    onPageChange={setNotificationsPage}
+                    itemLabel="notifications"
+                  />
+                  </>
                 ) : (
                   <div className="p-10 text-center bg-gray-50 rounded-2xl border border-dashed border-gray-200 space-y-2">
                     <Bell className="w-8 h-8 text-gray-300 mx-auto" />
@@ -4328,9 +4452,10 @@ CONTACT EMAIL COMPASS: ${studentEmail}
               <div className="p-5 bg-gradient-to-r from-orange-50/60 via-amber-50/30 to-orange-50/60 rounded-2xl border border-orange-200/80 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                 <div className="flex items-center gap-4">
                   <div className="relative group">
-                    <img 
-                      src={currentUser.avatarUrl || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80'} 
-                      alt="" 
+                    <ResponsiveAvatar
+                      src={currentUser.avatarUrl}
+                      alt=""
+                      sizePx={64}
                       className="w-16 h-16 rounded-full object-cover border-2 border-orange-300 shadow-sm bg-white"
                     />
                     <button
@@ -4396,7 +4521,9 @@ CONTACT EMAIL COMPASS: ${studentEmail}
               </div>
             </div>
           )}
-
+          </>
+          )}
+          </ErrorBoundary>
         </div>
 
         {/* ======================================================== */}
@@ -4533,9 +4660,11 @@ CONTACT EMAIL COMPASS: ${studentEmail}
             {/* Current Active Preview */}
             <div className="flex flex-col items-center justify-center gap-3 py-2">
               <div className="relative">
-                <img 
-                  src={customAvatarPreview} 
-                  alt="Avatar preview" 
+                <ResponsiveAvatar
+                  src={customAvatarPreview}
+                  alt="Avatar preview"
+                  sizePx={112}
+                  loading="eager"
                   className="w-28 h-28 rounded-full object-cover ring-4 ring-orange-100 shadow-md bg-orange-50"
                 />
                 <span className="absolute bottom-1 right-1 w-5 h-5 bg-emerald-500 border-2 border-white rounded-full"></span>
@@ -4581,9 +4710,10 @@ CONTACT EMAIL COMPASS: ${studentEmail}
                         : 'border-transparent hover:border-gray-300 opacity-80 hover:opacity-100'
                     }`}
                   >
-                    <img 
-                      src={url} 
-                      alt={`Preset ${idx + 1}`} 
+                    <ResponsiveAvatar
+                      src={url}
+                      alt={`Preset ${idx + 1}`}
+                      sizePx={48}
                       className="w-12 h-12 rounded-full object-cover"
                     />
                     {customAvatarPreview === url && (

@@ -3,6 +3,67 @@ import { migrate } from 'drizzle-orm/node-postgres/migrator';
 import fs from 'fs';
 import path from 'path';
 
+async function ensurePerformanceTablesAndIndexes(): Promise<void> {
+  if (!pool || !isDbConnected()) return;
+  const statements = [
+    `CREATE TABLE IF NOT EXISTS "notifications" (
+      "id" text PRIMARY KEY NOT NULL,
+      "user_id" text NOT NULL,
+      "title" text NOT NULL,
+      "message" text NOT NULL,
+      "type" text NOT NULL DEFAULT 'webapp',
+      "sent_by" text NOT NULL DEFAULT 'System',
+      "read" boolean NOT NULL DEFAULT false,
+      "created_at" text NOT NULL
+    );`,
+    `CREATE INDEX IF NOT EXISTS "idx_users_role" ON "users" ("role");`,
+    `CREATE INDEX IF NOT EXISTS "idx_users_created_at" ON "users" ("created_at");`,
+    `CREATE INDEX IF NOT EXISTS "idx_users_country" ON "users" ("country");`,
+    `CREATE INDEX IF NOT EXISTS "idx_users_status" ON "users" ("status");`,
+    `CREATE INDEX IF NOT EXISTS "idx_tutors_name" ON "tutors" ("name");`,
+    `CREATE INDEX IF NOT EXISTS "idx_tutors_primary_subject" ON "tutors" ("primary_subject");`,
+    `CREATE INDEX IF NOT EXISTS "idx_tutors_city_location" ON "tutors" ("city_location");`,
+    `CREATE INDEX IF NOT EXISTS "idx_tutors_country" ON "tutors" ("country");`,
+    `CREATE INDEX IF NOT EXISTS "idx_tutors_hourly_rate" ON "tutors" ("hourly_rate");`,
+    `CREATE INDEX IF NOT EXISTS "idx_tutors_rating" ON "tutors" ("rating");`,
+    `CREATE INDEX IF NOT EXISTS "idx_orders_student_id" ON "orders" ("student_id");`,
+    `CREATE INDEX IF NOT EXISTS "idx_orders_tutor_id" ON "orders" ("tutor_id");`,
+    `CREATE INDEX IF NOT EXISTS "idx_orders_status" ON "orders" ("status");`,
+    `CREATE INDEX IF NOT EXISTS "idx_orders_created_at" ON "orders" ("created_at");`,
+    `CREATE INDEX IF NOT EXISTS "idx_chat_rooms_order_id" ON "chat_rooms" ("order_id");`,
+    `CREATE INDEX IF NOT EXISTS "idx_chat_rooms_created_by" ON "chat_rooms" ("created_by");`,
+    `CREATE INDEX IF NOT EXISTS "idx_chat_rooms_updated_at" ON "chat_rooms" ("updated_at");`,
+    `CREATE INDEX IF NOT EXISTS "idx_messages_room_id" ON "messages" ("room_id");`,
+    `CREATE INDEX IF NOT EXISTS "idx_messages_sender_id" ON "messages" ("sender_id");`,
+    `CREATE INDEX IF NOT EXISTS "idx_messages_receiver_id" ON "messages" ("receiver_id");`,
+    `CREATE INDEX IF NOT EXISTS "idx_messages_chat_id" ON "messages" ("chat_id");`,
+    `CREATE INDEX IF NOT EXISTS "idx_messages_created_at" ON "messages" ("created_at");`,
+    `CREATE INDEX IF NOT EXISTS "idx_messages_room_created" ON "messages" ("room_id", "created_at");`,
+    `CREATE INDEX IF NOT EXISTS "idx_messages_chat_created" ON "messages" ("chat_id", "created_at");`,
+    `CREATE INDEX IF NOT EXISTS "idx_notifications_user_id" ON "notifications" ("user_id");`,
+    `CREATE INDEX IF NOT EXISTS "idx_notifications_created_at" ON "notifications" ("created_at");`,
+    `CREATE INDEX IF NOT EXISTS "idx_notifications_user_read" ON "notifications" ("user_id", "read");`,
+    `CREATE INDEX IF NOT EXISTS "idx_audit_logs_created_at" ON "audit_logs" ("created_at");`,
+    `CREATE INDEX IF NOT EXISTS "idx_audit_logs_user_id" ON "audit_logs" ("user_id");`,
+    `CREATE INDEX IF NOT EXISTS "idx_audit_logs_action" ON "audit_logs" ("action");`,
+    `CREATE INDEX IF NOT EXISTS "idx_quotes_chat_id" ON "quotes" ("chat_id");`,
+    `CREATE INDEX IF NOT EXISTS "idx_quotes_order_id" ON "quotes" ("order_id");`,
+    `CREATE INDEX IF NOT EXISTS "idx_quotes_tutor_id" ON "quotes" ("tutor_id");`,
+    `CREATE INDEX IF NOT EXISTS "idx_quotes_created_at" ON "quotes" ("created_at");`,
+    `CREATE INDEX IF NOT EXISTS "idx_user_sessions_expires_at" ON "user_sessions" ("expires_at");`,
+  ];
+
+  for (const sql of statements) {
+    try {
+      await pool.query(sql);
+    } catch (err: any) {
+      if (!err.message?.includes('already exists') && !err.message?.includes('does not exist')) {
+        console.warn('[DB] Index/table verification notice:', err.message);
+      }
+    }
+  }
+}
+
 export async function runMigrations(): Promise<boolean> {
   if (!isDbConnected() || !db || !pool) {
     return false;
@@ -11,13 +72,15 @@ export async function runMigrations(): Promise<boolean> {
   const drizzleDir = path.join(process.cwd(), 'drizzle');
   if (!fs.existsSync(drizzleDir)) {
     console.warn('[DB] Migration directory not found at:', drizzleDir);
+    await ensurePerformanceTablesAndIndexes();
     return false;
   }
 
   // 1. Attempt standard Drizzle migrator
   try {
     await migrate(db, { migrationsFolder: drizzleDir });
-    console.log('[DB] PostgreSQL migrations applied successfully via Drizzle migrator.');
+    await ensurePerformanceTablesAndIndexes();
+    console.log('[DB] PostgreSQL migrations & performance indexes applied successfully.');
     return true;
   } catch (migratorErr: any) {
     console.info('[DB] Drizzle migrator note:', migratorErr.message, '- applying safe SQL statements...');
@@ -69,7 +132,8 @@ export async function runMigrations(): Promise<boolean> {
       console.log(`[DB] Users table schema verified: tableExists=true, emailColumnExists=${verified.emailColumnExists}, missingColumns=${verified.missingColumns.length}`);
     }
 
-    console.log('[DB] PostgreSQL tables checked and verified successfully.');
+    await ensurePerformanceTablesAndIndexes();
+    console.log('[DB] PostgreSQL tables and performance indexes checked and verified successfully.');
     return true;
   } catch (err: any) {
     console.warn('[DB] Notice during PostgreSQL table migration check:', err.message);

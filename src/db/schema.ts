@@ -31,7 +31,12 @@ export const users = pgTable('users', {
   status: text('status').default('active'),
   availableSlots: text('available_slots'), // JSON stringified array
   searchableKeywords: text('searchable_keywords'),
-});
+}, (table) => [
+  index('idx_users_role').on(table.role),
+  index('idx_users_created_at').on(table.createdAt),
+  index('idx_users_country').on(table.country),
+  index('idx_users_status').on(table.status),
+]);
 
 // 2. Orders Table (Assignments & Tutoring Requests)
 export const orders = pgTable('orders', {
@@ -59,7 +64,12 @@ export const orders = pgTable('orders', {
   reviewed: boolean('reviewed').default(false),
   createdAt: text('created_at').notNull(),
   updatedAt: text('updated_at'),
-});
+}, (table) => [
+  index('idx_orders_student_id').on(table.studentId),
+  index('idx_orders_tutor_id').on(table.tutorId),
+  index('idx_orders_status').on(table.status),
+  index('idx_orders_created_at').on(table.createdAt),
+]);
 
 // 3. Inquiries Table (Get a Quote & WhatsApp Inquiries)
 export const inquiries = pgTable('inquiries', {
@@ -84,7 +94,11 @@ export const chatRooms = pgTable('chat_rooms', {
   createdBy: text('created_by').notNull().references(() => users.id),
   createdAt: text('created_at').notNull(),
   updatedAt: text('updated_at').notNull(),
-});
+}, (table) => [
+  index('idx_chat_rooms_order_id').on(table.orderId),
+  index('idx_chat_rooms_created_by').on(table.createdBy),
+  index('idx_chat_rooms_updated_at').on(table.updatedAt),
+]);
 
 // 5. Chat Room Members Table (Membership and Permissions)
 export const chatRoomMembers = pgTable('chat_room_members', {
@@ -116,7 +130,11 @@ export const messages = pgTable('messages', {
 }, (table) => [
   index('idx_messages_room_id').on(table.roomId),
   index('idx_messages_sender_id').on(table.senderId),
+  index('idx_messages_receiver_id').on(table.receiverId),
   index('idx_messages_chat_id').on(table.chatId),
+  index('idx_messages_created_at').on(table.createdAt),
+  index('idx_messages_room_created').on(table.roomId, table.createdAt),
+  index('idx_messages_chat_created').on(table.chatId, table.createdAt),
 ]);
 
 // 5. Quotes Table (Tutor / Admin Quotes for Orders & Inquiries)
@@ -138,7 +156,12 @@ export const quotes = pgTable('quotes', {
   notes: text('notes'),
   status: text('status').notNull().default('pending'), // 'pending', 'accepted', 'declined'
   createdAt: text('created_at').notNull(),
-});
+}, (table) => [
+  index('idx_quotes_chat_id').on(table.chatId),
+  index('idx_quotes_order_id').on(table.orderId),
+  index('idx_quotes_tutor_id').on(table.tutorId),
+  index('idx_quotes_created_at').on(table.createdAt),
+]);
 
 // 6. Audit Logs Table (Administrative & Security Activity Log)
 export const auditLogs = pgTable('audit_logs', {
@@ -152,7 +175,11 @@ export const auditLogs = pgTable('audit_logs', {
   details: text('details'),
   ipAddress: text('ip_address'),
   createdAt: text('created_at').notNull(),
-});
+}, (table) => [
+  index('idx_audit_logs_created_at').on(table.createdAt),
+  index('idx_audit_logs_user_id').on(table.userId),
+  index('idx_audit_logs_action').on(table.action),
+]);
 
 // 7. Blogs Table (Educational Blog Articles & Academic Guides)
 export const blogs = pgTable('blogs', {
@@ -198,6 +225,9 @@ export const tutors = pgTable('tutors', {
   index('idx_tutors_name').on(table.name),
   index('idx_tutors_primary_subject').on(table.primarySubject),
   index('idx_tutors_city_location').on(table.cityLocation),
+  index('idx_tutors_country').on(table.country),
+  index('idx_tutors_hourly_rate').on(table.hourlyRate),
+  index('idx_tutors_rating').on(table.rating),
 ]);
 
 // 9. Password Reset Tokens Table (Stores SHA-256 hash only, never plaintext tokens)
@@ -245,6 +275,7 @@ export const userSessions = pgTable('user_sessions', {
   updatedAt: text('updated_at').notNull(),
 }, (table) => [
   index('idx_user_sessions_user_id').on(table.userId),
+  index('idx_user_sessions_expires_at').on(table.expiresAt),
 ]);
 
 // 12. Email Verification Tokens Table (Stores SHA-256 hash only, never plaintext tokens)
@@ -260,6 +291,22 @@ export const emailVerificationTokens = pgTable('email_verification_tokens', {
   uniqueIndex('idx_email_verification_token_hash').on(table.tokenHash),
   index('idx_email_verification_user_id').on(table.userId),
   index('idx_email_verification_email').on(table.email),
+]);
+
+// 13. Notifications Table (Persistent In-App Alerts)
+export const notifications = pgTable('notifications', {
+  id: text('id').primaryKey(),
+  userId: text('user_id').notNull(),
+  title: text('title').notNull(),
+  message: text('message').notNull(),
+  type: text('type').notNull().default('webapp'),
+  sentBy: text('sent_by').notNull().default('System'),
+  read: boolean('read').notNull().default(false),
+  createdAt: text('created_at').notNull(),
+}, (table) => [
+  index('idx_notifications_user_id').on(table.userId),
+  index('idx_notifications_created_at').on(table.createdAt),
+  index('idx_notifications_user_read').on(table.userId, table.read),
 ]);
 
 

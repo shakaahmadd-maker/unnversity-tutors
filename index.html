@@ -84,6 +84,8 @@
       <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@500;600;700;800&display=swap" />
     </noscript>
 
+    <!-- Preload above-the-fold responsive logo to minimize LCP resource load delay -->
+    <link rel="preload" as="image" type="image/avif" imagesrcset="/logo-220.avif 220w, /logo-440.avif 440w" imagesizes="(max-width: 640px) 140px, 220px" />
     <!-- App icons -->
     <link rel="icon" type="image/x-icon" href="/favicon.ico" />
     <link rel="shortcut icon" href="/favicon.ico" />
@@ -91,7 +93,7 @@
     <title>University Tutors - Expert Academic Mentorship & Tutoring</title>
   </head>
   <body>
-    <!-- Facebook JavaScript SDK -->
+    <!-- Facebook JavaScript SDK (Deferred until after initial page load & idle to protect LCP/TBT) -->
     <script>
       window.fbAsyncInit = function() {
         try {
@@ -117,13 +119,37 @@
         }
       };
 
-      (function(d, s, id){
-         var js, fjs = d.getElementsByTagName(s)[0];
-         if (d.getElementById(id)) {return;}
-         js = d.createElement(s); js.id = id;
-         js.src = "https://connect.facebook.net/en_US/sdk.js";
-         fjs.parentNode.insertBefore(js, fjs);
-       }(document, 'script', 'facebook-jssdk'));
+      (function(w, d) {
+        var loaded = false;
+        function loadFbSdk() {
+          if (loaded || d.getElementById('facebook-jssdk')) return;
+          loaded = true;
+          var js = d.createElement('script');
+          js.id = 'facebook-jssdk';
+          js.async = true;
+          js.defer = true;
+          js.src = 'https://connect.facebook.net/en_US/sdk.js';
+          var fjs = d.getElementsByTagName('script')[0];
+          if (fjs && fjs.parentNode) {
+            fjs.parentNode.insertBefore(js, fjs);
+          } else if (d.head) {
+            d.head.appendChild(js);
+          }
+        }
+        var triggerEvents = ['pointerdown', 'keydown', 'touchstart', 'scroll'];
+        function onFirstInteraction() {
+          triggerEvents.forEach(function(evt) {
+            w.removeEventListener(evt, onFirstInteraction);
+          });
+          loadFbSdk();
+        }
+        triggerEvents.forEach(function(evt) {
+          w.addEventListener(evt, onFirstInteraction, { once: true, passive: true });
+        });
+        w.addEventListener('load', function() {
+          w.setTimeout(loadFbSdk, 10000);
+        }, { once: true });
+      })(window, document);
     </script>
 
     <div id="root">

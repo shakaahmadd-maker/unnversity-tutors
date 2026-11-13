@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { User, Chat, AssignmentStatus } from '../types';
 import { audioNotifier } from '../utils/audioNotification';
 import { store } from '../lib/store';
+import { PaginationBar } from './ui/StatePanels';
 
 // Inline SVG Icon components to replace react-icons and ensure standalone compilation
 const IconFileText = () => (
@@ -123,8 +124,19 @@ export default function AssignmentLedgerView({
   const [submissions, setSubmissions] = useState<SubmissionItem[]>(initialData);
   const [activeTab, setSubTab] = useState("All Requests");
   const [searchQuery, setSearchQuery] = useState("");
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
+  const pageSize = 15;
   const [selectedStudent, setSelectedStudent] = useState<string | null>(null); // Full student profile view
   const [selectedSubmissionDetail, setSelectedSubmissionDetail] = useState<SubmissionItem | null>(null); // Detailed submission drawer
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearchQuery(searchQuery);
+      setCurrentPage(1);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
   
   // Chat state supports chatMode: 'admin' or 'tutor'
   const [activeChatSubmission, setActiveChatSubmission] = useState<SubmissionItem | null>(null); 
@@ -242,14 +254,19 @@ export default function AssignmentLedgerView({
       activeTab === "Completed" ? sub.status === "Completed" :
       activeTab === "Revision" ? sub.status === "Revision" : true;
 
-    const matchesSearch = 
-      sub.studentName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      sub.subject.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      sub.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      sub.id.toLowerCase().includes(searchQuery.toLowerCase());
+    const q = debouncedSearchQuery.toLowerCase().trim();
+    const matchesSearch = !q ||
+      sub.studentName.toLowerCase().includes(q) ||
+      sub.subject.toLowerCase().includes(q) ||
+      sub.title.toLowerCase().includes(q) ||
+      sub.id.toLowerCase().includes(q);
 
     return matchesTab && matchesSearch;
   });
+
+  const totalPages = Math.max(1, Math.ceil(filteredSubmissions.length / pageSize));
+  const safePage = Math.min(currentPage, totalPages);
+  const paginatedSubmissions = filteredSubmissions.slice((safePage - 1) * pageSize, safePage * pageSize);
 
   const sendChatMessage = (subId: string) => {
     if (!chatMessageInput.trim()) return;
@@ -711,7 +728,7 @@ export default function AssignmentLedgerView({
               <p className="text-sm text-slate-400 mt-1">Try adjusting your search or category filter.</p>
             </div>
           ) : (
-            filteredSubmissions.map((sub) => (
+            paginatedSubmissions.map((sub) => (
               <div 
                 key={sub.id} 
                 className="bg-white rounded-2xl border border-slate-200 shadow-xs hover:shadow-md transition-all p-6 grid grid-cols-1 lg:grid-cols-12 gap-6 items-start relative group"
@@ -907,6 +924,13 @@ export default function AssignmentLedgerView({
             ))
           )}
         </div>
+        <PaginationBar
+          currentPage={safePage}
+          totalPages={totalPages}
+          totalItems={filteredSubmissions.length}
+          pageSize={pageSize}
+          onPageChange={setCurrentPage}
+        />
       </main>
         </div>
       </div>

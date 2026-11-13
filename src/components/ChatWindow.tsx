@@ -18,6 +18,8 @@ import {
 } from 'lucide-react';
 import { Chat, Message, User, UserRole, Quote } from '../types';
 import { audioNotifier } from '../utils/audioNotification';
+import { TabLoadingSkeleton, ErrorStatePanel } from './ui/StatePanels';
+import { ResponsiveAvatar } from './ResponsiveImage';
 
 interface ChatWindowProps {
   chat: Chat;
@@ -42,6 +44,8 @@ interface ChatWindowProps {
   tutors: User[];
   students: User[];
   isLoading?: boolean;
+  error?: string | null;
+  onRetry?: () => void;
 }
 
 export default function ChatWindow({
@@ -56,7 +60,9 @@ export default function ChatWindow({
   quotes,
   tutors,
   students,
-  isLoading
+  isLoading,
+  error,
+  onRetry,
 }: ChatWindowProps) {
 
   const [inputMsg, setInputMsg] = useState('');
@@ -243,10 +249,14 @@ export default function ChatWindow({
       <div className="bg-gray-50 border-b border-gray-150 p-3.5 sm:p-5 flex items-center justify-between pr-10 sm:pr-12">
         <div className="flex items-center gap-3">
           <div className="relative">
-            <img 
-              src={otherUser?.avatarUrl || 'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6'} 
-              className="w-10 h-10 rounded-full object-cover border" 
-              alt="Avatar" 
+            <ResponsiveAvatar
+              src={otherUser?.avatarUrl}
+              alt={otherUser?.name || 'Avatar'}
+              sizePx={48}
+              width={40}
+              height={40}
+              fallbackSrc="https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=96&h=96&fit=crop&auto=format&q=75"
+              className="w-10 h-10 rounded-full object-cover border"
             />
             <span className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-emerald-500 border-2 border-white rounded-full"></span>
           </div>
@@ -310,14 +320,21 @@ export default function ChatWindow({
       {/* Main Messages Body */}
       <div className="flex-1 overflow-y-auto p-5 space-y-4 bg-gray-50/30 text-xs">
         
-        {isLoading && (
-          <div className="flex items-center justify-center py-12 text-gray-400 gap-2" id="chat-loading-indicator">
-            <span className="w-4 h-4 border-2 border-orange-500 border-t-transparent rounded-full animate-spin"></span>
-            <span className="text-xs font-medium">Loading room messages...</span>
+        {error && (
+          <ErrorStatePanel
+            title="Unable to load messages"
+            message={error}
+            onRetry={onRetry}
+          />
+        )}
+
+        {isLoading && chatMessages.length === 0 && (
+          <div id="chat-loading-indicator">
+            <TabLoadingSkeleton rows={3} />
           </div>
         )}
 
-        {!isLoading && chatMessages.length === 0 && (
+        {!isLoading && !error && chatMessages.length === 0 && (
           <div className="flex flex-col items-center justify-center h-full min-h-[300px] text-center p-8 space-y-3" id="chat-empty-state">
             <div className="w-12 h-12 rounded-2xl bg-orange-50 border border-orange-150 flex items-center justify-center text-orange-600 shadow-xs">
               <Sparkles className="w-6 h-6" />
@@ -355,10 +372,14 @@ export default function ChatWindow({
             >
               {!isSelf && (
                 <div className="flex flex-col items-center self-end shrink-0">
-                  <img 
-                    src={msgSender?.avatarUrl || otherUser?.avatarUrl || 'https://images.unsplash.com/photo-1544005313-94ddf0286df2'} 
-                    className="w-7 h-7 rounded-full object-cover border" 
-                    alt="" 
+                  <ResponsiveAvatar
+                    src={msgSender?.avatarUrl || otherUser?.avatarUrl}
+                    alt={msgSender?.name || ''}
+                    sizePx={32}
+                    width={28}
+                    height={28}
+                    fallbackSrc="https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=64&h=64&fit=crop&auto=format&q=75"
+                    className="w-7 h-7 rounded-full object-cover border"
                   />
                 </div>
               )}
@@ -499,10 +520,14 @@ export default function ChatWindow({
 
         {isOtherUserTyping && (
           <div className="flex gap-3 mr-auto text-left max-w-xl animate-fade-in items-end pb-2">
-            <img 
-              src={otherUser?.avatarUrl || 'https://images.unsplash.com/photo-1544005313-94ddf0286df2'} 
-              className="w-7 h-7 rounded-full object-cover border shrink-0" 
-              alt="" 
+            <ResponsiveAvatar
+              src={otherUser?.avatarUrl}
+              alt={otherUser?.name || ''}
+              sizePx={32}
+              width={28}
+              height={28}
+              fallbackSrc="https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=64&h=64&fit=crop&auto=format&q=75"
+              className="w-7 h-7 rounded-full object-cover border shrink-0"
             />
             <div className="space-y-1">
               <div className="bg-white border border-gray-150 text-gray-800 rounded-2xl rounded-bl-none px-4 py-3 shadow-xs flex items-center gap-2">

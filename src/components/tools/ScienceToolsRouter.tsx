@@ -1,5 +1,5 @@
 import React from 'react';
-import { ResolvedScienceRoute, ScienceToolSlug } from '../../data/scienceToolsRegistry';
+import { ResolvedScienceRoute, ScienceToolSlug, resolveScienceRoute } from '../../data/scienceToolsRegistry';
 import ScienceMegaHub from './ScienceMegaHub';
 import ScienceToolLayout from './ScienceToolLayout';
 import {
@@ -44,7 +44,8 @@ import {
 } from './chemistry/OrganicAnalyticalChemTools';
 
 interface ScienceToolsRouterProps {
-  route: ResolvedScienceRoute;
+  route?: ResolvedScienceRoute;
+  activeView?: string;
   onNavigate: (view: string) => void;
   onOpenBecomeTutor?: () => void;
 }
@@ -118,10 +119,14 @@ function renderScienceToolComponent(slug: ScienceToolSlug): React.ReactNode {
 }
 
 export default function ScienceToolsRouter({
-  route,
+  route: passedRoute,
+  activeView,
   onNavigate,
   onOpenBecomeTutor,
 }: ScienceToolsRouterProps) {
+  const route =
+    passedRoute ??
+    (activeView ? resolveScienceRoute(activeView) : null) ?? { kind: 'hub' as const, category: 'Biology' as const };
   if (route.kind === 'hub') {
     return (
       <ScienceMegaHub
