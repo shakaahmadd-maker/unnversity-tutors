@@ -133,3 +133,108 @@
   animation-play-state: paused;
 }
 
+/* Mobile Viewport (360px–480px) Overflow Protection & 44px Touch Ergonomics */
+html,
+body,
+#university-tutors-root {
+  overflow-x: clip;
+  max-width: 100vw;
+}
+
+@media (max-width: 639px) {
+  #university-tutors-root main canvas {
+    max-width: 100%;
+  }
+
+  #university-tutors-root main select,
+  #university-tutors-root main input:not([type="checkbox"]):not([type="radio"]):not([type="color"]):not([type="range"]):not([type="file"]) {
+    min-height: 44px;
+    font-size: 16px; /* Prevents iOS/Android mobile auto-zoom on focus */
+  }
+
+  #university-tutors-root main button:not([aria-label*="Theme"]):not([style*="background-color"]) {
+    min-height: 44px;
+  }
+}
+
+/* Print-Ready A4 CV / Resume Sheet Rules */
+@media print {
+  @page {
+    size: A4 portrait;
+    margin: 0;
+  }
+
+  html,
+  body {
+    margin: 0 !important;
+    padding: 0 !important;
+    background: #ffffff !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  #main-header,
+  #floating-whatsapp-container,
+  #cookie-consent-container,
+  #main-footer,
+  #global-science-tools-footer,
+  .cv-no-print {
+    display: none !important;
+  }
+
+  #university-tutors-root,
+  #university-tutors-root > main,
+  #cv-builder-page,
+  #cv-workspace-grid,
+  #cv-workspace-grid > div,
+  #cv-preview-column,
+  #cv-preview-panel,
+  #cv-preview-viewport,
+  #cv-scale-wrapper,
+  #grade-converter-page {
+    display: block !important;
+    position: static !important;
+    width: auto !important;
+    max-width: none !important;
+    height: auto !important;
+    min-height: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: none !important;
+    box-shadow: none !important;
+    background: #ffffff !important;
+    overflow: visible !important;
+    transform: none !important;
+  }
+
+  #cv-print-sheet {
+    position: static !important;
+    transform: none !important;
+    width: 210mm !important;
+    min-height: 297mm !important;
+    margin: 0 auto !important;
+    padding: 12mm 15mm !important;
+    box-shadow: none !important;
+    border: none !important;
+    border-radius: 0 !important;
+    background: #ffffff !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  #grade-converter-print-report {
+    display: block !important;
+    position: static !important;
+    width: 210mm !important;
+    margin: 0 auto !important;
+    padding: 14mm 15mm !important;
+    background: #ffffff !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  .cv-entry-block {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+}

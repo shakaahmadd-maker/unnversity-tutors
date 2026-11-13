@@ -12,6 +12,8 @@ import {
 } from 'lucide-react';
 import FooterLocationsSubjects from './FooterLocationsSubjects';
 import { isModifiedAnchorClick } from '../data/dedicatedServiceRoutes';
+import { STUDENT_TOOLS } from '../data/studentToolsData';
+import { MATH_TOOLS_REGISTRY } from '../data/mathToolsRegistry';
 
 interface FooterProps {
   onNavigate: (view: string) => void;
@@ -180,6 +182,132 @@ export default function Footer({ onNavigate, onOpenBecomeTutor }: FooterProps) {
             </div>
           </div>
 
+        </div>
+
+        {/* Free University Mathematics & Statistics Suite (All 27 Standalone Pages) */}
+        <div className="mt-12 pt-8 border-t border-[#ffab85]/55">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4">
+            <div>
+              <h4 className="text-xs font-display font-bold text-[#331301] uppercase tracking-widest">
+                Free University Mathematics &amp; Statistics Suite (27 Interactive Solvers)
+              </h4>
+              <p className="text-[11px] text-[#542104]/80 mt-0.5 font-medium">
+                100% browser-local Algebra, Trigonometry, Calculus, Linear Algebra, Statistics, ODE, and RSA calculators.
+              </p>
+            </div>
+            <a
+              href="/tools/math"
+              onClick={(e) => {
+                if (!isModifiedAnchorClick(e)) {
+                  e.preventDefault();
+                  onNavigate('tools/math');
+                }
+              }}
+              className="text-xs font-bold text-orange-700 hover:text-orange-900 hover:underline whitespace-nowrap cursor-pointer"
+            >
+              Mathematics &amp; Stats Hub (27 Tools) →
+            </a>
+          </div>
+
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2 text-xs">
+            {MATH_TOOLS_REGISTRY.map((mTool) => (
+              <a
+                key={mTool.slug}
+                href={mTool.path}
+                onClick={(e) => {
+                  if (!isModifiedAnchorClick(e)) {
+                    e.preventDefault();
+                    onNavigate(mTool.viewKey);
+                  }
+                }}
+                className="px-3 py-2 rounded-xl bg-[#fffbf7] border border-[#ffab85]/45 hover:border-orange-500 hover:bg-[#ffece1] text-[#542104] hover:text-orange-800 font-semibold transition-colors truncate cursor-pointer"
+              >
+                {mTool.shortTitle}
+              </a>
+            ))}
+          </div>
+        </div>
+
+        {/* Free Student Tools Global SEO Directory (All Standalone Pages) */}
+        <div className="mt-10 pt-8 border-t border-[#ffab85]/55">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4">
+            <div>
+              <h4 className="text-xs font-display font-bold text-[#331301] uppercase tracking-widest">
+                Free Student Tools Suite (100% Local Browser Utilities)
+              </h4>
+              <p className="text-[11px] text-[#542104]/80 mt-0.5 font-medium">
+                Zero-upload PDF, citation, chart, resume, image compression, OCR, and GPA tools for university students.
+              </p>
+            </div>
+            <div className="flex flex-wrap items-center gap-3">
+              <a
+                href="/tools/math"
+                onClick={(e) => {
+                  if (!isModifiedAnchorClick(e)) {
+                    e.preventDefault();
+                    onNavigate('tools/math');
+                  }
+                }}
+                className="text-xs font-bold text-orange-700 hover:text-orange-900 hover:underline whitespace-nowrap cursor-pointer"
+              >
+                Math Hub (27 Tools) →
+              </a>
+              <a
+                href="/tools/biology"
+                onClick={(e) => {
+                  if (!isModifiedAnchorClick(e)) {
+                    e.preventDefault();
+                    onNavigate('tools/biology');
+                  }
+                }}
+                className="text-xs font-bold text-orange-700 hover:text-orange-900 hover:underline whitespace-nowrap cursor-pointer"
+              >
+                Biology Hub (14 Tools) →
+              </a>
+              <a
+                href="/tools/chemistry"
+                onClick={(e) => {
+                  if (!isModifiedAnchorClick(e)) {
+                    e.preventDefault();
+                    onNavigate('tools/chemistry');
+                  }
+                }}
+                className="text-xs font-bold text-orange-700 hover:text-orange-900 hover:underline whitespace-nowrap cursor-pointer"
+              >
+                Chemistry Hub (16 Tools) →
+              </a>
+              <a
+                href="/tools"
+                onClick={(e) => {
+                  if (!isModifiedAnchorClick(e)) {
+                    e.preventDefault();
+                    onNavigate('tools');
+                  }
+                }}
+                className="text-xs font-bold text-orange-700 hover:text-orange-900 hover:underline whitespace-nowrap cursor-pointer"
+              >
+                All Student Tools →
+              </a>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2.5 text-xs">
+            {STUDENT_TOOLS.map((tool) => (
+              <a
+                key={tool.slug}
+                href={tool.path}
+                onClick={(e) => {
+                  if (!isModifiedAnchorClick(e)) {
+                    e.preventDefault();
+                    onNavigate(tool.viewKey);
+                  }
+                }}
+                className="px-3 py-2 rounded-xl bg-[#fffbf7] border border-[#ffab85]/45 hover:border-orange-500 hover:bg-[#ffece1] text-[#542104] hover:text-orange-800 font-semibold transition-colors truncate cursor-pointer"
+              >
+                {tool.shortName}
+              </a>
+            ))}
+          </div>
         </div>
 
         {/* Gray Unethical Search Term Links Section */}

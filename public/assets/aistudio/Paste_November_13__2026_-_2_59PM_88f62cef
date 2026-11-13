@@ -1,0 +1,1006 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Universal 6-System University Grade & Credit Converter — University-Tutors.com</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+    body { font-family: 'Inter', sans-serif; background-color: #F9FAFB; color: #111827; }
+    .archetype-card { transition: all 0.18s ease; }
+    @media print {
+      body { background: #FFFFFF !important; }
+      body > *:not(#officialPrintReport) { display: none !important; }
+      #officialPrintReport {
+        display: block !important;
+        position: static !important;
+        width: 100% !important;
+        margin: 0 !important;
+        padding: 0 !important;
+      }
+      @page { size: A4; margin: 14mm; }
+    }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col">
+
+  <!-- Top Brand Header -->
+  <header class="bg-white border-b border-gray-200 px-4 lg:px-8 py-3.5 flex flex-wrap items-center justify-between gap-3 sticky top-0 z-20">
+    <div class="flex items-center gap-3">
+      <div class="w-9 h-9 rounded-lg bg-orange-500 text-white font-extrabold flex items-center justify-center text-lg shadow-sm">U</div>
+      <div>
+        <div class="flex items-center gap-2">
+          <span class="font-bold text-gray-900 text-base">University-Tutors<span class="text-orange-500">.com</span></span>
+          <span class="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-orange-50 text-orange-600 border border-orange-200">Universal Grade & Credit Converter</span>
+        </div>
+        <p class="text-xs text-gray-500">All 6 World Grading Systems → English-Speaking Study Destinations & ECTS</p>
+      </div>
+    </div>
+    <span class="inline-flex items-center gap-1.5 text-xs font-medium text-emerald-700 bg-emerald-50 border border-emerald-200 px-3 py-1.5 rounded-full">
+      <span class="w-2 h-2 rounded-full bg-emerald-500"></span> 100% Free & Official Formulas
+    </span>
+  </header>
+
+  <!-- Main Workspace -->
+  <main class="flex-1 max-w-6xl w-full mx-auto p-4 lg:p-8 space-y-6">
+
+    <!-- Hero Title -->
+    <div class="text-center max-w-3xl mx-auto">
+      <h1 class="text-2xl sm:text-3xl font-extrabold text-gray-900 tracking-tight">
+        Universal <span class="text-orange-500">6-System University Grade</span> & Credit Converter
+      </h1>
+      <p class="text-sm text-gray-600 mt-2">
+        Select your home university’s <strong>Grading System Type</strong> (or country preset), adjust for <strong>Absolute vs. Relative (Bell-Curve)</strong> grading, and convert into <strong>UK, USA, Canada, Australia, Ireland, New Zealand, or Singapore</strong>.
+      </p>
+    </div>
+
+    <!-- Step 1: Visual 6 Grading System Archetypes Selector -->
+    <section class="bg-white rounded-2xl border border-gray-200 p-5 shadow-sm">
+      <div class="flex flex-wrap items-center justify-between gap-2 mb-3.5">
+        <h2 class="text-xs font-bold uppercase tracking-wider text-gray-500">Step 1: Choose Your Home University’s Grading System Type</h2>
+        <span class="text-[11px] font-medium text-gray-500">Covers 99% of global universities</span>
+      </div>
+
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3" id="archetypeGrid">
+        <button type="button" onclick="selectArchetype('gpa')" id="arch-gpa" class="archetype-card text-left p-3.5 rounded-xl border-2 border-orange-500 bg-orange-50/50 shadow-sm">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-extrabold text-orange-600">1. GPA / Letter Scale</span>
+            <span class="text-[10px] font-bold bg-white border border-orange-200 text-gray-700 px-2 py-0.5 rounded">4.0 / 4.33 / 5.0</span>
+          </div>
+          <p class="text-[11px] text-gray-600 mt-1">USA, Canada, Pakistan (HEC), South Korea, Saudi Arabia, Nigeria</p>
+        </button>
+
+        <button type="button" onclick="selectArchetype('percentage')" id="arch-percentage" class="archetype-card text-left p-3.5 rounded-xl border border-gray-200 bg-white hover:border-orange-300">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-extrabold text-gray-900">2. Percentage & Division</span>
+            <span class="text-[10px] font-bold bg-gray-100 text-gray-700 px-2 py-0.5 rounded">0–100%</span>
+          </div>
+          <p class="text-[11px] text-gray-500 mt-1">India (Annual/State), Pakistan (Annual), China (60% pass), South Africa</p>
+        </button>
+
+        <button type="button" onclick="selectArchetype('honours')" id="arch-honours" class="archetype-card text-left p-3.5 rounded-xl border border-gray-200 bg-white hover:border-orange-300">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-extrabold text-gray-900">3. Honours Degree Class</span>
+            <span class="text-[10px] font-bold bg-gray-100 text-gray-700 px-2 py-0.5 rounded">1st / 2:1 / 2:2</span>
+          </div>
+          <p class="text-[11px] text-gray-500 mt-1">United Kingdom, Ireland, Kenya, Ghana (40% pass mark)</p>
+        </button>
+
+        <button type="button" onclick="selectArchetype('descriptive')" id="arch-descriptive" class="archetype-card text-left p-3.5 rounded-xl border border-gray-200 bg-white hover:border-orange-300">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-extrabold text-gray-900">4. Descriptive Band Scale</span>
+            <span class="text-[10px] font-bold bg-gray-100 text-gray-700 px-2 py-0.5 rounded">HD / D / Cr / P</span>
+          </div>
+          <p class="text-[11px] text-gray-500 mt-1">Australia (7.0 / HD–P), New Zealand (9.0 / A+ to C-, 50% pass)</p>
+        </button>
+
+        <button type="button" onclick="selectArchetype('numerical')" id="arch-numerical" class="archetype-card text-left p-3.5 rounded-xl border border-gray-200 bg-white hover:border-orange-300">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-extrabold text-gray-900">5. Numerical Point Scale</span>
+            <span class="text-[10px] font-bold bg-gray-100 text-gray-700 px-2 py-0.5 rounded">0–10 / 0–20 / 0–30</span>
+          </div>
+          <p class="text-[11px] text-gray-500 mt-1">India (10-pt CGPA), France (0–20), Netherlands (0–10), Italy (18–30)</p>
+        </button>
+
+        <button type="button" onclick="selectArchetype('inverted')" id="arch-inverted" class="archetype-card text-left p-3.5 rounded-xl border border-gray-200 bg-white hover:border-orange-300">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-extrabold text-gray-900">6. Inverted Numerical</span>
+            <span class="text-[10px] font-bold bg-gray-100 text-gray-700 px-2 py-0.5 rounded">Lower = Better</span>
+          </div>
+          <p class="text-[11px] text-gray-500 mt-1">Germany (1.0 best – 4.0 pass), Austria (1–5), Czechia / Slovakia (1–4)</p>
+        </button>
+      </div>
+    </section>
+
+    <!-- Step 2: Country Preset + Destination English-Speaking Country -->
+    <div class="bg-white rounded-2xl border border-gray-200 p-5 shadow-sm grid grid-cols-1 md:grid-cols-11 gap-4 items-center">
+      <!-- Specific Home Country Preset -->
+      <div class="md:col-span-5">
+        <label class="block text-xs font-bold uppercase tracking-wider text-gray-500 mb-1.5">Step 2A: Specific Country / University Preset</label>
+        <select id="fromCountry" onchange="applyFromCountry()" class="w-full rounded-xl border border-gray-300 bg-gray-50 px-3.5 py-3 text-sm font-bold text-gray-900 focus:border-orange-500 focus:bg-white focus:outline-none"></select>
+      </div>
+
+      <!-- Arrow -->
+      <div class="md:col-span-1 flex justify-center pt-4">
+        <div class="w-10 h-10 rounded-full bg-orange-50 border border-orange-200 text-orange-600 font-extrabold flex items-center justify-center">
+          →
+        </div>
+      </div>
+
+      <!-- Target English-Speaking Destination -->
+      <div class="md:col-span-5">
+        <label class="block text-xs font-bold uppercase tracking-wider text-orange-600 mb-1.5">Step 2B: Target English-Speaking Study Country</label>
+        <select id="toCountry" onchange="calculateAll()" class="w-full rounded-xl border-2 border-orange-400 bg-orange-50/40 px-3.5 py-3 text-sm font-bold text-gray-900 focus:border-orange-500 focus:bg-white focus:outline-none">
+          <option value="uk">🇬🇧 United Kingdom — Honours Class (1st, 2:1, 2:2) & UK CATS Credits</option>
+          <option value="usa">🇺🇸 United States — 4.0 GPA Scale & US Semester Credits</option>
+          <option value="canada">🇨🇦 Canada — 4.0 / 4.33 GPA, Letter Grade & Canadian Credits</option>
+          <option value="australia">🇦🇺 Australia — 7.0 GPA (HD, D, Cr, P) & AU Credit Points</option>
+          <option value="ireland">🇮🇪 Ireland — NQAI Honours (1H, 2H1, 2H2) & ECTS Credits</option>
+          <option value="nz">🇳🇿 New Zealand — 9.0 GPA Scale (A+ to C-) & NZ Credits</option>
+          <option value="singapore">🇸🇬 Singapore — 5.0 CAP / GPA Scale & Modular Credits (MCs)</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- Step 3: Interactive Inputs & Live Conversion Results -->
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+
+      <!-- Left Column: Score, Grading Rigor (Absolute vs Relative), Semesters & Credits -->
+      <div class="lg:col-span-6 space-y-5">
+
+        <!-- Card A: Score & Grading Policy -->
+        <div class="bg-white rounded-2xl border border-gray-200 p-6 shadow-sm space-y-4">
+          <div class="flex items-center justify-between border-b border-gray-100 pb-2.5">
+            <h2 class="text-xs font-bold uppercase tracking-wider text-gray-500">Your Score & Scale Bounds</h2>
+            <span id="fromSystemBadge" class="text-[11px] font-semibold bg-orange-50 text-orange-700 border border-orange-200 px-2.5 py-0.5 rounded-full">GPA / Letter Scale</span>
+          </div>
+
+          <div class="grid grid-cols-3 gap-3">
+            <div>
+              <label class="block text-xs font-semibold text-gray-600 mb-1">Max Grade (Nmax)</label>
+              <input type="number" id="nMax" value="4.0" step="0.01" oninput="calculateAll()" class="w-full rounded-xl border border-gray-300 px-3 py-2.5 text-sm font-bold text-gray-900 focus:border-orange-500 focus:outline-none" />
+            </div>
+            <div>
+              <label class="block text-xs font-semibold text-gray-600 mb-1">Min Pass (Nmin)</label>
+              <input type="number" id="nMin" value="2.0" step="0.01" oninput="calculateAll()" class="w-full rounded-xl border border-gray-300 px-3 py-2.5 text-sm font-bold text-gray-900 focus:border-orange-500 focus:outline-none" />
+            </div>
+            <div>
+              <label class="block text-xs font-bold text-orange-600 mb-1">Your Score (Nd)</label>
+              <input type="number" id="nObtained" value="3.45" step="0.01" oninput="calculateAll()" class="w-full rounded-xl border-2 border-orange-400 bg-orange-50/40 px-3 py-2.5 text-sm font-extrabold text-gray-900 focus:border-orange-500 focus:outline-none" />
+            </div>
+          </div>
+
+          <!-- Cross-System Concept: Absolute vs Relative Grading Toggle -->
+          <div class="pt-2 border-t border-gray-100">
+            <div class="flex items-center justify-between mb-2">
+              <span class="text-xs font-bold text-gray-700">Institutional Grading Policy</span>
+              <span class="text-[11px] text-gray-400">Cross-System Context</span>
+            </div>
+            <div class="grid grid-cols-2 gap-2">
+              <button type="button" id="policy-absolute" onclick="setGradingPolicy('absolute')" class="py-2 px-3 rounded-xl border-2 border-orange-500 bg-orange-50/50 text-xs font-bold text-gray-900 text-left">
+                <div>Absolute Grading</div>
+                <div class="text-[10px] font-normal text-gray-500">Fixed score cut-offs</div>
+              </button>
+              <button type="button" id="policy-relative" onclick="setGradingPolicy('relative')" class="py-2 px-3 rounded-xl border border-gray-200 bg-white text-xs font-bold text-gray-700 text-left hover:border-orange-300">
+                <div>Relative (Bell Curve)</div>
+                <div class="text-[10px] font-normal text-gray-500">Norm-referenced cohort rank</div>
+              </button>
+            </div>
+            <p id="policyExplainer" class="text-[11px] text-gray-500 mt-2 leading-relaxed">
+              <strong>Absolute Grading:</strong> Your raw score is evaluated against fixed institutional boundaries without cohort curve adjustment.
+            </p>
+          </div>
+
+          <div id="validationAlert" class="hidden rounded-xl bg-red-50 border border-red-200 px-3.5 py-2.5 text-xs font-medium text-red-700"></div>
+        </div>
+
+        <!-- Card B: Semesters, Credit Hours & Study Workload -->
+        <div class="bg-white rounded-2xl border border-gray-200 p-6 shadow-sm space-y-4">
+          <div class="flex items-center justify-between border-b border-gray-100 pb-2.5">
+            <h2 class="text-xs font-bold uppercase tracking-wider text-gray-500">Semesters, Credit Hours & Study Workload</h2>
+            <span class="text-[11px] font-semibold text-orange-600">Degree Duration</span>
+          </div>
+
+          <div class="grid grid-cols-3 gap-3">
+            <div>
+              <label class="block text-xs font-semibold text-gray-600 mb-1">Semesters Done</label>
+              <input type="number" id="numSemesters" value="8" min="1" max="16" oninput="calculateAll()" class="w-full rounded-xl border border-gray-300 px-3 py-2.5 text-sm font-bold text-gray-900 focus:border-orange-500 focus:outline-none" />
+            </div>
+            <div>
+              <label class="block text-xs font-semibold text-gray-600 mb-1">Total Credits</label>
+              <input type="number" id="totalCredits" value="136" min="1" max="400" oninput="calculateAll()" class="w-full rounded-xl border border-gray-300 px-3 py-2.5 text-sm font-bold text-gray-900 focus:border-orange-500 focus:outline-none" />
+            </div>
+            <div>
+              <label class="block text-xs font-semibold text-gray-600 mb-1">Weeks / Sem</label>
+              <input type="number" id="weeksPerSem" value="16" min="8" max="24" oninput="calculateAll()" class="w-full rounded-xl border border-gray-300 px-3 py-2.5 text-sm font-bold text-gray-900 focus:border-orange-500 focus:outline-none" />
+            </div>
+          </div>
+
+          <p id="homeCreditExplainer" class="text-[11px] text-gray-500 bg-gray-50 border border-gray-200 rounded-xl p-3 leading-relaxed"></p>
+        </div>
+
+      </div>
+
+      <!-- Right Column: Converted Grade + ECTS Bridge + Credits & Student Visa Work Hours -->
+      <div class="lg:col-span-6 flex flex-col gap-5">
+
+        <!-- Primary Target Country Grade Card -->
+        <div class="bg-white rounded-2xl border-2 border-orange-500 p-6 shadow-sm">
+          <div class="flex items-start justify-between gap-3">
+            <div>
+              <span id="targetCountryBadge" class="inline-block text-[11px] font-bold uppercase tracking-wider bg-orange-100 text-orange-700 px-2.5 py-0.5 rounded-full mb-2">
+                🇬🇧 United Kingdom — Honours Classification
+              </span>
+              <div class="flex items-baseline gap-3 flex-wrap">
+                <span id="convertedGradeBig" class="text-4xl sm:text-5xl font-extrabold text-gray-900">First (1st)</span>
+                <span id="convertedClassification" class="text-sm font-bold text-emerald-600">First-Class Honours (1st) (~75% UK equiv.)</span>
+              </div>
+              <p id="targetAdmissionNote" class="text-xs text-gray-500 mt-1.5">Most Russell Group & UK Master’s programs require a 2:1 (Upper Second-Class) or strong 2:2.</p>
+            </div>
+            <div class="flex items-center gap-2 shrink-0">
+              <button onclick="copyFullReport()" id="copyBtn" class="px-3 py-2 rounded-xl border border-gray-200 hover:border-orange-300 hover:bg-orange-50 text-xs font-semibold text-gray-700 transition">
+                Copy Text
+              </button>
+              <button onclick="openPdfModal()" class="px-3.5 py-2 rounded-xl bg-orange-500 hover:bg-orange-600 text-xs font-bold text-white shadow-sm transition flex items-center gap-1.5">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                <span>PDF Report</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Cross-System ECTS & Formula Strip -->
+          <div class="mt-4 pt-3 border-t border-gray-100 flex flex-wrap items-center justify-between gap-2 text-[11px]">
+            <span id="formulaUsedBox" class="font-mono text-gray-600">UK ENIC Equivalence Mapping</span>
+            <span id="ectsBridgeBadge" class="font-bold bg-indigo-50 text-indigo-700 border border-indigo-200 px-2.5 py-0.5 rounded-full">
+              ECTS Equivalent: Grade A (Top 10%)
+            </span>
+          </div>
+        </div>
+
+        <!-- Converted Credits, Study Workload & Official Student Working Hours -->
+        <div class="bg-white rounded-2xl border border-gray-200 p-6 shadow-sm space-y-4 flex-1">
+          <h3 class="text-xs font-bold uppercase tracking-wider text-gray-500">Converted Credits, Study Workload & Student Work Hours</h3>
+
+          <div class="grid grid-cols-2 gap-3">
+            <div class="rounded-xl bg-orange-50/60 border border-orange-200 p-3.5">
+              <div id="targetCreditLabel" class="text-[11px] font-semibold text-orange-700">Converted UK CATS Credits</div>
+              <div id="convertedCreditsVal" class="text-lg font-extrabold text-gray-900 mt-0.5">480 UK Credits</div>
+              <div id="creditsPerSemVal" class="text-[11px] text-gray-500 mt-0.5">~60.0 UK Credits / semester</div>
+            </div>
+
+            <div class="rounded-xl bg-gray-50 border border-gray-200 p-3.5">
+              <div class="text-[11px] font-semibold text-gray-500">Total Academic Study Hours</div>
+              <div id="totalStudyHoursVal" class="text-lg font-extrabold text-gray-900 mt-0.5">6,120 hrs</div>
+              <div id="weeklyStudyHoursVal" class="text-[11px] text-gray-500 mt-0.5">~47.8 hrs/week (contact + self)</div>
+            </div>
+
+            <div class="rounded-xl bg-emerald-50/70 border border-emerald-200 p-3.5 col-span-2">
+              <div class="flex items-center justify-between">
+                <span id="workHoursTitle" class="text-xs font-bold text-emerald-800">🇬🇧 Legal Student Working Hours in UK</span>
+                <span class="text-[10px] font-bold uppercase bg-emerald-600 text-white px-2 py-0.5 rounded">Visa Rule</span>
+              </div>
+              <div id="workHoursMain" class="text-sm font-extrabold text-gray-900 mt-1"></div>
+              <p id="workHoursNote" class="text-[11px] text-gray-600 mt-1"></p>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- All 7 English-Speaking Destinations + ECTS Live Comparison Grid -->
+    <div class="bg-white rounded-2xl border border-gray-200 p-5 shadow-sm">
+      <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
+        <h3 class="text-xs font-bold uppercase tracking-wider text-gray-500">Instant English-Speaking Study Destinations & ECTS Comparison</h3>
+        <span class="text-[11px] text-gray-400">Updates automatically as you type</span>
+      </div>
+      <div class="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2.5 text-center">
+        <div class="p-3 rounded-xl bg-gray-50 border border-gray-100">
+          <div class="text-[11px] text-gray-500 font-semibold">🇬🇧 UK Class</div>
+          <div id="snapUk" class="text-sm font-extrabold text-orange-600 mt-1">First (1st)</div>
+        </div>
+        <div class="p-3 rounded-xl bg-gray-50 border border-gray-100">
+          <div class="text-[11px] text-gray-500 font-semibold">🇺🇸 USA 4.0</div>
+          <div id="snapUs" class="text-base font-extrabold text-gray-900 mt-0.5">3.45</div>
+        </div>
+        <div class="p-3 rounded-xl bg-gray-50 border border-gray-100">
+          <div class="text-[11px] text-gray-500 font-semibold">🇨🇦 Canada</div>
+          <div id="snapCa" class="text-sm font-extrabold text-gray-900 mt-1">3.45 (A-)</div>
+        </div>
+        <div class="p-3 rounded-xl bg-gray-50 border border-gray-100">
+          <div class="text-[11px] text-gray-500 font-semibold">🇦🇺 Australia</div>
+          <div id="snapAu" class="text-sm font-extrabold text-gray-900 mt-1">6.0 / 7.0</div>
+        </div>
+        <div class="p-3 rounded-xl bg-gray-50 border border-gray-100">
+          <div class="text-[11px] text-gray-500 font-semibold">🇮🇪 Ireland</div>
+          <div id="snapIe" class="text-sm font-extrabold text-gray-900 mt-1">1H</div>
+        </div>
+        <div class="p-3 rounded-xl bg-gray-50 border border-gray-100">
+          <div class="text-[11px] text-gray-500 font-semibold">🇳🇿 NZ 9.0</div>
+          <div id="snapNz" class="text-sm font-extrabold text-gray-900 mt-1">7.2 / 9.0</div>
+        </div>
+        <div class="p-3 rounded-xl bg-gray-50 border border-gray-100">
+          <div class="text-[11px] text-gray-500 font-semibold">🇸🇬 Singapore</div>
+          <div id="snapSg" class="text-sm font-extrabold text-gray-900 mt-1">4.3 / 5.0</div>
+        </div>
+        <div class="p-3 rounded-xl bg-indigo-50/70 border border-indigo-100">
+          <div class="text-[11px] text-indigo-700 font-semibold">🇪🇺 ECTS Band</div>
+          <div id="snapEcts" class="text-sm font-extrabold text-indigo-900 mt-1">Grade A</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Contextual University-Tutors.com Conversion Banner -->
+    <div class="bg-gradient-to-r from-orange-50 via-amber-50 to-orange-50 rounded-2xl border border-orange-200 p-5 flex flex-col sm:flex-row items-center justify-between gap-4">
+      <div>
+        <span class="text-[11px] font-bold uppercase tracking-wider text-orange-600">International Admissions & Language Prep</span>
+        <h3 class="text-base font-bold text-gray-900 mt-0.5">Applying to Universities in the UK, USA, Canada, Australia, or Ireland?</h3>
+        <p class="text-xs text-gray-600 mt-0.5">Get 1-on-1 help with transcript evaluation, SOP/CV review, IELTS/PTE prep, and subject tutoring on University-Tutors.com.</p>
+      </div>
+      <div class="flex items-center gap-2.5 shrink-0">
+        <button onclick="openPdfModal()" class="px-4 py-2.5 rounded-xl border border-orange-300 bg-white hover:bg-orange-50 text-orange-700 text-xs font-bold transition">
+          Generate Branded PDF
+        </button>
+        <a href="#book-admission-tutor" class="px-5 py-2.5 rounded-xl bg-orange-500 hover:bg-orange-600 text-white text-xs font-bold shadow-sm transition">
+          Book 1-on-1 Guidance →
+        </a>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- PDF Report Customization Modal -->
+  <div id="pdfModal" class="hidden fixed inset-0 z-50 bg-gray-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl border border-gray-200 max-w-md w-full p-6 shadow-xl space-y-4">
+      <div class="flex items-center justify-between border-b border-gray-100 pb-3">
+        <div class="flex items-center gap-2.5">
+          <div class="w-8 h-8 rounded-lg bg-orange-500 text-white font-extrabold flex items-center justify-center text-sm">U</div>
+          <div>
+            <h3 class="text-sm font-extrabold text-gray-900">Official Branded PDF Report</h3>
+            <p class="text-[11px] text-gray-500">University-Tutors.com Academic Credential Summary</p>
+          </div>
+        </div>
+        <button onclick="closePdfModal()" class="text-gray-400 hover:text-gray-700 text-lg font-bold px-2">×</button>
+      </div>
+
+      <div class="space-y-3">
+        <div>
+          <label class="block text-xs font-bold text-gray-700 mb-1">Student Full Name (Optional)</label>
+          <input type="text" id="pdfStudentName" placeholder="e.g., Muhammad Ali Khan" class="w-full rounded-xl border border-gray-300 px-3.5 py-2.5 text-sm text-gray-900 focus:border-orange-500 focus:outline-none" />
+        </div>
+        <div>
+          <label class="block text-xs font-bold text-gray-700 mb-1">Home University / Degree Program (Optional)</label>
+          <input type="text" id="pdfHomeProgram" placeholder="e.g., BS Computer Science — COMSATS / NUST" class="w-full rounded-xl border border-gray-300 px-3.5 py-2.5 text-sm text-gray-900 focus:border-orange-500 focus:outline-none" />
+        </div>
+        <div>
+          <label class="block text-xs font-bold text-gray-700 mb-1">Target University / Intake (Optional)</label>
+          <input type="text" id="pdfTargetProgram" placeholder="e.g., MSc Data Science — Fall 2027" class="w-full rounded-xl border border-gray-300 px-3.5 py-2.5 text-sm text-gray-900 focus:border-orange-500 focus:outline-none" />
+        </div>
+      </div>
+
+      <div class="bg-orange-50 border border-orange-200 rounded-xl p-3 text-[11px] text-gray-700">
+        Generates a clean, print-ready <strong>A4 Academic Equivalence Report</strong> with the <strong>University-Tutors.com</strong> header logo, verification reference ID, and full English-speaking destination comparison table. Choose <strong>"Save as PDF"</strong> in the print dialog.
+      </div>
+
+      <div class="flex items-center justify-end gap-2.5 pt-2">
+        <button onclick="closePdfModal()" class="px-4 py-2 rounded-xl border border-gray-200 text-xs font-semibold text-gray-600 hover:bg-gray-50">
+          Cancel
+        </button>
+        <button onclick="generateBrandedPdf()" class="px-5 py-2.5 rounded-xl bg-orange-500 hover:bg-orange-600 text-white text-xs font-bold shadow-sm transition">
+          Download / Print PDF Report
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Hidden Official A4 Branded Report Sheet (Rendered on Print / Save as PDF) -->
+  <div id="officialPrintReport" class="hidden"></div>
+
+  <script>
+    let currentArchetype = 'gpa';
+    let gradingPolicy = 'absolute';
+
+    const PRESETS_BY_ARCHETYPE = {
+      gpa: [
+        {
+          id: 'pk_hec', label: '🇵🇰 Pakistan — HEC 4.0 CGPA Scale (Pass 2.0)',
+          badge: '1. GPA / Letter Scale (4.0)', max: 4.0, min: 2.0, sample: 3.45,
+          semesters: 8, credits: 136, weeks: 16, hoursPerCredit: 45, ectsMultiplier: 1.765,
+          explainer: 'Pakistan (HEC): 4-year BS = 130–136 Credit Hours across 8 semesters (1 credit = 16 contact hrs + ~29 self-study hrs ≈ 45 workload hrs; ~240 ECTS).'
+        },
+        {
+          id: 'us_4', label: '🇺🇸 United States — 4.0 GPA Scale (Pass 2.0)',
+          badge: '1. GPA / Letter Scale (4.0)', max: 4.0, min: 2.0, sample: 3.55,
+          semesters: 8, credits: 120, weeks: 15, hoursPerCredit: 45, ectsMultiplier: 2.0,
+          explainer: 'USA Semester System: 120 Semester Credit Hours across 8 semesters (1 US credit = 45 total workload hrs = 2.0 ECTS).'
+        },
+        {
+          id: 'ca_433', label: '🇨🇦 Canada — 4.33 GPA Scale (Pass 2.0)',
+          badge: '1. GPA / Letter Scale (4.33)', max: 4.33, min: 2.0, sample: 3.70,
+          semesters: 8, credits: 120, weeks: 15, hoursPerCredit: 45, ectsMultiplier: 2.0,
+          explainer: 'Canada (4.33 Scale): Used by UBC, SFU, York & Concordia where A+ = 4.33 and A = 4.00 across 120 degree credits.'
+        },
+        {
+          id: 'ng_5', label: '🇳🇬 Nigeria — NUC 5.0 CGPA Scale (Pass 1.5)',
+          badge: '1. GPA / Letter Scale (5.0)', max: 5.0, min: 1.5, sample: 4.15,
+          semesters: 8, credits: 144, weeks: 15, hoursPerCredit: 45, ectsMultiplier: 1.667,
+          explainer: 'Nigeria (NUC 5.0 Scale): First Class (4.50–5.00), Second Class Upper (3.50–4.49), Second Class Lower (2.40–3.49).'
+        },
+        {
+          id: 'sa_5', label: '🇸🇦 Saudi Arabia / GCC — 5.0 GPA Scale (Pass 2.0)',
+          badge: '1. GPA / Letter Scale (5.0)', max: 5.0, min: 2.0, sample: 4.25,
+          semesters: 8, credits: 130, weeks: 15, hoursPerCredit: 45, ectsMultiplier: 1.846,
+          explainer: 'Saudi Arabia / GCC 5.0 Scale: Excellent (4.50–5.00), Very Good (3.75–4.49), Good (2.75–3.74).'
+        }
+      ],
+      percentage: [
+        {
+          id: 'in_pct', label: '🇮🇳 India — Traditional University Percentage (Pass 40%)',
+          badge: '2. Percentage & Division (0–100%)', max: 100, min: 40, sample: 74,
+          semesters: 6, credits: 120, weeks: 16, hoursPerCredit: 40, ectsMultiplier: 1.5,
+          explainer: 'India Percentage System: First Division with Distinction typically starts at 75%, First Division at 60%, minimum pass 40%.'
+        },
+        {
+          id: 'pk_pct', label: '🇵🇰 Pakistan — Annual / Percentage System (Pass 50%)',
+          badge: '2. Percentage & Division (0–100%)', max: 100, min: 50, sample: 76,
+          semesters: 8, credits: 136, weeks: 16, hoursPerCredit: 45, ectsMultiplier: 1.765,
+          explainer: 'Pakistan Annual/Percentage System: First Division starts at 60%, minimum university passing mark is typically 50%.'
+        },
+        {
+          id: 'cn_100', label: '🇨🇳 China — 100-Point University Scale (Pass 60%)',
+          badge: '2. Percentage & Division (0–100%)', max: 100, min: 60, sample: 85,
+          semesters: 8, credits: 150, weeks: 16, hoursPerCredit: 40, ectsMultiplier: 1.6,
+          explainer: 'China 100-Point System: Minimum pass is 60/100; 85+ is generally evaluated as First-Class / Distinction equivalent.'
+        },
+        {
+          id: 'za_pct', label: '🇿🇦 South Africa — Percentage Scale (Pass 50%)',
+          badge: '2. Percentage & Division (0–100%)', max: 100, min: 50, sample: 72,
+          semesters: 6, credits: 360, weeks: 15, hoursPerCredit: 10, ectsMultiplier: 0.5,
+          explainer: 'South Africa (NQF): Pass mark is 50%, First-Class / Distinction is 75%+, 120 SA credits per year (360 for 3-year degree).'
+        }
+      ],
+      honours: [
+        {
+          id: 'uk_hon', label: '🇬🇧 United Kingdom — Honours Weighted % (Pass 40%)',
+          badge: '3. Honours Degree Class', max: 100, min: 40, sample: 68,
+          semesters: 6, credits: 360, weeks: 15, hoursPerCredit: 10, ectsMultiplier: 0.5,
+          explainer: 'UK Honours (CATS): 1st (70%+), 2:1 (60–69%), 2:2 (50–59%), 3rd (40–49%). 360 UK credits = 180 ECTS.'
+        },
+        {
+          id: 'ie_hon', label: '🇮🇪 Ireland — NQAI Honours % (1H / 2H1 / 2H2, Pass 40%)',
+          badge: '3. Honours Degree Class', max: 100, min: 40, sample: 66,
+          semesters: 6, credits: 180, weeks: 15, hoursPerCredit: 25, ectsMultiplier: 1.0,
+          explainer: 'Ireland (NQAI): 1H (70%+), 2H1 (60–69%), 2H2 (50–59%), Pass (40–49%). Uses 60 ECTS per academic year.'
+        },
+        {
+          id: 'gh_ke', label: '🇬🇭🇰🇪 Ghana / Kenya — Commonwealth Honours % (Pass 40%)',
+          badge: '3. Honours Degree Class', max: 100, min: 40, sample: 67,
+          semesters: 8, credits: 140, weeks: 15, hoursPerCredit: 40, ectsMultiplier: 1.71,
+          explainer: 'Commonwealth Honours System: Weighted module marks mapped to First Class, Second Class Upper (2:1), and Lower (2:2).'
+        }
+      ],
+      descriptive: [
+        {
+          id: 'au_7', label: '🇦🇺 Australia — 7.0 Scale (HD = 7, D = 6, Cr = 5, P = 4)',
+          badge: '4. Descriptive Band (7.0)', max: 7.0, min: 4.0, sample: 6.0,
+          semesters: 6, credits: 144, weeks: 14, hoursPerCredit: 25, ectsMultiplier: 1.25,
+          explainer: 'Australia (7.0 Scale): High Distinction (85–100% / 7.0), Distinction (75–84% / 6.0), Credit (65–74% / 5.0), Pass (50–64% / 4.0).'
+        },
+        {
+          id: 'nz_9', label: '🇳🇿 New Zealand — 9.0 Scale (A+ = 9, B+ = 6, C- = 1)',
+          badge: '4. Descriptive Band (9.0)', max: 9.0, min: 1.0, sample: 7.0,
+          semesters: 6, credits: 360, weeks: 15, hoursPerCredit: 10, ectsMultiplier: 0.5,
+          explainer: 'New Zealand (9.0 Scale): A+ (9), A (8), A- (7), B+ (6), B (5), B- (4), C+ (3), C (2), C- (1 = 50% Pass). 120 NZ credits/year.'
+        }
+      ],
+      numerical: [
+        {
+          id: 'in_10', label: '🇮🇳 India — 10.0 CGPA Scale (UGC / AICTE, Pass 4.0)',
+          badge: '5. Numerical Scale (0–10)', max: 10.0, min: 4.0, sample: 8.4,
+          semesters: 8, credits: 160, weeks: 16, hoursPerCredit: 40, ectsMultiplier: 1.5,
+          explainer: 'India 10-Point CGPA: 4-year B.Tech/BE = 160 credits (~240 ECTS); 3-year Bachelor = 120 credits (~180 ECTS).'
+        },
+        {
+          id: 'fr_20', label: '🇫🇷 France / Portugal — 0–20 Scale (Pass 10/20)',
+          badge: '5. Numerical Scale (0–20)', max: 20.0, min: 10.0, sample: 15.2,
+          semesters: 6, credits: 180, weeks: 15, hoursPerCredit: 28, ectsMultiplier: 1.0,
+          explainer: 'France (0–20 Scale): Très Bien (16–20), Bien (14–15.9), Assez Bien (12–13.9), Passable (10–11.9). 60 ECTS/year.'
+        },
+        {
+          id: 'nl_10', label: '🇳🇱 Netherlands / Spain — 0–10 Scale (Pass 5.5/10)',
+          badge: '5. Numerical Scale (0–10)', max: 10.0, min: 5.5, sample: 7.8,
+          semesters: 6, credits: 180, weeks: 16, hoursPerCredit: 28, ectsMultiplier: 1.0,
+          explainer: 'Netherlands (1–10 Scale): 8.0+ is Cum Laude / Distinction level; 5.5 is the minimum passing mark. 60 ECTS/year.'
+        },
+        {
+          id: 'it_30', label: '🇮🇹 Italy — 18–30 Scale (Pass 18/30, 30L = Max)',
+          badge: '5. Numerical Scale (18–30)', max: 30.0, min: 18.0, sample: 27.5,
+          semesters: 6, credits: 180, weeks: 15, hoursPerCredit: 25, ectsMultiplier: 1.0,
+          explainer: 'Italy (CFU / 30-Point Scale): Exams graded 18–30 (30 e lode = highest). 180 CFU = 180 ECTS for Laurea.'
+        }
+      ],
+      inverted: [
+        {
+          id: 'de_5', label: '🇩🇪 Germany — 1.0 to 5.0 Inverted Scale (1.0 Best, 4.0 Pass)',
+          badge: '6. Inverted Scale (Lower = Better)', max: 1.0, min: 4.0, sample: 1.7, inverted: true,
+          semesters: 6, credits: 180, weeks: 15, hoursPerCredit: 30, ectsMultiplier: 1.0,
+          explainer: 'Germany (1.0–5.0): 1.0–1.5 Sehr Gut (Very Good), 1.6–2.5 Gut (Good), 2.6–3.5 Befriedigend, 3.6–4.0 Ausreichend (Pass).'
+        },
+        {
+          id: 'at_5', label: '🇦🇹 Austria — 1 to 5 Inverted Scale (1 Best, 4 Pass)',
+          badge: '6. Inverted Scale (Lower = Better)', max: 1.0, min: 4.0, sample: 1.6, inverted: true,
+          semesters: 6, credits: 180, weeks: 15, hoursPerCredit: 25, ectsMultiplier: 1.0,
+          explainer: 'Austria (1–5 Scale): 1 = Sehr Gut, 2 = Gut, 3 = Befriedigend, 4 = Genügend (Pass), 5 = Nicht Genügend (Fail).'
+        },
+        {
+          id: 'cz_4', label: '🇨🇿🇸🇰 Czechia / Slovakia — 1 to 4 Scale (1 Best, 3 Pass)',
+          badge: '6. Inverted Scale (Lower = Better)', max: 1.0, min: 3.0, sample: 1.5, inverted: true,
+          semesters: 6, credits: 180, weeks: 15, hoursPerCredit: 28, ectsMultiplier: 1.0,
+          explainer: 'Czechia / Slovakia (1–4 Scale): 1 (Výborně / Excellent), 2 (Velmi dobře), 3 (Dobře / Pass), 4 (Nevyhověl / Fail).'
+        }
+      ]
+    };
+
+    const TARGET_COUNTRIES = {
+      uk: {
+        badge: '🇬🇧 United Kingdom — Honours Classification',
+        creditLabel: 'Converted UK CATS Credits',
+        creditUnit: 'UK Credits',
+        ectsFactor: 2.0,
+        workTitle: '🇬🇧 Legal Student Working Hours in UK (Student Visa)',
+        workMain: '20 hrs/week during term-time • Full-time (40+ hrs/week) during vacations',
+        workNote: 'Applies to full-time degree-level (RQF Level 6+) students at licensed UK universities.'
+      },
+      usa: {
+        badge: '🇺🇸 United States — 4.0 GPA Scale (WES Standard)',
+        creditLabel: 'Converted US Semester Credit Hours',
+        creditUnit: 'US Credits',
+        ectsFactor: 0.5,
+        workTitle: '🇺🇸 Legal Student Working Hours in USA (F-1 Visa)',
+        workMain: '20 hrs/week on-campus during semester • Full-time (40+ hrs/week) during breaks',
+        workNote: 'Off-campus work requires CPT/OPT authorization after completing one full academic year.'
+      },
+      canada: {
+        badge: '🇨🇦 Canada — 4.0 GPA & Letter Grade Scale',
+        creditLabel: 'Converted Canadian University Credits',
+        creditUnit: 'CA Credits',
+        ectsFactor: 0.5,
+        workTitle: '🇨🇦 Legal Student Working Hours in Canada (Study Permit)',
+        workMain: 'Up to 24 hrs/week off-campus during academic terms • Full-time on breaks',
+        workNote: 'Applies to full-time students enrolled at a Designated Learning Institution (DLI).'
+      },
+      australia: {
+        badge: '🇦🇺 Australia — 7.0 GPA & Descriptive Band Scale',
+        creditLabel: 'Converted Australian Credit Points (EFTSL)',
+        creditUnit: 'AU Credit Points',
+        ectsFactor: 0.8,
+        workTitle: '🇦🇺 Legal Student Working Hours in Australia (Subclass 500)',
+        workMain: '48 hours per fortnight (24 hrs/week avg) during study periods',
+        workNote: 'Unlimited working hours permitted during official scheduled semester breaks.'
+      },
+      ireland: {
+        badge: '🇮🇪 Ireland — NQAI Honours Classification (1H / 2H1 / 2H2)',
+        creditLabel: 'Converted Irish / ECTS Credits',
+        creditUnit: 'ECTS',
+        ectsFactor: 1.0,
+        workTitle: '🇮🇪 Legal Student Working Hours in Ireland (Stamp 2)',
+        workMain: '20 hrs/week during term-time • 40 hrs/week during holiday periods',
+        workNote: 'Holiday full-time work applies from June–September and Dec 15–Jan 15.'
+      },
+      nz: {
+        badge: '🇳🇿 New Zealand — 9.0 GPA Scale (A+ = 9, B+ = 6, C- = 1)',
+        creditLabel: 'Converted New Zealand Academic Credits',
+        creditUnit: 'NZ Credits',
+        ectsFactor: 2.0,
+        workTitle: '🇳🇿 Legal Student Working Hours in New Zealand',
+        workMain: '20 hrs/week during semester • Full-time during scheduled summer holidays',
+        workNote: 'Master’s by research and PhD students in New Zealand have unlimited work rights.'
+      },
+      singapore: {
+        badge: '🇸🇬 Singapore — 5.0 CAP / GPA Scale (NUS / NTU Standard)',
+        creditLabel: 'Converted Singapore Modular Credits (MCs / AUs)',
+        creditUnit: 'Modular Credits',
+        ectsFactor: 0.667,
+        workTitle: '🇸🇬 Legal Student Working Hours in Singapore (Student Pass)',
+        workMain: '16 hrs/week during term-time • Full-time during official vacation periods',
+        workNote: 'Applies to full-time matriculated students at approved Singapore institutions (NUS, NTU, SMU).'
+      }
+    };
+
+    function selectArchetype(arch) {
+      currentArchetype = arch;
+      document.querySelectorAll('.archetype-card').forEach(btn => {
+        btn.className = 'archetype-card text-left p-3.5 rounded-xl border border-gray-200 bg-white hover:border-orange-300';
+      });
+      const active = document.getElementById('arch-' + arch);
+      if (active) {
+        active.className = 'archetype-card text-left p-3.5 rounded-xl border-2 border-orange-500 bg-orange-50/50 shadow-sm';
+      }
+
+      const selectEl = document.getElementById('fromCountry');
+      const list = PRESETS_BY_ARCHETYPE[arch];
+      selectEl.innerHTML = list.map(item => `<option value="${item.id}">${item.label}</option>`).join('');
+      applyFromCountry();
+    }
+
+    function getCurrentPreset() {
+      const list = PRESETS_BY_ARCHETYPE[currentArchetype];
+      const selectedId = document.getElementById('fromCountry').value;
+      return list.find(x => x.id === selectedId) || list[0];
+    }
+
+    function applyFromCountry() {
+      const sys = getCurrentPreset();
+      document.getElementById('fromSystemBadge').textContent = sys.badge;
+      document.getElementById('nMax').value = sys.max;
+      document.getElementById('nMin').value = sys.min;
+      document.getElementById('nObtained').value = sys.sample;
+      document.getElementById('numSemesters').value = sys.semesters;
+      document.getElementById('totalCredits').value = sys.credits;
+      document.getElementById('weeksPerSem').value = sys.weeks;
+      document.getElementById('homeCreditExplainer').innerHTML = `<strong>System Credit & Workload Standard:</strong> ${sys.explainer}`;
+      calculateAll();
+    }
+
+    function setGradingPolicy(policy) {
+      gradingPolicy = policy;
+      const absBtn = document.getElementById('policy-absolute');
+      const relBtn = document.getElementById('policy-relative');
+      const exp = document.getElementById('policyExplainer');
+
+      if (policy === 'relative') {
+        relBtn.className = 'py-2 px-3 rounded-xl border-2 border-orange-500 bg-orange-50/50 text-xs font-bold text-gray-900 text-left';
+        absBtn.className = 'py-2 px-3 rounded-xl border border-gray-200 bg-white text-xs font-bold text-gray-700 text-left hover:border-orange-300';
+        exp.innerHTML = '<strong>Relative (Bell-Curve) Grading:</strong> Because only the top cohort percentile earns top grades under curve grading, admissions evaluators apply a slight upward competitiveness buffer (+4% cohort rank weight).';
+      } else {
+        absBtn.className = 'py-2 px-3 rounded-xl border-2 border-orange-500 bg-orange-50/50 text-xs font-bold text-gray-900 text-left';
+        relBtn.className = 'py-2 px-3 rounded-xl border border-gray-200 bg-white text-xs font-bold text-gray-700 text-left hover:border-orange-300';
+        exp.innerHTML = '<strong>Absolute Grading:</strong> Your raw score is evaluated directly against fixed institutional thresholds without cohort curve adjustment.';
+      }
+      calculateAll();
+    }
+
+    function calculateAll() {
+      const sys = getCurrentPreset();
+      const toKey = document.getElementById('toCountry').value;
+      const target = TARGET_COUNTRIES[toKey];
+
+      const nMax = parseFloat(document.getElementById('nMax').value);
+      const nMin = parseFloat(document.getElementById('nMin').value);
+      const nObt = parseFloat(document.getElementById('nObtained').value);
+      const alertBox = document.getElementById('validationAlert');
+
+      const isInverted = sys.inverted === true;
+      if (isNaN(nMax) || isNaN(nMin) || isNaN(nObt)) return;
+
+      if (!isInverted && (nMax <= nMin || nObt > nMax || nObt < 0)) {
+        alertBox.textContent = `Please enter a valid score between 0 and ${nMax} (with Max Grade > Min Pass ${nMin}).`;
+        alertBox.classList.remove('hidden');
+        return;
+      }
+      if (isInverted && (nObt < nMax || nObt > (nMin + 1))) {
+        alertBox.textContent = `In inverted scales, enter a value between ${nMax} (highest) and ${nMin + 1} (fail).`;
+        alertBox.classList.remove('hidden');
+        return;
+      }
+      alertBox.classList.add('hidden');
+
+      // Normalize passing performance ratio (0 = minimum pass, 1 = top possible score)
+      let passProgress;
+      if (isInverted) {
+        passProgress = Math.max(0, Math.min(1, (nMin - nObt) / (nMin - nMax)));
+      } else {
+        passProgress = (nObt - nMin) / (nMax - nMin);
+      }
+
+      // Apply subtle cohort curve recognition if Relative Grading is selected
+      if (gradingPolicy === 'relative' && passProgress >= 0) {
+        passProgress = Math.min(1.0, passProgress + 0.04);
+      }
+
+      const germanVal = Math.max(1.0, Math.min(5.0, 1 + 3 * (1 - passProgress)));
+      const pctVal = Math.max(0, Math.min(100, isInverted ? (100 - (germanVal - 1) * 15) : (nObt / nMax) * 100));
+      const us4Val = Math.max(0, Math.min(4.0, passProgress >= 0 ? 2.0 + 2.0 * passProgress : Math.max(0, (nObt / nMin) * 2.0)));
+
+      // ECTS Letter Grade Equivalence (Cross-System Concept)
+      let ectsBand = 'Grade E (Sufficient)';
+      let ectsShort = 'Grade E';
+      if (passProgress < 0) { ectsBand = 'Grade F / FX (Fail)'; ectsShort = 'Fail (F)'; }
+      else if (passProgress >= 0.82) { ectsBand = 'ECTS Grade A (Top 10%)'; ectsShort = 'Grade A'; }
+      else if (passProgress >= 0.65) { ectsBand = 'ECTS Grade B (Next 25%)'; ectsShort = 'Grade B'; }
+      else if (passProgress >= 0.45) { ectsBand = 'ECTS Grade C (Next 30%)'; ectsShort = 'Grade C'; }
+      else if (passProgress >= 0.25) { ectsBand = 'ECTS Grade D (Next 25%)'; ectsShort = 'Grade D'; }
+
+      document.getElementById('ectsBridgeBadge').textContent = ectsBand;
+      document.getElementById('snapEcts').textContent = ectsShort;
+
+      // Update Target Country Headers & Visa Work Hours
+      document.getElementById('targetCountryBadge').textContent = target.badge;
+      document.getElementById('targetCreditLabel').textContent = target.creditLabel;
+      document.getElementById('workHoursTitle').textContent = target.workTitle;
+      document.getElementById('workHoursMain').textContent = target.workMain;
+      document.getElementById('workHoursNote').textContent = target.workNote;
+
+      const bigEl = document.getElementById('convertedGradeBig');
+      const classEl = document.getElementById('convertedClassification');
+      const noteEl = document.getElementById('targetAdmissionNote');
+      const formulaEl = document.getElementById('formulaUsedBox');
+
+      const au7Val = (4.0 + Math.max(0, passProgress) * 3.0).toFixed(2);
+      const nz9Val = (1.0 + Math.max(0, passProgress) * 8.0).toFixed(2);
+      const sg5Val = (2.0 + Math.max(0, passProgress) * 3.0).toFixed(2);
+
+      let ukShort = '3rd', ukFull = 'Third-Class Honours (3rd)', ukPct = Math.round(40 + Math.max(0, passProgress) * 45);
+      if (passProgress < 0) { ukShort = 'Fail'; ukFull = 'Below Honours Pass'; }
+      else if (germanVal <= 1.6) { ukShort = 'First (1st)'; ukFull = 'First-Class Honours (1st)'; }
+      else if (germanVal <= 2.4) { ukShort = '2:1 Class'; ukFull = 'Upper Second-Class Honours (2:1)'; }
+      else if (germanVal <= 3.2) { ukShort = '2:2 Class'; ukFull = 'Lower Second-Class Honours (2:2)'; }
+
+      if (toKey === 'uk') {
+        bigEl.textContent = ukShort;
+        classEl.textContent = `${ukFull} (~${ukPct}% UK equiv.)`;
+        formulaEl.textContent = `UK ENIC Equivalence from ${nObt}/${nMax} (${gradingPolicy === 'relative' ? 'Bell-Curve Adjusted' : 'Absolute'})`;
+        noteEl.textContent = 'Most Russell Group & UK Master’s programs require a 2:1 (Upper Second-Class) or strong 2:2.';
+      } else if (toKey === 'usa') {
+        bigEl.textContent = `${us4Val.toFixed(2)} / 4.0`;
+        classEl.textContent = us4Val >= 3.7 ? 'Summa / Magna Cum Laude (A)' : us4Val >= 3.3 ? 'Dean’s List Standing (B+/A-)' : us4Val >= 3.0 ? 'Good Graduate Standing (B)' : 'Passing Standing';
+        formulaEl.textContent = `WES Passing Normalization: 2.0 + 2.0 × Pass Ratio (${(Math.max(0, passProgress) * 100).toFixed(0)}%)`;
+        noteEl.textContent = 'US universities typically require a minimum 3.00 / 4.00 GPA (and 3.5+ for top PhD/fellowship funding).';
+      } else if (toKey === 'canada') {
+        const caLetter = us4Val >= 3.8 ? 'A / A+' : us4Val >= 3.5 ? 'A-' : us4Val >= 3.0 ? 'B+' : us4Val >= 2.7 ? 'B' : 'C+';
+        bigEl.textContent = `${us4Val.toFixed(2)} / 4.0`;
+        classEl.textContent = `Canadian Grade ${caLetter} (~${Math.round(50 + Math.max(0, passProgress) * 42)}%)`;
+        formulaEl.textContent = `Canadian 4.0 Scale Conversion (B+ = 3.30, A- = 3.70, A = 4.00)`;
+        noteEl.textContent = 'Most Canadian Master’s programs (UofT, UBC, Waterloo) require at least a B+ (3.30/4.0) in the final 2 years.';
+      } else if (toKey === 'australia') {
+        const label = au7Val >= 6.5 ? 'High Distinction (HD)' : au7Val >= 5.5 ? 'Distinction (D)' : au7Val >= 4.5 ? 'Credit (Cr)' : 'Pass (P)';
+        bigEl.textContent = `${au7Val} / 7.0`;
+        classEl.textContent = label;
+        formulaEl.textContent = `Australian 7.0 Descriptive Band Scale (4.0 Pass → 7.0 High Distinction)`;
+        noteEl.textContent = 'Group of Eight (Go8) Australian universities typically require a Credit (5.0+) or Distinction (6.0+) average.';
+      } else if (toKey === 'ireland') {
+        const ieGrade = passProgress < 0 ? 'Fail' : germanVal <= 1.6 ? '1H (First-Class Honours)' : germanVal <= 2.4 ? '2H1 (Second-Class, Grade 1)' : germanVal <= 3.2 ? '2H2 (Second-Class, Grade 2)' : 'Pass';
+        bigEl.textContent = ieGrade.split(' ')[0];
+        classEl.textContent = ieGrade;
+        formulaEl.textContent = `Irish NQAI Honours Framework (1H ≥ 70%, 2H1 = 60–69%, 2H2 = 50–59%)`;
+        noteEl.textContent = 'Trinity College Dublin, UCD, and University of Galway generally require a 2H1 (Upper Second-Class) for Master’s entry.';
+      } else if (toKey === 'nz') {
+        const nzLetter = nz9Val >= 8.0 ? 'A+ / A (First Class)' : nz9Val >= 6.5 ? 'A- / B+ (Second Div 1)' : nz9Val >= 5.0 ? 'B / B- (Second Div 2)' : 'C+ / C (Pass)';
+        bigEl.textContent = `${nz9Val} / 9.0`;
+        classEl.textContent = nzLetter;
+        formulaEl.textContent = `New Zealand 9.0 Scale (9 = A+, 8 = A, 7 = A-, 6 = B+, 5 = B, 1 = C- Pass)`;
+        noteEl.textContent = 'University of Auckland and Otago typically require a B or B+ average (5.0–6.0 / 9.0) for postgraduate admission.';
+      } else if (toKey === 'singapore') {
+        const sgClass = sg5Val >= 4.5 ? 'Honours (Highest Distinction)' : sg5Val >= 4.0 ? 'Honours (Distinction)' : sg5Val >= 3.5 ? 'Honours (Merit)' : 'Pass';
+        bigEl.textContent = `${sg5Val} / 5.0`;
+        classEl.textContent = sgClass;
+        formulaEl.textContent = `Singapore 5.0 CAP Scale (5.0 = A+/A, 4.5 = A-, 4.0 = B+, 3.5 = B, 2.0 = Pass)`;
+        noteEl.textContent = 'NUS & NTU postgraduate programs typically look for at least Honours (Distinction) / 4.0+ out of 5.0.';
+      }
+
+      // Credits & Study Workload Hours Calculations
+      const sems = Math.max(1, parseInt(document.getElementById('numSemesters').value) || 8);
+      const credits = Math.max(1, parseFloat(document.getElementById('totalCredits').value) || 136);
+      const weeks = Math.max(1, parseInt(document.getElementById('weeksPerSem').value) || 16);
+
+      const estEcts = credits * sys.ectsMultiplier;
+      const targetCredits = Math.round(estEcts * target.ectsFactor);
+      const perSemCredits = (targetCredits / sems).toFixed(1);
+
+      const totalStudyHrs = Math.round(credits * sys.hoursPerCredit);
+      const weeklyStudyHrs = (totalStudyHrs / (sems * weeks)).toFixed(1);
+
+      document.getElementById('convertedCreditsVal').textContent = `${targetCredits} ${target.creditUnit}`;
+      document.getElementById('creditsPerSemVal').textContent = `~${perSemCredits} ${target.creditUnit} / semester (${sems} sems)`;
+      document.getElementById('totalStudyHoursVal').textContent = `${totalStudyHrs.toLocaleString()} hrs`;
+      document.getElementById('weeklyStudyHoursVal').textContent = `~${weeklyStudyHrs} hrs/week (${weeks} wks/sem)`;
+
+      // Update Bottom English-Speaking Snapshot
+      document.getElementById('snapUk').textContent = ukShort;
+      document.getElementById('snapUs').textContent = `${us4Val.toFixed(2)}`;
+      document.getElementById('snapCa').textContent = `${us4Val.toFixed(2)} (${us4Val >= 3.5 ? 'A-' : 'B+'})`;
+      document.getElementById('snapAu').textContent = `${au7Val} / 7.0`;
+      document.getElementById('snapIe').textContent = passProgress < 0 ? 'Fail' : germanVal <= 1.6 ? '1H' : germanVal <= 2.4 ? '2H1' : '2H2';
+      document.getElementById('snapNz').textContent = `${nz9Val} / 9.0`;
+      document.getElementById('snapSg').textContent = `${sg5Val} / 5.0`;
+    }
+
+    function copyFullReport() {
+      const fromText = document.getElementById('fromCountry').selectedOptions[0].text;
+      const toText = document.getElementById('toCountry').selectedOptions[0].text;
+      const grade = document.getElementById('convertedGradeBig').textContent;
+      const cls = document.getElementById('convertedClassification').textContent;
+      const ects = document.getElementById('ectsBridgeBadge').textContent;
+      const creds = document.getElementById('convertedCreditsVal').textContent;
+      const hrs = document.getElementById('totalStudyHoursVal').textContent;
+      const work = document.getElementById('workHoursMain').textContent;
+
+      const summary = `Universal Academic Grade Conversion (University-Tutors.com)\nFrom: ${fromText}\nTo: ${toText}\nConverted Grade: ${grade} (${cls}) | ${ects}\nConverted Credits: ${creds} | Total Study Workload: ${hrs}\nStudent Work Allowance: ${work}`;
+
+      const ta = document.createElement('textarea');
+      ta.value = summary;
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand('copy');
+      document.body.removeChild(ta);
+
+      const btn = document.getElementById('copyBtn');
+      btn.textContent = 'Copied!';
+      setTimeout(() => { btn.textContent = 'Copy Text'; }, 1600);
+    }
+
+    function openPdfModal() {
+      document.getElementById('pdfModal').classList.remove('hidden');
+    }
+
+    function closePdfModal() {
+      document.getElementById('pdfModal').classList.add('hidden');
+    }
+
+    function generateBrandedPdf() {
+      const studentName = document.getElementById('pdfStudentName').value.trim() || 'Prospective International Applicant';
+      const homeProgram = document.getElementById('pdfHomeProgram').value.trim() || 'Undergraduate / Graduate Degree Program';
+      const targetProgram = document.getElementById('pdfTargetProgram').value.trim() || 'International University Admission';
+
+      const fromText = document.getElementById('fromCountry').selectedOptions[0].text;
+      const toText = document.getElementById('toCountry').selectedOptions[0].text;
+      const nObt = document.getElementById('nObtained').value;
+      const nMax = document.getElementById('nMax').value;
+      const nMin = document.getElementById('nMin').value;
+      const grade = document.getElementById('convertedGradeBig').textContent;
+      const cls = document.getElementById('convertedClassification').textContent;
+      const ects = document.getElementById('ectsBridgeBadge').textContent;
+      const formula = document.getElementById('formulaUsedBox').textContent;
+      const creds = document.getElementById('convertedCreditsVal').textContent;
+      const credsSem = document.getElementById('creditsPerSemVal').textContent;
+      const hrs = document.getElementById('totalStudyHoursVal').textContent;
+      const hrsWeek = document.getElementById('weeklyStudyHoursVal').textContent;
+      const workMain = document.getElementById('workHoursMain').textContent;
+      const workNote = document.getElementById('workHoursNote').textContent;
+
+      const snapUk = document.getElementById('snapUk').textContent;
+      const snapUs = document.getElementById('snapUs').textContent;
+      const snapCa = document.getElementById('snapCa').textContent;
+      const snapAu = document.getElementById('snapAu').textContent;
+      const snapIe = document.getElementById('snapIe').textContent;
+      const snapNz = document.getElementById('snapNz').textContent;
+      const snapSg = document.getElementById('snapSg').textContent;
+
+      const reportId = 'UT-' + new Date().getFullYear() + '-' + Math.floor(100000 + Math.random() * 900000);
+      const issuedDate = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+      const policyLabel = gradingPolicy === 'relative' ? 'Relative (Bell-Curve / Cohort Rank Adjusted)' : 'Absolute (Fixed Institutional Cut-Offs)';
+
+      const reportHtml = `
+        <div style="font-family: 'Inter', sans-serif; color: #111827; max-width: 780px; margin: 0 auto;">
+          <!-- Branded Header with SVG Logo -->
+          <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 3px solid #F97316; padding-bottom: 16px; margin-bottom: 20px;">
+            <div style="display: flex; align-items: center; gap: 12px;">
+              <svg width="44" height="44" viewBox="0 0 44 44" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <rect width="44" height="44" rx="10" fill="#F97316"/>
+                <path d="M22 10L8 16.5L22 23L36 16.5L22 10Z" fill="white"/>
+                <path d="M13 20.5V27.5C13 30.5 17 33 22 33C27 33 31 30.5 31 27.5V20.5L22 24.7L13 20.5Z" fill="#FFF7ED"/>
+              </svg>
+              <div>
+                <div style="font-size: 20px; font-weight: 800; color: #111827; letter-spacing: -0.02em;">
+                  University-Tutors<span style="color: #F97316;">.com</span>
+                </div>
+                <div style="font-size: 11px; font-weight: 600; color: #6B7280;">
+                  International Academic Credential & Grade Equivalence Report
+                </div>
+              </div>
+            </div>
+            <div style="text-align: right; font-size: 11px; color: #4B5563;">
+              <div style="font-weight: 700; color: #111827;">Ref ID: ${reportId}</div>
+              <div>Issued: ${issuedDate}</div>
+              <div style="color: #EA580C; font-weight: 600;">www.university-tutors.com</div>
+            </div>
+          </div>
+
+          <!-- Applicant & Program Summary Box -->
+          <div style="background: #F9FAFB; border: 1px solid #E5E7EB; border-radius: 10px; padding: 14px 16px; margin-bottom: 18px; display: grid; grid-template-columns: 1fr 1fr; gap: 10px; font-size: 12px;">
+            <div><span style="color: #6B7280; font-weight: 600;">Applicant Name:</span> <strong style="color: #111827;">${studentName}</strong></div>
+            <div><span style="color: #6B7280; font-weight: 600;">Target Program:</span> <strong style="color: #111827;">${targetProgram}</strong></div>
+            <div><span style="color: #6B7280; font-weight: 600;">Home Qualification:</span> <strong style="color: #111827;">${homeProgram}</strong></div>
+            <div><span style="color: #6B7280; font-weight: 600;">Grading Policy:</span> <strong style="color: #111827;">${policyLabel}</strong></div>
+          </div>
+
+          <!-- Primary Conversion Result Highlight -->
+          <div style="background: #FFF7ED; border: 2px solid #F97316; border-radius: 12px; padding: 18px; margin-bottom: 18px;">
+            <div style="font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.06em; color: #EA580C; margin-bottom: 6px;">
+              Official Academic Equivalence Summary
+            </div>
+            <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
+              <div>
+                <div style="font-size: 12px; color: #4B5563;">Source: <strong>${fromText}</strong></div>
+                <div style="font-size: 13px; color: #111827; margin-top: 2px;">Obtained Score: <strong>${nObt} / ${nMax}</strong> (Min Pass: ${nMin})</div>
+                <div style="font-size: 12px; color: #4B5563; margin-top: 2px;">Destination: <strong>${toText}</strong></div>
+              </div>
+              <div style="text-align: right;">
+                <div style="font-size: 28px; font-weight: 800; color: #111827; line-height: 1.1;">${grade}</div>
+                <div style="font-size: 12px; font-weight: 700; color: #047857; margin-top: 3px;">${cls}</div>
+                <div style="font-size: 11px; font-weight: 700; color: #4338CA; margin-top: 2px;">${ects}</div>
+              </div>
+            </div>
+            <div style="margin-top: 10px; padding-top: 8px; border-top: 1px solid #FED7AA; font-size: 11px; color: #6B7280;">
+              Methodology: ${formula}
+            </div>
+          </div>
+
+          <!-- Credits, Study Workload & Visa Working Hours -->
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 18px; font-size: 12px;">
+            <div style="border: 1px solid #E5E7EB; border-radius: 10px; padding: 12px;">
+              <div style="font-size: 10px; font-weight: 700; text-transform: uppercase; color: #6B7280;">Converted Academic Credits</div>
+              <div style="font-size: 16px; font-weight: 800; color: #111827; margin-top: 3px;">${creds}</div>
+              <div style="font-size: 11px; color: #6B7280; margin-top: 2px;">${credsSem}</div>
+            </div>
+            <div style="border: 1px solid #E5E7EB; border-radius: 10px; padding: 12px;">
+              <div style="font-size: 10px; font-weight: 700; text-transform: uppercase; color: #6B7280;">Total Academic Workload</div>
+              <div style="font-size: 16px; font-weight: 800; color: #111827; margin-top: 3px;">${hrs}</div>
+              <div style="font-size: 11px; color: #6B7280; margin-top: 2px;">${hrsWeek}</div>
+            </div>
+          </div>
+
+          <div style="background: #ECFDF5; border: 1px solid #A7F3D0; border-radius: 10px; padding: 12px 14px; margin-bottom: 18px; font-size: 12px;">
+            <div style="font-size: 10px; font-weight: 800; text-transform: uppercase; color: #065F46;">Destination International Student Work Allowance</div>
+            <div style="font-weight: 700; color: #111827; margin-top: 3px;">${workMain}</div>
+            <div style="font-size: 11px; color: #374151; margin-top: 2px;">${workNote}</div>
+          </div>
+
+          <!-- Multi-Country English-Speaking Benchmark Table -->
+          <div style="margin-bottom: 20px;">
+            <div style="font-size: 11px; font-weight: 800; text-transform: uppercase; color: #4B5563; margin-bottom: 8px;">
+              Global English-Speaking Destinations & ECTS Benchmark Table
+            </div>
+            <table style="width: 100%; border-collapse: collapse; font-size: 11px; text-align: center;">
+              <thead>
+                <tr style="background: #111827; color: #FFFFFF;">
+                  <th style="padding: 7px; border: 1px solid #374151;">UK Honours</th>
+                  <th style="padding: 7px; border: 1px solid #374151;">USA (4.0)</th>
+                  <th style="padding: 7px; border: 1px solid #374151;">Canada</th>
+                  <th style="padding: 7px; border: 1px solid #374151;">Australia (7.0)</th>
+                  <th style="padding: 7px; border: 1px solid #374151;">Ireland</th>
+                  <th style="padding: 7px; border: 1px solid #374151;">NZ (9.0)</th>
+                  <th style="padding: 7px; border: 1px solid #374151;">Singapore (5.0)</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr style="background: #F9FAFB; font-weight: 700;">
+                  <td style="padding: 8px; border: 1px solid #E5E7EB;">${snapUk}</td>
+                  <td style="padding: 8px; border: 1px solid #E5E7EB;">${snapUs}</td>
+                  <td style="padding: 8px; border: 1px solid #E5E7EB;">${snapCa}</td>
+                  <td style="padding: 8px; border: 1px solid #E5E7EB;">${snapAu}</td>
+                  <td style="padding: 8px; border: 1px solid #E5E7EB;">${snapIe}</td>
+                  <td style="padding: 8px; border: 1px solid #E5E7EB;">${snapNz}</td>
+                  <td style="padding: 8px; border: 1px solid #E5E7EB;">${snapSg}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <!-- Footer & Disclaimer -->
+          <div style="border-top: 1px solid #E5E7EB; padding-top: 12px; display: flex; justify-content: space-between; align-items: center; gap: 16px; font-size: 10px; color: #6B7280;">
+            <div style="max-width: 520px; line-height: 1.4;">
+              <strong>Disclaimer:</strong> This report is generated by University-Tutors.com using internationally recognized linear & modified Bavarian equivalence formulas for preliminary self-assessment. Final admission decisions rest with the admitting university’s credential office.
+            </div>
+            <div style="text-align: right; font-weight: 700; color: #F97316; white-space: nowrap;">
+              Need SOP, CV or IELTS Prep?<br>
+              <span style="color: #111827;">Visit University-Tutors.com</span>
+            </div>
+          </div>
+        </div>
+      `;
+
+      document.getElementById('officialPrintReport').innerHTML = reportHtml;
+      closePdfModal();
+      setTimeout(() => {
+        window.print();
+      }, 150);
+    }
+
+    window.onload = function () {
+      selectArchetype('gpa');
+    };
+  </script>
+</body>
+</html>

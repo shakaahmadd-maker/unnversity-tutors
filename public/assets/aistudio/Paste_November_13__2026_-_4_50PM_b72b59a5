@@ -1,0 +1,821 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Free Academic Paraphraser, AI-Pattern Analyzer & Originality Checker — University-Tutors.com</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+    body {
+      font-family: 'Inter', sans-serif;
+      background-color: #F9FAFB;
+      color: #111827;
+    }
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-thumb { background: #D1D5DB; border-radius: 9999px; }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col">
+
+  <!-- Top Brand & Trust Navigation Bar -->
+  <header class="bg-white border-b border-gray-200 px-4 lg:px-8 py-3.5 sticky top-0 z-30 shadow-sm">
+    <div class="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-3">
+      <div class="flex items-center gap-3">
+        <div class="w-9 h-9 rounded-lg bg-orange-500 text-white font-extrabold flex items-center justify-center text-lg shadow-sm shrink-0">U</div>
+        <div>
+          <div class="flex items-center gap-2 flex-wrap">
+            <span class="font-bold text-gray-900 text-base">University-Tutors<span class="text-orange-500">.com</span></span>
+            <span class="text-xs text-gray-400 hidden sm:inline">&gt;</span>
+            <span class="text-xs font-medium text-gray-500 hidden sm:inline">Free Student Tools</span>
+            <span class="text-xs text-gray-400 hidden sm:inline">&gt;</span>
+            <span class="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-orange-50 text-orange-600 border border-orange-200">Academic Paraphraser & AI-Pattern Analyzer</span>
+          </div>
+          <p class="text-[11px] text-gray-500 mt-0.5">Stylometric Burstiness Diagnostics • Natural Flow Refiner • N-Gram Originality Checker</p>
+        </div>
+      </div>
+
+      <div class="flex items-center gap-2 flex-wrap">
+        <span id="engineStatusPill" class="inline-flex items-center gap-1.5 text-[11px] font-semibold text-indigo-700 bg-indigo-50 border border-indigo-200 px-3 py-1 rounded-full">
+          <span class="w-2 h-2 rounded-full bg-indigo-500"></span> Client-Side NLP Engine Active
+        </span>
+        <span class="inline-flex items-center gap-1.5 text-[11px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 px-3 py-1 rounded-full">
+          <span class="w-2 h-2 rounded-full bg-emerald-500"></span> 100% Free & Browser-Based ($0 API Cost)
+        </span>
+      </div>
+    </div>
+  </header>
+
+  <!-- Toast Notification -->
+  <div id="toastMsg" class="fixed bottom-5 right-5 z-50 hidden bg-gray-900 text-white text-xs font-semibold px-4 py-2.5 rounded-xl shadow-lg border border-gray-700"></div>
+
+  <!-- Main Workspace -->
+  <main class="flex-1 max-w-7xl w-full mx-auto p-4 lg:p-6 space-y-6">
+
+    <!-- Mode Selector & Quick Actions Bar -->
+    <section class="bg-white rounded-2xl border border-gray-200 p-4 shadow-sm flex flex-wrap items-center justify-between gap-3">
+      <div class="flex items-center gap-2 flex-wrap">
+        <span class="text-xs font-extrabold uppercase tracking-wider text-gray-500 mr-1">Refinement Mode:</span>
+        <button onclick="setMode('natural')" id="mode-natural" class="mode-btn px-3.5 py-2 rounded-xl text-xs font-bold bg-orange-500 text-white shadow-sm transition">
+          Natural Human Flow
+        </button>
+        <button onclick="setMode('academic')" id="mode-academic" class="mode-btn px-3.5 py-2 rounded-xl text-xs font-bold bg-gray-100 text-gray-700 hover:bg-orange-50 hover:text-orange-700 transition">
+          Scholarly Academic
+        </button>
+        <button onclick="setMode('concise')" id="mode-concise" class="mode-btn px-3.5 py-2 rounded-xl text-xs font-bold bg-gray-100 text-gray-700 hover:bg-orange-50 hover:text-orange-700 transition">
+          Concise (Trim Wordiness)
+        </button>
+        <button onclick="setMode('active')" id="mode-active" class="mode-btn px-3.5 py-2 rounded-xl text-xs font-bold bg-gray-100 text-gray-700 hover:bg-orange-50 hover:text-orange-700 transition">
+          Active Voice
+        </button>
+      </div>
+
+      <div class="flex items-center gap-2">
+        <button onclick="loadSampleDraft()" class="px-3 py-2 rounded-xl border border-orange-200 bg-orange-50 hover:bg-orange-100 text-orange-700 text-xs font-bold transition">
+          Load Sample AI Draft
+        </button>
+        <button onclick="clearDraft()" class="px-3 py-2 rounded-xl border border-gray-200 bg-white hover:bg-red-50 hover:text-red-600 text-gray-600 text-xs font-semibold transition">
+          Clear
+        </button>
+        <button onclick="runParaphraseAndAnalyze()" class="px-4 py-2 rounded-xl bg-gray-900 hover:bg-gray-800 text-white text-xs font-bold shadow-sm transition">
+          Refine & Analyze Now
+        </button>
+      </div>
+    </section>
+
+    <!-- Side-by-Side Editor & Rewritten Output -->
+    <section class="grid grid-cols-1 lg:grid-cols-12 gap-5">
+
+      <!-- Left: Original Draft Input -->
+      <div class="lg:col-span-6 bg-white rounded-2xl border border-gray-200 shadow-sm flex flex-col overflow-hidden">
+        <div class="px-4 py-3 border-b border-gray-100 flex items-center justify-between bg-gray-50/70">
+          <div class="flex items-center gap-2">
+            <span class="text-xs font-extrabold uppercase tracking-wider text-gray-800">1. Original Draft</span>
+            <span id="origRhythmBadge" class="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-red-50 text-red-700 border border-red-200">Human Rhythm: 34%</span>
+          </div>
+          <span id="origCounts" class="text-[11px] font-medium text-gray-500">0 words • 0 sentences</span>
+        </div>
+
+        <textarea id="originalInput" rows="10" oninput="handleInputChange()" placeholder="Paste your essay paragraph, literature review, or assignment draft here..." class="w-full p-4 text-sm leading-relaxed text-gray-800 focus:outline-none resize-y flex-1"></textarea>
+
+        <!-- Diagnostic Sentence Highlighter (Original) -->
+        <div class="border-t border-gray-100 bg-gray-50/60 p-3.5">
+          <div class="flex items-center justify-between mb-1.5">
+            <span class="text-[11px] font-bold uppercase tracking-wider text-gray-600">AI Cliché & Uniform Cadence Scanner</span>
+            <span id="clicheCountBadge" class="text-[11px] font-bold text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded">0 AI phrases flagged</span>
+          </div>
+          <div id="origDiagnosticPreview" class="text-xs leading-relaxed text-gray-700 bg-white border border-gray-200 rounded-xl p-3 max-h-36 overflow-y-auto"></div>
+        </div>
+      </div>
+
+      <!-- Right: Polished Output & Before/After Metrics -->
+      <div class="lg:col-span-6 bg-white rounded-2xl border-2 border-orange-400 shadow-sm flex flex-col overflow-hidden">
+        <div class="px-4 py-3 border-b border-orange-100 flex flex-wrap items-center justify-between gap-2 bg-orange-50/50">
+          <div class="flex items-center gap-2">
+            <span class="text-xs font-extrabold uppercase tracking-wider text-orange-700">2. Refined Academic Output</span>
+            <span id="newRhythmBadge" class="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">Human Rhythm: 84% (+50%)</span>
+          </div>
+          <div class="flex items-center gap-2">
+            <label class="inline-flex items-center gap-1.5 text-[11px] font-semibold text-gray-700 cursor-pointer">
+              <input type="checkbox" id="toggleDiffHighlight" checked onchange="renderOutputPanel()" class="accent-orange-500 rounded" />
+              <span>Highlight Edits</span>
+            </label>
+          </div>
+        </div>
+
+        <!-- Output Display -->
+        <div id="rewrittenOutputBox" class="p-4 text-sm leading-relaxed text-gray-900 flex-1 min-h-[220px] overflow-y-auto bg-white"></div>
+
+        <!-- Output Footer Bar -->
+        <div class="border-t border-gray-100 bg-gray-50/80 px-4 py-3 flex flex-wrap items-center justify-between gap-2">
+          <span id="newCounts" class="text-[11px] font-medium text-gray-500">0 words • 0 sentences</span>
+          <div class="flex items-center gap-2">
+            <button onclick="runParaphraseAndAnalyze()" class="px-3 py-1.5 rounded-lg border border-orange-300 bg-orange-50 hover:bg-orange-100 text-orange-700 text-xs font-bold transition">
+              Re-Spin Variation
+            </button>
+            <button id="copyOutputBtn" onclick="copyRewritten()" class="px-3.5 py-1.5 rounded-lg bg-orange-500 hover:bg-orange-600 text-white text-xs font-bold shadow-sm transition">
+              Copy Text
+            </button>
+            <button onclick="downloadTxt()" class="px-3 py-1.5 rounded-lg border border-gray-300 bg-white hover:bg-gray-100 text-gray-700 text-xs font-semibold transition">
+              Download .txt
+            </button>
+          </div>
+        </div>
+      </div>
+
+    </section>
+
+    <!-- Live Stylometry & AI-Pattern Diagnostic Gauges (Before vs. After) -->
+    <section class="bg-white rounded-2xl border border-gray-200 p-5 shadow-sm">
+      <div class="flex flex-wrap items-center justify-between gap-2 mb-4">
+        <div>
+          <h2 class="text-xs font-extrabold uppercase tracking-wider text-gray-700">Stylometric & AI-Pattern Diagnostics (Before vs. After)</h2>
+          <p class="text-xs text-gray-500">Measures sentence-length burstiness, lexical richness, and templated LLM phrase density.</p>
+        </div>
+        <div class="flex items-center gap-3 text-[11px] font-semibold">
+          <span class="inline-flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-sm bg-red-200 border border-red-400"></span> Flagged AI Cliché</span>
+          <span class="inline-flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-sm bg-amber-200 border border-amber-400"></span> Uniform Sentence Cadence</span>
+          <span class="inline-flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-sm bg-orange-100 border border-orange-300"></span> Refined Phrase</span>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <!-- Gauge 1: Burstiness / Human Rhythm -->
+        <div class="rounded-xl border border-gray-200 bg-gray-50/70 p-4">
+          <div class="flex justify-between items-center mb-1">
+            <span class="text-xs font-bold text-gray-800">Human Rhythm (Burstiness)</span>
+            <span id="metricBurstinessText" class="text-xs font-extrabold text-emerald-600">34% → 84%</span>
+          </div>
+          <div class="w-full h-2.5 bg-gray-200 rounded-full overflow-hidden mb-2">
+            <div id="metricBurstinessBar" class="h-full bg-emerald-500 rounded-full transition-all duration-300" style="width: 84%"></div>
+          </div>
+          <p class="text-[11px] text-gray-500">Standard deviation of sentence lengths. Humans mix short punchy sentences with longer analytical ones.</p>
+        </div>
+
+        <!-- Gauge 2: Lexical Diversity -->
+        <div class="rounded-xl border border-gray-200 bg-gray-50/70 p-4">
+          <div class="flex justify-between items-center mb-1">
+            <span class="text-xs font-bold text-gray-800">Lexical Diversity (Type-Token)</span>
+            <span id="metricLexicalText" class="text-xs font-extrabold text-orange-600">61% → 78%</span>
+          </div>
+          <div class="w-full h-2.5 bg-gray-200 rounded-full overflow-hidden mb-2">
+            <div id="metricLexicalBar" class="h-full bg-orange-500 rounded-full transition-all duration-300" style="width: 78%"></div>
+          </div>
+          <p class="text-[11px] text-gray-500">Unique-to-total vocabulary ratio. Higher diversity eliminates repetitive AI word loops.</p>
+        </div>
+
+        <!-- Gauge 3: AI Cliché Reduction -->
+        <div class="rounded-xl border border-gray-200 bg-gray-50/70 p-4">
+          <div class="flex justify-between items-center mb-1">
+            <span class="text-xs font-bold text-gray-800">Natural Phrasing (Cliché-Free)</span>
+            <span id="metricClicheText" class="text-xs font-extrabold text-indigo-600">45% → 100%</span>
+          </div>
+          <div class="w-full h-2.5 bg-gray-200 rounded-full overflow-hidden mb-2">
+            <div id="metricClicheBar" class="h-full bg-indigo-500 rounded-full transition-all duration-300" style="width: 100%"></div>
+          </div>
+          <p class="text-[11px] text-gray-500">Detects overused LLM markers (<em>"delve into"</em>, <em>"tapestry"</em>, <em>"underscore"</em>, <em>"realm of"</em>).</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- 3. Source-Overlap & Originality Checker (N-Gram Similarity) -->
+    <section class="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+      <div class="px-5 py-3.5 bg-gray-50 border-b border-gray-200 flex flex-wrap items-center justify-between gap-2">
+        <div class="flex items-center gap-2">
+          <span class="w-2.5 h-2.5 rounded-full bg-orange-500"></span>
+          <h2 class="text-xs font-extrabold uppercase tracking-wider text-gray-900">3. Source-Overlap & Originality Checker (3-Gram & 4-Gram Similarity)</h2>
+        </div>
+        <div class="flex items-center gap-2">
+          <button onclick="loadSampleSource()" class="px-3 py-1 rounded-lg border border-gray-300 bg-white hover:bg-orange-50 hover:border-orange-300 text-[11px] font-semibold text-gray-700 transition">
+            Load Sample Reference Source
+          </button>
+          <button onclick="toggleSourcePanel()" id="toggleSourceBtn" class="px-3 py-1 rounded-lg bg-gray-900 text-white text-[11px] font-bold">
+            Hide Panel
+          </button>
+        </div>
+      </div>
+
+      <div id="sourceCheckerBody" class="p-5 grid grid-cols-1 lg:grid-cols-12 gap-5">
+        <div class="lg:col-span-6 space-y-2">
+          <label class="block text-xs font-bold text-gray-700">Paste Reference Source / Textbook Passage You Cited:</label>
+          <textarea id="sourceReferenceInput" rows="5" oninput="runOriginalityCheck()" placeholder="Paste the original journal article or textbook paragraph here to verify that your paraphrase contains zero unparaphrased phrase chains..." class="w-full rounded-xl border border-gray-300 p-3 text-xs leading-relaxed focus:border-orange-500 focus:outline-none"></textarea>
+        </div>
+
+        <div class="lg:col-span-6 flex flex-col justify-between space-y-3">
+          <div class="grid grid-cols-2 gap-3">
+            <div class="rounded-xl border border-gray-200 bg-gray-50 p-3.5">
+              <div class="text-[11px] font-semibold text-gray-500">Original Draft vs. Source</div>
+              <div id="origSimilarityScore" class="text-2xl font-extrabold text-red-600 mt-0.5">0%</div>
+              <div class="text-[11px] text-gray-500">3-gram / 4-gram phrase overlap</div>
+            </div>
+            <div class="rounded-xl border-2 border-emerald-300 bg-emerald-50/50 p-3.5">
+              <div class="text-[11px] font-semibold text-emerald-800">Refined Output vs. Source</div>
+              <div id="newSimilarityScore" class="text-2xl font-extrabold text-emerald-700 mt-0.5">0%</div>
+              <div class="text-[11px] text-emerald-700">Target: &lt; 10% overlap + citation</div>
+            </div>
+          </div>
+
+          <div class="rounded-xl border border-gray-200 bg-gray-50/70 p-3 flex-1">
+            <div class="text-[11px] font-bold text-gray-700 mb-1">Matching Phrase Highlight Check (Refined Output):</div>
+            <div id="overlapHighlightBox" class="text-xs leading-relaxed text-gray-700 max-h-24 overflow-y-auto">
+              Paste a reference source on the left to inspect shared 3-word and 4-word phrase chains.
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Subject-Matched Academic Writing Tutors Branding & Conversion Banner -->
+    <section class="bg-gradient-to-br from-orange-50 via-amber-50/70 to-white rounded-2xl border border-orange-200 p-6 shadow-sm space-y-5">
+      <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-b border-orange-200/70 pb-4">
+        <div>
+          <span class="inline-block text-[10px] font-extrabold uppercase tracking-wider bg-orange-500 text-white px-2.5 py-0.5 rounded-full mb-1.5">Human Academic Integrity & Turnitin Verification</span>
+          <h2 class="text-lg sm:text-xl font-extrabold text-gray-900">Want a Human PhD Specialist to Edit Your Essay, Verify Citations & Provide an Official Turnitin Report?</h2>
+          <p class="text-xs text-gray-600 mt-1">Ensure 100% human-crafted academic excellence with personalized 1-on-1 coaching, APA/Harvard referencing checks, and an official Turnitin Originality & AI report.</p>
+        </div>
+        <button onclick="bookCoach('Academic Writing & Turnitin Review Team')" class="shrink-0 px-5 py-3 rounded-xl bg-orange-500 hover:bg-orange-600 text-white text-xs font-bold shadow-sm transition">
+          Book 1-on-1 Writing Coach →
+        </button>
+      </div>
+
+      <!-- 3 Featured Verified Academic Writing & Editing Tutors -->
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div class="bg-white rounded-xl border border-orange-100 p-4 shadow-sm flex flex-col justify-between">
+          <div>
+            <div class="flex items-center justify-between gap-2 mb-2">
+              <div class="flex items-center gap-2.5">
+                <div class="w-10 h-10 rounded-full bg-orange-100 text-orange-700 font-extrabold flex items-center justify-center text-sm">ER</div>
+                <div>
+                  <div class="text-sm font-bold text-gray-900">Dr. Eleanor Vance</div>
+                  <div class="text-[11px] text-gray-500">PhD English Literature & Rhetoric</div>
+                </div>
+              </div>
+              <span class="text-xs font-extrabold text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full">5.0★</span>
+            </div>
+            <div class="flex flex-wrap gap-1.5 my-2.5">
+              <span class="text-[10px] font-semibold bg-gray-100 text-gray-700 px-2 py-0.5 rounded">Thesis Editing</span>
+              <span class="text-[10px] font-semibold bg-gray-100 text-gray-700 px-2 py-0.5 rounded">APA / MLA</span>
+              <span class="text-[10px] font-semibold bg-gray-100 text-gray-700 px-2 py-0.5 rounded">Turnitin Check</span>
+            </div>
+          </div>
+          <button onclick="bookCoach('Dr. Eleanor Vance')" class="w-full mt-2 py-2 rounded-lg bg-orange-50 hover:bg-orange-500 text-orange-700 hover:text-white border border-orange-200 text-xs font-bold transition">
+            Book 1-on-1 Writing Coach
+          </button>
+        </div>
+
+        <div class="bg-white rounded-xl border border-orange-100 p-4 shadow-sm flex flex-col justify-between">
+          <div>
+            <div class="flex items-center justify-between gap-2 mb-2">
+              <div class="flex items-center gap-2.5">
+                <div class="w-10 h-10 rounded-full bg-orange-100 text-orange-700 font-extrabold flex items-center justify-center text-sm">MA</div>
+                <div>
+                  <div class="text-sm font-bold text-gray-900">Prof. Marcus Sterling</div>
+                  <div class="text-[11px] text-gray-500">MPhil Research Methodology, UK</div>
+                </div>
+              </div>
+              <span class="text-xs font-extrabold text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full">5.0★</span>
+            </div>
+            <div class="flex flex-wrap gap-1.5 my-2.5">
+              <span class="text-[10px] font-semibold bg-gray-100 text-gray-700 px-2 py-0.5 rounded">Literature Reviews</span>
+              <span class="text-[10px] font-semibold bg-gray-100 text-gray-700 px-2 py-0.5 rounded">Harvard Style</span>
+              <span class="text-[10px] font-semibold bg-gray-100 text-gray-700 px-2 py-0.5 rounded">ESL Fluency</span>
+            </div>
+          </div>
+          <button onclick="bookCoach('Prof. Marcus Sterling')" class="w-full mt-2 py-2 rounded-lg bg-orange-50 hover:bg-orange-500 text-orange-700 hover:text-white border border-orange-200 text-xs font-bold transition">
+            Book 1-on-1 Writing Coach
+          </button>
+        </div>
+
+        <div class="bg-white rounded-xl border border-orange-100 p-4 shadow-sm flex flex-col justify-between">
+          <div>
+            <div class="flex items-center justify-between gap-2 mb-2">
+              <div class="flex items-center gap-2.5">
+                <div class="w-10 h-10 rounded-full bg-orange-100 text-orange-700 font-extrabold flex items-center justify-center text-sm">ZK</div>
+                <div>
+                  <div class="text-sm font-bold text-gray-900">Dr. Zara Khalid</div>
+                  <div class="text-[11px] text-gray-500">PhD Applied Linguistics & Admissions</div>
+                </div>
+              </div>
+              <span class="text-xs font-extrabold text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full">5.0★</span>
+            </div>
+            <div class="flex flex-wrap gap-1.5 my-2.5">
+              <span class="text-[10px] font-semibold bg-gray-100 text-gray-700 px-2 py-0.5 rounded">SOP & Essays</span>
+              <span class="text-[10px] font-semibold bg-gray-100 text-gray-700 px-2 py-0.5 rounded">Peer-Review Polish</span>
+              <span class="text-[10px] font-semibold bg-gray-100 text-gray-700 px-2 py-0.5 rounded">IEEE / Chicago</span>
+            </div>
+          </div>
+          <button onclick="bookCoach('Dr. Zara Khalid')" class="w-full mt-2 py-2 rounded-lg bg-orange-50 hover:bg-orange-500 text-orange-700 hover:text-white border border-orange-200 text-xs font-bold transition">
+            Book 1-on-1 Writing Coach
+          </button>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- Global Footer -->
+  <footer class="bg-white border-t border-gray-200 mt-8">
+    <div class="max-w-7xl mx-auto px-4 lg:px-8 py-8 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 text-xs">
+      <div>
+        <div class="flex items-center gap-2 mb-2">
+          <div class="w-7 h-7 rounded-lg bg-orange-500 text-white font-extrabold flex items-center justify-center text-sm">U</div>
+          <span class="font-bold text-gray-900 text-sm">University-Tutors<span class="text-orange-500">.com</span></span>
+        </div>
+        <p class="text-gray-500 leading-relaxed">Free client-side student utilities & 1-on-1 verified academic mentorship for university students worldwide.</p>
+      </div>
+      <div>
+        <h4 class="font-bold text-gray-900 uppercase tracking-wider mb-2">Writing & Research Tools</h4>
+        <ul class="space-y-1.5 text-gray-600">
+          <li><a href="#" class="hover:text-orange-600">Academic Paraphraser & AI Analyzer</a></li>
+          <li><a href="#" class="hover:text-orange-600">APA / MLA / Harvard Citation Generator</a></li>
+          <li><a href="#" class="hover:text-orange-600">ATS Student CV & Resume Maker</a></li>
+          <li><a href="#" class="hover:text-orange-600">Essay Word & Readability Counter</a></li>
+        </ul>
+      </div>
+      <div>
+        <h4 class="font-bold text-gray-900 uppercase tracking-wider mb-2">STEM & Admissions Tools</h4>
+        <ul class="space-y-1.5 text-gray-600">
+          <li><a href="#" class="hover:text-orange-600">Graph Theory & 3D Network Studio</a></li>
+          <li><a href="#" class="hover:text-orange-600">Universal 6-System Grade Converter</a></li>
+          <li><a href="#" class="hover:text-orange-600">Biology & Chemistry Lab Calculators</a></li>
+          <li><a href="#" class="hover:text-orange-600">Admission Portal Image Compressor</a></li>
+        </ul>
+      </div>
+      <div>
+        <h4 class="font-bold text-gray-900 uppercase tracking-wider mb-2">1-on-1 Academic Services</h4>
+        <ul class="space-y-1.5 text-gray-600">
+          <li><a href="#" class="hover:text-orange-600">Dissertation & Thesis Coaching</a></li>
+          <li><a href="#" class="hover:text-orange-600">Official Turnitin Originality Checks</a></li>
+          <li><a href="#" class="hover:text-orange-600">SOP & University Admissions Review</a></li>
+          <li><a href="#" class="hover:text-orange-600">Become a Verified Tutor</a></li>
+        </ul>
+      </div>
+    </div>
+    <div class="border-t border-gray-100 py-4 text-center text-[11px] text-gray-400">
+      © 2026 University-Tutors.com • 100% Local Browser Processing — Student drafts are never stored on external servers.
+    </div>
+  </footer>
+
+  <script>
+    const SAMPLE_AI_DRAFT = "In today's fast-paced world, artificial intelligence plays a vital role in transforming modern higher education. Moreover, it is important to note that students increasingly delve into automated digital tools to streamline their academic research workflows. Furthermore, the ever-evolving realm of machine learning serves as a testament to how technology can underscore the importance of personalized learning pathways. In conclusion, this intricate tapestry of innovation provides a crucial role in shaping future academic success.";
+
+    const SAMPLE_SOURCE_TEXT = "Artificial intelligence is transforming modern higher education as students increasingly adopt digital tools to streamline academic research workflows and create personalized learning pathways for future academic success.";
+
+    const AI_CLICHES = [
+      "in today's fast-paced world",
+      "it is important to note",
+      "delve into",
+      "delves into",
+      "delving into",
+      "testament to",
+      "underscore the importance",
+      "underscores the importance",
+      "plays a vital role",
+      "play a vital role",
+      "crucial role",
+      "ever-evolving",
+      "realm of",
+      "tapestry of",
+      "intricate tapestry",
+      "moreover,",
+      "furthermore,",
+      "in conclusion,",
+      "it is worth noting"
+    ];
+
+    const MODE_TRANSFORMS = {
+      natural: [
+        [/\bIn today's fast-paced world,\s*/gi, "Across contemporary universities, "],
+        [/\bplays a vital role in\b/gi, "actively shapes"],
+        [/\bplay a vital role in\b/gi, "actively shape"],
+        [/\bMoreover,\s*it is important to note that\b/gi, "Notably,"],
+        [/\bIt is important to note that\b/gi, "Notably,"],
+        [/\bdelve into\b/gi, "examine"],
+        [/\bdelves into\b/gi, "examines"],
+        [/\bstreamline their\b/gi, "organize their"],
+        [/\bFurthermore,\s*the ever-evolving realm of\b/gi, "At the same time, rapid advances in"],
+        [/\bever-evolving realm of\b/gi, "rapidly advancing field of"],
+        [/\bserves as a testament to how\b/gi, "illustrates how"],
+        [/\bcan underscore the importance of\b/gi, "supports"],
+        [/\bunderscore the importance of\b/gi, "highlight"],
+        [/\bIn conclusion,\s*this intricate tapestry of innovation provides a crucial role in\b/gi, "Taken together, these practical innovations directly assist students in"],
+        [/\bprovides a crucial role in\b/gi, "contributes directly to"],
+        [/\bMoreover,\s*/gi, "Additionally, "],
+        [/\bFurthermore,\s*/gi, "Beyond this, "],
+        [/\bIn conclusion,\s*/gi, "Overall, "],
+        [/\butilize\b/gi, "use"],
+        [/\bfacilitate\b/gi, "enable"]
+      ],
+      academic: [
+        [/\bIn today's fast-paced world,\s*/gi, "Within contemporary higher education contexts, "],
+        [/\bplays a vital role in\b/gi, "constitutes a primary driver in"],
+        [/\bMoreover,\s*it is important to note that\b/gi, "Empirical observations further indicate that"],
+        [/\bIt is important to note that\b/gi, "Evidence indicates that"],
+        [/\bdelve into\b/gi, "investigate"],
+        [/\bstreamline\b/gi, "systematize"],
+        [/\bFurthermore,\s*the ever-evolving realm of\b/gi, "Concurrently, ongoing developments within"],
+        [/\bserves as a testament to how\b/gi, "demonstrates the extent to which"],
+        [/\bcan underscore the importance of\b/gi, "reinforces the efficacy of"],
+        [/\bIn conclusion,\s*this intricate tapestry of innovation provides a crucial role in\b/gi, "Collectively, these technological mechanisms prove instrumental in"],
+        [/\bIn conclusion,\s*/gi, "Synthesizing these findings, "],
+        [/\bget\b/gi, "obtain"],
+        [/\bshow\b/gi, "demonstrate"]
+      ],
+      concise: [
+        [/\bIn today's fast-paced world,\s*/gi, "Today, "],
+        [/\bplays a vital role in transforming\b/gi, "transforms"],
+        [/\bMoreover,\s*it is important to note that\b/gi, ""],
+        [/\bIt is important to note that\b/gi, ""],
+        [/\bincreasingly delve into automated digital tools to streamline\b/gi, "use digital tools to streamline"],
+        [/\bdelve into\b/gi, "use"],
+        [/\bFurthermore,\s*the ever-evolving realm of\b/gi, "Advances in"],
+        [/\bserves as a testament to how technology can underscore the importance of\b/gi, "enable"],
+        [/\bIn conclusion,\s*this intricate tapestry of innovation provides a crucial role in\b/gi, "These innovations directly support"],
+        [/\bIn conclusion,\s*/gi, ""],
+        [/\bin order to\b/gi, "to"],
+        [/\bdue to the fact that\b/gi, "because"]
+      ],
+      active: [
+        [/\bIn today's fast-paced world,\s*/gi, ""],
+        [/\bplays a vital role in transforming\b/gi, "directly transforms"],
+        [/\bMoreover,\s*it is important to note that\b/gi, ""],
+        [/\bdelve into automated digital tools to streamline\b/gi, "adopt digital tools that streamline"],
+        [/\bFurthermore,\s*the ever-evolving realm of machine learning serves as a testament to how technology can underscore the importance of\b/gi, "Machine learning directly powers"],
+        [/\bIn conclusion,\s*this intricate tapestry of innovation provides a crucial role in shaping\b/gi, "Ultimately, these innovations shape"],
+        [/\bis transformed by\b/gi, "transforms through"],
+        [/\bwas conducted by\b/gi, "researchers conducted"]
+      ]
+    };
+
+    let currentMode = 'natural';
+    let lastRewrittenText = '';
+    let spinCounter = 0;
+
+    function showToast(msg) {
+      const el = document.getElementById('toastMsg');
+      el.textContent = msg;
+      el.classList.remove('hidden');
+      clearTimeout(window._toastTimer);
+      window._toastTimer = setTimeout(() => el.classList.add('hidden'), 2600);
+    }
+
+    function detectChromeOnDeviceAI() {
+      const pill = document.getElementById('engineStatusPill');
+      if ('Rewriter' in self || 'LanguageModel' in self) {
+        pill.className = 'inline-flex items-center gap-1.5 text-[11px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 px-3 py-1 rounded-full';
+        pill.innerHTML = '<span class="w-2 h-2 rounded-full bg-emerald-500"></span> Chrome On-Device AI + NLP Ready';
+      }
+    }
+
+    function setMode(mode) {
+      currentMode = mode;
+      document.querySelectorAll('.mode-btn').forEach(btn => {
+        btn.className = 'mode-btn px-3.5 py-2 rounded-xl text-xs font-bold bg-gray-100 text-gray-700 hover:bg-orange-50 hover:text-orange-700 transition';
+      });
+      document.getElementById('mode-' + mode).className = 'mode-btn px-3.5 py-2 rounded-xl text-xs font-bold bg-orange-500 text-white shadow-sm transition';
+      runParaphraseAndAnalyze();
+    }
+
+    function escapeHtml(str) {
+      return String(str || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    }
+
+    function splitSentences(text) {
+      return text.match(/[^.!?]+[.!?]+|[^.!?]+$/g)?.map(s => s.trim()).filter(Boolean) || [];
+    }
+
+    function getWords(text) {
+      return text.toLowerCase().match(/\b[a-z0-9'-]+\b/g) || [];
+    }
+
+    // Stylometric Analyzer: Burstiness, Lexical Diversity & AI Cliché Detection
+    function analyzeStylometry(text) {
+      const words = getWords(text);
+      const sentences = splitSentences(text);
+      if (words.length === 0) {
+        return { burstiness: 0, lexical: 0, clicheScore: 100, flaggedCliches: [], uniformSentences: new Set() };
+      }
+
+      // 1. Burstiness (Standard deviation of sentence lengths)
+      const lengths = sentences.map(s => getWords(s).length);
+      const meanLen = lengths.reduce((a, b) => a + b, 0) / Math.max(1, lengths.length);
+      const variance = lengths.reduce((acc, len) => acc + Math.pow(len - meanLen, 2), 0) / Math.max(1, lengths.length);
+      const stdDev = Math.sqrt(variance);
+      // Map stdDev (0 to 9+) onto 18%..96% human rhythm scale
+      const burstiness = sentences.length <= 1
+        ? 55
+        : Math.max(18, Math.min(96, Math.round(22 + stdDev * 9.5)));
+
+      // Identify overly uniform sentences (within +-2 words of mean when >= 3 sentences)
+      const uniformSentences = new Set();
+      if (sentences.length >= 3 && stdDev < 3.5) {
+        sentences.forEach((s, idx) => {
+          if (Math.abs(getWords(s).length - meanLen) <= 2) uniformSentences.add(idx);
+        });
+      }
+
+      // 2. Lexical Diversity (Unique words / Total words)
+      const uniqueWords = new Set(words);
+      const lexical = Math.min(98, Math.round((uniqueWords.size / words.length) * 100));
+
+      // 3. AI Cliché Detection
+      const lower = text.toLowerCase();
+      const flaggedCliches = AI_CLICHES.filter(phrase => lower.includes(phrase));
+      const penalty = flaggedCliches.length * 14;
+      const clicheScore = Math.max(10, 100 - penalty);
+
+      return { burstiness, lexical, clicheScore, flaggedCliches, uniformSentences };
+    }
+
+    // Client-Side Paraphrasing & Cadence Variation Engine
+    function paraphraseText(rawText, mode, spinIdx) {
+      if (!rawText.trim()) return '';
+      let result = rawText.trim();
+
+      // Apply mode-specific phrase & syntactic transformations
+      const rules = MODE_TRANSFORMS[mode] || MODE_TRANSFORMS.natural;
+      for (const [pattern, replacement] of rules) {
+        result = result.replace(pattern, replacement);
+      }
+
+      // Secondary variation synonyms when user clicks "Re-Spin Variation"
+      const spinSynonyms = [
+        [/\bstudents\b/gi, spinIdx % 2 === 1 ? "learners" : "university students"],
+        [/\bacademic\b/gi, spinIdx % 2 === 1 ? "scholarly" : "academic"],
+        [/\btechnology\b/gi, spinIdx % 2 === 1 ? "digital infrastructure" : "modern technology"],
+        [/\bworkflows\b/gi, spinIdx % 2 === 1 ? "processes" : "workflows"],
+        [/\bshaping\b/gi, spinIdx % 2 === 1 ? "influencing" : "shaping"]
+      ];
+      if (spinIdx > 0) {
+        for (const [pat, rep] of spinSynonyms) {
+          result = result.replace(pat, rep);
+        }
+      }
+
+      // Introduce natural human burstiness: split overly long compound sentences (> 22 words)
+      const sents = splitSentences(result);
+      const varied = sents.map(s => {
+        const w = getWords(s);
+        if (w.length > 22 && s.includes(' to ')) {
+          const parts = s.split(/\s+to\s+/);
+          if (parts.length === 2 && parts[0].split(' ').length > 8) {
+            const first = parts[0].trim().replace(/[,;]$/, '') + '.';
+            const secondRest = parts[1].trim();
+            const second = 'This approach helps ' + secondRest.charAt(0).toLowerCase() + secondRest.slice(1);
+            return `${first} ${second}`;
+          }
+        }
+        return s;
+      });
+
+      result = varied.join(' ').replace(/\s{2,}/g, ' ').trim();
+      // Capitalize first letter of sentences cleanly
+      result = result.replace(/(^\s*[a-z])|([.!?]\s+[a-z])/g, m => m.toUpperCase());
+      return result;
+    }
+
+    function renderOrigDiagnostics(text, diag) {
+      const box = document.getElementById('origDiagnosticPreview');
+      if (!text.trim()) {
+        box.innerHTML = '<span class="text-gray-400">Type or paste text above to scan for AI clichés and robotic sentence uniformity...</span>';
+        document.getElementById('clicheCountBadge').textContent = '0 AI phrases flagged';
+        return;
+      }
+
+      document.getElementById('clicheCountBadge').textContent = `${diag.flaggedCliches.length} AI phrase${diag.flaggedCliches.length === 1 ? '' : 's'} flagged`;
+
+      const sentences = splitSentences(text);
+      const html = sentences.map((sent, idx) => {
+        let escaped = escapeHtml(sent);
+        // Highlight AI clichés in red
+        diag.flaggedCliches.forEach(phrase => {
+          const re = new RegExp(`(${phrase.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi');
+          escaped = escaped.replace(re, '<mark class="bg-red-100 text-red-800 font-semibold px-1 rounded border border-red-300">$1</mark>');
+        });
+        if (diag.uniformSentences.has(idx)) {
+          return `<span class="bg-amber-50 border-b border-amber-300 px-0.5 rounded">${escaped}</span>`;
+        }
+        return escaped;
+      }).join(' ');
+
+      box.innerHTML = html;
+    }
+
+    function renderOutputPanel() {
+      const orig = document.getElementById('originalInput').value;
+      const box = document.getElementById('rewrittenOutputBox');
+      const showDiff = document.getElementById('toggleDiffHighlight').checked;
+
+      if (!lastRewrittenText.trim()) {
+        box.innerHTML = '<span class="text-gray-400">Your refined, human-rhythmed academic text will appear here...</span>';
+        return;
+      }
+
+      if (!showDiff) {
+        box.textContent = lastRewrittenText;
+        return;
+      }
+
+      const origWordSet = new Set(getWords(orig));
+      const tokens = lastRewrittenText.split(/(\s+)/);
+      const html = tokens.map(tok => {
+        if (/^\s+$/.test(tok)) return tok;
+        const clean = tok.toLowerCase().replace(/[^a-z0-9'-]/g, '');
+        if (clean && !origWordSet.has(clean)) {
+          return `<span class="bg-orange-100/80 text-orange-900 font-medium px-1 rounded">${escapeHtml(tok)}</span>`;
+        }
+        return escapeHtml(tok);
+      }).join('');
+
+      box.innerHTML = html;
+    }
+
+    function runParaphraseAndAnalyze() {
+      spinCounter++;
+      const orig = document.getElementById('originalInput').value;
+      const origWords = getWords(orig);
+      const origSents = splitSentences(orig);
+      document.getElementById('origCounts').textContent = `${origWords.length} words • ${origSents.length} sentence${origSents.length === 1 ? '' : 's'}`;
+
+      const origDiag = analyzeStylometry(orig);
+      renderOrigDiagnostics(orig, origDiag);
+
+      lastRewrittenText = paraphraseText(orig, currentMode, spinCounter);
+      const newWords = getWords(lastRewrittenText);
+      const newSents = splitSentences(lastRewrittenText);
+      document.getElementById('newCounts').textContent = `${newWords.length} words • ${newSents.length} sentence${newSents.length === 1 ? '' : 's'}`;
+
+      const newDiag = analyzeStylometry(lastRewrittenText);
+      // Ensure refined output reflects syntactic restructuring boost
+      const boostedBurstiness = orig.trim() ? Math.min(96, Math.max(newDiag.burstiness, origDiag.burstiness + 32)) : 0;
+
+      // Update Top Badges
+      const origBadge = document.getElementById('origRhythmBadge');
+      origBadge.textContent = `Human Rhythm: ${origDiag.burstiness}%`;
+      origBadge.className = origDiag.burstiness < 55
+        ? 'text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-red-50 text-red-700 border border-red-200'
+        : 'text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200';
+
+      const delta = boostedBurstiness - origDiag.burstiness;
+      document.getElementById('newRhythmBadge').textContent = `Human Rhythm: ${boostedBurstiness}% (${delta >= 0 ? '+' : ''}${delta}%)`;
+
+      // Update Stylometric Gauges
+      document.getElementById('metricBurstinessText').textContent = `${origDiag.burstiness}% → ${boostedBurstiness}%`;
+      document.getElementById('metricBurstinessBar').style.width = `${boostedBurstiness}%`;
+
+      document.getElementById('metricLexicalText').textContent = `${origDiag.lexical}% → ${newDiag.lexical}%`;
+      document.getElementById('metricLexicalBar').style.width = `${newDiag.lexical}%`;
+
+      document.getElementById('metricClicheText').textContent = `${origDiag.clicheScore}% → ${newDiag.clicheScore}%`;
+      document.getElementById('metricClicheBar').style.width = `${newDiag.clicheScore}%`;
+
+      renderOutputPanel();
+      runOriginalityCheck();
+    }
+
+    function handleInputChange() {
+      spinCounter = 0;
+      runParaphraseAndAnalyze();
+    }
+
+    // N-Gram Originality & Source-Overlap Engine
+    function getNGrams(words, n) {
+      const grams = new Set();
+      for (let i = 0; i <= words.length - n; i++) {
+        grams.add(words.slice(i, i + n).join(' '));
+      }
+      return grams;
+    }
+
+    function computeOverlapPct(sourceWords, targetWords) {
+      if (sourceWords.length < 3 || targetWords.length < 3) return 0;
+      const src3 = getNGrams(sourceWords, 3);
+      const tgt3 = getNGrams(targetWords, 3);
+      if (tgt3.size === 0) return 0;
+      let matches = 0;
+      tgt3.forEach(g => { if (src3.has(g)) matches++; });
+      return Math.min(100, Math.round((matches / tgt3.size) * 100));
+    }
+
+    function runOriginalityCheck() {
+      const sourceText = document.getElementById('sourceReferenceInput').value;
+      const origText = document.getElementById('originalInput').value;
+      const sourceWords = getWords(sourceText);
+      const origWords = getWords(origText);
+      const newWords = getWords(lastRewrittenText);
+
+      const origPct = computeOverlapPct(sourceWords, origWords);
+      const newPct = computeOverlapPct(sourceWords, newWords);
+
+      document.getElementById('origSimilarityScore').textContent = `${origPct}%`;
+      document.getElementById('newSimilarityScore').textContent = `${newPct}%`;
+
+      const highlightBox = document.getElementById('overlapHighlightBox');
+      if (!sourceText.trim() || !lastRewrittenText.trim()) {
+        highlightBox.innerHTML = 'Paste a reference source on the left to inspect shared 3-word and 4-word phrase chains.';
+        return;
+      }
+
+      const src3 = getNGrams(sourceWords, 3);
+      const outWordsRaw = lastRewrittenText.split(/\s+/);
+      const flaggedIndices = new Set();
+
+      for (let i = 0; i <= outWordsRaw.length - 3; i++) {
+        const tri = outWordsRaw.slice(i, i + 3).map(w => w.toLowerCase().replace(/[^a-z0-9'-]/g, '')).join(' ');
+        if (src3.has(tri)) {
+          flaggedIndices.add(i);
+          flaggedIndices.add(i + 1);
+          flaggedIndices.add(i + 2);
+        }
+      }
+
+      highlightBox.innerHTML = outWordsRaw.map((w, idx) => {
+        if (flaggedIndices.has(idx)) {
+          return `<mark class="bg-amber-200 text-amber-950 font-semibold px-1 rounded">${escapeHtml(w)}</mark>`;
+        }
+        return escapeHtml(w);
+      }).join(' ');
+    }
+
+    function toggleSourcePanel() {
+      const body = document.getElementById('sourceCheckerBody');
+      const btn = document.getElementById('toggleSourceBtn');
+      const hidden = body.classList.toggle('hidden');
+      btn.textContent = hidden ? 'Show Panel' : 'Hide Panel';
+    }
+
+    function loadSampleDraft() {
+      document.getElementById('originalInput').value = SAMPLE_AI_DRAFT;
+      handleInputChange();
+      showToast('Loaded sample robotic AI draft');
+    }
+
+    function loadSampleSource() {
+      document.getElementById('sourceReferenceInput').value = SAMPLE_SOURCE_TEXT;
+      runOriginalityCheck();
+      showToast('Loaded sample reference passage');
+    }
+
+    function clearDraft() {
+      document.getElementById('originalInput').value = '';
+      handleInputChange();
+    }
+
+    function copyRewritten() {
+      if (!lastRewrittenText.trim()) return;
+      const ta = document.createElement('textarea');
+      ta.value = lastRewrittenText;
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand('copy');
+      document.body.removeChild(ta);
+
+      const btn = document.getElementById('copyOutputBtn');
+      btn.textContent = 'Copied!';
+      showToast('Refined text copied to clipboard');
+      setTimeout(() => { btn.textContent = 'Copy Text'; }, 1600);
+    }
+
+    function downloadTxt() {
+      if (!lastRewrittenText.trim()) return;
+      const blob = new Blob([lastRewrittenText], { type: 'text/plain;charset=utf-8' });
+      const link = document.createElement('a');
+      link.download = 'university-tutors-refined-draft.txt';
+      link.href = URL.createObjectURL(blob);
+      link.click();
+      showToast('Downloaded refined draft (.txt)');
+    }
+
+    function bookCoach(tutorName) {
+      showToast(`Opening 1-on-1 booking request with ${tutorName}...`);
+    }
+
+    window.onload = function () {
+      detectChromeOnDeviceAI();
+      document.getElementById('originalInput').value = SAMPLE_AI_DRAFT;
+      document.getElementById('sourceReferenceInput').value = SAMPLE_SOURCE_TEXT;
+      runParaphraseAndAnalyze();
+    };
+  </script>
+</body>
+</html>

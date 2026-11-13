@@ -1,0 +1,1113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Graph Theory & Network Builder — University-Tutors.com</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap');
+    body { font-family: 'Inter', sans-serif; background-color: #F9FAFB; color: #111827; }
+    .mono { font-family: 'JetBrains Mono', monospace; }
+    canvas { touch-action: none; }
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-thumb { background: #D1D5DB; border-radius: 9999px; }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col">
+
+  <!-- Top Brand & Trust Bar -->
+  <header class="bg-white border-b border-gray-200 px-4 lg:px-8 py-3.5 flex flex-wrap items-center justify-between gap-3 sticky top-0 z-20">
+    <div class="flex items-center gap-3">
+      <div class="w-9 h-9 rounded-lg bg-orange-500 text-white font-extrabold flex items-center justify-center text-lg shadow-sm">U</div>
+      <div>
+        <div class="flex items-center gap-2">
+          <span class="font-bold text-gray-900 text-base">University-Tutors<span class="text-orange-500">.com</span></span>
+          <span class="text-xs font-semibold px-2 py-0.5 rounded-full bg-orange-50 text-orange-600 border border-orange-200">Graph Theory Studio</span>
+        </div>
+        <p class="text-xs text-gray-500">Discrete Math, DSA & Network Topology Visualizer</p>
+      </div>
+    </div>
+
+    <div class="flex items-center gap-2 flex-wrap">
+      <span class="hidden md:inline-flex items-center gap-1.5 text-xs font-medium text-emerald-700 bg-emerald-50 border border-emerald-200 px-3 py-1.5 rounded-full">
+        <span class="w-2 h-2 rounded-full bg-emerald-500"></span> 100% Free & Client-Side
+      </span>
+      <button onclick="exportPNG()" class="px-3.5 py-1.5 text-xs font-semibold rounded-lg border border-gray-300 bg-white hover:bg-gray-50 text-gray-700 transition">
+        Export PNG
+      </button>
+      <button onclick="exportJSON()" class="px-3.5 py-1.5 text-xs font-semibold rounded-lg bg-orange-500 hover:bg-orange-600 text-white shadow-sm transition">
+        Save Graph JSON
+      </button>
+    </div>
+  </header>
+
+  <!-- Main Workspace -->
+  <main class="flex-1 max-w-[1600px] w-full mx-auto p-4 lg:p-6 grid grid-cols-1 lg:grid-cols-12 gap-5">
+
+    <!-- Left Sidebar: Presets & Algorithms -->
+    <aside class="lg:col-span-3 flex flex-col gap-4">
+      
+      <!-- Complex Graph Presets -->
+      <div class="bg-white rounded-xl border border-gray-200 p-4 shadow-sm">
+        <h2 class="text-xs font-bold uppercase tracking-wider text-gray-500 mb-3">1. Complex Graph Presets</h2>
+        <div class="grid grid-cols-2 gap-2">
+          <button onclick="loadPreset('weighted')" class="text-left p-2.5 rounded-lg border border-orange-200 bg-orange-50/60 hover:bg-orange-100 transition">
+            <div class="text-xs font-bold text-gray-900">Weighted Network</div>
+            <div class="text-[11px] text-gray-500">Dijkstra / MST ready</div>
+          </button>
+          <button onclick="loadPreset('petersen')" class="text-left p-2.5 rounded-lg border border-gray-200 hover:border-orange-300 hover:bg-orange-50/40 transition">
+            <div class="text-xs font-bold text-gray-900">Petersen Graph</div>
+            <div class="text-[11px] text-gray-500">10 vertices, 3-regular</div>
+          </button>
+          <button onclick="loadPreset('bipartite')" class="text-left p-2.5 rounded-lg border border-gray-200 hover:border-orange-300 hover:bg-orange-50/40 transition">
+            <div class="text-xs font-bold text-gray-900">Complete K₃,₃</div>
+            <div class="text-[11px] text-gray-500">Non-planar bipartite</div>
+          </button>
+          <button onclick="loadPreset('dag')" class="text-left p-2.5 rounded-lg border border-gray-200 hover:border-orange-300 hover:bg-orange-50/40 transition">
+            <div class="text-xs font-bold text-gray-900">Directed DAG</div>
+            <div class="text-[11px] text-gray-500">Topological sort</div>
+          </button>
+        </div>
+      </div>
+
+      <!-- Graph Properties Toggles -->
+      <div class="bg-white rounded-xl border border-gray-200 p-4 shadow-sm">
+        <h2 class="text-xs font-bold uppercase tracking-wider text-gray-500 mb-3">2. Graph Rules & Layout</h2>
+        <div class="space-y-2.5 text-sm">
+          <label class="flex items-center justify-between cursor-pointer">
+            <span class="font-medium text-gray-700">Directed Graph (Digraph)</span>
+            <input type="checkbox" id="toggleDirected" onchange="toggleGraphType()" class="w-4 h-4 accent-orange-500 rounded">
+          </label>
+          <label class="flex items-center justify-between cursor-pointer">
+            <span class="font-medium text-gray-700">Weighted Edges</span>
+            <input type="checkbox" id="toggleWeighted" checked onchange="draw()" class="w-4 h-4 accent-orange-500 rounded">
+          </label>
+          <button onclick="applyCircularLayout()" class="w-full mt-2 py-2 px-3 text-xs font-semibold rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-800 transition">
+            Auto-Arrange Circular Layout
+          </button>
+        </div>
+      </div>
+
+      <!-- Algorithm Simulator -->
+      <div class="bg-white rounded-xl border border-gray-200 p-4 shadow-sm flex-1 flex flex-col">
+        <h2 class="text-xs font-bold uppercase tracking-wider text-gray-500 mb-3">3. Algorithm Step Simulator</h2>
+        
+        <div class="grid grid-cols-2 gap-2 mb-3">
+          <div>
+            <label class="block text-[11px] font-semibold text-gray-600 mb-1">Start Node</label>
+            <select id="startNodeSelect" class="w-full text-xs border border-gray-300 rounded-lg p-2 bg-white font-semibold"></select>
+          </div>
+          <div>
+            <label class="block text-[11px] font-semibold text-gray-600 mb-1">Target Node</label>
+            <select id="endNodeSelect" class="w-full text-xs border border-gray-300 rounded-lg p-2 bg-white font-semibold"></select>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-2 mb-3">
+          <button onclick="runAlgorithm('dijkstra')" class="py-2 px-2.5 text-xs font-semibold rounded-lg bg-orange-500 hover:bg-orange-600 text-white transition">
+            Dijkstra Shortest
+          </button>
+          <button onclick="runAlgorithm('mst')" class="py-2 px-2.5 text-xs font-semibold rounded-lg bg-gray-900 hover:bg-gray-800 text-white transition">
+            Prim's MST
+          </button>
+          <button onclick="runAlgorithm('bfs')" class="py-2 px-2.5 text-xs font-semibold rounded-lg border border-orange-300 bg-orange-50 hover:bg-orange-100 text-orange-700 transition">
+            BFS Traversal
+          </button>
+          <button onclick="runAlgorithm('dfs')" class="py-2 px-2.5 text-xs font-semibold rounded-lg border border-orange-300 bg-orange-50 hover:bg-orange-100 text-orange-700 transition">
+            DFS Traversal
+          </button>
+        </div>
+
+        <button onclick="clearHighlights()" class="w-full py-1.5 text-xs font-medium text-gray-500 hover:text-gray-800 underline mb-3">
+          Reset Algorithm Highlights
+        </button>
+
+        <!-- Step Output Log -->
+        <div id="algoOutput" class="bg-gray-900 text-gray-100 rounded-lg p-3 text-xs mono flex-1 min-h-[120px] overflow-y-auto leading-relaxed">
+          <span class="text-orange-400 font-semibold">// Ready</span><br>
+          Select an algorithm above to trace shortest paths, spanning trees, or vertex traversals.
+        </div>
+      </div>
+    </aside>
+
+    <!-- Center Interactive Canvas -->
+    <section class="lg:col-span-6 flex flex-col gap-3">
+      <!-- Mode Toolbar -->
+      <div class="bg-white rounded-xl border border-gray-200 p-2.5 shadow-sm flex flex-wrap items-center justify-between gap-2">
+        <div class="flex items-center gap-1.5">
+          <button id="mode-select" onclick="setMode('select')" class="mode-btn px-3 py-1.5 rounded-lg text-xs font-semibold bg-orange-500 text-white">
+            Move / Select
+          </button>
+          <button id="mode-node" onclick="setMode('node')" class="mode-btn px-3 py-1.5 rounded-lg text-xs font-semibold bg-gray-100 text-gray-700 hover:bg-gray-200">
+            + Add Vertex
+          </button>
+          <button id="mode-edge" onclick="setMode('edge')" class="mode-btn px-3 py-1.5 rounded-lg text-xs font-semibold bg-gray-100 text-gray-700 hover:bg-gray-200">
+            + Connect Edge
+          </button>
+          <button id="mode-delete" onclick="setMode('delete')" class="mode-btn px-3 py-1.5 rounded-lg text-xs font-semibold bg-gray-100 text-red-600 hover:bg-red-50">
+            Delete
+          </button>
+        </div>
+
+        <div class="flex items-center gap-2">
+          <!-- 2D / 3D View Switcher -->
+          <div class="flex items-center bg-gray-100 p-1 rounded-lg border border-gray-200">
+            <button id="view-2d-btn" onclick="switchView('2d')" class="px-2.5 py-1 rounded-md text-xs font-bold bg-white text-gray-900 shadow-sm transition">
+              2D Canvas
+            </button>
+            <button id="view-3d-btn" onclick="switchView('3d')" class="px-2.5 py-1 rounded-md text-xs font-bold text-gray-600 hover:text-orange-600 transition flex items-center gap-1">
+              <span>3D Preview</span>
+            </button>
+          </div>
+          <button onclick="clearCanvas()" class="px-3 py-1.5 rounded-lg text-xs font-semibold text-gray-500 hover:text-red-600 hover:bg-red-50 transition">
+            Clear All
+          </button>
+        </div>
+      </div>
+
+      <!-- Canvas Container -->
+      <div class="relative bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden flex-1 min-h-[480px]">
+        <canvas id="graphCanvas" class="w-full h-full block cursor-crosshair"></canvas>
+        <div id="threeContainer" class="hidden w-full h-full absolute inset-0 bg-slate-950 cursor-grab active:cursor-grabbing"></div>
+        <div id="canvasHint" class="absolute bottom-3 left-3 bg-white/90 backdrop-blur border border-gray-200 px-3 py-1.5 rounded-lg text-[11px] text-gray-600 shadow-sm pointer-events-none">
+          Tip: Drag vertices to rearrange • Click an edge weight to increment/cycle it
+        </div>
+        <div id="threeControls" class="hidden absolute top-3 right-3 flex items-center gap-2">
+          <label class="flex items-center gap-1.5 bg-slate-900/85 text-slate-200 border border-slate-700 px-2.5 py-1 rounded-lg text-[11px] font-medium cursor-pointer">
+            <input type="checkbox" id="toggleAutoRotate" checked class="accent-orange-500"> Auto-Rotate
+          </label>
+          <button onclick="reset3DCamera()" class="bg-slate-900/85 hover:bg-slate-800 text-slate-200 border border-slate-700 px-2.5 py-1 rounded-lg text-[11px] font-medium">
+            Reset View
+          </button>
+        </div>
+      </div>
+
+      <!-- Live Graph Invariants Bar -->
+      <div class="bg-white rounded-xl border border-gray-200 p-3.5 shadow-sm grid grid-cols-2 sm:grid-cols-5 gap-3 text-center">
+        <div class="bg-gray-50 rounded-lg p-2">
+          <div class="text-[11px] text-gray-500 font-medium">Vertices |V|</div>
+          <div id="statV" class="text-base font-extrabold text-gray-900">0</div>
+        </div>
+        <div class="bg-gray-50 rounded-lg p-2">
+          <div class="text-[11px] text-gray-500 font-medium">Edges |E|</div>
+          <div id="statE" class="text-base font-extrabold text-gray-900">0</div>
+        </div>
+        <div class="bg-gray-50 rounded-lg p-2">
+          <div class="text-[11px] text-gray-500 font-medium">Density</div>
+          <div id="statDensity" class="text-base font-extrabold text-orange-600">0.00</div>
+        </div>
+        <div class="bg-gray-50 rounded-lg p-2">
+          <div class="text-[11px] text-gray-500 font-medium">Connected?</div>
+          <div id="statConnected" class="text-sm font-bold text-emerald-600 mt-0.5">Yes</div>
+        </div>
+        <div class="bg-gray-50 rounded-lg p-2 col-span-2 sm:col-span-1">
+          <div class="text-[11px] text-gray-500 font-medium">Eulerian</div>
+          <div id="statEuler" class="text-xs font-bold text-gray-800 mt-1">Circuit</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Right Panel: Live Matrices & Representations -->
+    <aside class="lg:col-span-3 flex flex-col gap-4">
+      <div class="bg-white rounded-xl border border-gray-200 p-4 shadow-sm flex-1 flex flex-col">
+        <div class="flex items-center justify-between border-b border-gray-100 pb-2.5 mb-3">
+          <h2 class="text-xs font-bold uppercase tracking-wider text-gray-500">Live Graph Representations</h2>
+          <span class="text-[11px] font-semibold text-orange-600 bg-orange-50 px-2 py-0.5 rounded">Auto-Synced</span>
+        </div>
+
+        <!-- Tabs -->
+        <div class="flex gap-1 bg-gray-100 p-1 rounded-lg mb-3">
+          <button onclick="switchRepTab('matrix')" id="tab-matrix" class="rep-tab flex-1 py-1.5 text-xs font-semibold rounded-md bg-white text-gray-900 shadow-sm">Adjacency Matrix</button>
+          <button onclick="switchRepTab('list')" id="tab-list" class="rep-tab flex-1 py-1.5 text-xs font-semibold rounded-md text-gray-600">Adj. List</button>
+          <button onclick="switchRepTab('degrees')" id="tab-degrees" class="rep-tab flex-1 py-1.5 text-xs font-semibold rounded-md text-gray-600">Degrees</button>
+        </div>
+
+        <!-- Representation Output -->
+        <div id="repContent" class="flex-1 overflow-auto text-xs mono bg-gray-50 border border-gray-200 rounded-lg p-3"></div>
+
+        <button id="copyBtn" onclick="copyRepresentation()" class="mt-3 w-full py-2 text-xs font-semibold rounded-lg border border-orange-300 bg-orange-50 hover:bg-orange-100 text-orange-700 transition">
+          Copy LaTeX / Matrix for Lab Report
+        </button>
+      </div>
+
+      <!-- University-Tutors.com Conversion Card -->
+      <div class="bg-gradient-to-br from-orange-50 to-amber-50 rounded-xl border border-orange-200 p-4 shadow-sm">
+        <span class="inline-block text-[10px] font-bold uppercase tracking-wider bg-orange-500 text-white px-2 py-0.5 rounded mb-2">1-on-1 CS & Math Help</span>
+        <h3 class="text-sm font-bold text-gray-900 leading-snug mb-1">Stuck on Discrete Math, Graph Proofs, or DSA Assignments?</h3>
+        <p class="text-xs text-gray-600 mb-3">Book a live whiteboard session with verified Computer Science & Mathematics tutors.</p>
+        <a href="#book-tutor" class="block text-center w-full py-2 px-3 rounded-lg bg-orange-500 hover:bg-orange-600 text-white text-xs font-bold shadow-sm transition">
+          Connect with a CS Tutor →
+        </a>
+      </div>
+    </aside>
+
+  </main>
+
+  <script>
+    const canvas = document.getElementById('graphCanvas');
+    const ctx = canvas.getContext('2d');
+
+    let nodes = [];
+    let edges = [];
+    let mode = 'select';
+    let isDirected = false;
+    let draggingNode = null;
+    let edgeSourceNode = null;
+    let pointerPos = { x: 0, y: 0 };
+    let highlightedNodes = new Set();
+    let highlightedEdges = new Set();
+    let activeRepTab = 'matrix';
+    let currentView = '2d';
+
+    // Three.js 3D Preview State
+    let threeScene, threeCamera, threeRenderer, graphGroup3D;
+    let isOrbiting = false, prevOrbit = { x: 0, y: 0 };
+    let camSpherical = { radius: 420, theta: 0.4, phi: 1.15 };
+
+    const LABELS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+
+    function switchView(view) {
+      currentView = view;
+      const c2d = document.getElementById('graphCanvas');
+      const c3d = document.getElementById('threeContainer');
+      const hint = document.getElementById('canvasHint');
+      const ctrl3d = document.getElementById('threeControls');
+      const btn2d = document.getElementById('view-2d-btn');
+      const btn3d = document.getElementById('view-3d-btn');
+
+      if (view === '3d') {
+        c2d.classList.add('hidden');
+        c3d.classList.remove('hidden');
+        ctrl3d.classList.remove('hidden');
+        btn3d.className = 'px-2.5 py-1 rounded-md text-xs font-bold bg-orange-500 text-white shadow-sm transition flex items-center gap-1';
+        btn2d.className = 'px-2.5 py-1 rounded-md text-xs font-bold text-gray-600 hover:text-gray-900 transition';
+        hint.className = 'absolute bottom-3 left-3 bg-slate-900/85 backdrop-blur border border-slate-700 px-3 py-1.5 rounded-lg text-[11px] text-slate-300 shadow-sm pointer-events-none';
+        hint.textContent = '3D Topology Mode: Drag to orbit • Scroll to zoom • Synced live with 2D graph & algorithms';
+        initThreeIfNeeded();
+        sync3DGraph();
+      } else {
+        c3d.classList.add('hidden');
+        ctrl3d.classList.add('hidden');
+        c2d.classList.remove('hidden');
+        btn2d.className = 'px-2.5 py-1 rounded-md text-xs font-bold bg-white text-gray-900 shadow-sm transition';
+        btn3d.className = 'px-2.5 py-1 rounded-md text-xs font-bold text-gray-600 hover:text-orange-600 transition flex items-center gap-1';
+        hint.className = 'absolute bottom-3 left-3 bg-white/90 backdrop-blur border border-gray-200 px-3 py-1.5 rounded-lg text-[11px] text-gray-600 shadow-sm pointer-events-none';
+        hint.textContent = 'Tip: Drag vertices to rearrange • Click an edge weight to cycle its value';
+        resizeCanvas();
+      }
+    }
+
+    function initThreeIfNeeded() {
+      const container = document.getElementById('threeContainer');
+      if (threeRenderer) {
+        onResize3D();
+        return;
+      }
+
+      threeScene = new THREE.Scene();
+      threeScene.background = new THREE.Color(0x090d16);
+
+      const rect = container.getBoundingClientRect();
+      threeCamera = new THREE.PerspectiveCamera(48, (rect.width || 600) / (rect.height || 480), 1, 2000);
+      update3DCameraPos();
+
+      threeRenderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
+      threeRenderer.setSize(rect.width || 600, rect.height || 480);
+      threeRenderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+      container.appendChild(threeRenderer.domElement);
+
+      const ambient = new THREE.AmbientLight(0xffffff, 0.7);
+      threeScene.add(ambient);
+      const dirLight = new THREE.DirectionalLight(0xffffff, 0.9);
+      dirLight.position.set(180, 260, 220);
+      threeScene.add(dirLight);
+      const rimLight = new THREE.PointLight(0xf97316, 0.8, 700);
+      rimLight.position.set(-160, -120, 140);
+      threeScene.add(rimLight);
+
+      const grid = new THREE.GridHelper(520, 16, 0x334155, 0x1e293b);
+      grid.position.y = -130;
+      threeScene.add(grid);
+
+      graphGroup3D = new THREE.Group();
+      threeScene.add(graphGroup3D);
+
+      const dom = threeRenderer.domElement;
+      dom.addEventListener('pointerdown', (e) => {
+        isOrbiting = true;
+        prevOrbit = { x: e.clientX, y: e.clientY };
+      });
+      window.addEventListener('pointermove', (e) => {
+        if (!isOrbiting || currentView !== '3d') return;
+        const dx = e.clientX - prevOrbit.x;
+        const dy = e.clientY - prevOrbit.y;
+        prevOrbit = { x: e.clientX, y: e.clientY };
+        camSpherical.theta -= dx * 0.008;
+        camSpherical.phi = Math.max(0.25, Math.min(Math.PI - 0.25, camSpherical.phi - dy * 0.008));
+        update3DCameraPos();
+      });
+      window.addEventListener('pointerup', () => { isOrbiting = false; });
+      dom.addEventListener('wheel', (e) => {
+        e.preventDefault();
+        camSpherical.radius = Math.max(180, Math.min(850, camSpherical.radius + e.deltaY * 0.35));
+        update3DCameraPos();
+      }, { passive: false });
+
+      window.addEventListener('resize', onResize3D);
+      animate3D();
+    }
+
+    function onResize3D() {
+      if (!threeRenderer) return;
+      const container = document.getElementById('threeContainer');
+      const rect = container.getBoundingClientRect();
+      if (!rect.width || !rect.height) return;
+      threeCamera.aspect = rect.width / rect.height;
+      threeCamera.updateProjectionMatrix();
+      threeRenderer.setSize(rect.width, rect.height);
+    }
+
+    function update3DCameraPos() {
+      if (!threeCamera) return;
+      const { radius, theta, phi } = camSpherical;
+      threeCamera.position.x = radius * Math.sin(phi) * Math.sin(theta);
+      threeCamera.position.y = radius * Math.cos(phi);
+      threeCamera.position.z = radius * Math.sin(phi) * Math.cos(theta);
+      threeCamera.lookAt(0, 0, 0);
+    }
+
+    function reset3DCamera() {
+      camSpherical = { radius: 420, theta: 0.4, phi: 1.15 };
+      if (graphGroup3D) graphGroup3D.rotation.y = 0;
+      update3DCameraPos();
+    }
+
+    function makeTextSprite(text, bgColor, textColor, borderColor) {
+      const spCanvas = document.createElement('canvas');
+      spCanvas.width = 128;
+      spCanvas.height = 64;
+      const sctx = spCanvas.getContext('2d');
+      sctx.fillStyle = bgColor;
+      sctx.beginPath();
+      sctx.roundRect(12, 8, 104, 48, 14);
+      sctx.fill();
+      if (borderColor) {
+        sctx.lineWidth = 4;
+        sctx.strokeStyle = borderColor;
+        sctx.stroke();
+      }
+      sctx.fillStyle = textColor;
+      sctx.font = 'bold 28px Inter, sans-serif';
+      sctx.textAlign = 'center';
+      sctx.textBaseline = 'middle';
+      sctx.fillText(text, 64, 33);
+
+      const tex = new THREE.CanvasTexture(spCanvas);
+      const mat = new THREE.SpriteMaterial({ map: tex, transparent: true });
+      const sprite = new THREE.Sprite(mat);
+      sprite.scale.set(38, 19, 1);
+      return sprite;
+    }
+
+    function sync3DGraph() {
+      if (!graphGroup3D) return;
+      while (graphGroup3D.children.length > 0) {
+        graphGroup3D.remove(graphGroup3D.children[0]);
+      }
+      if (nodes.length === 0) return;
+
+      const rect = canvas.parentElement.getBoundingClientRect();
+      const cx = (rect.width || 600) / 2;
+      const cy = (rect.height || 480) / 2;
+      const showWeights = document.getElementById('toggleWeighted').checked;
+
+      const pos3D = {};
+      nodes.forEach((n, idx) => {
+        const deg = getNeighbors(n.id).length;
+        const zDepth = Math.sin(idx * 1.45) * 75 + (deg - 2) * 16;
+        pos3D[n.id] = new THREE.Vector3((n.x - cx) * 0.85, -(n.y - cy) * 0.85, zDepth);
+      });
+
+      for (let e of edges) {
+        const p1 = pos3D[e.from];
+        const p2 = pos3D[e.to];
+        if (!p1 || !p2) continue;
+
+        const isActive = highlightedEdges.has(e.id);
+        const dir = new THREE.Vector3().subVectors(p2, p1);
+        const len = dir.length();
+        if (len < 1) continue;
+
+        const cylGeo = new THREE.CylinderGeometry(isActive ? 2.6 : 1.3, isActive ? 2.6 : 1.3, len, 10);
+        const cylMat = new THREE.MeshStandardMaterial({
+          color: isActive ? 0xf97316 : 0x64748b,
+          emissive: isActive ? 0xea580c : 0x000000,
+          emissiveIntensity: isActive ? 0.5 : 0
+        });
+        const cyl = new THREE.Mesh(cylGeo, cylMat);
+        cyl.position.copy(p1).addScaledVector(dir, 0.5);
+        cyl.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir.clone().normalize());
+        graphGroup3D.add(cyl);
+
+        if (isDirected) {
+          const coneGeo = new THREE.ConeGeometry(5.5, 14, 12);
+          const coneMat = new THREE.MeshStandardMaterial({ color: isActive ? 0xf97316 : 0x94a3b8 });
+          const cone = new THREE.Mesh(coneGeo, coneMat);
+          const norm = dir.clone().normalize();
+          cone.position.copy(p2).addScaledVector(norm, -20);
+          cone.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), norm);
+          graphGroup3D.add(cone);
+        }
+
+        if (showWeights) {
+          const wSprite = makeTextSprite(
+            String(e.weight),
+            isActive ? '#F97316' : '#1E293B',
+            '#FFFFFF',
+            isActive ? '#FDBA74' : '#475569'
+          );
+          wSprite.position.copy(p1).addScaledVector(dir, 0.5);
+          wSprite.position.y += 10;
+          wSprite.scale.set(28, 14, 1);
+          graphGroup3D.add(wSprite);
+        }
+      }
+
+      for (let n of nodes) {
+        const p = pos3D[n.id];
+        const isVisited = highlightedNodes.has(n.id);
+
+        const sphereGeo = new THREE.SphereGeometry(14, 24, 24);
+        const sphereMat = new THREE.MeshStandardMaterial({
+          color: isVisited ? 0xf97316 : 0xffffff,
+          emissive: isVisited ? 0xea580c : 0x1e293b,
+          emissiveIntensity: isVisited ? 0.45 : 0.25,
+          roughness: 0.3,
+          metalness: 0.15
+        });
+        const sphere = new THREE.Mesh(sphereGeo, sphereMat);
+        sphere.position.copy(p);
+        graphGroup3D.add(sphere);
+
+        const labelSprite = makeTextSprite(
+          n.label,
+          isVisited ? '#EA580C' : '#0F172A',
+          '#FFFFFF',
+          isVisited ? '#FED7AA' : '#F97316'
+        );
+        labelSprite.position.set(p.x, p.y + 23, p.z);
+        graphGroup3D.add(labelSprite);
+      }
+    }
+
+    function animate3D() {
+      requestAnimationFrame(animate3D);
+      if (currentView === '3d' && threeRenderer && threeScene && threeCamera) {
+        const autoRot = document.getElementById('toggleAutoRotate');
+        if (autoRot && autoRot.checked && !isOrbiting && graphGroup3D) {
+          graphGroup3D.rotation.y += 0.004;
+        }
+        threeRenderer.render(threeScene, threeCamera);
+      }
+    }
+
+    function resizeCanvas() {
+      const rect = canvas.parentElement.getBoundingClientRect();
+      const dpr = window.devicePixelRatio || 1;
+      canvas.width = (rect.width || 600) * dpr;
+      canvas.height = (rect.height || 480) * dpr;
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      draw();
+    }
+
+    window.addEventListener('resize', resizeCanvas);
+
+    function nextLabel() {
+      const used = new Set(nodes.map(n => n.label));
+      for (let ch of LABELS) if (!used.has(ch)) return ch;
+      return 'V' + (nodes.length + 1);
+    }
+
+    function setMode(newMode) {
+      mode = newMode;
+      edgeSourceNode = null;
+      document.querySelectorAll('.mode-btn').forEach(btn => {
+        btn.className = 'mode-btn px-3 py-1.5 rounded-lg text-xs font-semibold bg-gray-100 text-gray-700 hover:bg-gray-200';
+      });
+      const activeBtn = document.getElementById('mode-' + newMode);
+      if (activeBtn) {
+        activeBtn.className = newMode === 'delete'
+          ? 'mode-btn px-3 py-1.5 rounded-lg text-xs font-semibold bg-red-600 text-white'
+          : 'mode-btn px-3 py-1.5 rounded-lg text-xs font-semibold bg-orange-500 text-white';
+      }
+      draw();
+    }
+
+    function toggleGraphType() {
+      isDirected = document.getElementById('toggleDirected').checked;
+      clearHighlights();
+      updateAllUI();
+    }
+
+    function clearHighlights() {
+      highlightedNodes.clear();
+      highlightedEdges.clear();
+      draw();
+    }
+
+    function clearCanvas() {
+      nodes = [];
+      edges = [];
+      clearHighlights();
+      updateAllUI();
+    }
+
+    function getNodeAt(x, y) {
+      return nodes.find(n => Math.hypot(n.x - x, n.y - y) <= 22);
+    }
+
+    function getEdgeAt(x, y) {
+      return edges.find(e => {
+        const a = nodes.find(n => n.id === e.from);
+        const b = nodes.find(n => n.id === e.to);
+        if (!a || !b) return false;
+        const mx = (a.x + b.x) / 2;
+        const my = (a.y + b.y) / 2;
+        return Math.hypot(mx - x, my - y) <= 18;
+      });
+    }
+
+    function getCoords(e) {
+      const rect = canvas.getBoundingClientRect();
+      const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+      const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+      return { x: clientX - rect.left, y: clientY - rect.top };
+    }
+
+    canvas.addEventListener('pointerdown', (e) => {
+      const { x, y } = getCoords(e);
+      const hitNode = getNodeAt(x, y);
+      const hitEdge = getEdgeAt(x, y);
+
+      if (mode === 'select') {
+        if (hitNode) {
+          draggingNode = hitNode;
+        } else if (hitEdge && document.getElementById('toggleWeighted').checked) {
+          hitEdge.weight = (hitEdge.weight % 15) + 1;
+          clearHighlights();
+          updateAllUI();
+        }
+      } else if (mode === 'node') {
+        if (!hitNode) {
+          nodes.push({ id: Date.now() + Math.random(), label: nextLabel(), x, y });
+          clearHighlights();
+          updateAllUI();
+        }
+      } else if (mode === 'edge') {
+        if (hitNode) {
+          if (!edgeSourceNode) {
+            edgeSourceNode = hitNode;
+          } else if (edgeSourceNode.id !== hitNode.id) {
+            const exists = edges.some(ed =>
+              isDirected
+                ? ed.from === edgeSourceNode.id && ed.to === hitNode.id
+                : (ed.from === edgeSourceNode.id && ed.to === hitNode.id) || (ed.from === hitNode.id && ed.to === edgeSourceNode.id)
+            );
+            if (!exists) {
+              edges.push({
+                id: Date.now() + Math.random(),
+                from: edgeSourceNode.id,
+                to: hitNode.id,
+                weight: Math.floor(Math.random() * 9) + 1
+              });
+            }
+            edgeSourceNode = null;
+            clearHighlights();
+            updateAllUI();
+          }
+        }
+      } else if (mode === 'delete') {
+        if (hitNode) {
+          nodes = nodes.filter(n => n.id !== hitNode.id);
+          edges = edges.filter(ed => ed.from !== hitNode.id && ed.to !== hitNode.id);
+          clearHighlights();
+          updateAllUI();
+        } else if (hitEdge) {
+          edges = edges.filter(ed => ed.id !== hitEdge.id);
+          clearHighlights();
+          updateAllUI();
+        }
+      }
+      draw();
+    });
+
+    canvas.addEventListener('pointermove', (e) => {
+      const { x, y } = getCoords(e);
+      pointerPos = { x, y };
+      if (draggingNode) {
+        draggingNode.x = Math.max(28, Math.min(canvas.clientWidth - 28, x));
+        draggingNode.y = Math.max(28, Math.min(canvas.clientHeight - 28, y));
+        draw();
+      } else if (edgeSourceNode) {
+        draw();
+      }
+    });
+
+    canvas.addEventListener('pointerup', () => {
+      draggingNode = null;
+    });
+
+    function drawArrow(x1, y1, x2, y2, color) {
+      const angle = Math.atan2(y2 - y1, x2 - x1);
+      const r = 22;
+      const tx = x2 - r * Math.cos(angle);
+      const ty = y2 - r * Math.sin(angle);
+      ctx.save();
+      ctx.fillStyle = color;
+      ctx.beginPath();
+      ctx.moveTo(tx, ty);
+      ctx.lineTo(tx - 11 * Math.cos(angle - Math.PI / 6), ty - 11 * Math.sin(angle - Math.PI / 6));
+      ctx.lineTo(tx - 11 * Math.cos(angle + Math.PI / 6), ty - 11 * Math.sin(angle + Math.PI / 6));
+      ctx.closePath();
+      ctx.fill();
+      ctx.restore();
+    }
+
+    function draw() {
+      if (currentView === '3d') sync3DGraph();
+      const rect = canvas.parentElement.getBoundingClientRect();
+      ctx.clearRect(0, 0, rect.width, rect.height);
+
+      // Subtle Grid Background
+      ctx.strokeStyle = '#F3F4F6';
+      ctx.lineWidth = 1;
+      for (let gx = 0; gx < rect.width; gx += 28) {
+        ctx.beginPath(); ctx.moveTo(gx, 0); ctx.lineTo(gx, rect.height); ctx.stroke();
+      }
+      for (let gy = 0; gy < rect.height; gy += 28) {
+        ctx.beginPath(); ctx.moveTo(0, gy); ctx.lineTo(rect.width, gy); ctx.stroke();
+      }
+
+      // Preview line while connecting edge
+      if (edgeSourceNode) {
+        ctx.save();
+        ctx.setLineDash([5, 5]);
+        ctx.strokeStyle = '#F97316';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(edgeSourceNode.x, edgeSourceNode.y);
+        ctx.lineTo(pointerPos.x, pointerPos.y);
+        ctx.stroke();
+        ctx.restore();
+      }
+
+      const showWeights = document.getElementById('toggleWeighted').checked;
+
+      // Draw Edges
+      for (let e of edges) {
+        const a = nodes.find(n => n.id === e.from);
+        const b = nodes.find(n => n.id === e.to);
+        if (!a || !b) continue;
+
+        const isActive = highlightedEdges.has(e.id);
+        ctx.strokeStyle = isActive ? '#F97316' : '#9CA3AF';
+        ctx.lineWidth = isActive ? 3.5 : 2;
+        ctx.beginPath();
+        ctx.moveTo(a.x, a.y);
+        ctx.lineTo(b.x, b.y);
+        ctx.stroke();
+
+        if (isDirected) {
+          drawArrow(a.x, a.y, b.x, b.y, isActive ? '#F97316' : '#6B7280');
+        }
+
+        if (showWeights) {
+          const mx = (a.x + b.x) / 2;
+          const my = (a.y + b.y) / 2;
+          ctx.fillStyle = isActive ? '#FFF7ED' : '#FFFFFF';
+          ctx.strokeStyle = isActive ? '#F97316' : '#D1D5DB';
+          ctx.lineWidth = 1.5;
+          ctx.beginPath();
+          ctx.arc(mx, my, 12, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.stroke();
+
+          ctx.fillStyle = isActive ? '#EA580C' : '#374151';
+          ctx.font = '600 11px Inter, sans-serif';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText(e.weight, mx, my);
+        }
+      }
+
+      // Draw Nodes
+      for (let n of nodes) {
+        const isVisited = highlightedNodes.has(n.id);
+        const isSelected = edgeSourceNode && edgeSourceNode.id === n.id;
+
+        ctx.save();
+        ctx.shadowColor = 'rgba(0,0,0,0.08)';
+        ctx.shadowBlur = 8;
+        ctx.shadowOffsetY = 3;
+
+        ctx.fillStyle = isVisited ? '#F97316' : isSelected ? '#FFF7ED' : '#FFFFFF';
+        ctx.strokeStyle = isVisited ? '#EA580C' : isSelected ? '#F97316' : '#1F2937';
+        ctx.lineWidth = isVisited || isSelected ? 3 : 2.2;
+
+        ctx.beginPath();
+        ctx.arc(n.x, n.y, 20, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+        ctx.restore();
+
+        ctx.fillStyle = isVisited ? '#FFFFFF' : '#111827';
+        ctx.font = '700 13px Inter, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(n.label, n.x, n.y);
+      }
+    }
+
+    function getNeighbors(nodeId) {
+      const list = [];
+      for (let e of edges) {
+        if (e.from === nodeId) list.push({ to: e.to, weight: e.weight, edgeId: e.id });
+        else if (!isDirected && e.to === nodeId) list.push({ to: e.from, weight: e.weight, edgeId: e.id });
+      }
+      return list;
+    }
+
+    function runAlgorithm(type) {
+      if (nodes.length === 0) return;
+      clearHighlights();
+      const startId = Number(document.getElementById('startNodeSelect').value);
+      const endId = Number(document.getElementById('endNodeSelect').value);
+      const log = document.getElementById('algoOutput');
+      const getLabel = (id) => nodes.find(n => n.id === id)?.label || '?';
+
+      if (type === 'bfs' || type === 'dfs') {
+        const visited = new Set();
+        const order = [];
+        const stackOrQueue = [startId];
+        const parentEdge = {};
+
+        while (stackOrQueue.length > 0) {
+          const curr = type === 'bfs' ? stackOrQueue.shift() : stackOrQueue.pop();
+          if (visited.has(curr)) continue;
+          visited.add(curr);
+          order.push(getLabel(curr));
+          highlightedNodes.add(curr);
+          if (parentEdge[curr]) highlightedEdges.add(parentEdge[curr]);
+
+          const nbrs = getNeighbors(curr);
+          if (type === 'dfs') nbrs.reverse();
+          for (let nb of nbrs) {
+            if (!visited.has(nb.to)) {
+              if (!parentEdge[nb.to]) parentEdge[nb.to] = nb.edgeId;
+              stackOrQueue.push(nb.to);
+            }
+          }
+        }
+        log.innerHTML = `<span class="text-orange-400 font-bold">// ${type.toUpperCase()} Traversal from ${getLabel(startId)}</span><br>` +
+          `Visited Order: <span class="text-emerald-400 font-bold">${order.join(' → ')}</span><br>` +
+          `Reachable Vertices: ${visited.size} / ${nodes.length}`;
+      }
+
+      if (type === 'dijkstra') {
+        const dist = {};
+        const prev = {};
+        const prevEdge = {};
+        const unvisited = new Set(nodes.map(n => n.id));
+        nodes.forEach(n => dist[n.id] = Infinity);
+        dist[startId] = 0;
+
+        while (unvisited.size > 0) {
+          let u = null;
+          for (let id of unvisited) {
+            if (u === null || dist[id] < dist[u]) u = id;
+          }
+          if (dist[u] === Infinity) break;
+          unvisited.delete(u);
+          if (u === endId) break;
+
+          for (let nb of getNeighbors(u)) {
+            const alt = dist[u] + nb.weight;
+            if (alt < dist[nb.to]) {
+              dist[nb.to] = alt;
+              prev[nb.to] = u;
+              prevEdge[nb.to] = nb.edgeId;
+            }
+          }
+        }
+
+        if (dist[endId] === Infinity) {
+          log.innerHTML = `<span class="text-red-400">// No path exists between ${getLabel(startId)} and ${getLabel(endId)}</span>`;
+        } else {
+          const path = [];
+          let curr = endId;
+          while (curr !== undefined) {
+            path.unshift(getLabel(curr));
+            highlightedNodes.add(curr);
+            if (prevEdge[curr]) highlightedEdges.add(prevEdge[curr]);
+            curr = prev[curr];
+          }
+          log.innerHTML = `<span class="text-orange-400 font-bold">// Dijkstra Shortest Path</span><br>` +
+            `Path: <span class="text-emerald-400 font-bold">${path.join(' → ')}</span><br>` +
+            `Total Minimum Cost: <span class="text-white font-bold">${dist[endId]}</span>`;
+        }
+      }
+
+      if (type === 'mst') {
+        const visited = new Set([startId]);
+        highlightedNodes.add(startId);
+        let totalWeight = 0;
+        const treeEdges = [];
+
+        while (visited.size < nodes.length) {
+          let bestEdge = null;
+          for (let u of visited) {
+            for (let nb of getNeighbors(u)) {
+              if (!visited.has(nb.to)) {
+                if (!bestEdge || nb.weight < bestEdge.weight) {
+                  bestEdge = { from: u, to: nb.to, weight: nb.weight, edgeId: nb.edgeId };
+                }
+              }
+            }
+          }
+          if (!bestEdge) break;
+          visited.add(bestEdge.to);
+          highlightedNodes.add(bestEdge.to);
+          highlightedEdges.add(bestEdge.edgeId);
+          totalWeight += bestEdge.weight;
+          treeEdges.push(`(${getLabel(bestEdge.from)}-${getLabel(bestEdge.to)}:${bestEdge.weight})`);
+        }
+        log.innerHTML = `<span class="text-orange-400 font-bold">// Prim's Minimum Spanning Tree</span><br>` +
+          `MST Edges: <span class="text-emerald-400">${treeEdges.join(', ')}</span><br>` +
+          `Total MST Weight: <span class="text-white font-bold">${totalWeight}</span>`;
+      }
+
+      draw();
+    }
+
+    function switchRepTab(tab) {
+      activeRepTab = tab;
+      document.querySelectorAll('.rep-tab').forEach(btn => {
+        btn.className = 'rep-tab flex-1 py-1.5 text-xs font-semibold rounded-md text-gray-600';
+      });
+      document.getElementById('tab-' + tab).className = 'rep-tab flex-1 py-1.5 text-xs font-semibold rounded-md bg-white text-gray-900 shadow-sm';
+      renderRepresentation();
+    }
+
+    function renderRepresentation() {
+      const container = document.getElementById('repContent');
+      if (nodes.length === 0) {
+        container.innerHTML = '<span class="text-gray-400">Add vertices to generate matrices...</span>';
+        return;
+      }
+
+      if (activeRepTab === 'matrix') {
+        let html = '<table class="w-full text-center border-collapse"><thead><tr><th class="p-1 text-orange-600"></th>';
+        nodes.forEach(n => html += `<th class="p-1 text-orange-600 font-bold">${n.label}</th>`);
+        html += '</tr></thead><tbody>';
+        nodes.forEach((rowNode) => {
+          html += `<tr><td class="p-1 font-bold text-orange-600">${rowNode.label}</td>`;
+          nodes.forEach((colNode) => {
+            const edge = edges.find(e =>
+              isDirected
+                ? e.from === rowNode.id && e.to === colNode.id
+                : (e.from === rowNode.id && e.to === colNode.id) || (e.from === colNode.id && e.to === rowNode.id)
+            );
+            const val = edge ? edge.weight : 0;
+            html += `<td class="p-1 border border-gray-200 ${val ? 'bg-orange-50 font-bold text-gray-900' : 'text-gray-400'}">${val}</td>`;
+          });
+          html += '</tr>';
+        });
+        html += '</tbody></table>';
+        container.innerHTML = html;
+      } else if (activeRepTab === 'list') {
+        container.innerHTML = nodes.map(n => {
+          const nbrs = getNeighbors(n.id).map(nb => {
+            const lbl = nodes.find(x => x.id === nb.to)?.label;
+            return `${lbl}(w:${nb.weight})`;
+          });
+          return `<div class="mb-1.5"><span class="font-bold text-orange-600">${n.label}</span> → [ ${nbrs.join(', ') || '∅'} ]</div>`;
+        }).join('');
+      } else {
+        container.innerHTML = nodes.map(n => {
+          const deg = getNeighbors(n.id).length;
+          return `<div class="flex justify-between py-1 border-b border-gray-200"><span>Vertex <b>${n.label}</b></span><span>deg(${n.label}) = <b>${deg}</b></span></div>`;
+        }).join('');
+      }
+    }
+
+    function updateStats() {
+      const V = nodes.length;
+      const E = edges.length;
+      document.getElementById('statV').textContent = V;
+      document.getElementById('statE').textContent = E;
+
+      const maxE = isDirected ? V * (V - 1) : (V * (V - 1)) / 2;
+      const density = maxE > 0 ? (E / maxE).toFixed(2) : '0.00';
+      document.getElementById('statDensity').textContent = density;
+
+      if (V === 0) {
+        document.getElementById('statConnected').textContent = '—';
+        document.getElementById('statEuler').textContent = '—';
+        return;
+      }
+
+      const visited = new Set([nodes[0].id]);
+      const q = [nodes[0].id];
+      while (q.length) {
+        const u = q.shift();
+        for (let e of edges) {
+          if (e.from === u && !visited.has(e.to)) { visited.add(e.to); q.push(e.to); }
+          if (e.to === u && !visited.has(e.from)) { visited.add(e.from); q.push(e.from); }
+        }
+      }
+      const connected = visited.size === V;
+      const connEl = document.getElementById('statConnected');
+      connEl.textContent = connected ? 'Yes' : 'Disconnected';
+      connEl.className = connected ? 'text-sm font-bold text-emerald-600 mt-0.5' : 'text-sm font-bold text-red-600 mt-0.5';
+
+      const oddCount = nodes.filter(n => getNeighbors(n.id).length % 2 !== 0).length;
+      const eulerEl = document.getElementById('statEuler');
+      if (!connected || isDirected) eulerEl.textContent = isDirected ? 'Digraph' : 'None';
+      else if (oddCount === 0) eulerEl.textContent = 'Euler Circuit';
+      else if (oddCount === 2) eulerEl.textContent = 'Euler Path';
+      else eulerEl.textContent = 'Non-Eulerian';
+    }
+
+    function updateSelectors() {
+      const s1 = document.getElementById('startNodeSelect');
+      const s2 = document.getElementById('endNodeSelect');
+      const opts = nodes.map(n => `<option value="${n.id}">Vertex ${n.label}</option>`).join('');
+      s1.innerHTML = opts;
+      s2.innerHTML = opts;
+      if (nodes.length > 1) s2.selectedIndex = nodes.length - 1;
+    }
+
+    function updateAllUI() {
+      updateSelectors();
+      updateStats();
+      renderRepresentation();
+      draw();
+    }
+
+    function applyCircularLayout() {
+      const rect = canvas.parentElement.getBoundingClientRect();
+      const cx = (rect.width || 600) / 2;
+      const cy = (rect.height || 480) / 2;
+      const r = Math.min(cx, cy) * 0.68;
+      nodes.forEach((n, i) => {
+        const angle = (2 * Math.PI * i) / nodes.length - Math.PI / 2;
+        n.x = cx + r * Math.cos(angle);
+        n.y = cy + r * Math.sin(angle);
+      });
+      draw();
+    }
+
+    function loadPreset(type) {
+      const rect = canvas.parentElement.getBoundingClientRect();
+      const cx = (rect.width || 600) / 2;
+      const cy = (rect.height || 480) / 2;
+      nodes = [];
+      edges = [];
+      clearHighlights();
+
+      if (type === 'weighted') {
+        document.getElementById('toggleDirected').checked = false;
+        isDirected = false;
+        const coords = [
+          [-160, -90], [0, -130], [160, -90],
+          [-160, 90], [0, 130], [160, 90]
+        ];
+        coords.forEach(([dx, dy], i) => nodes.push({ id: i + 1, label: LABELS[i], x: cx + dx, y: cy + dy }));
+        const pairs = [
+          [1,2,4], [1,4,2], [2,3,5], [2,4,1], [2,5,8], [3,5,3], [3,6,6], [4,5,7], [5,6,2]
+        ];
+        pairs.forEach(([f, t, w], idx) => edges.push({ id: 100 + idx, from: f, to: t, weight: w }));
+      } else if (type === 'petersen') {
+        document.getElementById('toggleDirected').checked = false;
+        isDirected = false;
+        const rOuter = 165, rInner = 82;
+        for (let i = 0; i < 5; i++) {
+          const ang = (2 * Math.PI * i) / 5 - Math.PI / 2;
+          nodes.push({ id: i + 1, label: LABELS[i], x: cx + rOuter * Math.cos(ang), y: cy + rOuter * Math.sin(ang) });
+        }
+        for (let i = 0; i < 5; i++) {
+          const ang = (2 * Math.PI * i) / 5 - Math.PI / 2;
+          nodes.push({ id: i + 6, label: LABELS[i + 5], x: cx + rInner * Math.cos(ang), y: cy + rInner * Math.sin(ang) });
+        }
+        const outerEdges = [[1,2],[2,3],[3,4],[4,5],[5,1]];
+        const spokes = [[1,6],[2,7],[3,8],[4,9],[5,10]];
+        const starEdges = [[6,8],[8,10],[10,7],[7,9],[9,6]];
+        [...outerEdges, ...spokes, ...starEdges].forEach(([f, t], idx) => {
+          edges.push({ id: 200 + idx, from: f, to: t, weight: 1 });
+        });
+      } else if (type === 'bipartite') {
+        document.getElementById('toggleDirected').checked = false;
+        isDirected = false;
+        [-110, 0, 110].forEach((dy, i) => nodes.push({ id: i + 1, label: LABELS[i], x: cx - 130, y: cy + dy }));
+        [-110, 0, 110].forEach((dy, i) => nodes.push({ id: i + 4, label: LABELS[i + 3], x: cx + 130, y: cy + dy }));
+        let idx = 0;
+        for (let i = 1; i <= 3; i++) {
+          for (let j = 4; j <= 6; j++) {
+            edges.push({ id: 300 + idx++, from: i, to: j, weight: ((i + j) % 7) + 1 });
+          }
+        }
+      } else if (type === 'dag') {
+        document.getElementById('toggleDirected').checked = true;
+        isDirected = true;
+        const pos = [
+          [-180, 0], [-60, -100], [-60, 100], [70, -100], [70, 100], [190, 0]
+        ];
+        pos.forEach(([dx, dy], i) => nodes.push({ id: i + 1, label: LABELS[i], x: cx + dx, y: cy + dy }));
+        const dagPairs = [[1,2,3], [1,3,6], [2,4,4], [2,5,2], [3,5,5], [4,6,3], [5,6,4]];
+        dagPairs.forEach(([f, t, w], idx) => edges.push({ id: 400 + idx, from: f, to: t, weight: w }));
+      }
+      updateAllUI();
+    }
+
+    function copyRepresentation() {
+      const text = document.getElementById('repContent').innerText;
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand('copy');
+      document.body.removeChild(ta);
+
+      const btn = document.getElementById('copyBtn');
+      const orig = btn.textContent;
+      btn.textContent = 'Copied to Clipboard!';
+      setTimeout(() => { btn.textContent = orig; }, 1600);
+    }
+
+    function exportPNG() {
+      const link = document.createElement('a');
+      link.download = currentView === '3d' ? 'university-tutors-graph-3d.png' : 'university-tutors-graph.png';
+      link.href = (currentView === '3d' && threeRenderer)
+        ? threeRenderer.domElement.toDataURL('image/png')
+        : canvas.toDataURL('image/png');
+      link.click();
+    }
+
+    function exportJSON() {
+      const data = JSON.stringify({ directed: isDirected, nodes, edges }, null, 2);
+      const blob = new Blob([data], { type: 'application/json' });
+      const link = document.createElement('a');
+      link.download = 'graph-topology.json';
+      link.href = URL.createObjectURL(blob);
+      link.click();
+    }
+
+    window.onload = function () {
+      resizeCanvas();
+      loadPreset('weighted');
+    };
+  </script>
+</body>
+</html>

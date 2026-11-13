@@ -23,11 +23,17 @@ const SpecializedServicePage = lazy(() => import('./components/SpecializedServic
 const WhatsAppPage = lazy(() => import('./components/WhatsAppPage'));
 const UserDataPage = lazy(() => import('./components/UserDataPage'));
 const DataDeletionPage = lazy(() => import('./components/DataDeletionPage'));
+const ToolsHub = lazy(() => import('./components/tools/ToolsHub'));
+const ScienceToolsRouter = lazy(() => import('./components/tools/ScienceToolsRouter'));
+const MathToolsRouter = lazy(() => import('./components/tools/MathToolsRouter'));
 import ChatNotificationToast from './components/ChatNotificationToast';
 import { audioNotifier, ToastNotification } from './utils/audioNotification';
 import { COUNTRY_ONLINE_TUTORING_PAGES } from './data/countryOnlineTutoringData';
 import { SPECIALIZED_SERVICE_PAGES_MAP } from './data/specializedTutoringServicesData';
 import { resolveDedicatedServiceRoute } from './data/dedicatedServiceRoutes';
+import { STUDENT_TOOLS_BY_SLUG, resolveStudentToolSlug } from './data/studentToolsData';
+import { resolveScienceRoute } from './data/scienceToolsRegistry';
+import { resolveMathRoute } from './data/mathToolsRegistry';
 import { updatePageSeo } from './utils/seo';
 
 import { store } from './lib/store';
@@ -196,6 +202,44 @@ export default function App() {
       title = 'User Data Deletion Instructions - University Tutors';
       description = 'Instructions on how to request the permanent deletion of your account and personal data from University Tutors, compliant with Meta, GDPR, and global standards.';
       canonicalPath = '/data-deletion';
+    } else if (activeView === 'tools') {
+      title = 'Free Online Student Tools Suite — PDF, Citations, Charts, CV & GPA | University Tutors';
+      description = 'Free, 100% private browser-based academic & STEM calculators for university students: Biology & Genetics Simulators, Chemistry & Spectroscopy Calculators, PDF Merger, Citations & CGPA.';
+      canonicalPath = '/tools';
+    } else if (resolveMathRoute(activeView)) {
+      const mRoute = resolveMathRoute(activeView)!;
+      if (mRoute.kind === 'hub') {
+        title = 'Free University Mathematics & Statistics Calculators (27 Tools) | University-Tutors.com';
+        description = '27 free interactive browser-based Mathematics & Statistics solvers: Algebra, Unit Circle, Symbolic Derivatives, Riemann Integrals, Matrix RREF, Eigenvalues, Hypothesis Testing, RK4 ODEs & RSA.';
+        canonicalPath = '/tools/math';
+      } else {
+        title = mRoute.tool.seoTitle;
+        description = mRoute.tool.seoDescription;
+        canonicalPath = mRoute.tool.path;
+      }
+    } else if (resolveScienceRoute(activeView)) {
+      const sciRoute = resolveScienceRoute(activeView)!;
+      if (sciRoute.kind === 'hub') {
+        if (sciRoute.category === 'Biology') {
+          title = 'Free Biology, Genetics & Molecular Lab Calculators (14 Tools) | University-Tutors.com';
+          description = '14 free interactive browser-based Biology calculators: Punnett Square, DNA/RNA/Protein Translator, PCR Master Mix, CRISPR gRNA, Agarose Gel Simulator, Hardy-Weinberg, CFU/mL & Water Potential.';
+          canonicalPath = '/tools/biology';
+        } else {
+          title = 'Free Chemistry, Stoichiometry & Spectroscopy Calculators (16 Tools) | University-Tutors.com';
+          description = '16 free interactive browser-based Chemistry calculators: Periodic Table, Molar Mass, Equation Balancer, Limiting Reagent, Henderson-Hasselbalch Buffer, Titration, Nernst, VSEPR & NMR/IR Lookup.';
+          canonicalPath = '/tools/chemistry';
+        }
+      } else {
+        title = sciRoute.tool.seoTitle;
+        description = sciRoute.tool.seoDescription;
+        canonicalPath = sciRoute.tool.path;
+      }
+    } else if (resolveStudentToolSlug(activeView)) {
+      const toolSlug = resolveStudentToolSlug(activeView)!;
+      const toolDef = STUDENT_TOOLS_BY_SLUG[toolSlug];
+      title = toolDef.seoTitle;
+      description = toolDef.seoDescription;
+      canonicalPath = toolDef.path;
     }
 
     updatePageSeo({
@@ -320,6 +364,53 @@ export default function App() {
       setActiveView(dedicatedService.view);
       path = dedicatedService.path;
       window.history.pushState(null, '', path);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
+
+    if (view === 'tools' || view === '/tools') {
+      setSelectedTutorProfile(null);
+      setActiveView('tools');
+      window.history.pushState(null, '', '/tools');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
+
+    const matchedMathRoute = resolveMathRoute(view);
+    if (matchedMathRoute) {
+      setSelectedTutorProfile(null);
+      if (matchedMathRoute.kind === 'hub') {
+        setActiveView('tools/math');
+        window.history.pushState(null, '', '/tools/math');
+      } else {
+        setActiveView(matchedMathRoute.tool.viewKey);
+        window.history.pushState(null, '', matchedMathRoute.tool.path);
+      }
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
+
+    const matchedScienceRoute = resolveScienceRoute(view);
+    if (matchedScienceRoute) {
+      setSelectedTutorProfile(null);
+      if (matchedScienceRoute.kind === 'hub') {
+        const hubKey = matchedScienceRoute.category === 'Biology' ? 'tools/biology' : 'tools/chemistry';
+        setActiveView(hubKey);
+        window.history.pushState(null, '', '/' + hubKey);
+      } else {
+        setActiveView(matchedScienceRoute.tool.viewKey);
+        window.history.pushState(null, '', matchedScienceRoute.tool.path);
+      }
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
+
+    const matchedToolSlug = resolveStudentToolSlug(view);
+    if (matchedToolSlug) {
+      const toolDef = STUDENT_TOOLS_BY_SLUG[matchedToolSlug];
+      setSelectedTutorProfile(null);
+      setActiveView(toolDef.viewKey);
+      window.history.pushState(null, '', toolDef.path);
       window.scrollTo({ top: 0, behavior: 'smooth' });
       return;
     }
@@ -484,6 +575,38 @@ export default function App() {
         hash === '#get a quote'
       ) {
         setActiveView('get-a-quote');
+      } else if (decodedPath === '/tools' || hash === '#tools') {
+        setSelectedTutorProfile(null);
+        setActiveView('tools');
+      } else if (
+        resolveMathRoute(decodedPath) ||
+        resolveMathRoute(hash)
+      ) {
+        const mRoute = (resolveMathRoute(decodedPath) || resolveMathRoute(hash))!;
+        setSelectedTutorProfile(null);
+        if (mRoute.kind === 'hub') {
+          setActiveView('tools/math');
+        } else {
+          setActiveView(mRoute.tool.viewKey);
+        }
+      } else if (
+        resolveScienceRoute(decodedPath) ||
+        resolveScienceRoute(hash)
+      ) {
+        const sci = (resolveScienceRoute(decodedPath) || resolveScienceRoute(hash))!;
+        setSelectedTutorProfile(null);
+        if (sci.kind === 'hub') {
+          setActiveView(sci.category === 'Biology' ? 'tools/biology' : 'tools/chemistry');
+        } else {
+          setActiveView(sci.tool.viewKey);
+        }
+      } else if (
+        (decodedPath.startsWith('/tools/') && resolveStudentToolSlug(decodedPath)) ||
+        (hash.startsWith('#tools/') && resolveStudentToolSlug(hash))
+      ) {
+        const slug = (resolveStudentToolSlug(decodedPath) || resolveStudentToolSlug(hash))!;
+        setSelectedTutorProfile(null);
+        setActiveView(STUDENT_TOOLS_BY_SLUG[slug].viewKey);
       } else if (resolveDedicatedServiceRoute(decodedPath) || resolveDedicatedServiceRoute(hash)) {
         const matchedService = (resolveDedicatedServiceRoute(decodedPath) || resolveDedicatedServiceRoute(hash))!;
         setSelectedTutorProfile(null);
@@ -702,6 +825,36 @@ export default function App() {
         ) {
           e.preventDefault();
           handleNavigate('get-a-quote');
+        } else if (href === '/tools' || href === '#tools') {
+          e.preventDefault();
+          handleNavigate('tools');
+        } else if (
+          (href.startsWith('/tools/math') || href.startsWith('#tools/math') || href.includes('university-tutors.com/tools/math')) &&
+          resolveMathRoute(href)
+        ) {
+          e.preventDefault();
+          const mRoute = resolveMathRoute(href)!;
+          handleNavigate(mRoute.kind === 'hub' ? 'tools/math' : mRoute.tool.viewKey);
+        } else if (
+          (href.startsWith('/tools/') || href.startsWith('#tools/') || href.includes('university-tutors.com/tools/')) &&
+          resolveScienceRoute(href)
+        ) {
+          e.preventDefault();
+          const sci = resolveScienceRoute(href)!;
+          handleNavigate(
+            sci.kind === 'hub'
+              ? sci.category === 'Biology'
+                ? 'tools/biology'
+                : 'tools/chemistry'
+              : sci.tool.viewKey
+          );
+        } else if (
+          (href.startsWith('/tools/') || href.startsWith('#tools/') || href.includes('university-tutors.com/tools/')) &&
+          resolveStudentToolSlug(href)
+        ) {
+          e.preventDefault();
+          const slug = resolveStudentToolSlug(href)!;
+          handleNavigate(STUDENT_TOOLS_BY_SLUG[slug].viewKey);
         } else if (href === '/services' || href === '#services') {
           e.preventDefault();
           handleNavigate('services');
@@ -1398,6 +1551,24 @@ export default function App() {
             currentUser={storeState.currentUser}
             onNavigate={handleNavigate}
           />
+        ) : Boolean(resolveMathRoute(activeView)) ? (
+          <MathToolsRouter
+            route={resolveMathRoute(activeView)!}
+            onNavigate={handleNavigate}
+            onOpenBecomeTutor={() => setIsBecomeTutorOpen(true)}
+          />
+        ) : Boolean(resolveScienceRoute(activeView)) ? (
+          <ScienceToolsRouter
+            route={resolveScienceRoute(activeView)!}
+            onNavigate={handleNavigate}
+            onOpenBecomeTutor={() => setIsBecomeTutorOpen(true)}
+          />
+        ) : activeView === 'tools' || Boolean(resolveStudentToolSlug(activeView)) ? (
+          <ToolsHub
+            activeToolSlug={resolveStudentToolSlug(activeView)}
+            onNavigate={handleNavigate}
+            onOpenBecomeTutor={() => setIsBecomeTutorOpen(true)}
+          />
         ) : (
           /* Marketing Views (Home, Services, About Us, FAQs, Contact Form, Blog System) */
           <MarketingPages 
@@ -1444,12 +1615,16 @@ export default function App() {
       )}
 
       {/* 2. Footer (target flags, starting pricing, keyword no-follow links, academic disclaimers) */}
-      {activeView !== 'dashboard' && (
-        <Footer 
-          onNavigate={handleNavigate} 
-          onOpenBecomeTutor={() => setIsBecomeTutorOpen(true)}
-        />
-      )}
+      {activeView !== 'dashboard' &&
+        activeView !== 'tools' &&
+        !resolveMathRoute(activeView) &&
+        !resolveScienceRoute(activeView) &&
+        !resolveStudentToolSlug(activeView) && (
+          <Footer 
+            onNavigate={handleNavigate} 
+            onOpenBecomeTutor={() => setIsBecomeTutorOpen(true)}
+          />
+        )}
 
       {/* 3. Consent cookie banner disclosure */}
       <CookieBanner />
