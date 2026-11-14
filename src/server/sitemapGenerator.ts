@@ -10,6 +10,7 @@ import {
   STUDENT_TOOL_SLUGS,
 } from '../data/toolRouteMatchers';
 import { getBlogCanonicalSlug } from '../utils/blogSlug';
+import { assignUniqueTutorSlugs, getTutorCanonicalSlug } from '../utils/tutorSlug';
 
 export const SITEMAP_BASE_URL = 'https://university-tutors.com';
 export const SITEMAP_MAX_URLS_PER_FILE = 5000;
@@ -45,6 +46,7 @@ export interface SitemapBlogInput {
 export interface SitemapTutorInput {
   id: string;
   name?: string | null;
+  slug?: string | null;
   updatedAt?: string | Date | null;
   createdAt?: string | Date | null;
   suspended?: boolean | null;
@@ -84,12 +86,6 @@ export const ROBOTS_TXT_CONTENT = [
   'Disallow: /api/',
   'Disallow: /login',
   'Disallow: /signup',
-  'Disallow: /auth',
-  'Disallow: /reset-password',
-  'Disallow: /student/dashboard',
-  'Disallow: /tutor/dashboard',
-  'Disallow: /admin-login',
-  'Disallow: /user-data',
   '',
   `Sitemap: ${SITEMAP_BASE_URL}/sitemap.xml`,
   '',
@@ -307,16 +303,21 @@ export function buildAllSitemapEntries(params: {
     addRoute(`/blog/${encodeURIComponent(slug)}`, '0.8', 'weekly', lastmod);
   }
 
-  // 7. All Active Public Tutor Profiles (Database-driven)
-  for (const tutor of params.tutors) {
-    if (!tutor || !tutor.id) continue;
-    if (tutor.suspended === true) continue;
+  // 7. All Active Public Tutor Profiles (Database-driven, unique name-based slugs)
+  const eligibleTutors = params.tutors.filter((tutor) => {
+    if (!tutor || !tutor.id) return false;
+    if (tutor.suspended === true) return false;
     const statusLower = tutor.status ? String(tutor.status).toLowerCase() : '';
-    if (statusLower === 'suspended' || statusLower === 'rejected' || statusLower === 'pending') continue;
-    if (tutor.isApproved === false) continue;
+    if (statusLower === 'suspended' || statusLower === 'rejected' || statusLower === 'pending') return false;
+    if (tutor.isApproved === false) return false;
+    return true;
+  });
 
+  const tutorSlugMap = assignUniqueTutorSlugs(eligibleTutors);
+  for (const tutor of eligibleTutors) {
+    const slug = getTutorCanonicalSlug(tutor, tutorSlugMap);
     const lastmod = tutor.updatedAt || tutor.createdAt || undefined;
-    addRoute(`/tutor/${encodeURIComponent(String(tutor.id).trim())}`, '0.7', 'weekly', lastmod);
+    addRoute(`/tutor/${encodeURIComponent(slug)}`, '0.7', 'weekly', lastmod);
   }
 
   return Array.from(entryMap.values());

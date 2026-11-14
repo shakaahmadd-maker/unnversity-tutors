@@ -25,6 +25,7 @@ import {
   getFriendlyErrorMessage,
   SESSION_EXPIRED_EVENT,
 } from './apiClient';
+import { assignUniqueTutorSlugs, getTutorCanonicalSlug } from '../utils/tutorSlug';
 
 const TODAY_ISO = new Date().toISOString().split('T')[0];
 const TOMORROW_ISO = new Date(Date.now() + 86400000).toISOString().split('T')[0];
@@ -446,6 +447,27 @@ export class AppStore {
     return this.inFlightDirectoryLoad;
   }
 
+  public getTutorSlugMap(extraList?: User[]): Map<string, string> {
+    const source = extraList || this.users;
+    const tutorsOnly = source.filter(
+      (u) => u && (u.role === UserRole.TUTOR || String(u.id || '').startsWith('tutor'))
+    );
+    return assignUniqueTutorSlugs(tutorsOnly);
+  }
+
+  private applyTutorSlugsInPlace(): void {
+    const slugMap = this.getTutorSlugMap();
+    this.users = this.users.map((u) => {
+      if (u && (u.role === UserRole.TUTOR || String(u.id || '').startsWith('tutor'))) {
+        return {
+          ...u,
+          slug: getTutorCanonicalSlug(u, slugMap),
+        };
+      }
+      return u;
+    });
+  }
+
   public upsertTutorPreview(tutorRaw: any): User {
     const parsedSubs = this.parseSubjectField(
       tutorRaw?.subjectExpertise || tutorRaw?.subjects,
@@ -476,7 +498,11 @@ export class AppStore {
     } else {
       this.users = [normalized, ...this.users];
     }
-    return normalized;
+    this.applyTutorSlugsInPlace();
+    return this.users.find((u) => u.id === normalized.id) || {
+      ...normalized,
+      slug: getTutorCanonicalSlug(normalized),
+    };
   }
 
   public async loadTrendingTutorsFallback(): Promise<User[]> {
@@ -491,6 +517,7 @@ export class AppStore {
         if (!merged.has(t.id)) merged.set(t.id, t);
       }
       this.users = Array.from(merged.values());
+      this.applyTutorSlugsInPlace();
       this.trendingTutorsLoaded = true;
       this.notify();
     } catch {
@@ -651,6 +678,7 @@ export class AppStore {
     this.users = Array.from(mergedMap.values()).filter(
       (u: any) => u && u.deleted !== true && u.status !== 'deleted'
     );
+    this.applyTutorSlugsInPlace();
   }
 
   public applyRoomsData(rooms: any[]) {

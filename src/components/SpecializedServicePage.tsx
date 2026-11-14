@@ -12,7 +12,6 @@ import {
   ChevronRight,
   UserCheck,
   Award,
-  Globe2,
   FileCheck,
   Compass,
   Sparkles,
@@ -27,6 +26,7 @@ import {
 } from '../data/specializedTutoringServicesData';
 import { User } from '../types';
 import SEOKeywordLinksBlock from './SEOKeywordLinksBlock';
+import RegionalPortalBar from './RegionalPortalBar';
 import { ResponsiveAvatar } from './ResponsiveImage';
 
 interface SpecializedServicePageProps {
@@ -85,45 +85,21 @@ export default function SpecializedServicePage({
   return (
     <div className="min-h-screen bg-slate-50 font-sans text-slate-900" id={`service-page-${data.slug}`}>
       
-      {/* Top Country/Service Switcher Ribbon */}
-      <div className="bg-slate-900 text-white border-b border-slate-800 py-2 px-4 sticky top-20 z-30 shadow-md">
-        <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-2.5">
-          <div className="flex items-center gap-2 text-xs font-semibold text-slate-300">
-            <Globe2 className="w-4 h-4 text-orange-400" />
-            <span>Regional {data.category.replace('-', ' ').toUpperCase()} Portals:</span>
-          </div>
-          <div className="flex flex-wrap items-center justify-center gap-1.5">
-            <button
-              onClick={() => onNavigate(data.category)}
-              className={`px-2.5 py-0.5 rounded-full text-xs font-medium transition-all cursor-pointer ${
-                !data.countrySlug
-                  ? 'bg-orange-500 text-white font-bold'
-                  : 'bg-slate-800 text-slate-300 hover:bg-slate-700 hover:text-white'
-              }`}
-            >
-              🌐 Global
-            </button>
-            {data.countryExpansions.map((c) => {
-              const isSelected = c.slug === data.countrySlug;
-              return (
-                <button
-                  key={c.slug}
-                  id={`service-country-switch-${c.slug}`}
-                  onClick={() => onNavigate(`${data.category}-${c.slug}`)}
-                  className={`px-2.5 py-0.5 rounded-full text-xs font-medium transition-all cursor-pointer flex items-center gap-1 ${
-                    isSelected
-                      ? 'bg-orange-500 text-white font-bold shadow-xs'
-                      : 'bg-slate-800 text-slate-300 hover:bg-slate-700 hover:text-white'
-                  }`}
-                >
-                  <span>{c.flag}</span>
-                  <span>{c.name}</span>
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      </div>
+      {/* Top Country/Service Switcher Bar */}
+      <RegionalPortalBar
+        label={`Regional ${data.category.replace(/-/g, ' ').replace(/\b\w/g, (ch) => ch.toUpperCase())} Portals:`}
+        showGlobal={true}
+        isGlobalActive={!data.countrySlug}
+        onSelectGlobal={() => onNavigate(data.category)}
+        activeCountrySlug={data.countrySlug}
+        onSelectCountry={(slug) => onNavigate(`${data.category}-${slug}`)}
+        countries={data.countryExpansions.map((c) => ({
+          slug: c.slug,
+          name: c.name,
+          flag: c.flag,
+          id: `service-country-switch-${c.slug}`,
+        }))}
+      />
 
       {/* Hero Section */}
       <section className="bg-gradient-to-b from-[#fff8f2] via-[#fffbf7] to-slate-50 border-b border-orange-200/60 pt-10 pb-14 px-4 sm:px-6 lg:px-8">

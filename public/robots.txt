@@ -5,11 +5,5 @@ Disallow: /admin/
 Disallow: /api/
 Disallow: /login
 Disallow: /signup
-Disallow: /auth
-Disallow: /reset-password
-Disallow: /student/dashboard
-Disallow: /tutor/dashboard
-Disallow: /admin-login
-Disallow: /user-data
 
 Sitemap: https://university-tutors.com/sitemap.xml

@@ -118,11 +118,25 @@ export default function TutorsDirectoryPage({
   const [maxPrice, setMaxPrice] = useState<number>(MAX_PRICE_LIMIT);
   const [sortBy, setSortBy] = useState<'rating' | 'reviews' | 'price_low' | 'price_high'>('rating');
   const [currentPage, setCurrentPage] = useState<number>(1);
-  const [pageSize, setPageSize] = useState<number>(15);
+  const [pageSize, setPageSize] = useState<number>(0);
   const [showMobileFilters, setShowMobileFilters] = useState<boolean>(false);
+  const [isSmUp, setIsSmUp] = useState<boolean>(() =>
+    typeof window !== 'undefined' && typeof window.matchMedia === 'function'
+      ? window.matchMedia('(min-width: 640px)').matches
+      : true
+  );
   const [masterTutors, setMasterTutors] = useState<User[]>([]);
   const [isLoadingDirectory, setIsLoadingDirectory] = useState<boolean>(true);
   const [directoryError, setDirectoryError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return;
+    const mql = window.matchMedia('(min-width: 640px)');
+    setIsSmUp(mql.matches);
+    const handler = (e: MediaQueryListEvent) => setIsSmUp(e.matches);
+    mql.addEventListener('change', handler);
+    return () => mql.removeEventListener('change', handler);
+  }, []);
 
   const loadDirectoryData = async () => {
     setIsLoadingDirectory(true);
@@ -667,13 +681,33 @@ export default function TutorsDirectoryPage({
             
             {/* Results Status & Sorting Bar */}
             <div className="bg-white rounded-2xl p-4 border border-slate-200/80 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-              <div className="text-xs font-medium text-slate-600">
-                Showing <span className="font-bold text-slate-900">{sortedTutors.length}</span> verified tutors
-                {selectedCountry !== 'all' && (
-                  <span> in <strong className="text-[#FF7A00]">{activeCountryObj.label}</strong></span>
-                )}
-                {selectedSubject !== 'All Subjects' && (
-                  <span> for <strong className="text-[#FF7A00]">{selectedSubject}</strong></span>
+              <div className="flex flex-wrap items-center gap-2 text-xs font-medium text-slate-600">
+                <span>
+                  Showing{' '}
+                  <span className="font-bold text-slate-900">
+                    {paginatedTutors.length === sortedTutors.length
+                      ? sortedTutors.length
+                      : `${paginatedTutors.length} of ${sortedTutors.length}`}
+                  </span>{' '}
+                  verified tutors
+                  {selectedCountry !== 'all' && (
+                    <span> in <strong className="text-[#FF7A00]">{activeCountryObj.label}</strong></span>
+                  )}
+                  {selectedSubject !== 'All Subjects' && (
+                    <span> for <strong className="text-[#FF7A00]">{selectedSubject}</strong></span>
+                  )}
+                </span>
+                {pageSize !== 0 && sortedTutors.length > paginatedTutors.length && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setPageSize(0);
+                      setCurrentPage(1);
+                    }}
+                    className="compact-inline-link text-[11px] font-bold text-[#FF7A00] bg-orange-50 hover:bg-orange-100 border border-orange-200 px-2.5 py-1 rounded-lg cursor-pointer transition-colors"
+                  >
+                    Show All {sortedTutors.length} Tutors
+                  </button>
                 )}
               </div>
 
@@ -687,10 +721,10 @@ export default function TutorsDirectoryPage({
                   aria-label="Tutors displayed per page"
                   className="text-xs bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5 font-semibold text-slate-700 outline-none focus:border-[#FF7A00] cursor-pointer"
                 >
-                  <option value={15}>15 / page</option>
+                  <option value={0}>Show All ({sortedTutors.length})</option>
+                  <option value={25}>25 / page</option>
                   <option value={50}>50 / page</option>
                   <option value={100}>100 / page</option>
-                  <option value={0}>Show All ({sortedTutors.length})</option>
                 </select>
                 <span className="text-[11px] font-bold text-slate-400 uppercase">Sort by:</span>
                 <select
@@ -719,9 +753,26 @@ export default function TutorsDirectoryPage({
             ) : (
             <div className="space-y-5">
               {paginatedTutors.map((tutor) => {
-                const subjectsList = Array.isArray(tutor.subjectExpertise) && tutor.subjectExpertise.length > 0
-                  ? tutor.subjectExpertise
-                  : (Array.isArray(tutor.subjects) ? tutor.subjects : []);
+                const parseSubjectsArr = (val: unknown): string[] => {
+                  if (Array.isArray(val)) return val.map(String).map((s) => s.trim()).filter(Boolean);
+                  if (typeof val === 'string') {
+                    const t = val.trim();
+                    if (!t) return [];
+                    if (t.startsWith('[')) {
+                      try {
+                        const parsed = JSON.parse(t);
+                        if (Array.isArray(parsed)) return parsed.map(String).map((s) => s.trim()).filter(Boolean);
+                      } catch {
+                        // fallback to comma split
+                      }
+                    }
+                    return t.split(',').map((s) => s.replace(/^[\["']+|[\]"']+$/g, '').trim()).filter(Boolean);
+                  }
+                  return [];
+                };
+                const expArr = parseSubjectsArr(tutor.subjectExpertise);
+                const subArr = parseSubjectsArr(tutor.subjects);
+                const subjectsList = expArr.length > 0 ? expArr : subArr;
 
                 const countryName = (tutor as any).countryName || tutor.location || 'USA';
                 const flagEmoji = COUNTRY_OPTIONS.find(c => c.value === countryName || c.code === tutor.country)?.flag || '🌍';
@@ -741,7 +792,6 @@ export default function TutorsDirectoryPage({
 
                 const rate = tutor.hourlyRate || 166;
                 const parsedEdu = parseEducationDetails(tutor.education);
-                const verificationBanner = 'Verified Degree & Background';
                 const bioSnippet = tutor.experience || tutor.bio || (tutor as any).experienceSummary || 'Certified information security analyst training students in vulnerability assessments, encryption math, and network architecture.';
                 
                 // Top expertise topics (fallback to realistic topics if subjectsList is empty)
@@ -753,9 +803,10 @@ export default function TutorsDirectoryPage({
                 const canMeetText = tutor.canMeet || '1-on-1 Worldwide Interactive';
 
                 return (
-                  <div key={tutor.id}>
-                    {/* ================= MOBILE VIEW CARD (Exact Redesign) ================= */}
-                    <div className="block sm:hidden bg-white rounded-3xl p-4 shadow-sm border border-slate-150 relative transition-all duration-200 hover:shadow-md">
+                  <div key={tutor.id} className="tutor-directory-card">
+                    {!isSmUp ? (
+                    /* ================= MOBILE VIEW CARD (Exact Redesign) ================= */
+                    <div className="bg-white rounded-3xl p-4 shadow-sm border border-slate-150 relative transition-all duration-200 hover:shadow-md">
                       
                       {/* Top Row: Avatar + Info + Rate */}
                       <div className="flex items-start gap-3.5">
@@ -897,9 +948,9 @@ export default function TutorsDirectoryPage({
                         </button>
                       </div>
                     </div>
-
-                    {/* ================= DESKTOP VIEW CARD ================= */}
-                    <div className="hidden sm:block bg-white rounded-3xl p-6 sm:p-7 border border-slate-200/80 shadow-xs hover:shadow-md hover:border-orange-200 transition-all space-y-5">
+                    ) : (
+                    /* ================= DESKTOP VIEW CARD ================= */
+                    <div className="bg-white rounded-3xl p-6 sm:p-7 border border-slate-200/80 shadow-xs hover:shadow-md hover:border-orange-200 transition-all space-y-5">
                       <div className="flex flex-col sm:flex-row items-start gap-5">
                         
                         {/* Avatar with Verified Status */}
@@ -1061,6 +1112,7 @@ export default function TutorsDirectoryPage({
 
                       </div>
                     </div>
+                    )}
                   </div>
                 );
               })}

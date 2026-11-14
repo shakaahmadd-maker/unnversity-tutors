@@ -27,6 +27,12 @@ import {
   SitemapTutorInput,
 } from './src/server/sitemapGenerator';
 import { matchesBlogSlugOrId } from './src/utils/blogSlug';
+import {
+  assignUniqueTutorSlugs,
+  getTutorCanonicalSlug,
+  matchesTutorSlugOrId,
+  withAssignedTutorSlugs,
+} from './src/utils/tutorSlug';
 
 // Bundler-safe runtime environment reader: reads strictly from process['env'] at runtime (zero hardcoded fallbacks)
 export function readRuntimeEnv(key: string): string {
@@ -3999,19 +4005,6 @@ export async function createApp(options: CreateAppOptions = {}) {
     });
   };
 
-  const slugifyTutorIdentifier = (value: string): string =>
-    String(value || '')
-      .toLowerCase()
-      .replace(/^(?:(?:dr|prof|mr|ms|mrs)\.?\s+)+/i, '')
-      .replace(/[^a-z0-9]+/g, '-')
-      .replace(/^-+|-+$/g, '');
-
-  const slugifyRawString = (value: string): string =>
-    String(value || '')
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, '-')
-      .replace(/^-+|-+$/g, '');
-
   // GET /api/users - role-scoped, paginated user directory
   // Admins/subadmins receive all roles (students, tutors, admins) paginated;
   // Unauthenticated / student / tutor callers receive ONLY public approved tutors (+ own self record if logged in).
@@ -4209,16 +4202,28 @@ export async function createApp(options: CreateAppOptions = {}) {
         });
       }
 
+      const tutorCandidatesForSlugs = resultUsers.filter(
+        (u) => u && (u.role === 'tutor' || String(u.id || '').startsWith('tutor'))
+      );
+      const userTutorSlugMap = assignUniqueTutorSlugs(tutorCandidatesForSlugs);
+
       const total = resultUsers.length;
       const offset = (page - 1) * limit;
       const paginated = resultUsers.slice(offset, offset + limit).map((u) => {
-        if (u?.avatarUrl && typeof u.avatarUrl === 'string' && !u.avatarVariants) {
-          const meta = buildAvatarVariantMetadata(u.avatarUrl);
+        let enriched = u;
+        if (u && (u.role === 'tutor' || String(u.id || '').startsWith('tutor'))) {
+          enriched = {
+            ...enriched,
+            slug: getTutorCanonicalSlug(enriched, userTutorSlugMap),
+          };
+        }
+        if (enriched?.avatarUrl && typeof enriched.avatarUrl === 'string' && !enriched.avatarVariants) {
+          const meta = buildAvatarVariantMetadata(enriched.avatarUrl);
           if (meta) {
-            return { ...u, ...meta };
+            return { ...enriched, ...meta };
           }
         }
-        return u;
+        return enriched;
       });
 
       return res.status(200).json({
@@ -4238,8 +4243,203 @@ export async function createApp(options: CreateAppOptions = {}) {
     }
   });
 
+  const loadMergedPublicTutorCatalog = async (opts?: { activeOnly?: boolean }) => {
+    const activeOnly = Boolean(opts?.activeOnly);
+    const tutorMap = new Map<string, any>();
+
+    // 1. Trending 500 Master Tutors dataset (with searchableKeywords)
+    for (const t of TRENDING_TUTORS_500) {
+      tutorMap.set(t.id, { ...t });
+    }
+
+    // 2. Curated specialized faculty & initial seed tutors
+    for (const ct of CURATED_SPECIALIZED_TUTORS) {
+      if (!tutorMap.has(ct.id)) {
+        tutorMap.set(ct.id, { ...ct, role: 'tutor' });
+      }
+    }
+
+    for (const t of SEED_TUTORS) {
+      const { passwordHash: _, ...safeT } = t as any;
+      tutorMap.set(t.id, safeT);
+    }
+
+    // 3. Disk persisted updates for tutors
+    const persistedUpdates = getPersistedUserUpdates();
+    for (const [uId, uUpdates] of Object.entries(persistedUpdates)) {
+      if (tutorMap.has(uId)) {
+        tutorMap.set(uId, { ...tutorMap.get(uId), ...uUpdates });
+      } else if ((uUpdates as any)?.role === 'tutor' || uId.startsWith('tutor')) {
+        tutorMap.set(uId, { id: uId, role: 'tutor', ...uUpdates });
+      }
+    }
+
+    // 4. In-memory / dynamic tutors
+    const dbAndRegisteredIds = new Set<string>(SEED_TUTORS.map((s) => s.id));
+    for (const u of memoryStore.getAllUsers()) {
+      if (u.role === 'tutor' || u.id.startsWith('tutor_') || u.id.startsWith('tutor-') || u.hourlyRate) {
+        const { passwordHash: _, ...safeU } = u as any;
+        tutorMap.set(u.id, { ...(tutorMap.get(u.id) || {}), ...safeU });
+        dbAndRegisteredIds.add(u.id);
+      }
+    }
+
+    // 5. Database persisted tutors from users table (where role = 'tutor') and tutors table
+    if (isDbConnected() && db) {
+      try {
+        const dbTutorUsers = await withDbTimeout(
+          db.select().from(users).where(eq(users.role, 'tutor')),
+          8000,
+          'Select tutor users in loadMergedPublicTutorCatalog'
+        );
+        for (const du of dbTutorUsers) {
+          const { passwordHash: _, ...safeDu } = du as any;
+          tutorMap.set(du.id, { ...(tutorMap.get(du.id) || {}), ...safeDu, role: 'tutor' });
+          dbAndRegisteredIds.add(du.id);
+        }
+      } catch (dbUserErr) {
+        console.warn('[API] Notice querying users(role=tutor):', dbUserErr);
+      }
+
+      try {
+        const dbTutorsList = await withDbTimeout(
+          db.select().from(tutors),
+          8000,
+          'Select tutors table in loadMergedPublicTutorCatalog'
+        );
+        for (const t of dbTutorsList) {
+          const existing = tutorMap.get(t.id) || {};
+          const expArr = parseSubjectsListServer(t.subjectExpertise, t.primarySubject);
+          tutorMap.set(t.id, {
+            ...existing,
+            id: t.id,
+            name: t.name || existing.name,
+            tutorTier: t.tier || existing.tutorTier,
+            tier: t.tier || existing.tier,
+            country: t.country || existing.country,
+            countryFull: t.country || existing.countryFull,
+            location: t.cityLocation || existing.location,
+            cityLocation: t.cityLocation || existing.cityLocation,
+            rating: t.rating || existing.rating || 4.9,
+            reviewsCount: t.reviewsCount ?? existing.reviewsCount ?? existing.reviewCount ?? 0,
+            reviewCount: t.reviewsCount ?? existing.reviewCount ?? existing.reviewsCount ?? 0,
+            hourlyRate: t.hourlyRate ?? existing.hourlyRate,
+            primarySubject: t.primarySubject || existing.primarySubject,
+            subjectExpertise: expArr,
+            subjects: expArr,
+            searchableKeywords: t.searchableKeywords || existing.searchableKeywords,
+            education: t.education || existing.education,
+            experience: t.experienceSummary || existing.experience,
+            experienceSummary: t.experienceSummary || existing.experienceSummary,
+            bio: existing.bio || t.experienceSummary,
+            availability: t.availability || existing.availability,
+            canMeet: t.canMeet || existing.canMeet,
+            hobbies: t.hobbies || existing.hobbies,
+            verificationStatus: t.verificationStatus || existing.verificationStatus,
+            isVerified: true,
+            isApproved: existing.isApproved !== undefined ? existing.isApproved : true,
+            status: existing.status || 'approved',
+            avatarUrl: t.profileImageUrl || existing.avatarUrl,
+            profileImageUrl: t.profileImageUrl || existing.profileImageUrl,
+            createdAt: t.createdAt || existing.createdAt,
+            role: 'tutor',
+          });
+          dbAndRegisteredIds.add(t.id);
+        }
+      } catch (dbErr) {
+        console.warn('[API] Notice querying tutors table:', dbErr);
+      }
+    }
+
+    let preparedTutors = Array.from(tutorMap.values())
+      .filter((t) => t && t.deleted !== true && t.status !== 'deleted')
+      .map((t) => {
+        const { passwordHash: _, email: _e, phoneNumber: _p, ...publicT } = t;
+        const expArr = parseSubjectsListServer(
+          publicT.subjectExpertise || publicT.subjects,
+          publicT.primarySubject
+        );
+        return {
+          ...publicT,
+          role: 'tutor',
+          subjects: expArr,
+          subjectExpertise: expArr,
+          primarySubject: publicT.primarySubject || expArr[0] || 'Academic Mentorship',
+          reviewCount: publicT.reviewCount ?? publicT.reviewsCount ?? 100,
+          reviewsCount: publicT.reviewsCount ?? publicT.reviewCount ?? 100,
+          location: publicT.location || publicT.cityLocation || publicT.city || 'Miami, FL',
+          experience: publicT.experience || publicT.experienceSummary || publicT.bio || '',
+          availability: publicT.availability || publicT.availabilities || 'Flexible global scheduling',
+        };
+      });
+
+    if (activeOnly) {
+      preparedTutors = preparedTutors.filter((t) => {
+        if (t.suspended === true || t.status === 'suspended' || t.status === 'rejected') return false;
+        if (t.isApproved === false || t.status === 'pending') return false;
+        return true;
+      });
+      preparedTutors.sort((a, b) => {
+        const aCore = dbAndRegisteredIds.has(a.id) ? 1 : 0;
+        const bCore = dbAndRegisteredIds.has(b.id) ? 1 : 0;
+        if (aCore !== bCore) return bCore - aCore;
+        return (Number(b.rating) || 4.9) - (Number(a.rating) || 4.9);
+      });
+    }
+
+    // STRICT ZERO DUPLICATES ENFORCEMENT: Deduplicate by composite key: (name, primarySubject, cityLocation)
+    const uniqueCompositeMap = new Map<string, any>();
+    const rawIdToCompositeKey = new Map<string, string>();
+    for (const t of preparedTutors) {
+      const cName = (t.name || '').trim().toLowerCase();
+      const cSub = (t.primarySubject || (Array.isArray(t.subjectExpertise) ? t.subjectExpertise[0] : '') || '')
+        .trim()
+        .toLowerCase();
+      const cLoc = (t.cityLocation || t.location || '').trim().toLowerCase();
+      const compositeKey = `${cName}|${cSub}|${cLoc}`;
+      rawIdToCompositeKey.set(String(t.id), compositeKey);
+      if (!uniqueCompositeMap.has(compositeKey)) {
+        uniqueCompositeMap.set(compositeKey, t);
+      } else {
+        const existing = uniqueCompositeMap.get(compositeKey);
+        if (t.avatarUrl?.includes('/uploads/avatars/') && !existing.avatarUrl?.includes('/uploads/avatars/')) {
+          uniqueCompositeMap.set(compositeKey, t);
+        }
+      }
+    }
+
+    const deduplicated = Array.from(uniqueCompositeMap.values());
+    const slugMap = assignUniqueTutorSlugs(deduplicated);
+    const allTutors = withAssignedTutorSlugs(deduplicated);
+
+    const canonicalByCompositeKey = new Map<string, any>();
+    for (const t of allTutors) {
+      const cName = (t.name || '').trim().toLowerCase();
+      const cSub = (t.primarySubject || (Array.isArray(t.subjectExpertise) ? t.subjectExpertise[0] : '') || '')
+        .trim()
+        .toLowerCase();
+      const cLoc = (t.cityLocation || t.location || '').trim().toLowerCase();
+      canonicalByCompositeKey.set(`${cName}|${cSub}|${cLoc}`, t);
+    }
+
+    const canonicalByRawId = new Map<string, any>();
+    for (const [rawId, compKey] of rawIdToCompositeKey.entries()) {
+      const canonical = canonicalByCompositeKey.get(compKey);
+      if (canonical) {
+        canonicalByRawId.set(rawId, canonical);
+        canonicalByRawId.set(rawId.toLowerCase(), canonical);
+      }
+    }
+
+    return {
+      allTutors,
+      slugMap,
+      canonicalByRawId,
+    };
+  };
+
   // GET /api/tutors
-  // Public directory search with CORS, searchable keywords matching, and zero duplicates
+  // Public directory search with CORS, searchable keywords matching, unique name-based slugs, and zero duplicates
   app.get('/api/tutors', async (req, res) => {
     try {
       res.setHeader('Access-Control-Allow-Origin', '*');
@@ -4255,165 +4455,8 @@ export async function createApp(options: CreateAppOptions = {}) {
         ? Math.min(5000, Math.max(1, parseInt(req.query.limit as string, 10) || 1000))
         : 1000;
 
-      const tutorMap = new Map<string, any>();
-
-      // 1. Trending 500 Master Tutors dataset (with searchableKeywords)
-      for (const t of TRENDING_TUTORS_500) {
-        tutorMap.set(t.id, { ...t });
-      }
-
-      // 2. Curated specialized faculty & initial seed tutors
-      for (const ct of CURATED_SPECIALIZED_TUTORS) {
-        if (!tutorMap.has(ct.id)) {
-          tutorMap.set(ct.id, { ...ct, role: 'tutor' });
-        }
-      }
-
-      for (const t of SEED_TUTORS) {
-        const { passwordHash: _, ...safeT } = t as any;
-        tutorMap.set(t.id, safeT);
-      }
-
-      // 3. Disk persisted updates for tutors
-      const persistedUpdates = getPersistedUserUpdates();
-      for (const [uId, uUpdates] of Object.entries(persistedUpdates)) {
-        if (tutorMap.has(uId)) {
-          tutorMap.set(uId, { ...tutorMap.get(uId), ...uUpdates });
-        } else if ((uUpdates as any)?.role === 'tutor' || uId.startsWith('tutor')) {
-          tutorMap.set(uId, { id: uId, role: 'tutor', ...uUpdates });
-        }
-      }
-
-      // 4. In-memory / dynamic tutors
-      const dbAndRegisteredIds = new Set<string>(SEED_TUTORS.map((s) => s.id));
-      for (const u of memoryStore.getAllUsers()) {
-        if (u.role === 'tutor' || u.id.startsWith('tutor_') || u.id.startsWith('tutor-') || u.hourlyRate) {
-          const { passwordHash: _, ...safeU } = u as any;
-          tutorMap.set(u.id, { ...(tutorMap.get(u.id) || {}), ...safeU });
-          dbAndRegisteredIds.add(u.id);
-        }
-      }
-
-      // 5. Database persisted tutors from users table (where role = 'tutor') and tutors table
-      if (isDbConnected() && db) {
-        try {
-          const dbTutorUsers = await withDbTimeout(
-            db.select().from(users).where(eq(users.role, 'tutor')),
-            8000,
-            'Select tutor users in /api/tutors'
-          );
-          for (const du of dbTutorUsers) {
-            const { passwordHash: _, ...safeDu } = du as any;
-            tutorMap.set(du.id, { ...(tutorMap.get(du.id) || {}), ...safeDu, role: 'tutor' });
-            dbAndRegisteredIds.add(du.id);
-          }
-        } catch (dbUserErr) {
-          console.warn('[API] Notice querying users(role=tutor) in /api/tutors:', dbUserErr);
-        }
-
-        try {
-          const dbTutorsList = await withDbTimeout(
-            db.select().from(tutors),
-            8000,
-            'Select tutors table in /api/tutors'
-          );
-          for (const t of dbTutorsList) {
-            const existing = tutorMap.get(t.id) || {};
-            const expArr = parseSubjectsListServer(t.subjectExpertise, t.primarySubject);
-            tutorMap.set(t.id, {
-              ...existing,
-              id: t.id,
-              name: t.name || existing.name,
-              tutorTier: t.tier || existing.tutorTier,
-              tier: t.tier || existing.tier,
-              country: t.country || existing.country,
-              countryFull: t.country || existing.countryFull,
-              location: t.cityLocation || existing.location,
-              cityLocation: t.cityLocation || existing.cityLocation,
-              rating: t.rating || existing.rating || 4.9,
-              reviewsCount: t.reviewsCount ?? existing.reviewsCount ?? existing.reviewCount ?? 0,
-              reviewCount: t.reviewsCount ?? existing.reviewCount ?? existing.reviewsCount ?? 0,
-              hourlyRate: t.hourlyRate ?? existing.hourlyRate,
-              primarySubject: t.primarySubject || existing.primarySubject,
-              subjectExpertise: expArr,
-              subjects: expArr,
-              searchableKeywords: t.searchableKeywords || existing.searchableKeywords,
-              education: t.education || existing.education,
-              experience: t.experienceSummary || existing.experience,
-              experienceSummary: t.experienceSummary || existing.experienceSummary,
-              bio: existing.bio || t.experienceSummary,
-              availability: t.availability || existing.availability,
-              canMeet: t.canMeet || existing.canMeet,
-              hobbies: t.hobbies || existing.hobbies,
-              verificationStatus: t.verificationStatus || existing.verificationStatus,
-              isVerified: true,
-              isApproved: existing.isApproved !== undefined ? existing.isApproved : true,
-              status: existing.status || 'approved',
-              avatarUrl: t.profileImageUrl || existing.avatarUrl,
-              profileImageUrl: t.profileImageUrl || existing.profileImageUrl,
-              role: 'tutor',
-            });
-            dbAndRegisteredIds.add(t.id);
-          }
-        } catch (dbErr) {
-          console.warn('[API] Notice querying tutors table in /api/tutors:', dbErr);
-        }
-      }
-
-      let allTutors = Array.from(tutorMap.values())
-        .filter((t) => t && t.deleted !== true && t.status !== 'deleted')
-        .map((t) => {
-          const { passwordHash: _, email: _e, phoneNumber: _p, ...publicT } = t;
-          const expArr = parseSubjectsListServer(
-            publicT.subjectExpertise || publicT.subjects,
-            publicT.primarySubject
-          );
-          return {
-            ...publicT,
-            role: 'tutor',
-            subjects: expArr,
-            subjectExpertise: expArr,
-            primarySubject: publicT.primarySubject || expArr[0] || 'Academic Mentorship',
-            reviewCount: publicT.reviewCount ?? publicT.reviewsCount ?? 100,
-            reviewsCount: publicT.reviewsCount ?? publicT.reviewCount ?? 100,
-            location: publicT.location || publicT.cityLocation || publicT.city || 'Miami, FL',
-            experience: publicT.experience || publicT.experienceSummary || publicT.bio || '',
-          };
-        });
-
-      if (activeOnly) {
-        allTutors = allTutors.filter((t) => {
-          if (t.suspended === true || t.status === 'suspended' || t.status === 'rejected') return false;
-          if (t.isApproved === false || t.status === 'pending') return false;
-          return true;
-        });
-        // Put verified/registered/DB tutors first while keeping rating order cleanly balanced
-        allTutors.sort((a, b) => {
-          const aCore = dbAndRegisteredIds.has(a.id) ? 1 : 0;
-          const bCore = dbAndRegisteredIds.has(b.id) ? 1 : 0;
-          if (aCore !== bCore) return bCore - aCore;
-          return (Number(b.rating) || 4.9) - (Number(a.rating) || 4.9);
-        });
-      }
-
-      // STRICT ZERO DUPLICATES ENFORCEMENT: Deduplicate by composite key: (name, primarySubject, cityLocation)
-      const uniqueCompositeMap = new Map<string, any>();
-      for (const t of allTutors) {
-        const cName = (t.name || '').trim().toLowerCase();
-        const cSub = (t.primarySubject || (Array.isArray(t.subjectExpertise) ? t.subjectExpertise[0] : '') || '').trim().toLowerCase();
-        const cLoc = (t.cityLocation || t.location || '').trim().toLowerCase();
-        const compositeKey = `${cName}|${cSub}|${cLoc}`;
-        if (!uniqueCompositeMap.has(compositeKey)) {
-          uniqueCompositeMap.set(compositeKey, t);
-        } else {
-          // If a version with a persistent upload URL exists, prefer it
-          const existing = uniqueCompositeMap.get(compositeKey);
-          if (t.avatarUrl?.includes('/uploads/avatars/') && !existing.avatarUrl?.includes('/uploads/avatars/')) {
-            uniqueCompositeMap.set(compositeKey, t);
-          }
-        }
-      }
-      allTutors = Array.from(uniqueCompositeMap.values());
+      const { allTutors: baseTutors } = await loadMergedPublicTutorCatalog({ activeOnly });
+      let allTutors = baseTutors;
 
       // Filter by country (code or name)
       if (countryQuery && countryQuery !== 'all') {
@@ -4483,133 +4526,30 @@ export async function createApp(options: CreateAppOptions = {}) {
   });
 
   // GET /api/tutors/:id
-  // Retrieves a single tutor profile by ID or slug with authoritative persistence guarantees
+  // Retrieves a single tutor profile by canonical name slug (including -2, -3 disambiguators) or legacy ID
   app.get('/api/tutors/:id', async (req, res) => {
     try {
       res.setHeader('Access-Control-Allow-Origin', '*');
       res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
       const rawParam = decodeURIComponent(req.params.id || '').trim();
       const lowerParam = rawParam.toLowerCase();
-      const paramSlug = slugifyTutorIdentifier(rawParam);
-      const rawSlug = slugifyRawString(rawParam);
 
-      const matchesCandidate = (candidate: any): boolean => {
-        if (!candidate) return false;
-        const cid = String(candidate.id || '').trim();
-        if (cid === rawParam || cid.toLowerCase() === lowerParam) return true;
-        if (rawSlug && slugifyRawString(cid) === rawSlug) return true;
-        if (candidate.name) {
-          if (paramSlug && slugifyTutorIdentifier(candidate.name) === paramSlug) return true;
-          if (rawSlug && slugifyRawString(candidate.name) === rawSlug) return true;
-        }
-        return false;
-      };
+      const { allTutors, slugMap, canonicalByRawId } = await loadMergedPublicTutorCatalog({
+        activeOnly: false,
+      });
 
-      let tutorRecord: any = null;
+      // Priority 1: Exact canonical slug match (handles duplicate-name suffixes like -2, -3 accurately)
+      let matchedTutor =
+        allTutors.find((t) => t.slug === lowerParam) ||
+        canonicalByRawId.get(rawParam) ||
+        canonicalByRawId.get(lowerParam) ||
+        allTutors.find((t) => matchesTutorSlugOrId(t, rawParam, slugMap));
 
-      // 1. Check static & curated datasets
-      const trending =
-        TRENDING_TUTORS_500.find((t) => t.id === rawParam) ||
-        TRENDING_TUTORS_500.find(matchesCandidate);
-      if (trending) tutorRecord = { ...trending };
-
-      const curated =
-        CURATED_SPECIALIZED_TUTORS.find((t) => t.id === rawParam) ||
-        CURATED_SPECIALIZED_TUTORS.find(matchesCandidate);
-      if (curated) tutorRecord = { ...(tutorRecord || {}), ...curated };
-
-      const seed =
-        SEED_TUTORS.find((t) => t.id === rawParam) ||
-        SEED_TUTORS.find(matchesCandidate);
-      if (seed) tutorRecord = { ...(tutorRecord || {}), ...seed };
-
-      const resolvedId = tutorRecord?.id || rawParam;
-
-      // 2. Memory store
-      const memUser =
-        memoryStore.getUser(resolvedId) ||
-        memoryStore.getAllUsers().find((u) => (u.role === 'tutor' || u.id.startsWith('tutor')) && matchesCandidate(u));
-      if (memUser) tutorRecord = { ...(tutorRecord || {}), ...memUser };
-
-      const finalId = tutorRecord?.id || resolvedId;
-
-      // 3. Disk persisted updates
-      const persisted = getPersistedUserUpdates();
-      if (persisted[finalId]) {
-        tutorRecord = { ...(tutorRecord || {}), ...persisted[finalId] };
+      if (!matchedTutor || matchedTutor.deleted === true || matchedTutor.status === 'deleted') {
+        return res.status(404).json({ error: `Tutor "${rawParam}" not found.` });
       }
 
-      // 4. PostgreSQL database (users table + tutors table)
-      if (isDbConnected() && db) {
-        try {
-          const userRows = await db.select().from(users).where(eq(users.id, finalId)).limit(1);
-          if (userRows.length > 0) {
-            const { passwordHash: _, ...safeDbUser } = userRows[0] as any;
-            tutorRecord = { ...(tutorRecord || {}), ...safeDbUser };
-          }
-        } catch (dbUserErr: any) {
-          console.warn('[API] DB notice fetching tutor from users by ID:', dbUserErr.message);
-        }
-
-        try {
-          const dbRows = await db.select().from(tutors).where(eq(tutors.id, finalId)).limit(1);
-          if (dbRows.length > 0) {
-            const dbT = dbRows[0];
-            const expArr = parseSubjectsListServer(dbT.subjectExpertise, dbT.primarySubject);
-            tutorRecord = {
-              ...(tutorRecord || {}),
-              id: dbT.id,
-              name: dbT.name,
-              tutorTier: dbT.tier,
-              tier: dbT.tier,
-              country: dbT.country,
-              location: dbT.cityLocation,
-              cityLocation: dbT.cityLocation,
-              rating: dbT.rating || 4.9,
-              reviewsCount: dbT.reviewsCount || 0,
-              reviewCount: dbT.reviewsCount || tutorRecord?.reviewCount || 100,
-              hourlyRate: dbT.hourlyRate,
-              primarySubject: dbT.primarySubject,
-              subjectExpertise: expArr,
-              subjects: expArr,
-              searchableKeywords: dbT.searchableKeywords,
-              education: dbT.education,
-              experience: dbT.experienceSummary,
-              experienceSummary: dbT.experienceSummary,
-              bio: tutorRecord?.bio || dbT.experienceSummary,
-              availability: dbT.availability,
-              canMeet: dbT.canMeet,
-              hobbies: dbT.hobbies,
-              verificationStatus: dbT.verificationStatus,
-              isVerified: true,
-              avatarUrl: dbT.profileImageUrl || tutorRecord?.avatarUrl,
-              profileImageUrl: dbT.profileImageUrl || tutorRecord?.profileImageUrl,
-              role: 'tutor',
-            };
-          }
-        } catch (dbErr: any) {
-          console.warn('[API] DB error fetching tutor by ID:', dbErr.message);
-        }
-      }
-
-      if (!tutorRecord || tutorRecord.deleted === true || tutorRecord.status === 'deleted') {
-        return res.status(404).json({ error: `Tutor with ID "${rawParam}" not found.` });
-      }
-
-      const { passwordHash: _, email: _e, phoneNumber: _p, ...safeTutor } = tutorRecord;
-      const normalizedSubjects = parseSubjectsListServer(
-        safeTutor.subjectExpertise || safeTutor.subjects,
-        safeTutor.primarySubject
-      );
-      safeTutor.role = 'tutor';
-      safeTutor.subjects = normalizedSubjects;
-      safeTutor.subjectExpertise = normalizedSubjects;
-      safeTutor.primarySubject = safeTutor.primarySubject || normalizedSubjects[0] || 'Academic Mentorship';
-      safeTutor.reviewCount = safeTutor.reviewCount ?? safeTutor.reviewsCount ?? 120;
-      safeTutor.reviewsCount = safeTutor.reviewsCount ?? safeTutor.reviewCount ?? 120;
-      safeTutor.location = safeTutor.location || safeTutor.cityLocation || safeTutor.city || 'Miami, FL';
-      safeTutor.experience = safeTutor.experience || safeTutor.experienceSummary || safeTutor.bio || '';
-      safeTutor.availability = safeTutor.availability || safeTutor.availabilities || 'Flexible global scheduling';
+      const safeTutor = { ...matchedTutor };
       if (safeTutor.avatarUrl && typeof safeTutor.avatarUrl === 'string' && !safeTutor.avatarVariants) {
         const meta = buildAvatarVariantMetadata(safeTutor.avatarUrl);
         if (meta) {
@@ -7687,139 +7627,15 @@ export async function createApp(options: CreateAppOptions = {}) {
       }
     }
 
-    // 2. Collect all active, approved public tutor profiles (matching /api/tutors precedence & deduplication)
-    const tutorMap = new Map<string, any>();
-    for (const t of TRENDING_TUTORS_500) {
-      tutorMap.set(t.id, { ...t });
-    }
-    for (const t of SEED_TUTORS) {
-      const { passwordHash: _, ...safeT } = t as any;
-      tutorMap.set(t.id, safeT);
-    }
-
-    const persistedUpdates = getPersistedUserUpdates();
-    for (const [uId, uUpdates] of Object.entries(persistedUpdates)) {
-      if (tutorMap.has(uId)) {
-        tutorMap.set(uId, { ...tutorMap.get(uId), ...uUpdates });
-      }
-    }
-
-    for (const u of memoryStore.getAllUsers()) {
-      if (u.role === 'tutor' || u.id.startsWith('tutor_') || u.id.startsWith('tutor-') || u.hourlyRate) {
-        const { passwordHash: _, ...safeU } = u as any;
-        tutorMap.set(u.id, { ...(tutorMap.get(u.id) || {}), ...safeU });
-      }
-    }
-
-    if (isDbConnected() && db) {
-      try {
-        const dbTutorUsers = await withDbTimeout(
-          db.select({
-            id: users.id,
-            name: users.name,
-            role: users.role,
-            suspended: users.suspended,
-            isApproved: users.isApproved,
-            status: users.status,
-            location: users.location,
-            subjects: users.subjects,
-            avatarUrl: users.avatarUrl,
-            createdAt: users.createdAt,
-          }).from(users).where(eq(users.role, 'tutor')),
-          8000,
-          'Sitemap query tutor users'
-        );
-        for (const u of dbTutorUsers) {
-          let parsedSub = '';
-          try {
-            const arr = u.subjects ? JSON.parse(u.subjects) : [];
-            if (Array.isArray(arr) && arr[0]) parsedSub = String(arr[0]);
-          } catch {
-            parsedSub = u.subjects || '';
-          }
-          tutorMap.set(u.id, {
-            ...(tutorMap.get(u.id) || {}),
-            id: u.id,
-            name: u.name,
-            role: u.role,
-            suspended: u.suspended,
-            isApproved: u.isApproved,
-            status: u.status,
-            location: u.location || tutorMap.get(u.id)?.location,
-            primarySubject: tutorMap.get(u.id)?.primarySubject || parsedSub,
-            avatarUrl: u.avatarUrl || tutorMap.get(u.id)?.avatarUrl,
-            createdAt: u.createdAt,
-          });
-        }
-      } catch (err: any) {
-        console.warn('[SITEMAP] Notice querying tutor users from DB:', err?.message || err);
-      }
-
-      try {
-        const dbTutorsRows = await withDbTimeout(
-          db.select().from(tutors),
-          8000,
-          'Sitemap query tutors table'
-        );
-        for (const t of dbTutorsRows) {
-          tutorMap.set(t.id, {
-            ...(tutorMap.get(t.id) || {}),
-            id: t.id,
-            name: t.name,
-            primarySubject: t.primarySubject,
-            cityLocation: t.cityLocation,
-            location: t.cityLocation,
-            avatarUrl: t.profileImageUrl,
-            isApproved: tutorMap.get(t.id)?.isApproved ?? true,
-            suspended: tutorMap.get(t.id)?.suspended ?? false,
-            status: tutorMap.get(t.id)?.status || 'approved',
-            createdAt: t.createdAt,
-          });
-        }
-      } catch (err: any) {
-        console.warn('[SITEMAP] Notice querying tutors table from DB:', err?.message || err);
-      }
-    }
-
-    // Filter out inactive, suspended, rejected, or unapproved tutors
-    const activeRawTutors = Array.from(tutorMap.values()).filter((t) => {
-      if (!t || !t.id) return false;
-      if (t.suspended === true) return false;
-      const st = t.status ? String(t.status).toLowerCase() : '';
-      if (st === 'suspended' || st === 'rejected' || st === 'pending') return false;
-      if (t.isApproved === false) return false;
-      return true;
+    // 2. Collect all active, approved public tutor profiles with canonical name-based slugs
+    const { allTutors: activeMergedTutors } = await loadMergedPublicTutorCatalog({
+      activeOnly: true,
     });
 
-    // Deduplicate by composite key (name, primarySubject, cityLocation) exactly like GET /api/tutors
-    const uniqueCompositeTutors = new Map<string, any>();
-    for (const t of activeRawTutors) {
-      const cName = String(t.name || '').trim().toLowerCase();
-      const cSub = String(
-        t.primarySubject ||
-          (Array.isArray(t.subjectExpertise) ? t.subjectExpertise[0] : '') ||
-          ''
-      )
-        .trim()
-        .toLowerCase();
-      const cLoc = String(t.cityLocation || t.location || '').trim().toLowerCase();
-      const compositeKey = `${cName}|${cSub}|${cLoc}`;
-      if (!uniqueCompositeTutors.has(compositeKey)) {
-        uniqueCompositeTutors.set(compositeKey, t);
-      } else {
-        const existing = uniqueCompositeTutors.get(compositeKey);
-        if (
-          t.avatarUrl?.includes('/uploads/avatars/') &&
-          !existing.avatarUrl?.includes('/uploads/avatars/')
-        ) {
-          uniqueCompositeTutors.set(compositeKey, t);
-        }
-      }
-    }
-
-    const activeTutors: SitemapTutorInput[] = Array.from(uniqueCompositeTutors.values()).map((t) => ({
+    const activeTutors: SitemapTutorInput[] = activeMergedTutors.map((t) => ({
       id: String(t.id),
       name: t.name || null,
+      slug: t.slug || null,
       updatedAt: t.updatedAt || null,
       createdAt: t.createdAt || null,
       suspended: Boolean(t.suspended),
@@ -7837,6 +7653,46 @@ export async function createApp(options: CreateAppOptions = {}) {
     res.setHeader('Content-Type', 'text/plain; charset=utf-8');
     res.setHeader('Cache-Control', 'public, max-age=3600, stale-while-revalidate=86400');
     return res.status(200).send(ROBOTS_TXT_CONTENT);
+  });
+
+  // Backwards-compatible 301 Permanent Redirect from legacy /tutor/tutor_global_XXX (and /tutors/:id, /tutor-profile/:id) to /tutor/<tutor-name-slug>
+  app.get(['/tutor/:slugOrId', '/tutors/:slugOrId', '/tutor-profile/:slugOrId'], async (req, res, next) => {
+    try {
+      let rawParam = req.params.slugOrId || '';
+      try {
+        rawParam = decodeURIComponent(rawParam).trim();
+      } catch {
+        rawParam = String(req.params.slugOrId || '').trim();
+      }
+
+      if (!rawParam || rawParam.toLowerCase() === 'dashboard' || rawParam.includes('.')) {
+        return next();
+      }
+
+      const { allTutors, slugMap, canonicalByRawId } = await loadMergedPublicTutorCatalog({
+        activeOnly: false,
+      });
+      const lowerParam = rawParam.toLowerCase();
+
+      const matched =
+        allTutors.find((t) => t.slug === lowerParam) ||
+        canonicalByRawId.get(rawParam) ||
+        canonicalByRawId.get(lowerParam) ||
+        allTutors.find((t) => matchesTutorSlugOrId(t, rawParam, slugMap));
+
+      if (matched && matched.slug) {
+        const canonicalPath = `/tutor/${encodeURIComponent(matched.slug)}`;
+        if (req.path !== canonicalPath) {
+          const qIdx = req.originalUrl.indexOf('?');
+          const querySuffix = qIdx >= 0 ? req.originalUrl.slice(qIdx) : '';
+          return res.redirect(301, `${canonicalPath}${querySuffix}`);
+        }
+      }
+
+      return next();
+    } catch {
+      return next();
+    }
   });
 
   const llmsTxtFallback = [
@@ -8129,7 +7985,9 @@ export async function createApp(options: CreateAppOptions = {}) {
           } else if (filePath.toLowerCase().endsWith('.webp')) {
             res.setHeader('Content-Type', 'image/webp');
           }
-          if (filePath.endsWith('.html')) {
+          if (filePath.toLowerCase().endsWith('robots.txt')) {
+            res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+          } else if (filePath.endsWith('.html')) {
             res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
             res.setHeader('Link', '</.well-known/ard.json>; rel="ard"; type="application/json"');
           } else if (/(logo-\d+|logo_transparent-\d+)\.(avif|webp)$/i.test(filePath)) {

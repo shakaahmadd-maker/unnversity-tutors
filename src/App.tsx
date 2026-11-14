@@ -14,6 +14,7 @@ import {
 } from './data/toolRouteMatchers';
 import { updatePageSeo } from './utils/seo';
 import { getBlogCanonicalSlug, matchesBlogSlugOrId } from './utils/blogSlug';
+import { assignUniqueTutorSlugs, getTutorCanonicalSlug, matchesTutorSlugOrId } from './utils/tutorSlug';
 import { store } from './lib/store';
 import { UserRole, Chat, User } from './types';
 import { AlertCircle, X } from 'lucide-react';
@@ -352,7 +353,9 @@ export default function App() {
           selectedTutorProfile.experienceSummary ||
           selectedTutorProfile.experience ||
           defaultDesc;
-        canonicalPath = `/tutor/${encodeURIComponent(selectedTutorProfile.id)}`;
+        canonicalPath = `/tutor/${encodeURIComponent(
+          getTutorCanonicalSlug(selectedTutorProfile, store.getTutorSlugMap())
+        )}`;
       } else if (activeView === 'services') {
         title = 'Academic Tutoring Services - University Tutors';
         canonicalPath = '/services';
@@ -548,45 +551,53 @@ export default function App() {
     }
   }, [activeChat]);
 
-  const openTutorProfileById = async (tutorId: string, pushUrl = true) => {
-    const cleanId = decodeURIComponent(tutorId || '').trim();
-    if (!cleanId) return;
+  const openTutorProfileById = async (tutorIdOrSlug: string, pushUrl = true) => {
+    const cleanParam = decodeURIComponent(tutorIdOrSlug || '').trim();
+    if (!cleanParam) return;
+    const lowerParam = cleanParam.toLowerCase();
 
-    const slugify = (val: string) =>
-      String(val || '')
-        .toLowerCase()
-        .replace(/^(?:(?:dr|prof|mr|ms|mrs)\.?\s+)+/i, '')
-        .replace(/[^a-z0-9]+/g, '-')
-        .replace(/^-+|-+$/g, '');
-    const targetSlug = slugify(cleanId);
+    const syncCanonicalBrowserUrl = (tutor: User, shouldPush: boolean) => {
+      if (typeof window === 'undefined') return;
+      const canonicalSlug = getTutorCanonicalSlug(tutor, store.getTutorSlugMap());
+      const targetPath = `/tutor/${encodeURIComponent(canonicalSlug)}`;
+      if (shouldPush) {
+        if (window.location.pathname !== targetPath) {
+          window.history.pushState(null, '', targetPath);
+        }
+      } else if (window.location.pathname !== targetPath) {
+        window.history.replaceState(null, '', targetPath);
+      }
+    };
 
-    const findInList = (list: User[]) =>
-      list.find(
-        (u) =>
-          u.id === cleanId ||
-          u.id.toLowerCase() === cleanId.toLowerCase() ||
-          (targetSlug && (slugify(u.id) === targetSlug || slugify(u.name) === targetSlug))
+    const findInList = (list: User[]) => {
+      const slugMap = assignUniqueTutorSlugs(
+        list.filter((u) => u && (u.role === UserRole.TUTOR || String(u.id || '').startsWith('tutor')))
       );
-
-    if (pushUrl) {
-      window.history.pushState(null, '', `/tutor/${encodeURIComponent(cleanId)}`);
-    }
+      return (
+        list.find((u) => getTutorCanonicalSlug(u, slugMap) === lowerParam) ||
+        list.find((u) => u.id === cleanParam || u.id.toLowerCase() === lowerParam) ||
+        list.find((u) => matchesTutorSlugOrId(u, cleanParam, slugMap))
+      );
+    };
 
     const localMatch = findInList(store.users);
     if (localMatch) {
       const normalizedLocal = store.upsertTutorPreview(localMatch);
+      syncCanonicalBrowserUrl(normalizedLocal, pushUrl);
       setIsLoadingTutorProfile(false);
       setSelectedTutorProfile(normalizedLocal);
       setActiveView('tutor-profile');
       window.scrollTo({ top: 0, behavior: 'smooth' });
 
-      void apiFetch(`/api/tutors/${encodeURIComponent(normalizedLocal.id)}`)
+      const lookupKey = normalizedLocal.slug || normalizedLocal.id;
+      void apiFetch(`/api/tutors/${encodeURIComponent(lookupKey)}`)
         .then(async (res) => {
           if (!res.ok) return;
           const data = await res.json().catch(() => null);
           if (data?.tutor) {
             const enriched = store.upsertTutorPreview(data.tutor);
             setSelectedTutorProfile((prev) => (prev && prev.id === enriched.id ? enriched : prev));
+            syncCanonicalBrowserUrl(enriched, false);
           }
         })
         .catch(() => {});
@@ -598,7 +609,7 @@ export default function App() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
 
     try {
-      const res = await apiFetch(`/api/tutors/${encodeURIComponent(cleanId)}`);
+      const res = await apiFetch(`/api/tutors/${encodeURIComponent(cleanParam)}`);
       if (res.ok) {
         const data = await res.json();
         if (data?.tutor) {
@@ -606,9 +617,7 @@ export default function App() {
           setSelectedTutorProfile(normalized);
           setIsLoadingTutorProfile(false);
           setActiveView('tutor-profile');
-          if (normalized.id && normalized.id !== cleanId) {
-            window.history.replaceState(null, '', `/tutor/${encodeURIComponent(normalized.id)}`);
-          }
+          syncCanonicalBrowserUrl(normalized, pushUrl);
           return;
         }
       }
@@ -624,6 +633,7 @@ export default function App() {
         setSelectedTutorProfile(normalizedFallback);
         setIsLoadingTutorProfile(false);
         setActiveView('tutor-profile');
+        syncCanonicalBrowserUrl(normalizedFallback, pushUrl);
         return;
       }
     } catch {
@@ -1639,22 +1649,31 @@ export default function App() {
 
   const handleSelectTutorProfile = useCallback((tutorObj: User) => {
     const normalized = store.upsertTutorPreview(tutorObj);
+    const initialSlug = getTutorCanonicalSlug(normalized, store.getTutorSlugMap());
     setIsLoadingTutorProfile(false);
     setSelectedTutorProfile(normalized);
     setActiveView('tutor-profile');
-    if (typeof window !== 'undefined' && normalized?.id) {
-      window.history.pushState(null, '', `/tutor/${encodeURIComponent(normalized.id)}`);
+    if (typeof window !== 'undefined' && initialSlug) {
+      window.history.pushState(null, '', `/tutor/${encodeURIComponent(initialSlug)}`);
     }
     window.scrollTo({ top: 0, behavior: 'smooth' });
 
-    if (normalized?.id) {
-      void apiFetch(`/api/tutors/${encodeURIComponent(normalized.id)}`)
+    const lookupKey = normalized?.slug || normalized?.id;
+    if (lookupKey) {
+      void apiFetch(`/api/tutors/${encodeURIComponent(lookupKey)}`)
         .then(async (res) => {
           if (!res.ok) return;
           const data = await res.json().catch(() => null);
           if (data?.tutor) {
             const enriched = store.upsertTutorPreview(data.tutor);
             setSelectedTutorProfile((prev) => (prev && prev.id === enriched.id ? enriched : prev));
+            const authoritativeSlug = getTutorCanonicalSlug(enriched, store.getTutorSlugMap());
+            if (typeof window !== 'undefined' && authoritativeSlug) {
+              const canonicalTarget = `/tutor/${encodeURIComponent(authoritativeSlug)}`;
+              if (window.location.pathname !== canonicalTarget) {
+                window.history.replaceState(null, '', canonicalTarget);
+              }
+            }
           }
         })
         .catch(() => {});

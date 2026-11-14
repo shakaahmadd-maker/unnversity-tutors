@@ -95,17 +95,17 @@ export default function Header({
   return (
     <header className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-orange-100/60" id="main-header">
       {/* Top Banner with Online Counter & Brand Promise */}
-      <div className="bg-gray-900 text-white text-[11px] font-mono py-1.5 px-3 sm:px-4 flex flex-wrap justify-between items-center z-50">
-        <div className="flex items-center gap-2 sm:gap-4 w-full justify-between">
-          <div className="flex items-center gap-2 sm:gap-3 min-w-0">
-            <div className="flex items-center gap-1.5 truncate">
+      <div className="bg-gray-900 text-white text-[11px] font-mono py-1.5 px-3 sm:px-4 z-50">
+        <div className="max-w-7xl mx-auto flex items-center gap-2 sm:gap-4 w-full justify-between">
+          <div className="flex items-center gap-2 sm:gap-3 min-w-0 overflow-x-auto no-scrollbar whitespace-nowrap">
+            <div className="flex items-center gap-1.5 shrink-0">
               <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse inline-block shrink-0"></span>
-              <span className="truncate">{studentsOnline} students online</span>
+              <span>{studentsOnline} students online</span>
             </div>
             {isMdUp && (
               <>
-                <span className="hidden md:inline text-gray-500">|</span>
-                <div className="hidden md:flex items-center gap-2 text-gray-200">
+                <span className="hidden md:inline text-gray-500 shrink-0">|</span>
+                <div className="hidden md:flex items-center gap-1.5 text-gray-200 shrink-0">
                   <span className="text-gray-300">🔥 Regional Online Tutoring:</span>
                   {[
                     { code: 'usa', label: 'USA 🇺🇸' },
@@ -119,9 +119,10 @@ export default function Header({
                   ].map((c) => (
                     <button
                       key={c.code}
+                      type="button"
                       id={`header-country-${c.code}`}
                       onClick={() => handleLinkClick(`online-tutoring-${c.code}`)}
-                      className="hover:text-orange-400 hover:underline cursor-pointer text-[10px] font-sans px-1"
+                      className="hover:text-orange-400 hover:underline cursor-pointer text-[10px] font-sans px-1 shrink-0"
                     >
                       {c.label}
                     </button>
@@ -132,6 +133,7 @@ export default function Header({
           </div>
 
           <button
+            type="button"
             id="header-whatsapp-fast-track-btn"
             onClick={() => handleLinkClick('whatsapp')}
             className="flex items-center gap-1.5 bg-emerald-950/80 hover:bg-emerald-900 text-emerald-300 hover:text-white px-2.5 py-0.5 rounded border border-emerald-700/60 transition-colors font-sans font-semibold text-[11px] cursor-pointer whitespace-nowrap shrink-0"
@@ -142,15 +144,16 @@ export default function Header({
         </div>
       </div>
 
-      <div className="container mx-auto px-4 md:px-8 max-w-7xl">
-        <div className="flex h-16 lg:h-20 items-center justify-between gap-2">
+      <div className="container mx-auto px-4 lg:px-5 xl:px-8 max-w-7xl">
+        <div className="flex h-16 lg:h-20 items-center justify-between gap-3 xl:gap-6">
           {/* Logo Brand Identity */}
           <button
+            type="button"
             id="logo-home-nav"
             onClick={() => handleLinkClick('home')}
-            className="flex items-center gap-3 cursor-pointer p-1 group select-none text-left min-w-0 shrink"
+            className="flex items-center cursor-pointer py-1 pr-2 group select-none text-left shrink-0"
           >
-            <picture>
+            <picture className="shrink-0">
               <source type="image/avif" srcSet="/logo-440.avif" />
               <source
                 type="image/webp"
@@ -165,18 +168,19 @@ export default function Header({
                 loading="eager"
                 decoding="sync"
                 fetchPriority="high"
-                className="h-9 sm:h-12 md:h-14 w-auto max-w-[175px] sm:max-w-[250px] object-contain transition-transform group-hover:scale-102"
+                className="h-9 sm:h-11 lg:h-10 xl:h-12 w-auto max-w-[165px] sm:max-w-[195px] lg:max-w-[165px] xl:max-w-[210px] object-contain transition-transform group-hover:scale-102"
               />
             </picture>
           </button>
 
           {/* Desktop Navigation Links */}
           {isLgUp && (
-            <nav className="hidden lg:flex items-center gap-5 xl:gap-6" onPointerEnter={prefetchHeaderMenus}>
+            <nav className="hidden lg:flex items-center gap-3.5 xl:gap-5 shrink-0" onPointerEnter={prefetchHeaderMenus}>
               <button
+                type="button"
                 id="nav-home"
                 onClick={() => handleLinkClick('home')}
-                className={`text-sm font-semibold tracking-wide transition-colors cursor-pointer whitespace-nowrap shrink-0 ${
+                className={`text-[13px] xl:text-sm font-semibold tracking-wide transition-colors cursor-pointer whitespace-nowrap shrink-0 ${
                   activeView === 'home'
                     ? 'text-orange-650 border-b-2 border-orange-650 pb-1'
                     : 'text-gray-700 hover:text-orange-650 pb-1'
@@ -187,10 +191,11 @@ export default function Header({
 
               {/* Services Dropdown */}
               <div
-                className="relative group"
+                className="relative group shrink-0"
                 onMouseLeave={() => setIsServicesDropdownOpen(false)}
               >
                 <button
+                  type="button"
                   id="nav-services-dropdown"
                   aria-expanded={isServicesDropdownOpen}
                   aria-haspopup="menu"
@@ -200,7 +205,7 @@ export default function Header({
                     prefetchHeaderMenus();
                     setIsServicesDropdownOpen(true);
                   }}
-                  className={`text-sm font-semibold tracking-wide transition-colors cursor-pointer flex items-center gap-1 pb-1 whitespace-nowrap shrink-0 ${
+                  className={`text-[13px] xl:text-sm font-semibold tracking-wide transition-colors cursor-pointer flex items-center gap-1 pb-1 whitespace-nowrap shrink-0 ${
                     activeView === 'services' ||
                     Boolean(resolveDedicatedServiceRoute(activeView)) ||
                     activeView === 'specialized-service' ||
@@ -212,7 +217,7 @@ export default function Header({
                   }`}
                 >
                   <span>Services</span>
-                  <ChevronDown className="w-3.5 h-3.5" />
+                  <ChevronDown className="w-3.5 h-3.5 shrink-0" />
                 </button>
 
                 {isServicesDropdownOpen && (
@@ -227,10 +232,11 @@ export default function Header({
 
               {/* Free Tools Dropdown */}
               <div
-                className="relative group"
+                className="relative group shrink-0"
                 onMouseLeave={() => setIsToolsDropdownOpen(false)}
               >
                 <button
+                  type="button"
                   id="nav-tools-dropdown"
                   aria-expanded={isToolsDropdownOpen}
                   aria-haspopup="menu"
@@ -240,14 +246,14 @@ export default function Header({
                     prefetchHeaderMenus();
                     setIsToolsDropdownOpen(true);
                   }}
-                  className={`text-sm font-semibold tracking-wide transition-colors cursor-pointer flex items-center gap-1 pb-1 whitespace-nowrap shrink-0 ${
+                  className={`text-[13px] xl:text-sm font-semibold tracking-wide transition-colors cursor-pointer flex items-center gap-1 pb-1 whitespace-nowrap shrink-0 ${
                     activeView === 'tools' || activeView.startsWith('tools/')
                       ? 'text-orange-650 border-b-2 border-orange-650'
                       : 'text-gray-700 hover:text-orange-650'
                   }`}
                 >
                   <span>Free Tools</span>
-                  <ChevronDown className="w-3.5 h-3.5" />
+                  <ChevronDown className="w-3.5 h-3.5 shrink-0" />
                 </button>
 
                 {isToolsDropdownOpen && (
@@ -266,10 +272,11 @@ export default function Header({
                   (link.view === 'blog' && (activeView.startsWith('blog-') || activeView.startsWith('blog/')));
                 return (
                   <button
+                    type="button"
                     key={link.view}
                     id={`nav-${link.view}`}
                     onClick={() => handleLinkClick(link.view)}
-                    className={`text-sm font-semibold tracking-wide transition-colors cursor-pointer whitespace-nowrap shrink-0 ${
+                    className={`text-[13px] xl:text-sm font-semibold tracking-wide transition-colors cursor-pointer whitespace-nowrap shrink-0 ${
                       isActive
                         ? 'text-orange-650 border-b-2 border-orange-650 pb-1'
                         : 'text-gray-700 hover:text-orange-650 pb-1'
@@ -284,21 +291,23 @@ export default function Header({
 
           {/* Right Action buttons */}
           {isLgUp && (
-            <div className="hidden lg:flex items-center gap-3">
+            <div className="hidden lg:flex items-center gap-2 xl:gap-2.5 shrink-0">
               {currentUser ? (
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2.5 shrink-0">
                   <button
+                    type="button"
                     id="dashboard-header-nav"
                     onClick={() => handleLinkClick('dashboard')}
-                    className="bg-gray-100 hover:bg-orange-50 text-gray-800 hover:text-orange-650 flex items-center gap-2 px-3.5 py-2 min-h-[40px] rounded-xl transition-all cursor-pointer border border-transparent hover:border-orange-100 text-xs font-semibold"
+                    className="bg-gray-100 hover:bg-orange-50 text-gray-800 hover:text-orange-650 flex items-center gap-2 px-3.5 py-2 min-h-[40px] rounded-xl transition-all cursor-pointer border border-transparent hover:border-orange-100 text-xs font-semibold whitespace-nowrap shrink-0"
                   >
-                    <UserIcon className="w-4 h-4 text-orange-650" />
+                    <UserIcon className="w-4 h-4 text-orange-650 shrink-0" />
                     <span>My Dashboard ({currentUser.role})</span>
                   </button>
                   <button
+                    type="button"
                     id="logout-header-btn"
                     onClick={onLogout}
-                    className="text-gray-600 hover:text-red-600 p-2 min-w-[40px] min-h-[40px] inline-flex items-center justify-center rounded-xl hover:bg-gray-150 transition-colors cursor-pointer"
+                    className="text-gray-600 hover:text-red-600 p-2 min-w-[40px] min-h-[40px] inline-flex items-center justify-center rounded-xl hover:bg-gray-150 transition-colors cursor-pointer shrink-0"
                     title="Logout Session"
                     aria-label="Logout Session"
                   >
@@ -306,29 +315,32 @@ export default function Header({
                   </button>
                 </div>
               ) : (
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 xl:gap-2.5 shrink-0">
                   <button
+                    type="button"
                     id="nav-join-login"
                     onClick={() => handleLinkClick('auth')}
-                    className="text-xs font-semibold text-gray-700 hover:text-orange-650 transition-colors cursor-pointer px-2.5 py-2 min-h-[40px]"
+                    className="text-xs xl:text-[13px] font-semibold text-gray-700 hover:text-orange-650 transition-colors cursor-pointer px-2.5 py-2 min-h-[40px] whitespace-nowrap shrink-0"
                   >
                     Sign In
                   </button>
                   <button
+                    type="button"
                     id="nav-join-find"
                     onClick={() => handleLinkClick('tutors')}
-                    className="bg-orange-650 text-white font-semibold text-xs tracking-wider uppercase px-3.5 py-2 min-h-[40px] rounded-xl shadow-md shadow-orange-500/15 hover:bg-orange-700 hover:shadow-orange-500/20 hover:-translate-y-0.5 transition-all duration-200 cursor-pointer"
+                    className="bg-orange-600 hover:bg-orange-700 text-white font-bold text-[11px] xl:text-xs tracking-wider uppercase px-3 xl:px-4 py-2 min-h-[40px] rounded-xl shadow-md shadow-orange-500/20 hover:-translate-y-0.5 transition-all duration-200 cursor-pointer whitespace-nowrap shrink-0"
                   >
                     Find a Tutor
                   </button>
                   <button
+                    type="button"
                     id="nav-become-tutor-btn"
                     onClick={() => {
                       if (onOpenBecomeTutor) onOpenBecomeTutor();
                     }}
-                    className="bg-slate-900 text-white font-semibold text-xs tracking-wider uppercase px-3.5 py-2 min-h-[40px] rounded-xl shadow-md hover:bg-slate-800 hover:-translate-y-0.5 transition-all duration-200 cursor-pointer flex items-center gap-1.5"
+                    className="bg-slate-900 hover:bg-slate-800 text-white font-bold text-[11px] xl:text-xs tracking-wider uppercase px-3 xl:px-4 py-2 min-h-[40px] rounded-xl shadow-md hover:-translate-y-0.5 transition-all duration-200 cursor-pointer inline-flex items-center gap-1.5 whitespace-nowrap shrink-0"
                   >
-                    <GraduationCap className="w-3.5 h-3.5 text-orange-400" />
+                    <GraduationCap className="w-3.5 h-3.5 text-orange-400 shrink-0" />
                     <span>Become a Tutor</span>
                   </button>
                 </div>

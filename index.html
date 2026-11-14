@@ -90,48 +90,46 @@
     <link rel="apple-touch-icon" href="/logo.webp" />
     <title>University Tutors - Expert Academic Mentorship & Tutoring</title>
     <style id="critical-shell-css">
-      *,::before,::after{box-sizing:border-box}
-      html,body{margin:0;padding:0;background:#ffffff;color:#0F172A;font-family:"Inter",system-ui,-apple-system,sans-serif;overflow-x:clip;max-width:100vw}
-      .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
-      .hidden{display:none}
-      @media (min-width:1024px){.lg\:flex{display:flex}.lg\:hidden{display:none}}
-      #main-header{position:sticky;top:0;z-index:40;background:rgba(255,255,255,.95);border-bottom:1px solid rgba(254,215,170,.6)}
-      #main-header button,#main-header a{background:transparent;border:0;font:inherit;color:inherit;text-decoration:none}
-      #main-header>.bg-gray-900{background:#0F172A;color:#fff;font-size:11px;line-height:1.5;font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace;padding:.375rem .75rem;display:flex;align-items:center;justify-content:space-between}
-      @media (min-width:640px){#main-header>.bg-gray-900{padding-left:1rem;padding-right:1rem}}
-      #main-header .shell-top-inner{display:flex;align-items:center;justify-content:space-between;width:100%;gap:.5rem}
-      #main-header .shell-online{display:inline-flex;align-items:center;gap:.375rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-      #main-header .shell-dot{width:.5rem;height:.5rem;border-radius:9999px;background:#10b981;display:inline-block;flex-shrink:0}
-      #main-header .shell-wa-pill{display:inline-flex;align-items:center;gap:.375rem;background:rgba(2,44,34,.8);color:#6ee7b7;padding:.125rem .625rem;border-radius:.25rem;border:1px solid rgba(4,120,87,.6);font-family:"Inter",system-ui,sans-serif;font-weight:600;font-size:11px;line-height:1.5;white-space:nowrap;flex-shrink:0}
-      #main-header .container{max-width:80rem;margin-left:auto;margin-right:auto;padding-left:1rem;padding-right:1rem}
-      @media (min-width:768px){#main-header .container{padding-left:2rem;padding-right:2rem}}
-      #main-header .container>div{display:flex;height:4rem;align-items:center;justify-content:space-between;gap:.5rem}
-      @media (min-width:1024px){#main-header .container>div{height:5rem}}
-      #logo-home-nav{display:flex;align-items:center;gap:.75rem;padding:.25rem;margin:0;cursor:pointer;min-width:0}
-      #logo-home-nav img{height:2.25rem;width:auto;max-width:175px;object-fit:contain;display:block}
-      @media (min-width:640px){#logo-home-nav img{height:3rem;max-width:250px}}
-      @media (min-width:768px){#logo-home-nav img{height:3.5rem}}
-      .hero-shell-heading{font-family:"Outfit",system-ui,sans-serif;font-weight:800;line-height:1.15;color:#0F172A}
+      #preboot-shell,#preboot-shell *,#preboot-shell ::before,#preboot-shell ::after{box-sizing:border-box}
+      #preboot-shell{min-height:100vh;display:flex;flex-direction:column;background:#F8FAFC;color:#0F172A;font-family:"Inter",system-ui,-apple-system,sans-serif}
+      #preboot-shell .preboot-sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+      #preboot-shell .preboot-header{position:sticky;top:0;z-index:40;background:rgba(255,255,255,.95);border-bottom:1px solid rgba(254,215,170,.6)}
+      #preboot-shell .preboot-topbar{background:#0F172A;color:#fff;font-size:11px;line-height:1.5;font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace;padding:.375rem .75rem;display:flex;align-items:center;justify-content:space-between}
+      @media (min-width:640px){#preboot-shell .preboot-topbar{padding-left:1rem;padding-right:1rem}}
+      #preboot-shell .preboot-top-inner{display:flex;align-items:center;justify-content:space-between;width:100%;gap:.5rem}
+      #preboot-shell .preboot-online{display:inline-flex;align-items:center;gap:.375rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+      #preboot-shell .preboot-dot{width:.5rem;height:.5rem;border-radius:9999px;background:#10b981;display:inline-block;flex-shrink:0}
+      #preboot-shell .preboot-wa-pill{display:inline-flex;align-items:center;gap:.375rem;background:rgba(2,44,34,.8);color:#6ee7b7;padding:.125rem .625rem;border-radius:.25rem;border:1px solid rgba(4,120,87,.6);font-family:"Inter",system-ui,sans-serif;font-weight:600;font-size:11px;line-height:1.5;white-space:nowrap;flex-shrink:0;text-decoration:none}
+      #preboot-shell .preboot-container{max-width:80rem;margin-left:auto;margin-right:auto;padding-left:1rem;padding-right:1rem}
+      @media (min-width:768px){#preboot-shell .preboot-container{padding-left:2rem;padding-right:2rem}}
+      #preboot-shell .preboot-navrow{display:flex;height:4rem;align-items:center;justify-content:space-between;gap:.5rem}
+      @media (min-width:1024px){#preboot-shell .preboot-navrow{height:5rem}}
+      #preboot-shell .preboot-logo{display:flex;align-items:center;padding:.25rem .5rem .25rem 0;margin:0;text-decoration:none;flex-shrink:0}
+      #preboot-shell .preboot-logo img{height:2.25rem;width:auto;max-width:165px;object-fit:contain;display:block}
+      @media (min-width:640px){#preboot-shell .preboot-logo img{height:2.75rem;max-width:195px}}
+      @media (min-width:1024px){#preboot-shell .preboot-logo img{height:2.5rem;max-width:165px}}
+      @media (min-width:1280px){#preboot-shell .preboot-logo img{height:3rem;max-width:210px}}
+      #preboot-shell .preboot-main{flex:1 1 auto;min-height:90vh}
     </style>
   </head>
   <body>
     <div id="root">
-      <div class="flex flex-col min-h-screen bg-gray-50 text-gray-800" style="min-height:100vh;display:flex;flex-direction:column;">
-        <header id="main-header">
-          <div class="bg-gray-900">
-            <div class="shell-top-inner">
-              <div class="shell-online">
-                <span class="shell-dot" aria-hidden="true"></span>
+      <div id="preboot-shell">
+        <header class="preboot-header">
+          <div class="preboot-topbar">
+            <div class="preboot-top-inner">
+              <div class="preboot-online">
+                <span class="preboot-dot" aria-hidden="true"></span>
                 <span>84 students online</span>
               </div>
-              <a href="/whatsapp" class="shell-wa-pill">
+              <a href="/whatsapp" class="preboot-wa-pill">
                 <span>WhatsApp (24/7)</span>
               </a>
             </div>
           </div>
-          <div class="container">
-            <div>
-              <a id="logo-home-nav" href="/" aria-label="Uni Tutors Home">
+          <div class="preboot-container">
+            <div class="preboot-navrow">
+              <a class="preboot-logo" href="/" aria-label="Uni Tutors Home">
                 <picture>
                   <source type="image/avif" srcset="/logo-440.avif" />
                   <source type="image/webp" srcset="/logo-220.webp 220w, /logo-440.webp 440w" sizes="(max-width: 640px) 140px, 220px" />
@@ -149,8 +147,8 @@
             </div>
           </div>
         </header>
-        <main style="flex:1 1 auto;min-height:90vh;">
-          <div class="sr-only">
+        <main class="preboot-main">
+          <div class="preboot-sr-only">
             <h1>Expert Tutors for Every University Subject Online, On-Demand</h1>
             <p>Verified 1-on-1 expert academic tutoring, assignment guidance, coursework support, and study consultations across major universities.</p>
           </div>

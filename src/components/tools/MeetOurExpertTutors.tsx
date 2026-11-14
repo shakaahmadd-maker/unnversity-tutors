@@ -14,6 +14,7 @@ import { User } from '../../types';
 import { ResponsiveAvatar } from '../ResponsiveImage';
 import { apiJson, isAbortError, getFriendlyErrorMessage } from '../../lib/apiClient';
 import { isModifiedAnchorClick } from '../../data/dedicatedServiceRoutes';
+import { getTutorCanonicalSlug } from '../../utils/tutorSlug';
 import { store } from '../../lib/store';
 
 interface MeetOurExpertTutorsProps {
@@ -209,8 +210,9 @@ export default function MeetOurExpertTutors({ onNavigate, subjectHint }: MeetOur
 
   const openTutorFullProfile = (tutor: LiveTutorProfile) => {
     if (!tutor?.id) return;
-    store.upsertTutorPreview(tutor);
-    onNavigate(`tutor-profile:${tutor.id}`);
+    const upserted = store.upsertTutorPreview(tutor);
+    const slug = getTutorCanonicalSlug(upserted, store.getTutorSlugMap());
+    onNavigate(`/tutor/${encodeURIComponent(slug)}`);
   };
 
   const handleTutorProfileLinkClick = (
@@ -387,6 +389,8 @@ export default function MeetOurExpertTutors({ onNavigate, subjectHint }: MeetOur
                 const locationText = tutor.cityLocation || tutor.location || tutor.country || 'Online Worldwide';
                 const hourlyRate = tutor.hourlyRate || 55;
 
+                const tutorSlug = getTutorCanonicalSlug(tutor);
+
                 return (
                   <article
                     key={tutor.id}
@@ -401,7 +405,7 @@ export default function MeetOurExpertTutors({ onNavigate, subjectHint }: MeetOur
                       {/* Avatar + Name + Rate */}
                       <div className="flex items-start gap-3">
                         <a
-                          href={`/tutor/${encodeURIComponent(tutor.id)}`}
+                          href={`/tutor/${encodeURIComponent(tutorSlug)}`}
                           onClick={(e) => handleTutorProfileLinkClick(e, tutor)}
                           className="shrink-0 block cursor-pointer"
                         >
@@ -419,7 +423,7 @@ export default function MeetOurExpertTutors({ onNavigate, subjectHint }: MeetOur
                         <div className="min-w-0 flex-1">
                           <div className="flex items-center gap-1">
                             <a
-                              href={`/tutor/${encodeURIComponent(tutor.id)}`}
+                              href={`/tutor/${encodeURIComponent(tutorSlug)}`}
                               onClick={(e) => handleTutorProfileLinkClick(e, tutor)}
                               className="text-sm font-bold text-[#111827] hover:text-[#EA580C] truncate transition-colors cursor-pointer"
                             >
@@ -472,7 +476,7 @@ export default function MeetOurExpertTutors({ onNavigate, subjectHint }: MeetOur
                     {/* Direct Dual CTA Buttons (44px+ touch targets) */}
                     <div className="flex flex-col sm:flex-row lg:flex-col gap-2 pt-3 border-t border-slate-200/70">
                       <a
-                        href={`/tutor/${encodeURIComponent(tutor.id)}`}
+                        href={`/tutor/${encodeURIComponent(tutorSlug)}`}
                         onClick={(e) => handleTutorProfileLinkClick(e, tutor)}
                         className="w-full min-h-[44px] py-2 px-3 rounded-xl bg-white border border-slate-300 hover:border-[#F97316] text-[#111827] hover:text-[#EA580C] text-xs font-semibold inline-flex items-center justify-center transition-colors cursor-pointer whitespace-nowrap"
                       >

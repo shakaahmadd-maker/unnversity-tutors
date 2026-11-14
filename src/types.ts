@@ -25,6 +25,7 @@ export interface User {
   password?: string;
   resetToken?: string;
   // Tutor fields
+  slug?: string;
   bio?: string;
   hourlyRate?: number;
   rating?: number;

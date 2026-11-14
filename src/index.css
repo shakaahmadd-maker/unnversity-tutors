@@ -147,6 +147,19 @@ body,
   contain-intrinsic-size: auto 1200px;
 }
 
+.tutor-directory-card {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 320px;
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
 @media (max-width: 639px) {
   #university-tutors-root main canvas {
     max-width: 100%;
@@ -158,7 +171,7 @@ body,
     font-size: 16px; /* Prevents iOS/Android mobile auto-zoom on focus */
   }
 
-  #university-tutors-root main button:not([aria-label*="Theme"]):not([style*="background-color"]) {
+  #university-tutors-root main button:not([aria-label*="Theme"]):not([style*="background-color"]):not(.compact-inline-link):not(.compact-pill-btn) {
     min-height: 44px;
   }
 }

@@ -437,8 +437,9 @@ export default function TutorProfilePage({
                   {(showAllKeywords ? highSearchKws : highSearchKws.slice(0, 8)).map((kw, idx) => (
                     <button
                       key={idx}
+                      type="button"
                       onClick={() => handleKeywordClick(kw)}
-                      className="text-[10px] bg-white hover:bg-orange-500 hover:text-white text-slate-700 border border-slate-200 font-medium px-2 py-0.5 rounded-md transition-all shadow-2xs cursor-pointer flex items-center gap-0.5"
+                      className="compact-inline-link text-[10px] bg-white hover:bg-orange-500 hover:text-white text-slate-700 border border-slate-200 font-medium px-2 py-0.5 rounded-md transition-all shadow-2xs cursor-pointer flex items-center gap-0.5"
                     >
                       <span>{kw}</span>
                       <span className="text-[9px] text-slate-400">↗</span>
@@ -462,8 +463,9 @@ export default function TutorProfilePage({
                   {researchKws.slice(0, 8).map((kw, idx) => (
                     <button
                       key={idx}
+                      type="button"
                       onClick={() => handleKeywordClick(kw)}
-                      className="text-[10px] bg-emerald-50/60 hover:bg-emerald-600 hover:text-white text-emerald-900 border border-emerald-200/80 font-medium px-2 py-0.5 rounded-md transition-all shadow-2xs cursor-pointer flex items-center gap-0.5"
+                      className="compact-inline-link text-[10px] bg-emerald-50/60 hover:bg-emerald-600 hover:text-white text-emerald-900 border border-emerald-200/80 font-medium px-2 py-0.5 rounded-md transition-all shadow-2xs cursor-pointer flex items-center gap-0.5"
                     >
                       <span>{kw}</span>
                       <span className="text-[9px] text-emerald-600">↗</span>
@@ -487,8 +489,9 @@ export default function TutorProfilePage({
                   {jobKws.slice(0, 8).map((kw, idx) => (
                     <button
                       key={idx}
+                      type="button"
                       onClick={() => handleKeywordClick(kw)}
-                      className="text-[10px] bg-indigo-50/60 hover:bg-indigo-600 hover:text-white text-indigo-900 border border-indigo-200/80 font-medium px-2 py-0.5 rounded-md transition-all shadow-2xs cursor-pointer flex items-center gap-0.5"
+                      className="compact-inline-link text-[10px] bg-indigo-50/60 hover:bg-indigo-600 hover:text-white text-indigo-900 border border-indigo-200/80 font-medium px-2 py-0.5 rounded-md transition-all shadow-2xs cursor-pointer flex items-center gap-0.5"
                     >
                       <span>{kw}</span>
                       <span className="text-[9px] text-indigo-500">↗</span>
@@ -512,8 +515,9 @@ export default function TutorProfilePage({
                   {combinedKws.slice(0, 8).map((kw, idx) => (
                     <button
                       key={idx}
+                      type="button"
                       onClick={() => handleKeywordClick(kw)}
-                      className="text-[10px] bg-amber-50/70 hover:bg-amber-600 hover:text-white text-amber-950 border border-amber-200/80 font-medium px-2 py-0.5 rounded-md transition-all shadow-2xs cursor-pointer flex items-center gap-0.5"
+                      className="compact-inline-link text-[10px] bg-amber-50/70 hover:bg-amber-600 hover:text-white text-amber-950 border border-amber-200/80 font-medium px-2 py-0.5 rounded-md transition-all shadow-2xs cursor-pointer flex items-center gap-0.5"
                     >
                       <span>{kw}</span>
                       <span className="text-[9px] text-amber-600">↗</span>
@@ -524,10 +528,11 @@ export default function TutorProfilePage({
             </div>
 
             {highSearchKws.length > 8 && (
-              <div className="pt-1 text-center">
+              <div className="pt-0.5 text-center">
                 <button
+                  type="button"
                   onClick={() => setShowAllKeywords(!showAllKeywords)}
-                  className="text-[10.5px] font-bold text-blue-700 hover:text-blue-900 bg-blue-50/80 px-3 py-1 rounded-xl border border-blue-200 cursor-pointer transition-all"
+                  className="compact-inline-link text-[10.5px] font-bold text-blue-700 hover:text-blue-900 bg-blue-50/80 px-3 py-1 rounded-xl border border-blue-200 cursor-pointer transition-all"
                 >
                   {showAllKeywords ? '▲ Show Fewer Keywords' : `▼ View All ${highSearchKws.length} Search Keywords`}
                 </button>
@@ -536,13 +541,17 @@ export default function TutorProfilePage({
           </section>
 
           {/* SEO Keyword Links Block for Nearby Locations & Subjects (Mobile Compact) */}
-          <div className="pt-1">
-            <SEOKeywordLinksBlock 
-              locationName={tutor.location || tutor.city || 'Atlanta, GA'}
+          <div>
+            <SEOKeywordLinksBlock
+              locationName={locationDisplay}
               tutorName={tutor.name}
-              onNavigateLocation={(loc) => onNavigate('tutors-directory')}
-              onNavigateSubject={(subj) => onNavigate('tutors-directory')}
-              className="rounded-2xl border border-slate-200/80 shadow-xs text-xs"
+              primarySubject={tutor.primarySubject || subjects[0]}
+              tutorSubjects={subjects}
+              tutorEducation={tutor.education}
+              primaryDomain={relevantKw.primaryDomain}
+              onNavigateLocation={(loc) => onNavigate(`location:${loc}`)}
+              onNavigateSubject={(subj) => onNavigate(`subject:${subj}`)}
+              className="rounded-2xl border border-slate-200/80 shadow-xs"
             />
           </div>
 
@@ -778,14 +787,14 @@ export default function TutorProfilePage({
         </div>
 
         {/* Relevant Subject & Industry Keywords Card (Domain-Specific for this Tutor) */}
-        <div className="bg-white border border-slate-200/90 rounded-3xl p-6 md:p-8 shadow-xs space-y-6">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-4">
-            <div className="space-y-1">
+        <div className="bg-white border border-slate-200/90 rounded-3xl p-4 sm:p-6 shadow-xs space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-3">
+            <div className="space-y-0.5">
               <div className="flex items-center gap-2">
                 <div className="bg-orange-100 text-orange-600 p-1.5 rounded-lg">
                   <Tag className="w-4 h-4 stroke-[2.5]" />
                 </div>
-                <h3 className="text-lg sm:text-xl font-serif font-bold text-[#1f3a60]">
+                <h3 className="text-base sm:text-lg font-serif font-bold text-[#1f3a60]">
                   Relevant Subject, Research &amp; Industry Keywords
                 </h3>
               </div>
@@ -802,10 +811,10 @@ export default function TutorProfilePage({
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
             
             {/* 1. High-Search Subject Keywords */}
-            <div className="bg-slate-50/70 rounded-2xl p-4 sm:p-5 border border-slate-200/70 space-y-3">
+            <div className="bg-slate-50/70 rounded-2xl p-3.5 sm:p-4 border border-slate-200/70 space-y-2">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
                   <Search className="w-3.5 h-3.5 text-blue-700" />
@@ -819,9 +828,10 @@ export default function TutorProfilePage({
                 {(showAllKeywords ? highSearchKws : highSearchKws.slice(0, 12)).map((kw, idx) => (
                   <button
                     key={idx}
+                    type="button"
                     onClick={() => handleKeywordClick(kw)}
                     title={`Search all tutors for ${kw}`}
-                    className="text-xs bg-white hover:bg-orange-500 hover:text-white hover:border-orange-500 text-slate-700 border border-slate-200 font-medium px-2.5 py-1 rounded-lg transition-all shadow-2xs cursor-pointer flex items-center gap-1 group"
+                    className="compact-inline-link text-xs bg-white hover:bg-orange-500 hover:text-white hover:border-orange-500 text-slate-700 border border-slate-200 font-medium px-2.5 py-1 rounded-lg transition-all shadow-2xs cursor-pointer flex items-center gap-1 group"
                   >
                     <span>{kw}</span>
                     <span className="text-[10px] text-slate-400 group-hover:text-white">↗</span>
@@ -831,7 +841,7 @@ export default function TutorProfilePage({
             </div>
 
             {/* 2. Research & Academic Focus Keywords */}
-            <div className="bg-slate-50/70 rounded-2xl p-4 sm:p-5 border border-slate-200/70 space-y-3">
+            <div className="bg-slate-50/70 rounded-2xl p-3.5 sm:p-4 border border-slate-200/70 space-y-2">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
                   <Compass className="w-3.5 h-3.5 text-emerald-700" />
@@ -845,9 +855,10 @@ export default function TutorProfilePage({
                 {researchKws.map((kw, idx) => (
                   <button
                     key={idx}
+                    type="button"
                     onClick={() => handleKeywordClick(kw)}
                     title={`Search all tutors for ${kw}`}
-                    className="text-xs bg-emerald-50/60 hover:bg-emerald-600 hover:text-white hover:border-emerald-600 text-emerald-900 border border-emerald-200/80 font-medium px-2.5 py-1 rounded-lg transition-all shadow-2xs cursor-pointer flex items-center gap-1 group"
+                    className="compact-inline-link text-xs bg-emerald-50/60 hover:bg-emerald-600 hover:text-white hover:border-emerald-600 text-emerald-900 border border-emerald-200/80 font-medium px-2.5 py-1 rounded-lg transition-all shadow-2xs cursor-pointer flex items-center gap-1 group"
                   >
                     <span>{kw}</span>
                     <span className="text-[10px] text-emerald-600 group-hover:text-white">↗</span>
@@ -857,7 +868,7 @@ export default function TutorProfilePage({
             </div>
 
             {/* 3. Job Search & Industry Target Keywords */}
-            <div className="bg-slate-50/70 rounded-2xl p-4 sm:p-5 border border-slate-200/70 space-y-3">
+            <div className="bg-slate-50/70 rounded-2xl p-3.5 sm:p-4 border border-slate-200/70 space-y-2">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
                   <Briefcase className="w-3.5 h-3.5 text-indigo-700" />
@@ -871,9 +882,10 @@ export default function TutorProfilePage({
                 {jobKws.map((kw, idx) => (
                   <button
                     key={idx}
+                    type="button"
                     onClick={() => handleKeywordClick(kw)}
                     title={`Search tutors with career prep in ${kw}`}
-                    className="text-xs bg-indigo-50/60 hover:bg-indigo-600 hover:text-white hover:border-indigo-600 text-indigo-900 border border-indigo-200/80 font-medium px-2.5 py-1 rounded-lg transition-all shadow-2xs cursor-pointer flex items-center gap-1 group"
+                    className="compact-inline-link text-xs bg-indigo-50/60 hover:bg-indigo-600 hover:text-white hover:border-indigo-600 text-indigo-900 border border-indigo-200/80 font-medium px-2.5 py-1 rounded-lg transition-all shadow-2xs cursor-pointer flex items-center gap-1 group"
                   >
                     <span>{kw}</span>
                     <span className="text-[10px] text-indigo-500 group-hover:text-white">↗</span>
@@ -883,7 +895,7 @@ export default function TutorProfilePage({
             </div>
 
             {/* 4. High-Growth & Interdisciplinary Combinations */}
-            <div className="bg-slate-50/70 rounded-2xl p-4 sm:p-5 border border-slate-200/70 space-y-3">
+            <div className="bg-slate-50/70 rounded-2xl p-3.5 sm:p-4 border border-slate-200/70 space-y-2">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
                   <Award className="w-3.5 h-3.5 text-amber-700" />
@@ -897,9 +909,10 @@ export default function TutorProfilePage({
                 {combinedKws.map((kw, idx) => (
                   <button
                     key={idx}
+                    type="button"
                     onClick={() => handleKeywordClick(kw)}
                     title={`Search tutors for ${kw}`}
-                    className="text-xs bg-amber-50/70 hover:bg-amber-600 hover:text-white hover:border-amber-600 text-amber-950 border border-amber-200/80 font-medium px-2.5 py-1 rounded-lg transition-all shadow-2xs cursor-pointer flex items-center gap-1 group"
+                    className="compact-inline-link text-xs bg-amber-50/70 hover:bg-amber-600 hover:text-white hover:border-amber-600 text-amber-950 border border-amber-200/80 font-medium px-2.5 py-1 rounded-lg transition-all shadow-2xs cursor-pointer flex items-center gap-1 group"
                   >
                     <span>{kw}</span>
                     <span className="text-[10px] text-amber-600 group-hover:text-white">↗</span>
@@ -911,10 +924,11 @@ export default function TutorProfilePage({
           </div>
 
           {highSearchKws.length > 12 && (
-            <div className="pt-2 flex justify-center">
+            <div className="pt-1 flex justify-center">
               <button
+                type="button"
                 onClick={() => setShowAllKeywords(!showAllKeywords)}
-                className="text-xs font-bold text-blue-700 hover:text-blue-900 bg-blue-50/80 px-4 py-2 rounded-xl border border-blue-200 cursor-pointer transition-all"
+                className="compact-inline-link text-xs font-bold text-blue-700 hover:text-blue-900 bg-blue-50/80 px-4 py-1.5 rounded-xl border border-blue-200 cursor-pointer transition-all"
               >
                 {showAllKeywords ? '▲ Show Fewer Keywords' : `▼ View All ${highSearchKws.length} Search Keywords for this Domain`}
               </button>
@@ -922,16 +936,18 @@ export default function TutorProfilePage({
           )}
         </div>
 
-        {/* SEO Keyword Links Block (Nearby Cities & Top Subjects) */}
-        <div className="pt-4">
-          <SEOKeywordLinksBlock 
-            locationName={locationDisplay}
-            tutorName={tutor.name}
-            onNavigateLocation={(loc) => onNavigate(`location:${loc}`)}
-            onNavigateSubject={(subj) => onNavigate(`subject:${subj}`)}
-            className="rounded-3xl border border-slate-200/80 shadow-xs"
-          />
-        </div>
+        {/* SEO Keyword Links Block (Foundational Courses, Specialized Disciplines & Nearby Cities) */}
+        <SEOKeywordLinksBlock
+          locationName={locationDisplay}
+          tutorName={tutor.name}
+          primarySubject={tutor.primarySubject || subjects[0]}
+          tutorSubjects={subjects}
+          tutorEducation={tutor.education}
+          primaryDomain={relevantKw.primaryDomain}
+          onNavigateLocation={(loc) => onNavigate(`location:${loc}`)}
+          onNavigateSubject={(subj) => onNavigate(`subject:${subj}`)}
+          className="rounded-3xl border border-slate-200/80 shadow-xs"
+        />
 
       </div>
     </div>

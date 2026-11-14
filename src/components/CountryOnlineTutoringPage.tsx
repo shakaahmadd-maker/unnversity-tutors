@@ -1,6 +1,5 @@
 import React, { useEffect } from 'react';
 import { 
-  Globe2, 
   CheckCircle2, 
   BookOpen, 
   MapPin, 
@@ -24,6 +23,7 @@ import {
 } from '../data/countryOnlineTutoringData';
 import { User } from '../types';
 import SEOKeywordLinksBlock from './SEOKeywordLinksBlock';
+import RegionalPortalBar from './RegionalPortalBar';
 import { ResponsiveAvatar } from './ResponsiveImage';
 
 interface CountryOnlineTutoringPageProps {
@@ -85,35 +85,23 @@ export default function CountryOnlineTutoringPage({
   return (
     <div className="min-h-screen bg-slate-50 font-sans text-slate-900" id={`country-page-${data.slug}`}>
       {/* Top Country Selector Bar */}
-      <div className="bg-slate-900 text-white border-b border-slate-800 py-2.5 px-4 sticky top-20 z-30 shadow-md">
-        <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-2.5">
-          <div className="flex items-center gap-2 text-xs font-semibold text-slate-300">
-            <Globe2 className="w-4 h-4 text-orange-400" />
-            <span>Select Regional Tutoring Hub:</span>
-          </div>
-          <div className="flex flex-wrap items-center justify-center gap-1.5 sm:gap-2">
-            {ALL_COUNTRY_KEYS.map((key) => {
-              const country = COUNTRY_ONLINE_TUTORING_PAGES[key];
-              const isSelected = key === data.countryKey;
-              return (
-                <button
-                  key={key}
-                  id={`country-switch-${key}`}
-                  onClick={() => onSelectCountry(key)}
-                  className={`px-3 py-1 rounded-full text-xs font-medium transition-all cursor-pointer flex items-center gap-1.5 ${
-                    isSelected
-                      ? 'bg-orange-500 text-white font-bold shadow-xs scale-105'
-                      : 'bg-slate-800 text-slate-300 hover:bg-slate-700 hover:text-white'
-                  }`}
-                >
-                  <span>{country.flagEmoji}</span>
-                  <span>{country.countryName}</span>
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      </div>
+      <RegionalPortalBar
+        label="Regional Online Tutoring Portals:"
+        showGlobal={true}
+        isGlobalActive={false}
+        onSelectGlobal={() => onNavigate('service-1on1')}
+        activeCountrySlug={data.countryKey}
+        onSelectCountry={onSelectCountry}
+        countries={ALL_COUNTRY_KEYS.map((key) => {
+          const country = COUNTRY_ONLINE_TUTORING_PAGES[key];
+          return {
+            slug: key,
+            name: country.countryName,
+            flag: country.flagEmoji,
+            id: `country-switch-${key}`,
+          };
+        })}
+      />
 
       {/* Hero Header Section */}
       <section className="bg-gradient-to-b from-[#fff8f2] via-[#fffbf7] to-slate-50 border-b border-orange-200/60 pt-10 pb-14 px-4 sm:px-6 lg:px-8">
