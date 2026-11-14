@@ -7881,6 +7881,129 @@ export async function createApp(options: CreateAppOptions = {}) {
     return res.status(200).send(cachedLlmsTxt);
   });
 
+  const ardManifestFallbackObj = {
+    '@context': 'https://agenticresourcediscovery.org/context/v1',
+    entries: [
+      {
+        identifier: 'urn:air:university-tutors.com:platform:overview',
+        displayName: 'University Tutors Platform & Services Guide',
+        type: 'text/markdown',
+        url: 'https://university-tutors.com/llms.txt',
+        description:
+          'Machine-readable overview of University Tutors (university-tutors.com), covering verified 1-on-1 live academic tutoring, assignment guidance, semester coursework tracks, essay and citation review, and platform navigation.',
+        representativeQueries: [
+          'what academic tutoring services does university-tutors.com offer',
+          'find 1-on-1 online university tutoring and coursework guidance',
+          'how does university tutors verify mentors and protect payments in escrow',
+        ],
+      },
+      {
+        identifier: 'urn:air:university-tutors.com:api:tutors',
+        displayName: 'University Tutors Public Directory API',
+        type: 'application/json',
+        url: 'https://university-tutors.com/api/tutors',
+        description:
+          'Live JSON API endpoint returning active, vetted university tutors with subject specializations, academic credentials, hourly rates, ratings, and availability across STEM, humanities, business, and medicine.',
+        representativeQueries: [
+          'query active university tutors and subject specialists via json api',
+          'search verified phd and masters tutors by subject or hourly rate',
+          'retrieve live tutor profiles and availability on university-tutors.com',
+        ],
+      },
+      {
+        identifier: 'urn:air:university-tutors.com:directory:tutors',
+        displayName: 'Find Verified University Tutors Directory',
+        type: 'text/html',
+        url: 'https://university-tutors.com/tutors',
+        description:
+          'Interactive public directory of 500+ verified university tutors filterable by subject, country, university background, rating, and hourly rate with direct profile views and 1-on-1 booking.',
+        representativeQueries: [
+          'find a verified university tutor for calculus organic chemistry or statistics',
+          'browse online university tutors in the us uk canada and australia',
+          'compare tutor credentials hourly rates and student reviews',
+        ],
+      },
+      {
+        identifier: 'urn:air:university-tutors.com:services:quote-request',
+        displayName: 'Request a Tutoring & Coursework Milestone Quote',
+        type: 'text/html',
+        url: 'https://university-tutors.com/get-quote',
+        description:
+          'Transparent pricing calculator and custom academic support quote request page for 1-on-1 tutoring sessions, assignment guidance, dissertation coaching, and semester coursework packages.',
+        representativeQueries: [
+          'get a quote for university tutoring or assignment guidance',
+          'check hourly tutoring rates and coursework package pricing',
+          'request a custom milestone quote from an academic specialist',
+        ],
+      },
+      {
+        identifier: 'urn:air:university-tutors.com:content:blog',
+        displayName: 'University Tutors Academic Blog & Study Guides',
+        type: 'text/html',
+        url: 'https://university-tutors.com/blog',
+        description:
+          'Published academic study guides, citation manuals (APA, MLA, Harvard, Chicago), research methodology tutorials, dissertation structuring advice, and exam preparation articles.',
+        representativeQueries: [
+          'read university study guides on apa citations and essay structure',
+          'how to write a university lab report or literature review',
+          'academic integrity tips and exam preparation strategies for college students',
+        ],
+      },
+      {
+        identifier: 'urn:air:university-tutors.com:utilities:student-tools',
+        displayName: 'Free Client-Side Student & STEM Tools Suite',
+        type: 'text/html',
+        url: 'https://university-tutors.com/tools',
+        description:
+          'Free, 100% browser-based student utilities including 27 Mathematics & Statistics calculators, 14 Biology & Genetics simulators, 16 Chemistry & Spectroscopy solvers, Interactive Whiteboard, Academic CV Maker, PDF Toolkit, Citation Generator, and International University Grade Converter.',
+        representativeQueries: [
+          'use free online math calculus matrix statistics and chemistry calculators',
+          'convert international university grades to us gpa or uk degree classification',
+          'open free browser whiteboard academic cv maker or apa citation generator',
+        ],
+      },
+    ],
+  };
+
+  let cachedArdJson: string | null = null;
+  app.options(['/.well-known/ard.json', '/.well-known/ai-catalog.json'], (_req, res) => {
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, HEAD, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Accept');
+    return res.status(204).end();
+  });
+
+  app.get(['/.well-known/ard.json', '/.well-known/ai-catalog.json'], (_req, res) => {
+    if (!cachedArdJson) {
+      try {
+        const candidatePaths = [
+          path.resolve(process.cwd(), 'public', '.well-known', 'ard.json'),
+          path.resolve(process.cwd(), 'dist', '.well-known', 'ard.json'),
+          path.resolve(__dirname, 'public', '.well-known', 'ard.json'),
+          path.resolve(__dirname, 'dist', '.well-known', 'ard.json'),
+        ];
+        for (const p of candidatePaths) {
+          if (fs.existsSync(p)) {
+            const raw = fs.readFileSync(p, 'utf-8');
+            // Verify JSON validity before caching
+            JSON.parse(raw);
+            cachedArdJson = raw;
+            break;
+          }
+        }
+      } catch {
+        cachedArdJson = null;
+      }
+      if (!cachedArdJson) {
+        cachedArdJson = JSON.stringify(ardManifestFallbackObj, null, 2);
+      }
+    }
+    res.setHeader('Content-Type', 'application/json; charset=utf-8');
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Cache-Control', 'public, max-age=3600, stale-while-revalidate=86400');
+    return res.status(200).send(cachedArdJson);
+  });
+
   app.get('/sitemap.xml', async (_req, res) => {
     try {
       const payload = await getOrBuildSitemapPayload(loadSitemapDatabaseRecords);
@@ -7934,6 +8057,19 @@ export async function createApp(options: CreateAppOptions = {}) {
 
   if (!options.skipStaticAndVite) {
     if (NODE_ENV !== 'production') {
+      app.all('/.well-known/*', (req, res) => {
+        return res.status(404).json({
+          error: `Well-known resource not found: ${req.path}`,
+          code: 'NOT_FOUND',
+          status: 404,
+        });
+      });
+      app.use((req, res, next) => {
+        if (req.method === 'GET' && !req.path.startsWith('/@') && !req.path.startsWith('/src/') && !req.path.includes('.')) {
+          res.setHeader('Link', '</.well-known/ard.json>; rel="ard"; type="application/json"');
+        }
+        next();
+      });
       const vite = await createViteServer({
         server: { middlewareMode: true },
         appType: 'spa',
@@ -7968,8 +8104,24 @@ export async function createApp(options: CreateAppOptions = {}) {
         }));
       }
 
+      // Serve /.well-known files explicitly with dotfiles allowed so they never fall through to index.html
+      const wellKnownDir = path.join(distPath, '.well-known');
+      if (fs.existsSync(wellKnownDir)) {
+        app.use('/.well-known', express.static(wellKnownDir, {
+          dotfiles: 'allow',
+          maxAge: '1h',
+          setHeaders: (res, filePath) => {
+            if (filePath.toLowerCase().endsWith('.json')) {
+              res.setHeader('Content-Type', 'application/json; charset=utf-8');
+              res.setHeader('Access-Control-Allow-Origin', '*');
+            }
+          },
+        }));
+      }
+
       // Static files: long immutable caching for versioned logo variants, 7-day SWR for stable filenames, no-cache for HTML
       app.use(express.static(distPath, {
+        dotfiles: 'allow',
         maxAge: '7d',
         setHeaders: (res, filePath) => {
           if (filePath.toLowerCase().endsWith('.avif')) {
@@ -7979,6 +8131,7 @@ export async function createApp(options: CreateAppOptions = {}) {
           }
           if (filePath.endsWith('.html')) {
             res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+            res.setHeader('Link', '</.well-known/ard.json>; rel="ard"; type="application/json"');
           } else if (/(logo-\d+|logo_transparent-\d+)\.(avif|webp)$/i.test(filePath)) {
             res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
           } else if (/\.(avif|webp|jpe?g|png|svg|ico|woff2?)$/i.test(filePath)) {
@@ -7987,8 +8140,18 @@ export async function createApp(options: CreateAppOptions = {}) {
         },
       }));
 
+      // Never return SPA HTML for unknown /.well-known/* discovery endpoints
+      app.all('/.well-known/*', (req, res) => {
+        return res.status(404).json({
+          error: `Well-known resource not found: ${req.path}`,
+          code: 'NOT_FOUND',
+          status: 404,
+        });
+      });
+
       app.get('*', (_req, res) => {
         res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+        res.setHeader('Link', '</.well-known/ard.json>; rel="ard"; type="application/json"');
         res.sendFile(path.join(distPath, 'index.html'));
       });
     }

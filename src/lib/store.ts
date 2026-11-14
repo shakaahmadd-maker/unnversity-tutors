@@ -1,15 +1,15 @@
-import { 
-  User, 
-  UserRole, 
-  Chat, 
-  Message, 
-  Quote, 
-  Assignment, 
-  AssignmentStatus, 
-  Payment, 
-  Blog, 
-  FAQ, 
-  SupportTicket, 
+import {
+  User,
+  UserRole,
+  Chat,
+  Message,
+  Quote,
+  Assignment,
+  AssignmentStatus,
+  Payment,
+  Blog,
+  FAQ,
+  SupportTicket,
   Review,
   Invoice,
   ActivityLog,
@@ -17,18 +17,18 @@ import {
   SOP,
   AssignmentReport,
   Agreement,
-  TriggeredEmail
+  TriggeredEmail,
 } from '../types';
 import {
   apiFetch as centralizedApiFetch,
   isAbortError,
   getFriendlyErrorMessage,
-  recordTabDiagnosticError,
-  clearTabDiagnosticError,
   SESSION_EXPIRED_EVENT,
 } from './apiClient';
 
-// Standard Initial Mock Data
+const TODAY_ISO = new Date().toISOString().split('T')[0];
+const TOMORROW_ISO = new Date(Date.now() + 86400000).toISOString().split('T')[0];
+
 const INITIAL_TUTORS: User[] = [
   {
     id: 'tutor_clara',
@@ -43,11 +43,7 @@ const INITIAL_TUTORS: User[] = [
     reviewCount: 142,
     subjects: ['English Literature', 'Essays & Editing', 'History', 'Philosophy'],
     country: 'GB',
-    availableSlots: [
-      new Date().toISOString().split('T')[0] + 'T10:00:00.000Z',
-      new Date().toISOString().split('T')[0] + 'T14:00:00.000Z',
-      new Date(Date.now() + 86400000).toISOString().split('T')[0] + 'T09:00:00.000Z'
-    ]
+    availableSlots: [`${TODAY_ISO}T10:00:00.000Z`, `${TODAY_ISO}T14:00:00.000Z`, `${TOMORROW_ISO}T09:00:00.000Z`],
   },
   {
     id: 'tutor_liam',
@@ -62,10 +58,7 @@ const INITIAL_TUTORS: User[] = [
     reviewCount: 96,
     subjects: ['Advanced Mathematics', 'Statistics', 'Physics', 'Mechanical Engineering'],
     country: 'US',
-    availableSlots: [
-      new Date().toISOString().split('T')[0] + 'T11:00:00.000Z',
-      new Date(Date.now() + 86400000).toISOString().split('T')[0] + 'T15:00:00.000Z'
-    ]
+    availableSlots: [`${TODAY_ISO}T11:00:00.000Z`, `${TOMORROW_ISO}T15:00:00.000Z`],
   },
   {
     id: 'tutor_chloe',
@@ -80,10 +73,7 @@ const INITIAL_TUTORS: User[] = [
     reviewCount: 68,
     subjects: ['Psychology', 'Business Administration', 'Marketing', 'Sociology'],
     country: 'CA',
-    availableSlots: [
-      new Date().toISOString().split('T')[0] + 'T16:00:00.000Z',
-      new Date(Date.now() + 86400000).toISOString().split('T')[0] + 'T13:00:00.000Z'
-    ]
+    availableSlots: [`${TODAY_ISO}T16:00:00.000Z`, `${TOMORROW_ISO}T13:00:00.000Z`],
   },
   {
     id: 'tutor_james',
@@ -98,11 +88,7 @@ const INITIAL_TUTORS: User[] = [
     reviewCount: 215,
     subjects: ['Computer Science', 'Data Structures', 'Coding & Python', 'Database Systems'],
     country: 'AU',
-    availableSlots: [
-      new Date().toISOString().split('T')[0] + 'T09:00:00.000Z',
-      new Date().toISOString().split('T')[0] + 'T13:00:00.000Z',
-      new Date(Date.now() + 86400000).toISOString().split('T')[0] + 'T11:00:00.000Z'
-    ]
+    availableSlots: [`${TODAY_ISO}T09:00:00.000Z`, `${TODAY_ISO}T13:00:00.000Z`, `${TOMORROW_ISO}T11:00:00.000Z`],
   },
   {
     id: 'tutor-dr-marcus-vance',
@@ -118,35 +104,39 @@ const INITIAL_TUTORS: User[] = [
     rating: 4.98,
     reviewCount: 184,
     education: 'Emory University - Ph.D, Neuroscience & Organic Chemistry',
-    experience: "Senior Emory research scientist and dedicated private tutor in Atlanta with over 8 years of experience. I specialize in Organic Chemistry, MCAT preparation, Biochemistry, and Cell Biology for pre-med and undergraduate students.",
+    experience:
+      'Senior Emory research scientist and dedicated private tutor in Atlanta with over 8 years of experience. I specialize in Organic Chemistry, MCAT preparation, Biochemistry, and Cell Biology for pre-med and undergraduate students.',
     subjects: ['Organic Chemistry', 'MCAT', 'Biochemistry', 'Chemistry'],
     isApproved: true,
-    status: 'approved'
-  }
+    status: 'approved',
+  },
 ];
 
 const INITIAL_FAQS: FAQ[] = [
   {
     id: 'faq_1',
     question: 'How do you vet your academic tutors?',
-    answer: 'Every tutor on universitytutors.com is rigorously vetted. We verify their academic transcripts, conduct subject-matter exam assessments, and host live screening video sessions before onboarding.',
+    answer:
+      'Every tutor on universitytutors.com is rigorously vetted. We verify their academic transcripts, conduct subject-matter exam assessments, and host live screening video sessions before onboarding.',
     category: 'General',
-    order: 1
+    order: 1,
   },
   {
     id: 'faq_2',
     question: 'How do Stripe payment holds/escrow work?',
-    answer: 'Your safety is our top priority. When you agree on a quote from your tutor and click "Proceed to Payment", your funds are held in a secure Stripe-enabled escrow account. Money is only released to the tutor after you click "Confirm & Approve Delivery" on your dashboard.',
+    answer:
+      'Your safety is our top priority. When you agree on a quote from your tutor and click "Proceed to Payment", your funds are held in a secure Stripe-enabled escrow account. Money is only released to the tutor after you click "Confirm & Approve Delivery" on your dashboard.',
     category: 'Payments',
-    order: 1
+    order: 1,
   },
   {
     id: 'faq_3',
     question: 'Are your services ethical and aligned with University policies?',
-    answer: 'Absolutely. We provide strictly ethical academic guidance. Our tutors explain concepts, review research methodologies, structure essays, provide line-by-line feedback, and compile custom explanatory study examples.',
+    answer:
+      'Absolutely. We provide strictly ethical academic guidance. Our tutors explain concepts, review research methodologies, structure essays, provide line-by-line feedback, and compile custom explanatory study examples.',
     category: 'Tutoring Process',
-    order: 1
-  }
+    order: 1,
+  },
 ];
 
 export function isShakaEmail(email: string | undefined | null): boolean {
@@ -163,6 +153,8 @@ export interface TabLoadState {
   loadedAt: number | null;
 }
 
+type StoreOpsModule = typeof import('./storeOperations');
+
 export class AppStore {
   users: User[] = [
     ...INITIAL_TUTORS,
@@ -172,8 +164,8 @@ export class AppStore {
       name: 'Alex Mercer',
       email: 'alex@example.com',
       avatarUrl: 'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=150&auto=format&fit=crop&q=80',
-      createdAt: new Date().toISOString(),
-      verified: true
+      createdAt: '2025-01-10T00:00:00.000Z',
+      verified: true,
     },
     {
       id: 'admin_emily',
@@ -181,8 +173,8 @@ export class AppStore {
       name: 'Emily Vance (Platform Admin)',
       email: 'emily@example.com',
       avatarUrl: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150&auto=format&fit=crop&q=80',
-      createdAt: new Date().toISOString(),
-      verified: true
+      createdAt: '2025-01-10T00:00:00.000Z',
+      verified: true,
     },
     {
       id: 'admin_shaka',
@@ -190,9 +182,9 @@ export class AppStore {
       name: 'Shaka Ahmad',
       email: 'shaka.ahmadd@gmail.com',
       avatarUrl: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&auto=format&fit=crop&q=80',
-      createdAt: new Date().toISOString(),
-      verified: true
-    }
+      createdAt: '2025-01-10T00:00:00.000Z',
+      verified: true,
+    },
   ];
   currentUser: User | null = null;
   blogs: Blog[] = [];
@@ -218,37 +210,100 @@ export class AppStore {
   activeStudentsOnline: number = 84;
 
   connectionStatus: 'connected' | 'offline' | 'error' | 'syncing' = 'connected';
-  lastSyncTime: string | null = new Date().toLocaleTimeString();
+  lastSyncTime: string | null = null;
   syncError: string | null = null;
   sessionExpiredMessage: string | null = null;
   tabStates: Record<string, TabLoadState> = {};
 
   private listeners: (() => void)[] = [];
   private pollTimer: any = null;
-  private tabAbortControllers = new Map<string, AbortController>();
-  private chatAbortController: AbortController | null = null;
+  private liveCounterTimer: any = null;
+  public tabAbortControllers = new Map<string, AbortController>();
+  public chatAbortController: AbortController | null = null;
   private fetchDataAbortController: AbortController | null = null;
   private inFlightFetchData: Promise<void> | null = null;
   private trendingTutorsLoaded = false;
-  private fullDirectoryLoaded = false;
+  public fullDirectoryLoaded = false;
   private inFlightDirectoryLoad: Promise<void> | null = null;
   private curatedTutorsCache: User[] = [];
   private catalogDataLoaded = false;
   private inFlightCatalogLoad: Promise<void> | null = null;
+  private opsPromise: Promise<StoreOpsModule> | null = null;
   public isSessionInitialized: boolean = false;
   public sessionReadyPromise: Promise<User | null>;
 
   constructor() {
-    this.startLiveStudentCounter();
-    if (typeof window !== 'undefined') {
-      window.addEventListener(SESSION_EXPIRED_EVENT, () => {
-        if (this.currentUser) {
-          this.handleSessionExpired();
-        }
-      });
+    if (typeof window === 'undefined') {
+      this.isSessionInitialized = true;
+      this.sessionReadyPromise = Promise.resolve(null);
+      return;
     }
-    this.sessionReadyPromise = this.bootstrap();
+
+    window.addEventListener(SESSION_EXPIRED_EVENT, () => {
+      if (this.currentUser) {
+        this.handleSessionExpired();
+      }
+    });
+
+    const pathname = window.location.pathname.toLowerCase();
+    const isProtectedRoute = /^\/(student|admin|user-data)(\/|$)/.test(pathname) || pathname === '/tutor' || pathname === '/tutor/dashboard';
+    const cookieStr = typeof document !== 'undefined' ? document.cookie || '' : '';
+    const hasCookieHint = /(?:^|;\s*)ut_session_active=1(?:;|$)/.test(cookieStr);
+    let hasStoredHint = false;
+    try {
+      hasStoredHint = Boolean(localStorage.getItem('ut_current_user') || localStorage.getItem('auth_token'));
+    } catch {
+      hasStoredHint = false;
+    }
+
+    if (hasCookieHint || hasStoredHint || isProtectedRoute) {
+      this.sessionReadyPromise = Promise.resolve().then(() => this.bootstrap());
+      this.ensureBackgroundTimersStarted();
+    } else {
+      // Anonymous public visitor: zero blocking work during module evaluation & initial paint
+      this.isSessionInitialized = true;
+      this.sessionReadyPromise = Promise.resolve(null);
+      this.schedulePostLoadPublicSync();
+    }
+  }
+
+  private schedulePostLoadPublicSync() {
+    if (typeof window === 'undefined') return;
+    const runIdleSync = () => {
+      const ric = (window as Window & { requestIdleCallback?: (cb: () => void, opts?: { timeout: number }) => number })
+        .requestIdleCallback;
+      const trigger = () => {
+        this.ensureBackgroundTimersStarted();
+        const path = window.location.pathname;
+        const delayMs = path === '/' || path === '' ? 4500 : 800;
+        window.setTimeout(() => {
+          this.fetchData().catch(() => {});
+        }, delayMs);
+      };
+      if (typeof ric === 'function') {
+        ric(trigger, { timeout: 2000 });
+      } else {
+        window.setTimeout(trigger, 600);
+      }
+    };
+
+    if (document.readyState === 'complete') {
+      runIdleSync();
+    } else {
+      window.addEventListener('load', runIdleSync, { once: true });
+    }
+  }
+
+  public ensureBackgroundTimersStarted() {
+    this.startLiveStudentCounter();
     this.startPolling();
+  }
+
+  private loadOps(): Promise<StoreOpsModule> {
+    if (!this.opsPromise) {
+      this.opsPromise = import('./storeOperations');
+    }
+    return this.opsPromise;
   }
 
   public async ensureCatalogDataLoaded(): Promise<void> {
@@ -310,7 +365,6 @@ export class AppStore {
       return null;
     }
     await this.ensureCatalogDataLoaded();
-    // Single initial data fetch after session check completes
     await this.fetchData();
     return user;
   }
@@ -411,7 +465,8 @@ export class AppStore {
       reviewCount: tutorRaw.reviewCount ?? tutorRaw.reviewsCount ?? existing?.reviewCount ?? 120,
       location: tutorRaw.location || tutorRaw.cityLocation || tutorRaw.city || existing?.location || 'Miami, FL',
       experience: tutorRaw.experience || tutorRaw.experienceSummary || tutorRaw.bio || existing?.experience || '',
-      availability: tutorRaw.availability || tutorRaw.availabilities || existing?.availability || 'Flexible global scheduling',
+      availability:
+        tutorRaw.availability || tutorRaw.availabilities || existing?.availability || 'Flexible global scheduling',
       isApproved: tutorRaw.isApproved !== undefined ? tutorRaw.isApproved : true,
       status: tutorRaw.status || 'approved',
     };
@@ -459,7 +514,6 @@ export class AppStore {
       hasStoredHint = false;
     }
 
-    // Avoid firing /api/auth/me (and logging a 401 console error) when visitor is clearly logged out
     if (!forceNetwork && !hasCookieHint && !hasStoredHint) {
       const hadUser = this.currentUser !== null;
       this.currentUser = null;
@@ -483,6 +537,7 @@ export class AppStore {
           } catch {
             // ignore cookie write errors
           }
+          this.ensureBackgroundTimersStarted();
           this.notify();
           if (triggerFetch) {
             this.fetchData().catch(() => {});
@@ -516,10 +571,8 @@ export class AppStore {
   }
 
   private startPolling() {
-    if (typeof window !== 'undefined') {
-      if (this.pollTimer) clearInterval(this.pollTimer);
+    if (typeof window !== 'undefined' && !this.pollTimer) {
       this.pollTimer = setInterval(() => {
-        // Only background poll if logged in, session is active, and tab is visible
         if (this.currentUser && !this.sessionExpiredMessage && !document.hidden) {
           this.fetchData().catch(() => {});
         }
@@ -566,7 +619,7 @@ export class AppStore {
     return Array.from(new Set(out));
   }
 
-  private mergeServerUsers(serverUsersRaw: any[]) {
+  public mergeServerUsers(serverUsersRaw: any[]) {
     const serverUsers = serverUsersRaw.map((u: any) => {
       const parsedSubjects = this.parseSubjectField(u.subjects, u.primarySubject);
       const parsedExpertise = this.parseSubjectField(u.subjectExpertise || u.subjects, u.primarySubject);
@@ -600,7 +653,7 @@ export class AppStore {
     );
   }
 
-  private applyRoomsData(rooms: any[]) {
+  public applyRoomsData(rooms: any[]) {
     if (!Array.isArray(rooms)) return;
     this.chatRooms = rooms;
     if (rooms.length === 0) {
@@ -642,251 +695,6 @@ export class AppStore {
     });
   }
 
-  public async loadDashboardTabData(
-    role: string,
-    tab: string,
-    options?: { force?: boolean; page?: number; limit?: number; search?: string }
-  ): Promise<void> {
-    if (!this.currentUser) return;
-
-    const key = `${role}:${tab}`;
-    const existingState = this.tabStates[key];
-    if (!options?.force && existingState?.loadedAt && Date.now() - existingState.loadedAt < 12_000) {
-      return;
-    }
-
-    // Cancel any previous in-flight fetch for the same tab
-    this.cancelTabRequests(key);
-    const controller = new AbortController();
-    this.tabAbortControllers.set(key, controller);
-    const { signal } = controller;
-
-    this.tabStates = {
-      ...this.tabStates,
-      [key]: { loading: true, error: null, loadedAt: existingState?.loadedAt ?? null },
-    };
-    this.notify();
-
-    const page = options?.page ?? 1;
-    const limit = options?.limit ?? 50;
-    const searchQ = options?.search ? `&search=${encodeURIComponent(options.search.trim())}` : '';
-
-    const isStaff =
-      this.currentUser.role === UserRole.ADMIN ||
-      this.currentUser.role === UserRole.SUBADMIN ||
-      (this.currentUser.role as string) === 'admin' ||
-      (this.currentUser.role as string) === 'subadmin';
-
-    try {
-      const tasks: Promise<void>[] = [];
-
-      const safeGet = async (url: string, apply: (data: any) => void) => {
-        const res = await apiFetch(url, { signal });
-        if (!res.ok) {
-          const errJson = await res.json().catch(() => ({}));
-          throw new Error(errJson.error || `Failed to load ${url.split('?')[0]} (HTTP ${res.status})`);
-        }
-        const data = await res.json();
-        apply(data);
-      };
-
-      // Map tab -> minimal required API calls (strictly honoring role permissions)
-      if (role === 'student') {
-        if (['dashboard', 'assignments', 'submit', 'progress', 'deadlines', 'files'].includes(tab)) {
-          tasks.push(
-            safeGet(`/api/orders?page=${page}&limit=${limit}${searchQ}`, (oData) => {
-              if (Array.isArray(oData.orders)) {
-                this.assignments = oData.orders.map((o: any) => ({
-                  ...o,
-                  wordCount: o.wordCount || 250,
-                  fileUrls: typeof o.fileUrls === 'string' ? JSON.parse(o.fileUrls || '[]') : (o.fileUrls || []),
-                  fileNames: typeof o.fileNames === 'string' ? JSON.parse(o.fileNames || '[]') : (o.fileNames || []),
-                }));
-              }
-            })
-          );
-          tasks.push(
-            safeGet(`/api/quotes?page=${page}&limit=${limit}`, (qData) => {
-              if (Array.isArray(qData.quotes)) this.quotes = qData.quotes;
-            })
-          );
-        }
-        if (['dashboard', 'chat', 'messages', 'support'].includes(tab)) {
-          tasks.push(
-            safeGet(`/api/chat-rooms?page=${page}&limit=${limit}`, (rData) => {
-              if (Array.isArray(rData.rooms)) this.applyRoomsData(rData.rooms);
-            })
-          );
-        }
-        if (['dashboard', 'tutors', 'submit'].includes(tab)) {
-          tasks.push(
-            safeGet(`/api/users?role=tutor&page=1&limit=2500`, (uData) => {
-              if (Array.isArray(uData.users)) {
-                this.mergeServerUsers(uData.users);
-                this.fullDirectoryLoaded = true;
-              }
-            })
-          );
-        }
-        if (['dashboard', 'notifications'].includes(tab)) {
-          tasks.push(
-            safeGet(`/api/notifications?userId=${encodeURIComponent(this.currentUser.id)}&page=${page}&limit=${limit}`, (nData) => {
-              if (Array.isArray(nData.notifications)) this.appNotifications = nData.notifications;
-            })
-          );
-        }
-        if (['payments', 'invoices', 'escrow'].includes(tab)) {
-          tasks.push(
-            safeGet(`/api/payments?page=${page}&limit=${limit}`, (pData) => {
-              if (Array.isArray(pData.payments)) this.payments = pData.payments;
-            }),
-            safeGet(`/api/invoices?page=${page}&limit=${limit}`, (iData) => {
-              if (Array.isArray(iData.invoices)) this.invoices = iData.invoices;
-            })
-          );
-        }
-      } else if (role === 'tutor') {
-        if (['assignments', 'reports'].includes(tab)) {
-          tasks.push(
-            safeGet(`/api/orders?page=${page}&limit=${limit}`, (oData) => {
-              if (Array.isArray(oData.orders)) {
-                this.assignments = oData.orders.map((o: any) => ({
-                  ...o,
-                  wordCount: o.wordCount || 250,
-                  fileUrls: typeof o.fileUrls === 'string' ? JSON.parse(o.fileUrls || '[]') : (o.fileUrls || []),
-                  fileNames: typeof o.fileNames === 'string' ? JSON.parse(o.fileNames || '[]') : (o.fileNames || []),
-                }));
-              }
-            }),
-            safeGet(`/api/payments?page=${page}&limit=${limit}`, (pData) => {
-              if (Array.isArray(pData.payments)) this.payments = pData.payments;
-            })
-          );
-        }
-        if (['chats'].includes(tab)) {
-          tasks.push(
-            safeGet(`/api/chat-rooms?page=${page}&limit=${limit}`, (rData) => {
-              if (Array.isArray(rData.rooms)) this.applyRoomsData(rData.rooms);
-            })
-          );
-        }
-      } else if (role === 'admin' && isStaff) {
-        if (['tutors_list', 'users', 'user_data', 'student_profiles'].includes(tab)) {
-          tasks.push(
-            safeGet(`/api/users?page=1&limit=2500${searchQ}`, (uData) => {
-              if (Array.isArray(uData.users)) {
-                this.mergeServerUsers(uData.users);
-                this.fullDirectoryLoaded = true;
-              }
-            })
-          );
-        }
-        if (['assignments', 'student_profiles', 'disputes', 'reports'].includes(tab)) {
-          tasks.push(
-            safeGet(`/api/orders?page=${page}&limit=${limit}`, (oData) => {
-              if (Array.isArray(oData.orders)) {
-                this.assignments = oData.orders.map((o: any) => ({
-                  ...o,
-                  wordCount: o.wordCount || 250,
-                  fileUrls: typeof o.fileUrls === 'string' ? JSON.parse(o.fileUrls || '[]') : (o.fileUrls || []),
-                  fileNames: typeof o.fileNames === 'string' ? JSON.parse(o.fileNames || '[]') : (o.fileNames || []),
-                }));
-              }
-            })
-          );
-        }
-        if (['chats'].includes(tab)) {
-          tasks.push(
-            safeGet(`/api/chat-rooms?page=${page}&limit=${limit}`, (rData) => {
-              if (Array.isArray(rData.rooms)) this.applyRoomsData(rData.rooms);
-            })
-          );
-        }
-        if (['payments_ledger', 'create_invoice', 'disputes', 'student_profiles'].includes(tab)) {
-          tasks.push(
-            safeGet(`/api/payments?page=${page}&limit=${limit}`, (pData) => {
-              if (Array.isArray(pData.payments)) this.payments = pData.payments;
-            }),
-            safeGet(`/api/invoices?page=${page}&limit=${limit}`, (iData) => {
-              if (Array.isArray(iData.invoices)) this.invoices = iData.invoices;
-            })
-          );
-        }
-        if (['activity_log'].includes(tab)) {
-          tasks.push(
-            safeGet(`/api/audit-logs?page=${page}&limit=${limit}`, (lData) => {
-              if (Array.isArray(lData.logs)) {
-                this.activityLogs = lData.logs.map((l: any) => ({
-                  id: l.id,
-                  userId: l.userId || '',
-                  userName: l.userName || '',
-                  userRole: (l.userRole || 'student') as UserRole,
-                  action: l.action,
-                  details: l.details,
-                  timestamp: l.createdAt,
-                }));
-              }
-            })
-          );
-        }
-        if (['notifications'].includes(tab)) {
-          tasks.push(
-            safeGet(`/api/notifications?page=${page}&limit=${limit}`, (nData) => {
-              if (Array.isArray(nData.notifications)) this.appNotifications = nData.notifications;
-            })
-          );
-        }
-        if (['blogs'].includes(tab)) {
-          tasks.push(
-            safeGet(`/api/blogs?page=${page}&limit=${limit}`, (bData) => {
-              if (Array.isArray(bData.blogs) && bData.blogs.length > 0) {
-                this.blogs = bData.blogs.map((b: any) => ({
-                  ...b,
-                  image: b.imageUrl || b.image,
-                  imageUrl: b.imageUrl || b.image,
-                  tags: typeof b.tags === 'string' ? JSON.parse(b.tags || '[]') : (b.tags || []),
-                }));
-              }
-            })
-          );
-        }
-      }
-
-      if (tasks.length > 0) {
-        await Promise.all(tasks);
-      }
-
-      if (signal.aborted) return;
-      clearTabDiagnosticError(tab, role);
-      this.tabStates = {
-        ...this.tabStates,
-        [key]: { loading: false, error: null, loadedAt: Date.now() },
-      };
-      this.lastSyncTime = new Date().toLocaleTimeString();
-      this.syncError = null;
-    } catch (err: any) {
-      if (isAbortError(err) || signal.aborted) return;
-      const errMsg = getFriendlyErrorMessage(err, `Unable to load ${tab.replace(/_/g, ' ')} data.`);
-      recordTabDiagnosticError(tab, errMsg, role);
-      this.tabStates = {
-        ...this.tabStates,
-        [key]: { loading: false, error: errMsg, loadedAt: existingState?.loadedAt ?? null },
-      };
-      this.syncError = errMsg;
-    } finally {
-      if (this.tabAbortControllers.get(key) === controller) {
-        this.tabAbortControllers.delete(key);
-      }
-      if (!signal.aborted && this.tabStates[key]?.loading) {
-        this.tabStates = {
-          ...this.tabStates,
-          [key]: { ...this.tabStates[key], loading: false },
-        };
-      }
-      this.notify();
-    }
-  }
-
   public async fetchData() {
     if (this.inFlightFetchData) {
       return this.inFlightFetchData;
@@ -903,11 +711,12 @@ export class AppStore {
       let hadError = false;
       let latestErrMsg: string | null = null;
       try {
-        // 1. Fetch public users/tutors and blogs (lean payload for unauthenticated marketing landing, full directory otherwise)
         const pathname = typeof window !== 'undefined' ? window.location.pathname.toLowerCase() : '/';
         const needsFullDirectoryImmediately =
           Boolean(this.currentUser) ||
-          /\/(tutors|tutors-directory|find-a-tutor|user-data|get-a-quote|online-tutoring|services|our-blog|blog|admin|student|tutor)/.test(pathname);
+          /\/(tutors|tutors-directory|find-a-tutor|user-data|get-a-quote|online-tutoring|services|our-blog|blog|admin|student|tutor)/.test(
+            pathname
+          );
         if (needsFullDirectoryImmediately) {
           await this.ensureCatalogDataLoaded();
         }
@@ -967,7 +776,6 @@ export class AppStore {
           return;
         }
 
-        // 2. For authenticated users, run role-scoped paginated requests in parallel
         const isStaff =
           this.currentUser.role === UserRole.ADMIN ||
           this.currentUser.role === UserRole.SUBADMIN ||
@@ -1082,8 +890,8 @@ export class AppStore {
   }
 
   private startLiveStudentCounter() {
-    if (typeof window === 'undefined') return;
-    setInterval(() => {
+    if (typeof window === 'undefined' || this.liveCounterTimer) return;
+    this.liveCounterTimer = setInterval(() => {
       if (document.hidden) return;
       const delta = Math.floor(Math.random() * 5) - 2;
       this.activeStudentsOnline = Math.max(45, Math.min(140, this.activeStudentsOnline + delta));
@@ -1094,315 +902,29 @@ export class AppStore {
   subscribe(listener: () => void) {
     this.listeners.push(listener);
     return () => {
-      this.listeners = this.listeners.filter(l => l !== listener);
+      this.listeners = this.listeners.filter((l) => l !== listener);
     };
   }
 
   notify() {
-    this.listeners.forEach(listener => {
+    this.listeners.forEach((listener) => {
       try {
         listener();
       } catch (e) {
-        console.error("Store listener error: ", e);
+        console.error('Store listener error: ', e);
       }
     });
   }
 
-  async subscribeToChatDetails(chatId: string) {
-    if (!chatId) return;
-    if (this.chatAbortController) {
-      this.chatAbortController.abort();
-    }
-    const controller = new AbortController();
-    this.chatAbortController = controller;
-    const { signal } = controller;
-
-    this.isLoadingMessages = true;
-    this.chatError = null;
-    this.notify();
-    try {
-      let res = await apiFetch(`/api/chat-rooms/${encodeURIComponent(chatId)}/messages?limit=100`, { signal });
-      if (!res.ok && res.status !== 401 && res.status !== 403) {
-        res = await apiFetch(`/api/messages?chatId=${encodeURIComponent(chatId)}&limit=100`, { signal });
-      }
-      if (signal.aborted) return;
-      if (res.ok) {
-        const data = await res.json();
-        if (Array.isArray(data.messages)) {
-          const otherMsgs = this.messages.filter(m => m.chatId !== chatId && m.roomId !== chatId);
-          const newMsgs = data.messages.map((m: any) => ({ ...m, timestamp: m.createdAt }));
-          this.messages = [...otherMsgs, ...newMsgs];
-          this.chatError = null;
-        }
-      } else {
-        const errJson = await res.json().catch(() => ({}));
-        this.chatError = errJson.error || 'Unable to load messages for this chat room.';
-      }
-    } catch (err: any) {
-      if (isAbortError(err) || signal.aborted) return;
-      this.chatError = getFriendlyErrorMessage(err, 'Error connecting to chat server.');
-    } finally {
-      if (this.chatAbortController === controller) {
-        this.chatAbortController = null;
-      }
-      this.isLoadingMessages = false;
-      this.notify();
-    }
-  }
-
   // ==========================================
-  // AUTHENTICATION (Email & Password via PostgreSQL)
-  // ==========================================
-
-  async login(email: string, password?: string): Promise<boolean> {
-    const cleanEmail = email.toLowerCase().trim();
-    try {
-      const res = await apiFetch('/api/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: cleanEmail, password: password || '' }),
-        skipAuthEvent: true,
-      });
-
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        throw new Error(data.error || 'Authentication rejected');
-      }
-
-      if (!data?.user?.id) {
-        throw new Error('Backend session could not be established.');
-      }
-
-      this.currentUser = data.user;
-      this.sessionExpiredMessage = null;
-      this.isSessionInitialized = true;
-      this.fetchData().catch(() => {});
-      this.notify();
-      return true;
-    } catch (err: any) {
-      console.error('[AUTH] Login error:', err.message);
-      throw err;
-    }
-  }
-
-  async register(name: string, email: string, _role: UserRole, extra?: any): Promise<boolean> {
-    const cleanEmail = email.toLowerCase().trim();
-    if (!extra?.password || typeof extra.password !== 'string') {
-      throw new Error('Password is required to register an account.');
-    }
-    try {
-      const res = await apiFetch('/api/auth/register', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        skipAuthEvent: true,
-        body: JSON.stringify({
-          name: name.trim(),
-          email: cleanEmail,
-          password: extra.password,
-          confirmPassword: extra.confirmPassword || extra.passwordConfirmation || extra.password,
-          termsAccepted: extra.termsAccepted ?? extra.agreeTerms ?? true,
-          extra: {
-            bio: extra.bio,
-            country: extra.country,
-            location: extra.location,
-            phoneNumber: extra.phoneNumber,
-            education: extra.education,
-          }
-        })
-      });
-
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        throw new Error(data?.error || data?.message || 'Registration failed');
-      }
-      if (!data?.user?.id) {
-        throw new Error('Backend session could not be established.');
-      }
-
-      this.currentUser = data.user;
-      this.sessionExpiredMessage = null;
-      this.isSessionInitialized = true;
-      this.users.push(data.user);
-      this.notify();
-      return true;
-    } catch (err: any) {
-      console.error('[AUTH] Register error:', err.message);
-      throw err;
-    }
-  }
-
-  async logout(): Promise<void> {
-    this.cancelAllPendingRequests();
-    try {
-      await apiFetch('/api/auth/logout', { method: 'POST', skipAuthEvent: true });
-    } catch {
-      // ignore network failure while clearing client state
-    }
-    this.currentUser = null;
-    this.sessionExpiredMessage = null;
-    this.assignments = [];
-    this.chats = [];
-    this.chatRooms = [];
-    this.messages = [];
-    this.quotes = [];
-    this.payments = [];
-    this.invoices = [];
-    this.appNotifications = [];
-    this.tabStates = {};
-    if (typeof window !== 'undefined') {
-      localStorage.removeItem('ut_current_user');
-      localStorage.removeItem('auth_token');
-    }
-    this.notify();
-  }
-
-  async createTutorProfile(tutorData: any): Promise<boolean> {
-    const res = await apiFetch('/api/tutors', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(tutorData)
-    });
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok) {
-      throw new Error(data.error || 'Failed to create tutor profile');
-    }
-
-    const created = data.tutor || data.user;
-    if (created) {
-      const normalized: User = {
-        ...created,
-        role: UserRole.TUTOR,
-        subjects: typeof created.subjects === 'string' ? JSON.parse(created.subjects || '[]') : (created.subjects || []),
-        subjectExpertise: typeof created.subjectExpertise === 'string' ? JSON.parse(created.subjectExpertise || '[]') : (created.subjectExpertise || []),
-      };
-      const idx = this.users.findIndex(u => u.id === normalized.id || u.email.toLowerCase().trim() === normalized.email.toLowerCase().trim());
-      if (idx !== -1) {
-        this.users[idx] = { ...this.users[idx], ...normalized };
-      } else {
-        this.users.unshift(normalized);
-      }
-      this.notify();
-    }
-    return true;
-  }
-
-  async registerTutorFromModal(tutorData: any): Promise<boolean> {
-    return this.createTutorProfile(tutorData);
-  }
-
-  // ==========================================
-  // USERS MANAGEMENT
-  // ==========================================
-
-  async verifyUser(userId: string) {
-    const user = this.users.find(u => u.id === userId);
-    if (user) {
-      user.verified = true;
-      this.notify();
-      apiFetch(`/api/users/${userId}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ verified: true })
-      }).catch(() => {});
-    }
-  }
-
-  async toggleUserStatus(userId: string) {
-    const user = this.users.find(u => u.id === userId);
-    if (user) {
-      user.suspended = !user.suspended;
-      this.notify();
-      apiFetch(`/api/users/${userId}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ suspended: user.suspended })
-      }).catch(() => {});
-    }
-  }
-
-  async updateUserRole(userId: string, targetRole: UserRole) {
-    const user = this.users.find(u => u.id === userId);
-    if (user) {
-      user.role = targetRole;
-      this.notify();
-      apiFetch(`/api/users/${userId}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ role: targetRole })
-      }).catch(() => {});
-    }
-  }
-
-  async deleteUser(userId: string) {
-    this.users = this.users.filter(u => u.id !== userId);
-    this.notify();
-  }
-
-  async updateUserProfile(userId: string, data: Partial<User>) {
-    const userIndex = this.users.findIndex(u => u.id === userId);
-    if (userIndex !== -1) {
-      this.users[userIndex] = { ...this.users[userIndex], ...data };
-      if (this.currentUser?.id === userId) {
-        this.currentUser = { ...this.currentUser, ...data };
-      }
-      this.notify();
-      try {
-        await apiFetch(`/api/users/${userId}`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(data)
-        });
-      } catch (e) {
-        console.warn('[Store] Notice saving user profile to API:', e);
-      }
-    }
-  }
-
-  async updateUser(userId: string, data: Partial<User>) {
-    return this.updateUserProfile(userId, data);
-  }
-
-  // Password reset methods - connected strictly to server API endpoints (never receives or logs reset tokens)
-  async requestPasswordReset(email: string): Promise<boolean> {
-    const cleanEmail = email.toLowerCase().trim();
-    const res = await apiFetch('/api/auth/forgot-password', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: cleanEmail })
-    });
-    const data = await res.json();
-    if (!res.ok) {
-      throw new Error(data.error || 'Password reset request failed');
-    }
-    return true;
-  }
-
-  async resetPassword(email: string, token: string, newPassword: string, confirmPassword?: string): Promise<boolean> {
-    const cleanEmail = email.toLowerCase().trim();
-    const res = await apiFetch('/api/auth/reset-password', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: cleanEmail, token, newPassword, confirmPassword: confirmPassword || newPassword })
-    });
-    const data = await res.json();
-    if (!res.ok) {
-      throw new Error(data.error || 'Failed to reset password');
-    }
-    if (data.user) {
-      this.currentUser = data.user;
-    }
-    this.notify();
-    return true;
-  }
-
-  // ==========================================
-  // CHAT & MESSAGING
+  // SYNCHRONOUS CHAT STATE HELPERS
   // ==========================================
 
   getOrCreateChat(studentId: string, tutorId: string, subject: string = 'Academic Mentorship'): Chat {
-    const existing = this.chats.find(c => 
-      (c.studentId === studentId && c.tutorId === tutorId) || 
-      (c.studentId === tutorId && c.tutorId === studentId)
+    const existing = this.chats.find(
+      (c) =>
+        (c.studentId === studentId && c.tutorId === tutorId) ||
+        (c.studentId === tutorId && c.tutorId === studentId)
     );
     if (existing) return existing;
 
@@ -1412,12 +934,11 @@ export class AppStore {
       tutorId,
       subject,
       createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
+      updatedAt: new Date().toISOString(),
     };
     this.chats.push(newChat);
     this.notify();
 
-    // Persist room to backend
     apiFetch('/api/chat-rooms', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -1426,16 +947,123 @@ export class AppStore {
         title: subject,
         type: 'direct',
         memberIds: [studentId, tutorId],
-      })
-    }).catch(err => console.warn('[STORE] Notice registering room on backend:', err));
+      }),
+    }).catch((err) => console.warn('[STORE] Notice registering room on backend:', err));
 
     return newChat;
   }
 
   deleteChat(chatId: string) {
-    this.chats = this.chats.filter(c => c.id !== chatId);
-    this.messages = this.messages.filter(m => m.chatId !== chatId);
+    this.chats = this.chats.filter((c) => c.id !== chatId);
+    this.messages = this.messages.filter((m) => m.chatId !== chatId);
     this.notify();
+  }
+
+  markMessagesAsRead(chatId: string, currentUserId: string) {
+    this.messages.forEach((m) => {
+      if (m.chatId === chatId && m.senderId !== currentUserId) {
+        m.read = true;
+      }
+    });
+    this.notify();
+  }
+
+  setTypingStatus(chatId: string, userId: string, isTyping: boolean) {
+    const chat = this.chats.find((c) => c.id === chatId);
+    if (chat) {
+      if (chat.studentId === userId) {
+        chat.studentIsTyping = isTyping;
+      } else {
+        chat.tutorIsTyping = isTyping;
+      }
+      this.notify();
+    }
+  }
+
+  // ==========================================
+  // LAZY-DELEGATED OPERATIONS (Code-Split Chunk)
+  // ==========================================
+
+  public async loadDashboardTabData(
+    role: string,
+    tab: string,
+    options?: { force?: boolean; page?: number; limit?: number; search?: string }
+  ): Promise<void> {
+    const ops = await this.loadOps();
+    return ops.loadDashboardTabData(this, role, tab, options);
+  }
+
+  async subscribeToChatDetails(chatId: string) {
+    const ops = await this.loadOps();
+    return ops.subscribeToChatDetails(this, chatId);
+  }
+
+  async login(email: string, password?: string): Promise<boolean> {
+    const ops = await this.loadOps();
+    return ops.login(this, email, password);
+  }
+
+  async register(name: string, email: string, role: UserRole, extra?: any): Promise<boolean> {
+    const ops = await this.loadOps();
+    return ops.register(this, name, email, role, extra);
+  }
+
+  async logout(): Promise<void> {
+    const ops = await this.loadOps();
+    return ops.logout(this);
+  }
+
+  async createTutorProfile(tutorData: any): Promise<boolean> {
+    const ops = await this.loadOps();
+    return ops.createTutorProfile(this, tutorData);
+  }
+
+  async registerTutorFromModal(tutorData: any): Promise<boolean> {
+    return this.createTutorProfile(tutorData);
+  }
+
+  async verifyUser(userId: string) {
+    const ops = await this.loadOps();
+    return ops.verifyUser(this, userId);
+  }
+
+  async toggleUserStatus(userId: string) {
+    const ops = await this.loadOps();
+    return ops.toggleUserStatus(this, userId);
+  }
+
+  async updateUserRole(userId: string, targetRole: UserRole) {
+    const ops = await this.loadOps();
+    return ops.updateUserRole(this, userId, targetRole);
+  }
+
+  async deleteUser(userId: string) {
+    const ops = await this.loadOps();
+    return ops.deleteUser(this, userId);
+  }
+
+  async updateUserProfile(userId: string, data: Partial<User>) {
+    const ops = await this.loadOps();
+    return ops.updateUserProfile(this, userId, data);
+  }
+
+  async updateUser(userId: string, data: Partial<User>) {
+    return this.updateUserProfile(userId, data);
+  }
+
+  async requestPasswordReset(email: string): Promise<boolean> {
+    const ops = await this.loadOps();
+    return ops.requestPasswordReset(email);
+  }
+
+  async resetPassword(
+    email: string,
+    token: string,
+    newPassword: string,
+    confirmPassword?: string
+  ): Promise<boolean> {
+    const ops = await this.loadOps();
+    return ops.resetPassword(this, email, token, newPassword, confirmPassword);
   }
 
   async addMessage(
@@ -1446,82 +1074,9 @@ export class AppStore {
     fileName?: string,
     isSystem?: boolean,
     orderId?: string
-  ) {
-    // Client-side length validation
-    if (!content || !content.trim()) {
-      throw new Error('Message content cannot be empty.');
-    }
-    if (content.length > 5000) {
-      throw new Error('Message length exceeds the 5,000 character limit.');
-    }
-
-    const msgId = `msg_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
-    const newMsg: Message = {
-      id: msgId,
-      chatId,
-      roomId: chatId,
-      senderId,
-      content: content.trim(),
-      fileUrl,
-      fileName,
-      timestamp: new Date().toISOString(),
-      isSystem: isSystem || false,
-      read: false
-    };
-
-    // Optimistically add to UI
-    this.messages.push(newMsg);
-    this.notify();
-
-    try {
-      const res = await apiFetch(`/api/chat-rooms/${encodeURIComponent(chatId)}/messages`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          id: msgId,
-          orderId,
-          content: content.trim(),
-          fileUrl,
-          fileName,
-          isSystem: Boolean(isSystem),
-          senderId,
-          sendAsTutorId: (senderId !== this.currentUser?.id) ? senderId : undefined,
-        }),
-      });
-
-      if (!res.ok) {
-        // Fallback to /api/messages if /api/chat-rooms/:id not matched
-        const fallbackRes = await apiFetch('/api/messages', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            id: msgId,
-            chatId,
-            roomId: chatId,
-            orderId,
-            senderId,
-            sendAsTutorId: (senderId !== this.currentUser?.id) ? senderId : undefined,
-            content: content.trim(),
-            fileUrl,
-            fileName,
-            isSystem: Boolean(isSystem),
-            createdAt: newMsg.timestamp,
-          }),
-        });
-        if (!fallbackRes.ok) {
-          const errData = await fallbackRes.json().catch(() => ({}));
-          const errMessage = errData.error || `Server error (${fallbackRes.status}): Failed to send message.`;
-          this.messages = this.messages.filter(m => m.id !== msgId);
-          this.notify();
-          throw new Error(errMessage);
-        }
-      }
-      return newMsg;
-    } catch (err: any) {
-      this.messages = this.messages.filter(m => m.id !== msgId);
-      this.notify();
-      throw err;
-    }
+  ): Promise<Message> {
+    const ops = await this.loadOps();
+    return ops.addMessage(this, chatId, senderId, content, fileUrl, fileName, isSystem, orderId);
   }
 
   sendMessage(
@@ -1536,31 +1091,6 @@ export class AppStore {
     return this.addMessage(chatId, senderId, content, fileUrl, fileName, isSystem, orderId);
   }
 
-  markMessagesAsRead(chatId: string, currentUserId: string) {
-    this.messages.forEach(m => {
-      if (m.chatId === chatId && m.senderId !== currentUserId) {
-        m.read = true;
-      }
-    });
-    this.notify();
-  }
-
-  setTypingStatus(chatId: string, userId: string, isTyping: boolean) {
-    const chat = this.chats.find(c => c.id === chatId);
-    if (chat) {
-      if (chat.studentId === userId) {
-        chat.studentIsTyping = isTyping;
-      } else {
-        chat.tutorIsTyping = isTyping;
-      }
-      this.notify();
-    }
-  }
-
-  // ==========================================
-  // QUOTES
-  // ==========================================
-
   async addQuote(
     chatId: string,
     tutorId: string,
@@ -1572,70 +1102,27 @@ export class AppStore {
     advancePercentage: number = 50,
     orderId?: string,
     notes?: string
-  ) {
-    const quoteId = `quote_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
-    const advAmount = Number(((amount * advancePercentage) / 100).toFixed(2));
-    const balAmount = Number((amount - advAmount).toFixed(2));
-
-    const newQuote: Quote = {
-      id: quoteId,
+  ): Promise<Quote> {
+    const ops = await this.loadOps();
+    return ops.addQuote(
+      this,
       chatId,
+      tutorId,
       amount,
       estimatedHours,
-      status: 'pending',
-      serviceType: serviceType || 'Academic Mentorship',
-      deliveryTime: deliveryTime || '3-5 Business Days',
-      scopeOfWork: scopeOfWork || 'Comprehensive guidance, drafting reviews, and model examples.',
+      serviceType,
+      deliveryTime,
+      scopeOfWork,
       advancePercentage,
-      advanceAmount: advAmount,
-      balanceAmount: balAmount,
-      createdAt: new Date().toISOString(),
-    };
-
-    this.quotes.push(newQuote);
-    this.notify();
-
-    apiFetch('/api/quotes', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        id: quoteId,
-        chatId,
-        orderId,
-        tutorId,
-        amount,
-        estimatedHours,
-        serviceType,
-        deliveryTime,
-        scopeOfWork,
-        advancePercentage,
-        advanceAmount: advAmount,
-        balanceAmount: balAmount,
-        notes,
-        status: 'pending',
-      })
-    }).catch(() => {});
-
-    return newQuote;
+      orderId,
+      notes
+    );
   }
 
   async updateQuoteStatus(quoteId: string, status: 'accepted' | 'declined') {
-    const quote = this.quotes.find(q => q.id === quoteId);
-    if (quote) {
-      quote.status = status;
-      this.notify();
-
-      apiFetch(`/api/quotes/${quoteId}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status })
-      }).catch(() => {});
-    }
+    const ops = await this.loadOps();
+    return ops.updateQuoteStatus(this, quoteId, status);
   }
-
-  // ==========================================
-  // ASSIGNMENTS & ORDERS
-  // ==========================================
 
   async addAssignment(
     studentId: string,
@@ -1650,49 +1137,21 @@ export class AppStore {
     fileNames: string[] = [],
     tutorId?: string
   ): Promise<Assignment> {
-    const assignId = `assign_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
-    const newAssignment: Assignment = {
-      id: assignId,
+    const ops = await this.loadOps();
+    return ops.addAssignment(
+      this,
       studentId,
-      tutorId: tutorId || '',
       title,
       subject,
       deadline,
+      instructions,
       wordCount,
       referenceStyle,
       sourcesCount,
-      instructions,
       fileUrls,
       fileNames,
-      status: tutorId ? AssignmentStatus.IN_PROGRESS : AssignmentStatus.PENDING,
-      progressPercent: 0,
-      createdAt: new Date().toISOString()
-    };
-
-    this.assignments.unshift(newAssignment);
-    this.notify();
-
-    apiFetch('/api/orders', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        id: assignId,
-        studentId,
-        tutorId: tutorId || null,
-        title,
-        subject,
-        deadline,
-        wordCount,
-        referenceStyle,
-        sourcesCount,
-        instructions,
-        fileUrls,
-        fileNames,
-        status: newAssignment.status,
-      })
-    }).catch(() => {});
-
-    return newAssignment;
+      tutorId
+    );
   }
 
   async createAssignmentWithDirectInvoice(
@@ -1708,46 +1167,33 @@ export class AppStore {
     fileUrls: string[] = [],
     fileNames: string[] = [],
     tutorId?: string
-  ) {
-    const assign = await this.addAssignment(studentId, title, subject, deadline, instructions, wordCount, referenceStyle, sourcesCount, fileUrls, fileNames, tutorId);
-    assign.quoteAmount = quoteAmount;
-    assign.status = AssignmentStatus.AWAITING_PAYMENT;
-    this.notify();
-
-    apiFetch(`/api/orders/${assign.id}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ quoteAmount, status: assign.status })
-    }).catch(() => {});
-
-    return assign;
+  ): Promise<Assignment> {
+    const ops = await this.loadOps();
+    return ops.createAssignmentWithDirectInvoice(
+      this,
+      studentId,
+      title,
+      subject,
+      deadline,
+      instructions,
+      quoteAmount,
+      wordCount,
+      referenceStyle,
+      sourcesCount,
+      fileUrls,
+      fileNames,
+      tutorId
+    );
   }
 
   async updateAssignmentStatus(assignmentId: string, status: AssignmentStatus) {
-    const assign = this.assignments.find(a => a.id === assignmentId);
-    if (assign) {
-      assign.status = status;
-      this.notify();
-      apiFetch(`/api/orders/${assignmentId}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status })
-      }).catch(() => {});
-    }
+    const ops = await this.loadOps();
+    return ops.updateAssignmentStatus(this, assignmentId, status);
   }
 
   async assignTutorToAssignment(assignmentId: string, tutorId: string) {
-    const assign = this.assignments.find(a => a.id === assignmentId);
-    if (assign) {
-      assign.tutorId = tutorId;
-      assign.status = AssignmentStatus.IN_PROGRESS;
-      this.notify();
-      apiFetch(`/api/orders/${assignmentId}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ tutorId, status: assign.status })
-      }).catch(() => {});
-    }
+    const ops = await this.loadOps();
+    return ops.assignTutorToAssignment(this, assignmentId, tutorId);
   }
 
   async assignTutor(assignmentId: string, tutorId: string) {
@@ -1755,121 +1201,38 @@ export class AppStore {
   }
 
   async updateAssignmentProgress(assignmentId: string, progressPercent: number) {
-    const assign = this.assignments.find(a => a.id === assignmentId);
-    if (assign) {
-      assign.progressPercent = progressPercent;
-      this.notify();
-      apiFetch(`/api/orders/${assignmentId}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ progressPercent })
-      }).catch(() => {});
-    }
+    const ops = await this.loadOps();
+    return ops.updateAssignmentProgress(this, assignmentId, progressPercent);
   }
 
   async setAssignmentCustomPrice(assignmentId: string, price: number) {
-    const assign = this.assignments.find(a => a.id === assignmentId);
-    if (assign) {
-      assign.quoteAmount = price;
-      this.notify();
-      apiFetch(`/api/orders/${assignmentId}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ quoteAmount: price })
-      }).catch(() => {});
-    }
+    const ops = await this.loadOps();
+    return ops.setAssignmentCustomPrice(this, assignmentId, price);
   }
 
   async completeAssignmentByTutor(assignmentId: string, fileUrl: string, fileName: string) {
-    const assign = this.assignments.find(a => a.id === assignmentId);
-    if (assign) {
-      assign.status = AssignmentStatus.COMPLETED;
-      assign.progressPercent = 100;
-      assign.tutorWorkFileUrl = fileUrl;
-      assign.tutorWorkFileName = fileName;
-      this.notify();
-      apiFetch(`/api/orders/${assignmentId}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          status: AssignmentStatus.COMPLETED,
-          progressPercent: 100,
-          tutorWorkFileUrl: fileUrl,
-          tutorWorkFileName: fileName
-        })
-      }).catch(() => {});
-    }
+    const ops = await this.loadOps();
+    return ops.completeAssignmentByTutor(this, assignmentId, fileUrl, fileName);
   }
 
   async approveAssignmentAndReleasePayment(assignmentId: string, rating?: number, reviewComment?: string) {
-    const assign = this.assignments.find(a => a.id === assignmentId);
-    if (assign) {
-      assign.reviewed = true;
-      this.notify();
-      apiFetch(`/api/orders/${assignmentId}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ reviewed: true, escrowStatus: 'released' })
-      }).catch(() => {});
-
-      if (rating && assign.tutorId) {
-        this.reviews.push({
-          id: `rev_${Date.now()}`,
-          tutorId: assign.tutorId,
-          studentName: this.currentUser?.name || 'Student',
-          studentAvatar: this.currentUser?.avatarUrl || '',
-          rating,
-          comment: reviewComment || 'Excellent academic guidance and support!',
-          createdAt: new Date().toISOString()
-        });
-        this.notify();
-      }
-    }
+    const ops = await this.loadOps();
+    return ops.approveAssignmentAndReleasePayment(this, assignmentId, rating, reviewComment);
   }
 
   async requestAssignmentRevision(assignmentId: string, revisionNotes: string) {
-    const assign = this.assignments.find(a => a.id === assignmentId);
-    if (assign) {
-      assign.status = AssignmentStatus.REVISION;
-      this.notify();
-      apiFetch(`/api/orders/${assignmentId}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: AssignmentStatus.REVISION, instructions: assign.instructions + '\n\n[REVISION NOTES]: ' + revisionNotes })
-      }).catch(() => {});
-    }
+    const ops = await this.loadOps();
+    return ops.requestAssignmentRevision(this, assignmentId, revisionNotes);
   }
 
   async updateAssignment(assignmentId: string, updates: Partial<Assignment>) {
-    const idx = this.assignments.findIndex(a => a.id === assignmentId);
-    if (idx !== -1) {
-      this.assignments[idx] = { ...this.assignments[idx], ...updates };
-      this.notify();
-    }
-    try {
-      const res = await apiFetch(`/api/orders/${assignmentId}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(updates)
-      });
-      return res.ok;
-    } catch {
-      return false;
-    }
+    const ops = await this.loadOps();
+    return ops.updateAssignment(this, assignmentId, updates);
   }
 
   async deleteAssignment(assignmentId: string) {
-    this.assignments = this.assignments.filter(a => a.id !== assignmentId);
-    this.notify();
-    try {
-      const res = await apiFetch(`/api/orders/${assignmentId}`, {
-        method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' }
-      });
-      return res.ok;
-    } catch {
-      return false;
-    }
+    const ops = await this.loadOps();
+    return ops.deleteAssignment(this, assignmentId);
   }
 
   async createAssignmentOrder(data: {
@@ -1891,96 +1254,23 @@ export class AppStore {
     fileUrls?: string[];
     fileNames?: string[];
   }) {
-    const assignId = 'ord_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6);
-    const newAssignment: Assignment = {
-      id: assignId,
-      studentId: data.studentId,
-      tutorId: data.tutorId || '',
-      title: data.title,
-      subject: data.subject,
-      academicLevel: data.academicLevel || 'Undergraduate',
-      deadline: data.deadline,
-      pages: data.pages || 1,
-      wordCount: data.wordCount || 250,
-      referenceStyle: data.referenceStyle || 'APA 7th',
-      sourcesCount: data.sourcesCount || 0,
-      instructions: data.instructions || '',
-      budget: data.budget,
-      quoteAmount: data.quoteAmount,
-      fileUrls: data.fileUrls || [],
-      fileNames: data.fileNames || [],
-      status: data.status || (data.tutorId ? AssignmentStatus.IN_PROGRESS : AssignmentStatus.PENDING),
-      escrowStatus: data.escrowStatus || (data.quoteAmount ? 'secured' : 'pending'),
-      progressPercent: 0,
-      createdAt: new Date().toISOString()
-    };
-
-    this.assignments.unshift(newAssignment);
-    this.notify();
-
-    try {
-      const res = await apiFetch('/api/orders', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          ...newAssignment,
-          pages: newAssignment.pages,
-          wordCount: newAssignment.wordCount,
-          sourcesCount: newAssignment.sourcesCount,
-          quoteAmount: newAssignment.quoteAmount,
-          budget: newAssignment.budget,
-          fileUrls: newAssignment.fileUrls,
-          fileNames: newAssignment.fileNames
-        })
-      });
-      return { success: res.ok, order: newAssignment };
-    } catch (err: any) {
-      return { success: false, error: err.message, order: newAssignment };
-    }
+    const ops = await this.loadOps();
+    return ops.createAssignmentOrder(this, data);
   }
 
   async releaseEscrow(assignmentId: string) {
-    const assign = this.assignments.find(a => a.id === assignmentId);
-    if (assign) {
-      assign.escrowStatus = 'released';
-      this.notify();
-      apiFetch(`/api/orders/${assignmentId}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ escrowStatus: 'released' })
-      }).catch(() => {});
-    }
+    const ops = await this.loadOps();
+    return ops.releaseEscrow(this, assignmentId);
   }
 
-  // ==========================================
-  // INVOICES & PAYMENTS
-  // ==========================================
-
   async updateInvoiceStatus(invoiceId: string, status: 'due' | 'paid' | 'pending' | 'uninvoiced') {
-    const inv = this.invoices.find(i => i.id === invoiceId);
-    if (inv) {
-      inv.status = status;
-      this.notify();
-    }
+    const ops = await this.loadOps();
+    return ops.updateInvoiceStatus(this, invoiceId, status);
   }
 
   async addInvoice(invoice: Omit<Invoice, 'id' | 'createdAt'>) {
-    const id = `inv_${Date.now()}`;
-    const newInvoice: Invoice = {
-      ...invoice,
-      id,
-      createdAt: new Date().toISOString()
-    };
-    this.invoices.push(newInvoice);
-    this.notify();
-
-    apiFetch('/api/invoices', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(newInvoice)
-    }).catch(() => {});
-
-    return newInvoice;
+    const ops = await this.loadOps();
+    return ops.addInvoice(this, invoice);
   }
 
   async recordPayment(paymentData: {
@@ -1991,28 +1281,8 @@ export class AppStore {
     type?: 'advance' | 'balance' | 'full';
     notes?: string;
   }): Promise<Payment | null> {
-    try {
-      const res = await apiFetch('/api/payments', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(paymentData)
-      });
-      if (res.ok) {
-        const data = await res.json();
-        if (data.payment) {
-          this.payments.unshift(data.payment);
-          const assign = this.assignments.find(a => a.id === paymentData.assignmentId);
-          if (assign) {
-            assign.status = AssignmentStatus.IN_PROGRESS;
-          }
-          this.notify();
-          return data.payment;
-        }
-      }
-    } catch (e) {
-      console.warn('Error recording payment:', e);
-    }
-    return null;
+    const ops = await this.loadOps();
+    return ops.recordPayment(this, paymentData);
   }
 
   async processAdvancePayment(assignmentId: string, amount: number) {
@@ -2022,7 +1292,7 @@ export class AppStore {
       amount,
       status: 'escrow',
       type: 'advance',
-      notes: 'Initial 50% Advance Escrow Payment'
+      notes: 'Initial 50% Advance Escrow Payment',
     });
   }
 
@@ -2033,288 +1303,91 @@ export class AppStore {
       amount,
       status: 'escrow',
       type: 'balance',
-      notes: 'Milestone Balance Escrow Settlement'
+      notes: 'Milestone Balance Escrow Settlement',
     });
   }
 
-  // ==========================================
-  // NOTIFICATIONS, LOGS, SOPS, REPORTS
-  // ==========================================
-
   async addNotification(notif: Omit<AppNotification, 'id' | 'createdAt' | 'read'>) {
-    const id = `notif_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
-    const newNotif: AppNotification = {
-      ...notif,
-      id,
-      read: false,
-      createdAt: new Date().toISOString()
-    };
-    this.appNotifications.unshift(newNotif);
-    this.notify();
-
-    apiFetch('/api/notifications', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(newNotif)
-    }).catch(() => {});
-
-    return newNotif;
+    const ops = await this.loadOps();
+    return ops.addNotification(this, notif);
   }
 
   async markNotificationRead(notifId: string) {
-    const notif = this.appNotifications.find(n => n.id === notifId);
-    if (notif) {
-      notif.read = true;
-      this.notify();
-
-      apiFetch(`/api/notifications/${notifId}/read`, {
-        method: 'PUT'
-      }).catch(() => {});
-    }
+    const ops = await this.loadOps();
+    return ops.markNotificationRead(this, notifId);
   }
 
   async markAllNotificationsRead(userId: string) {
-    this.appNotifications = this.appNotifications.map(n => 
-      (n.userId === userId || n.userId === 'all') ? { ...n, read: true } : n
-    );
-    this.notify();
-
-    apiFetch('/api/notifications/mark-all-read', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ userId })
-    }).catch(() => {});
+    const ops = await this.loadOps();
+    return ops.markAllNotificationsRead(this, userId);
   }
 
   async addActivityLog(log: Omit<ActivityLog, 'id' | 'timestamp'>) {
-    const id = `log_${Date.now()}`;
-    const newLog: ActivityLog = {
-      ...log,
-      id,
-      timestamp: new Date().toISOString()
-    };
-    this.activityLogs.unshift(newLog);
-    this.notify();
-
-    apiFetch('/api/audit-logs', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        action: log.action,
-        details: log.details,
-        userId: log.userId,
-        userName: log.userName,
-        userRole: log.userRole
-      })
-    }).catch(() => {});
+    const ops = await this.loadOps();
+    return ops.addActivityLog(this, log);
   }
 
   async addAssignmentReport(report: Omit<AssignmentReport, 'id' | 'createdAt'>) {
-    const id = `rep_${Date.now()}`;
-    const newReport: AssignmentReport = {
-      ...report,
-      id,
-      createdAt: new Date().toISOString()
-    };
-    this.assignmentReports.unshift(newReport);
-    this.notify();
-    return newReport;
+    const ops = await this.loadOps();
+    return ops.addAssignmentReport(this, report);
   }
 
-  async updateAssignmentReportStatus(reportId: string, status: AssignmentReport['status'], feedback?: string) {
-    const rep = this.assignmentReports.find(r => r.id === reportId);
-    if (rep) {
-      rep.status = status;
-      if (feedback) rep.feedbackFromAdmin = feedback;
-      this.notify();
-    }
+  async updateAssignmentReportStatus(
+    reportId: string,
+    status: AssignmentReport['status'],
+    feedback?: string
+  ) {
+    const ops = await this.loadOps();
+    return ops.updateAssignmentReportStatus(this, reportId, status, feedback);
   }
 
   async addAgreement(agreement: Omit<Agreement, 'id' | 'sentAt' | 'status'>) {
-    const id = `agr_${Date.now()}`;
-    const newAgr: Agreement = {
-      ...agreement,
-      id,
-      status: 'pending_signature',
-      sentAt: new Date().toISOString()
-    };
-    this.agreements.unshift(newAgr);
-    this.notify();
-    return newAgr;
+    const ops = await this.loadOps();
+    return ops.addAgreement(this, agreement);
   }
 
   async signAgreement(agreementId: string) {
-    const agr = this.agreements.find(a => a.id === agreementId);
-    if (agr) {
-      agr.status = 'signed';
-      agr.signedAt = new Date().toISOString();
-      this.notify();
-    }
+    const ops = await this.loadOps();
+    return ops.signAgreement(this, agreementId);
   }
 
-  // ==========================================
-  // BLOGS & FAQS
-  // ==========================================
-
-  async addBlog(titleOrBlog: any, content?: string, image?: string, category?: string, tags?: string[], adminId?: string) {
-    const id = `blog_${Date.now()}`;
-    let blogPayload: any;
-    if (typeof titleOrBlog === 'object') {
-      blogPayload = {
-        ...titleOrBlog,
-        id: titleOrBlog.id || id,
-        imageUrl: titleOrBlog.imageUrl || titleOrBlog.image,
-        image: titleOrBlog.image || titleOrBlog.imageUrl,
-        publishedAt: titleOrBlog.publishedAt || new Date().toISOString(),
-      };
-    } else {
-      blogPayload = {
-        id,
-        adminId: adminId || this.currentUser?.id || 'admin_shaka',
-        title: titleOrBlog,
-        content: content || '',
-        imageUrl: image || '',
-        image: image || '',
-        category: category || 'University Survival',
-        tags: tags || [],
-        publishedAt: new Date().toISOString()
-      };
-    }
-    this.blogs.unshift(blogPayload);
-    this.notify();
-
-    try {
-      const res = await apiFetch('/api/blogs', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(blogPayload)
-      });
-      if (res.ok) {
-        const data = await res.json();
-        if (data.blog) {
-          const index = this.blogs.findIndex(b => b.id === blogPayload.id);
-          if (index !== -1) {
-            this.blogs[index] = {
-              ...data.blog,
-              image: data.blog.imageUrl || data.blog.image,
-              imageUrl: data.blog.imageUrl || data.blog.image,
-              tags: typeof data.blog.tags === 'string' ? JSON.parse(data.blog.tags) : data.blog.tags,
-            };
-            this.notify();
-          }
-        }
-      }
-    } catch (e) {
-      console.warn('[STORE] Network notice saving blog to server:', e);
-    }
-
-    return blogPayload;
+  async addBlog(
+    titleOrBlog: any,
+    content?: string,
+    image?: string,
+    category?: string,
+    tags?: string[],
+    adminId?: string
+  ) {
+    const ops = await this.loadOps();
+    return ops.addBlog(this, titleOrBlog, content, image, category, tags, adminId);
   }
 
   async deleteBlog(blogId: string) {
-    this.blogs = this.blogs.filter(b => b.id !== blogId);
-    this.notify();
-
-    try {
-      await apiFetch(`/api/blogs/${encodeURIComponent(blogId)}`, {
-        method: 'DELETE',
-      });
-    } catch (e) {
-      console.warn('[STORE] Network notice deleting blog from server:', e);
-    }
+    const ops = await this.loadOps();
+    return ops.deleteBlog(this, blogId);
   }
 
-  async updateBlog(blogId: string, titleOrData: any, content?: string, image?: string, category?: string, tags?: string[]) {
-    const blog = this.blogs.find(b => b.id === blogId);
-    let updates: any = {};
-    if (typeof titleOrData === 'object') {
-      updates = { ...titleOrData };
-    } else {
-      if (titleOrData) updates.title = titleOrData;
-      if (content) updates.content = content;
-      if (image) {
-        updates.image = image;
-        updates.imageUrl = image;
-      }
-      if (category) updates.category = category;
-      if (tags) updates.tags = tags;
-    }
-
-    if (blog) {
-      Object.assign(blog, updates);
-      if (updates.imageUrl && !blog.image) blog.image = updates.imageUrl;
-      if (updates.image && !blog.imageUrl) blog.imageUrl = updates.image;
-      this.notify();
-    }
-
-    try {
-      await apiFetch(`/api/blogs/${encodeURIComponent(blogId)}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(updates)
-      });
-    } catch (e) {
-      console.warn('[STORE] Network notice updating blog on server:', e);
-    }
+  async updateBlog(
+    blogId: string,
+    titleOrData: any,
+    content?: string,
+    image?: string,
+    category?: string,
+    tags?: string[]
+  ) {
+    const ops = await this.loadOps();
+    return ops.updateBlog(this, blogId, titleOrData, content, image, category, tags);
   }
 
   async syncDefaultBlogs(): Promise<boolean> {
-    try {
-      const res = await apiFetch('/api/blogs/sync-defaults', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        }
-      });
-      if (res.ok) {
-        const data = await res.json();
-        if (Array.isArray(data.blogs)) {
-          this.blogs = data.blogs.map((b: any) => ({
-            ...b,
-            image: b.imageUrl || b.image,
-            imageUrl: b.imageUrl || b.image,
-            tags: typeof b.tags === 'string' ? JSON.parse(b.tags || '[]') : (b.tags || []),
-          }));
-          this.notify();
-          return true;
-        }
-      }
-    } catch (e) {
-      console.warn('[STORE] Error calling /api/blogs/sync-defaults:', e);
-    }
-
-    // Local fallback: reload from DEFAULT_20_BLOGS
-    const { DEFAULT_20_BLOGS } = await import('../data/defaultBlogsData');
-    this.blogs = DEFAULT_20_BLOGS.map(b => ({
-      id: b.id,
-      adminId: b.adminId || 'admin_shaka',
-      title: b.title,
-      slug: b.id,
-      excerpt: b.title,
-      content: b.content,
-      author: 'Editorial Team',
-      image: b.image,
-      imageUrl: b.image,
-      category: b.category,
-      tags: b.tags,
-      readTime: '5 min read',
-      featured: false,
-      publishedAt: b.publishedAt,
-    }));
-    this.notify();
-    return true;
+    const ops = await this.loadOps();
+    return ops.syncDefaultBlogs(this);
   }
 
   async addFAQ(faq: Omit<FAQ, 'id'>) {
-    const id = `faq_${Date.now()}`;
-    const newFaq: FAQ = { ...faq, id };
-    this.faqs.push(newFaq);
-    this.notify();
-    return newFaq;
+    const ops = await this.loadOps();
+    return ops.addFAQ(this, faq);
   }
 
   async addFaq(question: string, answer: string, category: any) {
@@ -2322,8 +1395,8 @@ export class AppStore {
   }
 
   async deleteFAQ(faqId: string) {
-    this.faqs = this.faqs.filter(f => f.id !== faqId);
-    this.notify();
+    const ops = await this.loadOps();
+    return ops.deleteFAQ(this, faqId);
   }
 
   async deleteFaq(faqId: string) {
@@ -2335,17 +1408,26 @@ export class AppStore {
   // ==========================================
 
   offerQuote(
-    chatId: string, 
-    amount: number, 
-    estimatedHours: number, 
-    serviceType?: string, 
-    deliveryTime?: string, 
+    chatId: string,
+    amount: number,
+    estimatedHours: number,
+    serviceType?: string,
+    deliveryTime?: string,
     scopeOfWork?: string,
     advancePercentage?: number,
     _advanceAmount?: number,
     _balanceAmount?: number
   ) {
-    return this.addQuote(chatId, 'tutor_clara', amount, estimatedHours, serviceType, deliveryTime, scopeOfWork, advancePercentage || 50);
+    return this.addQuote(
+      chatId,
+      'tutor_clara',
+      amount,
+      estimatedHours,
+      serviceType,
+      deliveryTime,
+      scopeOfWork,
+      advancePercentage || 50
+    );
   }
 
   acceptQuote(quoteId: string) {
@@ -2427,7 +1509,7 @@ export class AppStore {
       title: 'Pending Escrow Payment',
       message: `Assignment #${assignmentId} requires confirmed payment of $${amount}.`,
       type: 'both',
-      sentBy: 'Admin Accounting'
+      sentBy: 'Admin Accounting',
     });
   }
 
@@ -2444,7 +1526,7 @@ export class AppStore {
   }
 
   async verifyUserEmail(email: string): Promise<boolean> {
-    const user = this.users.find(u => u.email.toLowerCase().trim() === email.toLowerCase().trim());
+    const user = this.users.find((u) => u.email.toLowerCase().trim() === email.toLowerCase().trim());
     if (user) {
       await this.verifyUser(user.id);
       return true;
@@ -2457,59 +1539,23 @@ export class AppStore {
   }
 
   async addSupportTicket(studentId: string, subject: string, message: string) {
-    const id = `ticket_${Date.now()}`;
-    const newTicket: SupportTicket = {
-      id,
-      studentId,
-      subject,
-      message,
-      status: 'open',
-      createdAt: new Date().toISOString()
-    };
-    this.supportTickets.unshift(newTicket);
-    this.notify();
-    return newTicket;
+    const ops = await this.loadOps();
+    return ops.addSupportTicket(this, studentId, subject, message);
   }
 
   async resolveSupportTicket(ticketId: string) {
-    const ticket = this.supportTickets.find(t => t.id === ticketId);
-    if (ticket) {
-      ticket.status = 'resolved';
-      this.notify();
-    }
+    const ops = await this.loadOps();
+    return ops.resolveSupportTicket(this, ticketId);
   }
 
-  async arbitrateRefund(assignmentId: string, _notes?: string) {
-    const assign = this.assignments.find(a => a.id === assignmentId);
-    if (assign) {
-      assign.status = AssignmentStatus.PENDING;
-      this.notify();
-      apiFetch(`/api/orders/${assignmentId}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ escrowStatus: 'refunded', status: AssignmentStatus.PENDING })
-      }).catch(() => {});
-    }
+  async arbitrateRefund(assignmentId: string, notes?: string) {
+    const ops = await this.loadOps();
+    return ops.arbitrateRefund(this, assignmentId, notes);
   }
 
   async sendTriggeredEmail(to: string, subject: string, htmlContent: string) {
-    const id = `email_${Date.now()}`;
-    const newEmail: TriggeredEmail = {
-      id,
-      to,
-      message: {
-        subject,
-        html: htmlContent
-      },
-      status: {
-        state: 'SUCCESS',
-        sentAt: new Date().toISOString()
-      },
-      createdAt: new Date().toISOString()
-    };
-    this.emails.unshift(newEmail);
-    this.notify();
-    return newEmail;
+    const ops = await this.loadOps();
+    return ops.sendTriggeredEmail(this, to, subject, htmlContent);
   }
 
   async seedMockStudentData() {

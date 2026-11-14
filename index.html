@@ -3,7 +3,8 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0" />
-    <link rel="preload" as="image" href="/logo-440.avif" type="image/avif" fetchpriority="high">
+    <link rel="preload" as="image" href="/logo-440.avif" type="image/avif" fetchpriority="high" />
+    <link rel="ard" type="application/json" href="/.well-known/ard.json" />
     <meta http-equiv="X-UA-Compatible" content="IE=edge" />
     <meta name="theme-color" content="#EA580C" />
     <meta name="description" content="University Tutors - Verified 1-on-1 expert academic tutoring, assignment guidance, coursework support, and study consultations across major universities." />
@@ -73,11 +74,9 @@
     }
     </script>
 
-    <!-- DNS and SSL preconnects -->
+    <!-- Critical font origin preconnects only (lazy-loaded third-party image origins omitted) -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link rel="preconnect" href="https://images.unsplash.com" crossorigin />
-    <link rel="dns-prefetch" href="https://images.unsplash.com" />
     
     <!-- Non-blocking asynchronous Google Fonts with display=swap -->
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@500;600;700;800&display=swap" media="print" onload="this.media='all'" />
@@ -97,18 +96,69 @@
       .hidden{display:none}
       @media (min-width:1024px){.lg\:flex{display:flex}.lg\:hidden{display:none}}
       #main-header{position:sticky;top:0;z-index:40;background:rgba(255,255,255,.95);border-bottom:1px solid rgba(254,215,170,.6)}
-      #main-header>.bg-gray-900{background:#0F172A;color:#fff;font-size:11px;padding:.375rem .75rem;display:flex;align-items:center}
+      #main-header button,#main-header a{background:transparent;border:0;font:inherit;color:inherit;text-decoration:none}
+      #main-header>.bg-gray-900{background:#0F172A;color:#fff;font-size:11px;line-height:1.5;font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace;padding:.375rem .75rem;display:flex;align-items:center;justify-content:space-between}
+      @media (min-width:640px){#main-header>.bg-gray-900{padding-left:1rem;padding-right:1rem}}
+      #main-header .shell-top-inner{display:flex;align-items:center;justify-content:space-between;width:100%;gap:.5rem}
+      #main-header .shell-online{display:inline-flex;align-items:center;gap:.375rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+      #main-header .shell-dot{width:.5rem;height:.5rem;border-radius:9999px;background:#10b981;display:inline-block;flex-shrink:0}
+      #main-header .shell-wa-pill{display:inline-flex;align-items:center;gap:.375rem;background:rgba(2,44,34,.8);color:#6ee7b7;padding:.125rem .625rem;border-radius:.25rem;border:1px solid rgba(4,120,87,.6);font-family:"Inter",system-ui,sans-serif;font-weight:600;font-size:11px;line-height:1.5;white-space:nowrap;flex-shrink:0}
       #main-header .container{max-width:80rem;margin-left:auto;margin-right:auto;padding-left:1rem;padding-right:1rem}
+      @media (min-width:768px){#main-header .container{padding-left:2rem;padding-right:2rem}}
       #main-header .container>div{display:flex;height:4rem;align-items:center;justify-content:space-between;gap:.5rem}
       @media (min-width:1024px){#main-header .container>div{height:5rem}}
-      #logo-home-nav img{height:2.25rem;width:auto;object-fit:contain;display:block}
-      @media (min-width:640px){#logo-home-nav img{height:3rem}}
+      #logo-home-nav{display:flex;align-items:center;gap:.75rem;padding:.25rem;margin:0;cursor:pointer;min-width:0}
+      #logo-home-nav img{height:2.25rem;width:auto;max-width:175px;object-fit:contain;display:block}
+      @media (min-width:640px){#logo-home-nav img{height:3rem;max-width:250px}}
       @media (min-width:768px){#logo-home-nav img{height:3.5rem}}
       .hero-shell-heading{font-family:"Outfit",system-ui,sans-serif;font-weight:800;line-height:1.15;color:#0F172A}
     </style>
   </head>
   <body>
-    <!-- Facebook JavaScript SDK (Deferred until after initial page load & idle to protect LCP/TBT) -->
+    <div id="root">
+      <div class="flex flex-col min-h-screen bg-gray-50 text-gray-800" style="min-height:100vh;display:flex;flex-direction:column;">
+        <header id="main-header">
+          <div class="bg-gray-900">
+            <div class="shell-top-inner">
+              <div class="shell-online">
+                <span class="shell-dot" aria-hidden="true"></span>
+                <span>84 students online</span>
+              </div>
+              <a href="/whatsapp" class="shell-wa-pill">
+                <span>WhatsApp (24/7)</span>
+              </a>
+            </div>
+          </div>
+          <div class="container">
+            <div>
+              <a id="logo-home-nav" href="/" aria-label="Uni Tutors Home">
+                <picture>
+                  <source type="image/avif" srcset="/logo-440.avif" />
+                  <source type="image/webp" srcset="/logo-220.webp 220w, /logo-440.webp 440w" sizes="(max-width: 640px) 140px, 220px" />
+                  <img
+                    src="/logo.webp"
+                    alt="Uni Tutors"
+                    width="220"
+                    height="84"
+                    loading="eager"
+                    decoding="sync"
+                    fetchpriority="high"
+                  />
+                </picture>
+              </a>
+            </div>
+          </div>
+        </header>
+        <main style="flex:1 1 auto;min-height:90vh;">
+          <div class="sr-only">
+            <h1>Expert Tutors for Every University Subject Online, On-Demand</h1>
+            <p>Verified 1-on-1 expert academic tutoring, assignment guidance, coursework support, and study consultations across major universities.</p>
+          </div>
+        </main>
+      </div>
+    </div>
+
+    <!-- Facebook JavaScript SDK (Strictly deferred until after window.load + idle or explicit user tap/keypress) -->
     <script>
       window.fbAsyncInit = function() {
         try {
@@ -118,14 +168,10 @@
             xfbml      : true,
             version    : 'v21.0'
           };
-
-          // Attach appId when user configures their actual Meta App ID
           if (fbAppId && fbAppId !== '{your-app-id}' && !fbAppId.startsWith('{')) {
             initConfig.appId = fbAppId;
           }
-
           FB.init(initConfig);
-
           if (FB.AppEvents && typeof FB.AppEvents.logPageView === 'function') {
             FB.AppEvents.logPageView();
           }
@@ -144,14 +190,9 @@
           js.async = true;
           js.defer = true;
           js.src = 'https://connect.facebook.net/en_US/sdk.js';
-          var fjs = d.getElementsByTagName('script')[0];
-          if (fjs && fjs.parentNode) {
-            fjs.parentNode.insertBefore(js, fjs);
-          } else if (d.head) {
-            d.head.appendChild(js);
-          }
+          (d.body || d.head).appendChild(js);
         }
-        var triggerEvents = ['pointerdown', 'keydown', 'touchstart', 'scroll'];
+        var triggerEvents = ['pointerdown', 'keydown', 'touchstart'];
         function onFirstInteraction() {
           triggerEvents.forEach(function(evt) {
             w.removeEventListener(evt, onFirstInteraction);
@@ -162,18 +203,17 @@
           w.addEventListener(evt, onFirstInteraction, { once: true, passive: true });
         });
         w.addEventListener('load', function() {
-          w.setTimeout(loadFbSdk, 10000);
+          w.setTimeout(function() {
+            if (typeof w.requestIdleCallback === 'function') {
+              w.requestIdleCallback(loadFbSdk, { timeout: 5000 });
+            } else {
+              loadFbSdk();
+            }
+          }, 12000);
         }, { once: true });
       })(window, document);
     </script>
 
-    <div id="root">
-      <!-- Semantic crawler fallback matching client-rendered H1 -->
-      <header style="position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;">
-        <h1>Expert Tutors for Every University Subject Online, On-Demand</h1>
-        <p>Verified 1-on-1 expert academic tutoring, assignment guidance, coursework support, and study consultations across major universities.</p>
-      </header>
-    </div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, lazy, Suspense } from 'react';
 import { Search, ShieldCheck, Star, ArrowRight, Dna, FlaskConical, Sigma } from 'lucide-react';
 import {
   STUDENT_TOOLS,
@@ -12,17 +12,28 @@ import { isModifiedAnchorClick } from '../../data/dedicatedServiceRoutes';
 import ToolPageLayout, { renderToolIcon } from './ToolPageLayout';
 import MeetOurExpertTutors from './MeetOurExpertTutors';
 import SiteFooter from './SiteFooter';
-import PdfToolkit from './PdfToolkit';
-import WhiteboardTool from './WhiteboardTool';
-import GraphBuilder from './GraphBuilder';
-import GraphTheoryBuilder from './GraphTheoryBuilder';
-import CvBuilder from './cv-builder/CvBuilder';
-import ImageTools from './ImageTools';
-import OcrTranslator from './OcrTranslator';
-import CitationGenerator from './CitationGenerator';
-import StudyUtilities from './StudyUtilities';
-import UniversityGradeConverter from './UniversityGradeConverter';
-import AcademicParaphraser from './AcademicParaphraser';
+
+// Route-level code splitting for every individual student tool
+const PdfToolkit = lazy(() => import('./PdfToolkit'));
+const WhiteboardTool = lazy(() => import('./WhiteboardTool'));
+const GraphBuilder = lazy(() => import('./GraphBuilder'));
+const GraphTheoryBuilder = lazy(() => import('./GraphTheoryBuilder'));
+const CvBuilder = lazy(() => import('./cv-builder/CvBuilder'));
+const ImageTools = lazy(() => import('./ImageTools'));
+const OcrTranslator = lazy(() => import('./OcrTranslator'));
+const CitationGenerator = lazy(() => import('./CitationGenerator'));
+const StudyUtilities = lazy(() => import('./StudyUtilities'));
+const UniversityGradeConverter = lazy(() => import('./UniversityGradeConverter'));
+const AcademicParaphraser = lazy(() => import('./AcademicParaphraser'));
+
+function ToolWorkspaceFallback() {
+  return (
+    <div className="min-h-[360px] flex flex-col items-center justify-center py-16 gap-3 text-orange-600">
+      <div className="w-8 h-8 border-2 border-orange-500 border-t-transparent rounded-full animate-spin" />
+      <span className="text-xs font-semibold text-slate-500">Loading interactive tool...</span>
+    </div>
+  );
+}
 
 interface ToolsHubProps {
   activeToolSlug?: ToolSlug | null;
@@ -78,19 +89,23 @@ export default function ToolsHub({
   if (activeToolSlug && STUDENT_TOOLS_BY_SLUG[activeToolSlug]) {
     if (activeToolSlug === 'cv-maker') {
       return (
-        <CvBuilder
-          onNavigate={onNavigate}
-          onOpenBecomeTutor={onOpenBecomeTutor}
-        />
+        <Suspense fallback={<ToolWorkspaceFallback />}>
+          <CvBuilder
+            onNavigate={onNavigate}
+            onOpenBecomeTutor={onOpenBecomeTutor}
+          />
+        </Suspense>
       );
     }
 
     if (activeToolSlug === 'academic-paraphraser') {
       return (
-        <AcademicParaphraser
-          onNavigate={onNavigate}
-          onOpenBecomeTutor={onOpenBecomeTutor}
-        />
+        <Suspense fallback={<ToolWorkspaceFallback />}>
+          <AcademicParaphraser
+            onNavigate={onNavigate}
+            onOpenBecomeTutor={onOpenBecomeTutor}
+          />
+        </Suspense>
       );
     }
 
@@ -134,7 +149,9 @@ export default function ToolsHub({
         onOpenBecomeTutor={onOpenBecomeTutor}
         wideWorkspace={activeToolSlug === 'graph-theory-network-builder'}
       >
-        {renderToolWorkspace()}
+        <Suspense fallback={<ToolWorkspaceFallback />}>
+          {renderToolWorkspace()}
+        </Suspense>
       </ToolPageLayout>
     );
   }
@@ -332,7 +349,7 @@ export default function ToolsHub({
         </div>
       </section>
 
-      {/* 12 Standalone Tool Cards Grid */}
+      {/* Standalone Tool Cards Grid */}
       <section className="max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {filteredTools.length === 0 ? (
           <div className="bg-[#FFFFFF] border border-slate-200 rounded-3xl p-12 text-center space-y-3">

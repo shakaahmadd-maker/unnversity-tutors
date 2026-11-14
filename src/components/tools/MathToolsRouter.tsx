@@ -1,46 +1,110 @@
-import React from 'react';
+import React, { lazy, Suspense } from 'react';
 import { MathToolSlug, ResolvedMathRoute, resolveMathRoute } from '../../data/mathToolsRegistry';
-import MathMegaHub from './MathMegaHub';
 import MathToolPageLayout from './MathToolPageLayout';
-import {
-  FractionRatioPercentageSolver,
-  LinearEquationsSystemSolver,
-  LogarithmExponentSimplifier,
-  QuadraticPolynomialSolver,
-  ScientificExpressionEvaluator,
-} from './math/Level1AlgebraTools';
-import {
-  ComplexNumberPolarConverter,
-  ConicSectionsVisualizer,
-  InteractiveUnitCircleExplorer,
-  TriangleLawSinesCosinesSolver,
-} from './math/Level2TrigGeometryTools';
-import {
-  DefiniteIntegralRiemannPlotter,
-  LimitsLhopitalExplorer,
-  SequenceSeriesConvergenceTester,
-  SymbolicDerivativeCalculator,
-  TaylorMaclaurinSeriesVisualizer,
-} from './math/Level3CalculusTools';
-import {
-  EigenvaluesEigenvectorsCalculator,
-  MatrixAlgebraRrefLab,
-  Vector3dDotCrossVisualizer,
-  VectorCalculusGradDivCurl,
-} from './math/Level4LinearAlgebraTools';
-import {
-  CombinatoricsPermutationsCalculator,
-  DescriptiveStatisticsBoxplot,
-  HypothesisTestingSuite,
-  ProbabilityDistributionExplorer,
-  RegressionCurveFittingAnalyzer,
-} from './math/Level5StatisticsTools';
-import {
-  LaplaceFourierTransformStudio,
-  NumberTheoryModularRsaCalculator,
-  NumericalRootFindingLab,
-  OdeSlopeFieldRk4Plotter,
-} from './math/Level6AdvancedMathTools';
+
+const MathMegaHub = lazy(() => import('./MathMegaHub'));
+
+// Level 1: Algebra (1–5)
+const ScientificExpressionEvaluator = lazy(() =>
+  import('./math/Level1AlgebraTools').then((m) => ({ default: m.ScientificExpressionEvaluator }))
+);
+const QuadraticPolynomialSolver = lazy(() =>
+  import('./math/Level1AlgebraTools').then((m) => ({ default: m.QuadraticPolynomialSolver }))
+);
+const LinearEquationsSystemSolver = lazy(() =>
+  import('./math/Level1AlgebraTools').then((m) => ({ default: m.LinearEquationsSystemSolver }))
+);
+const FractionRatioPercentageSolver = lazy(() =>
+  import('./math/Level1AlgebraTools').then((m) => ({ default: m.FractionRatioPercentageSolver }))
+);
+const LogarithmExponentSimplifier = lazy(() =>
+  import('./math/Level1AlgebraTools').then((m) => ({ default: m.LogarithmExponentSimplifier }))
+);
+
+// Level 2: Geometry, Trig & Pre-Calc (6–9)
+const InteractiveUnitCircleExplorer = lazy(() =>
+  import('./math/Level2TrigGeometryTools').then((m) => ({ default: m.InteractiveUnitCircleExplorer }))
+);
+const TriangleLawSinesCosinesSolver = lazy(() =>
+  import('./math/Level2TrigGeometryTools').then((m) => ({ default: m.TriangleLawSinesCosinesSolver }))
+);
+const ConicSectionsVisualizer = lazy(() =>
+  import('./math/Level2TrigGeometryTools').then((m) => ({ default: m.ConicSectionsVisualizer }))
+);
+const ComplexNumberPolarConverter = lazy(() =>
+  import('./math/Level2TrigGeometryTools').then((m) => ({ default: m.ComplexNumberPolarConverter }))
+);
+
+// Level 3: Calculus & Real Analysis (10–14)
+const SymbolicDerivativeCalculator = lazy(() =>
+  import('./math/Level3CalculusTools').then((m) => ({ default: m.SymbolicDerivativeCalculator }))
+);
+const DefiniteIntegralRiemannPlotter = lazy(() =>
+  import('./math/Level3CalculusTools').then((m) => ({ default: m.DefiniteIntegralRiemannPlotter }))
+);
+const LimitsLhopitalExplorer = lazy(() =>
+  import('./math/Level3CalculusTools').then((m) => ({ default: m.LimitsLhopitalExplorer }))
+);
+const TaylorMaclaurinSeriesVisualizer = lazy(() =>
+  import('./math/Level3CalculusTools').then((m) => ({ default: m.TaylorMaclaurinSeriesVisualizer }))
+);
+const SequenceSeriesConvergenceTester = lazy(() =>
+  import('./math/Level3CalculusTools').then((m) => ({ default: m.SequenceSeriesConvergenceTester }))
+);
+
+// Level 4: Linear Algebra & Vector Calculus (15–18)
+const MatrixAlgebraRrefLab = lazy(() =>
+  import('./math/Level4LinearAlgebraTools').then((m) => ({ default: m.MatrixAlgebraRrefLab }))
+);
+const EigenvaluesEigenvectorsCalculator = lazy(() =>
+  import('./math/Level4LinearAlgebraTools').then((m) => ({ default: m.EigenvaluesEigenvectorsCalculator }))
+);
+const Vector3dDotCrossVisualizer = lazy(() =>
+  import('./math/Level4LinearAlgebraTools').then((m) => ({ default: m.Vector3dDotCrossVisualizer }))
+);
+const VectorCalculusGradDivCurl = lazy(() =>
+  import('./math/Level4LinearAlgebraTools').then((m) => ({ default: m.VectorCalculusGradDivCurl }))
+);
+
+// Level 5: Probability, Statistics & Data Science (19–23)
+const DescriptiveStatisticsBoxplot = lazy(() =>
+  import('./math/Level5StatisticsTools').then((m) => ({ default: m.DescriptiveStatisticsBoxplot }))
+);
+const ProbabilityDistributionExplorer = lazy(() =>
+  import('./math/Level5StatisticsTools').then((m) => ({ default: m.ProbabilityDistributionExplorer }))
+);
+const HypothesisTestingSuite = lazy(() =>
+  import('./math/Level5StatisticsTools').then((m) => ({ default: m.HypothesisTestingSuite }))
+);
+const RegressionCurveFittingAnalyzer = lazy(() =>
+  import('./math/Level5StatisticsTools').then((m) => ({ default: m.RegressionCurveFittingAnalyzer }))
+);
+const CombinatoricsPermutationsCalculator = lazy(() =>
+  import('./math/Level5StatisticsTools').then((m) => ({ default: m.CombinatoricsPermutationsCalculator }))
+);
+
+// Level 6: Advanced University Mathematics (24–27)
+const OdeSlopeFieldRk4Plotter = lazy(() =>
+  import('./math/Level6AdvancedMathTools').then((m) => ({ default: m.OdeSlopeFieldRk4Plotter }))
+);
+const LaplaceFourierTransformStudio = lazy(() =>
+  import('./math/Level6AdvancedMathTools').then((m) => ({ default: m.LaplaceFourierTransformStudio }))
+);
+const NumericalRootFindingLab = lazy(() =>
+  import('./math/Level6AdvancedMathTools').then((m) => ({ default: m.NumericalRootFindingLab }))
+);
+const NumberTheoryModularRsaCalculator = lazy(() =>
+  import('./math/Level6AdvancedMathTools').then((m) => ({ default: m.NumberTheoryModularRsaCalculator }))
+);
+
+function MathToolFallback() {
+  return (
+    <div className="min-h-[320px] flex flex-col items-center justify-center py-14 gap-3 text-orange-600">
+      <div className="w-8 h-8 border-2 border-orange-500 border-t-transparent rounded-full animate-spin" />
+      <span className="text-xs font-semibold text-slate-500">Loading math solver...</span>
+    </div>
+  );
+}
 
 interface MathToolsRouterProps {
   route?: ResolvedMathRoute;
@@ -51,7 +115,6 @@ interface MathToolsRouterProps {
 
 function renderMathToolComponent(slug: MathToolSlug): React.ReactNode {
   switch (slug) {
-    // Level 1: Algebra (1–5)
     case 'scientific-expression-evaluator':
       return <ScientificExpressionEvaluator />;
     case 'quadratic-polynomial-solver':
@@ -62,8 +125,6 @@ function renderMathToolComponent(slug: MathToolSlug): React.ReactNode {
       return <FractionRatioPercentageSolver />;
     case 'logarithm-exponent-simplifier':
       return <LogarithmExponentSimplifier />;
-
-    // Level 2: Geometry, Trig & Pre-Calc (6–9)
     case 'interactive-unit-circle':
       return <InteractiveUnitCircleExplorer />;
     case 'triangle-law-sines-cosines-solver':
@@ -72,8 +133,6 @@ function renderMathToolComponent(slug: MathToolSlug): React.ReactNode {
       return <ConicSectionsVisualizer />;
     case 'complex-number-polar-converter':
       return <ComplexNumberPolarConverter />;
-
-    // Level 3: Calculus & Real Analysis (10–14)
     case 'symbolic-derivative-calculator':
       return <SymbolicDerivativeCalculator />;
     case 'definite-integral-riemann-plotter':
@@ -84,8 +143,6 @@ function renderMathToolComponent(slug: MathToolSlug): React.ReactNode {
       return <TaylorMaclaurinSeriesVisualizer />;
     case 'sequence-series-convergence-tester':
       return <SequenceSeriesConvergenceTester />;
-
-    // Level 4: Linear Algebra & Vector Calculus (15–18)
     case 'matrix-algebra-rref-lab':
       return <MatrixAlgebraRrefLab />;
     case 'eigenvalues-eigenvectors-calculator':
@@ -94,8 +151,6 @@ function renderMathToolComponent(slug: MathToolSlug): React.ReactNode {
       return <Vector3dDotCrossVisualizer />;
     case 'vector-calculus-grad-div-curl':
       return <VectorCalculusGradDivCurl />;
-
-    // Level 5: Probability, Statistics & Data Science (19–23)
     case 'descriptive-statistics-boxplot':
       return <DescriptiveStatisticsBoxplot />;
     case 'probability-distribution-explorer':
@@ -106,8 +161,6 @@ function renderMathToolComponent(slug: MathToolSlug): React.ReactNode {
       return <RegressionCurveFittingAnalyzer />;
     case 'combinatorics-permutations-calculator':
       return <CombinatoricsPermutationsCalculator />;
-
-    // Level 6: Advanced University Mathematics (24–27)
     case 'ode-slope-field-rk4-plotter':
       return <OdeSlopeFieldRk4Plotter />;
     case 'laplace-fourier-transform-studio':
@@ -127,7 +180,11 @@ export default function MathToolsRouter({
 }: MathToolsRouterProps) {
   const route = passedRoute ?? (activeView ? resolveMathRoute(activeView) : null) ?? { kind: 'hub' as const };
   if (route.kind === 'hub') {
-    return <MathMegaHub onNavigate={onNavigate} onOpenBecomeTutor={onOpenBecomeTutor} />;
+    return (
+      <Suspense fallback={<MathToolFallback />}>
+        <MathMegaHub onNavigate={onNavigate} onOpenBecomeTutor={onOpenBecomeTutor} />
+      </Suspense>
+    );
   }
 
   return (
@@ -136,7 +193,9 @@ export default function MathToolsRouter({
       onNavigate={onNavigate}
       onOpenBecomeTutor={onOpenBecomeTutor}
     >
-      {renderMathToolComponent(route.tool.slug)}
+      <Suspense fallback={<MathToolFallback />}>
+        {renderMathToolComponent(route.tool.slug)}
+      </Suspense>
     </MathToolPageLayout>
   );
 }
