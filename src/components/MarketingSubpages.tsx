@@ -34,6 +34,8 @@ import {
   resolveDedicatedServiceRoute,
   isModifiedAnchorClick,
 } from '../data/dedicatedServiceRoutes';
+import { getBlogCanonicalSlug, matchesBlogSlugOrId } from '../utils/blogSlug';
+import { apiFetch } from '../lib/apiClient';
 
 const DedicatedServicePages = React.lazy(() => import('./DedicatedServicePages'));
 
@@ -263,10 +265,49 @@ export default function MarketingSubpages({
 
   // Sync selected blog and dedicated service page with activeView URL state
   useEffect(() => {
-    setSelectedBlog(null);
     const matchedDedicated = resolveDedicatedServiceRoute(activeView);
     setSelectedServiceId(matchedDedicated ? matchedDedicated.id : null);
-  }, [activeView]);
+
+    if (activeView.startsWith('blog/')) {
+      const slugPart = activeView.slice('blog/'.length);
+      const localMatch = blogs.find((b) => matchesBlogSlugOrId(b, slugPart));
+      if (localMatch) {
+        setSelectedBlog(localMatch);
+        return;
+      }
+
+      let cancelled = false;
+      void (async () => {
+        try {
+          const res = await apiFetch(`/api/blogs/${encodeURIComponent(slugPart)}`);
+          if (!cancelled && res.ok) {
+            const data = await res.json();
+            if (data?.blog) {
+              const raw = data.blog;
+              const normalized: Blog = {
+                ...raw,
+                image: raw.image || raw.imageUrl || '',
+                imageUrl: raw.imageUrl || raw.image || '',
+                tags: Array.isArray(raw.tags)
+                  ? raw.tags
+                  : typeof raw.tags === 'string'
+                    ? JSON.parse(raw.tags || '[]')
+                    : [],
+              };
+              setSelectedBlog(normalized);
+            }
+          }
+        } catch {
+          // Ignore fallback fetch errors
+        }
+      })();
+      return () => {
+        cancelled = true;
+      };
+    } else {
+      setSelectedBlog(null);
+    }
+  }, [activeView, blogs]);
 
   // Sync state between sibling child views if lateral jump takes place
   useEffect(() => {
@@ -288,7 +329,8 @@ export default function MarketingSubpages({
   }, [onNavigate]);
 
   const handleCopyCitation = (blog: Blog) => {
-    const citationText = `University-Tutors. (2026). ${blog.title}. Academic Guides & Mentorship Articles. Retrieved from https://universitytutors.com/blog/${blog.id}`;
+    const canonicalSlug = getBlogCanonicalSlug(blog);
+    const citationText = `University-Tutors. (2026). ${blog.title}. Academic Guides & Mentorship Articles. Retrieved from https://university-tutors.com/blog/${canonicalSlug}`;
     navigator.clipboard.writeText(citationText);
     setCopiedId(blog.id);
     setTimeout(() => setCopiedId(null), 2500);
@@ -1188,7 +1230,7 @@ export default function MarketingSubpages({
       )}
 
       {/* ==================== 6. BLOG SYSTEM SECTION ==================== */}
-      {activeView === 'blog' && (
+      {(activeView === 'blog' || activeView.startsWith('blog/')) && (
         <section
           id="blog-section"
           className="py-16 md:py-24 container mx-auto px-4 md:px-8 max-w-7xl text-left animate-fade-in animate-duration-300"
@@ -1302,6 +1344,7 @@ export default function MarketingSubpages({
                         className="bg-white border border-gray-150 rounded-3xl overflow-hidden shadow-xs hover:border-orange-200 hover:shadow-md transition-all flex flex-col justify-between cursor-pointer group"
                         onClick={() => {
                           setSelectedBlog(b);
+                          onNavigate(`blog/${getBlogCanonicalSlug(b)}`);
                           window.scrollTo({ top: 0, behavior: 'instant' });
                         }}
                       >
@@ -1357,7 +1400,10 @@ export default function MarketingSubpages({
               <div className="flex items-center justify-between pb-4 border-b border-gray-150">
                 <button
                   id="close-blog-popup"
-                  onClick={() => setSelectedBlog(null)}
+                  onClick={() => {
+                    setSelectedBlog(null);
+                    onNavigate('blog');
+                  }}
                   className="flex items-center gap-2 text-xs font-bold text-gray-700 hover:text-orange-700 py-2.5 px-4 min-h-[44px] rounded-xl bg-white border border-gray-200 transition-all cursor-pointer shadow-xs"
                 >
                   <ArrowLeft className="w-4 h-4" />
@@ -1365,7 +1411,7 @@ export default function MarketingSubpages({
                 </button>
 
                 <div className="text-[10px] text-gray-600 font-medium font-mono hidden md:block">
-                  Reference: https://universitytutors.com/blog/{selectedBlog.id}
+                  Reference: https://university-tutors.com/blog/{getBlogCanonicalSlug(selectedBlog)}
                 </div>
               </div>
 

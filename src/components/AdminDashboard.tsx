@@ -264,7 +264,7 @@ export default function AdminDashboard({
     setIsAuditingUsers(true);
     setAuditError(null);
     try {
-      const res = await apiFetch('/api/users?limit=500', {
+      const res = await apiFetch('/api/users?limit=2500', {
         credentials: 'include',
         signal: controller.signal,
       });

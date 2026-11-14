@@ -960,11 +960,24 @@ export function getRelevantKeywordsForTutor(tutorSubjects: string[] | string | u
   combinedKeywords: string[];
   allFlatKeywords: string[];
 } {
-  const subjectList: string[] = Array.isArray(tutorSubjects) 
-    ? tutorSubjects 
-    : typeof tutorSubjects === 'string' 
-    ? tutorSubjects.split(',').map(s => s.trim()) 
-    : [];
+  let subjectList: string[] = [];
+  if (Array.isArray(tutorSubjects)) {
+    subjectList = tutorSubjects;
+  } else if (typeof tutorSubjects === 'string') {
+    const trimmed = tutorSubjects.trim();
+    if (trimmed.startsWith('[')) {
+      try {
+        const parsed = JSON.parse(trimmed);
+        if (Array.isArray(parsed)) {
+          subjectList = parsed.map((s) => String(s).trim()).filter(Boolean);
+        }
+      } catch {
+        subjectList = trimmed.split(',').map((s) => s.replace(/^[\["']+|[\]"']+$/g, '').trim()).filter(Boolean);
+      }
+    } else if (trimmed) {
+      subjectList = trimmed.split(',').map((s) => s.trim()).filter(Boolean);
+    }
+  }
 
   const combinedText = [
     primaryDomain || '',

@@ -606,16 +606,16 @@ export default function HowItWorksSection({ onNavigate }: HowItWorksSectionProps
       </div>
 
       {/* Floating toast alert notifications */}
-      <div 
-        className={`fixed bottom-6 right-6 px-5 py-4 bg-slate-900 text-white text-xs font-semibold rounded-2xl shadow-xl backdrop-blur border border-slate-800 flex items-center gap-2.5 transition-all duration-300 ease-out z-50 ${
-          toastMessage ? 'translate-y-0 opacity-100' : 'translate-y-24 opacity-0 pointer-events-none'
-        }`}
-      >
-        <div className="p-1 rounded-full bg-emerald-500/20 text-emerald-400 shrink-0">
-          <Check className="w-4 h-4 stroke-[2.5]" />
+      {toastMessage && (
+        <div
+          className="fixed bottom-6 right-6 px-5 py-4 bg-slate-900 text-white text-xs font-semibold rounded-2xl shadow-xl backdrop-blur border border-slate-800 flex items-center gap-2.5 transition-all duration-300 ease-out z-50 translate-y-0 opacity-100"
+        >
+          <div className="p-1 rounded-full bg-emerald-500/20 text-emerald-400 shrink-0">
+            <Check className="w-4 h-4 stroke-[2.5]" />
+          </div>
+          <span>{toastMessage}</span>
         </div>
-        <span>{toastMessage}</span>
-      </div>
+      )}
 
     </section>
   );

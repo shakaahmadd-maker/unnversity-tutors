@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   GraduationCap, 
   Menu, 
@@ -54,7 +54,32 @@ export default function Header({
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isServicesDropdownOpen, setIsServicesDropdownOpen] = useState(false);
   const [isToolsDropdownOpen, setIsToolsDropdownOpen] = useState(false);
-  const [isQuickPanelOpen, setIsQuickPanelOpen] = useState(false);
+  const [isMdUp, setIsMdUp] = useState<boolean>(() =>
+    typeof window !== 'undefined' && typeof window.matchMedia === 'function'
+      ? window.matchMedia('(min-width: 768px)').matches
+      : true
+  );
+  const [isLgUp, setIsLgUp] = useState<boolean>(() =>
+    typeof window !== 'undefined' && typeof window.matchMedia === 'function'
+      ? window.matchMedia('(min-width: 1024px)').matches
+      : true
+  );
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return;
+    const mdMql = window.matchMedia('(min-width: 768px)');
+    const lgMql = window.matchMedia('(min-width: 1024px)');
+    setIsMdUp(mdMql.matches);
+    setIsLgUp(lgMql.matches);
+    const onMd = (e: MediaQueryListEvent) => setIsMdUp(e.matches);
+    const onLg = (e: MediaQueryListEvent) => setIsLgUp(e.matches);
+    mdMql.addEventListener('change', onMd);
+    lgMql.addEventListener('change', onLg);
+    return () => {
+      mdMql.removeEventListener('change', onMd);
+      lgMql.removeEventListener('change', onLg);
+    };
+  }, []);
 
   const navLinks = [
     { name: 'Home', view: 'home' },
@@ -82,29 +107,33 @@ export default function Header({
               <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse inline-block shrink-0"></span>
               <span className="truncate">{studentsOnline} students online</span>
             </div>
-            <span className="hidden md:inline text-gray-500">|</span>
-            <div className="hidden md:flex items-center gap-2 text-gray-200">
-              <span className="text-gray-300">🔥 Regional Online Tutoring:</span>
-              {[
-                { code: 'usa', label: 'USA 🇺🇸' },
-                { code: 'canada', label: 'CA 🇨🇦' },
-                { code: 'uk', label: 'UK 🇬🇧' },
-                { code: 'uae', label: 'UAE 🇦🇪' },
-                { code: 'ireland', label: 'IE 🇮🇪' },
-                { code: 'australia', label: 'AU 🇦🇺' },
-                { code: 'new-zealand', label: 'NZ 🇳🇿' },
-                { code: 'singapore', label: 'SG 🇸🇬' }
-              ].map(c => (
-                <button
-                  key={c.code}
-                  id={`header-country-${c.code}`}
-                  onClick={() => handleLinkClick(`online-tutoring-${c.code}`)}
-                  className="hover:text-orange-400 hover:underline cursor-pointer text-[10px] font-sans px-1"
-                >
-                  {c.label}
-                </button>
-              ))}
-            </div>
+            {isMdUp && (
+              <>
+                <span className="hidden md:inline text-gray-500">|</span>
+                <div className="hidden md:flex items-center gap-2 text-gray-200">
+                  <span className="text-gray-300">🔥 Regional Online Tutoring:</span>
+                  {[
+                    { code: 'usa', label: 'USA 🇺🇸' },
+                    { code: 'canada', label: 'CA 🇨🇦' },
+                    { code: 'uk', label: 'UK 🇬🇧' },
+                    { code: 'uae', label: 'UAE 🇦🇪' },
+                    { code: 'ireland', label: 'IE 🇮🇪' },
+                    { code: 'australia', label: 'AU 🇦🇺' },
+                    { code: 'new-zealand', label: 'NZ 🇳🇿' },
+                    { code: 'singapore', label: 'SG 🇸🇬' }
+                  ].map(c => (
+                    <button
+                      key={c.code}
+                      id={`header-country-${c.code}`}
+                      onClick={() => handleLinkClick(`online-tutoring-${c.code}`)}
+                      className="hover:text-orange-400 hover:underline cursor-pointer text-[10px] font-sans px-1"
+                    >
+                      {c.label}
+                    </button>
+                  ))}
+                </div>
+              </>
+            )}
           </div>
 
           <button
@@ -130,8 +159,7 @@ export default function Header({
             <picture>
               <source
                 type="image/avif"
-                srcSet="/logo-220.avif 220w, /logo-440.avif 440w"
-                sizes="(max-width: 640px) 140px, 220px"
+                srcSet="/logo-440.avif"
               />
               <source
                 type="image/webp"
@@ -152,6 +180,7 @@ export default function Header({
           </button>
 
           {/* Desktop Navigation Links */}
+          {isLgUp && (
           <nav className="hidden lg:flex items-center gap-5 xl:gap-6">
             <button
               id="nav-home"
@@ -166,9 +195,14 @@ export default function Header({
             </button>
 
             {/* Services Dropdown */}
-            <div className="relative group">
+            <div
+              className="relative group"
+              onMouseLeave={() => setIsServicesDropdownOpen(false)}
+            >
               <button
                 id="nav-services-dropdown"
+                aria-expanded={isServicesDropdownOpen}
+                aria-haspopup="menu"
                 onClick={() => setIsServicesDropdownOpen(!isServicesDropdownOpen)}
                 onMouseEnter={() => setIsServicesDropdownOpen(true)}
                 className={`text-sm font-semibold tracking-wide transition-colors cursor-pointer flex items-center gap-1 pb-1 whitespace-nowrap shrink-0 ${
@@ -187,13 +221,11 @@ export default function Header({
               </button>
 
               {/* Dropdown Menu */}
+              {isServicesDropdownOpen && (
               <div 
-                onMouseLeave={() => setIsServicesDropdownOpen(false)}
-                className={`absolute top-full left-0 mt-2 w-76 bg-white rounded-2xl shadow-xl border border-slate-200 p-2 z-50 transition-all ${
-                  isServicesDropdownOpen ? 'opacity-100 visible translate-y-0' : 'opacity-0 invisible pointer-events-none -translate-y-2'
-                }`}
+                className="absolute top-full left-0 pt-2 w-76 z-50"
               >
-                <div className="p-1 space-y-1">
+                <div className="bg-white rounded-2xl shadow-xl border border-slate-200 p-2 space-y-1">
                   <a
                     href="/services"
                     onClick={(e) => {
@@ -253,12 +285,18 @@ export default function Header({
                   })}
                 </div>
               </div>
+              )}
             </div>
 
             {/* Free Tools Dropdown (Biology 14, Chemistry 16, Academic 12) */}
-            <div className="relative group">
+            <div
+              className="relative group"
+              onMouseLeave={() => setIsToolsDropdownOpen(false)}
+            >
               <button
                 id="nav-tools-dropdown"
+                aria-expanded={isToolsDropdownOpen}
+                aria-haspopup="menu"
                 onClick={() => setIsToolsDropdownOpen(!isToolsDropdownOpen)}
                 onMouseEnter={() => setIsToolsDropdownOpen(true)}
                 className={`text-sm font-semibold tracking-wide transition-colors cursor-pointer flex items-center gap-1 pb-1 whitespace-nowrap shrink-0 ${
@@ -271,15 +309,11 @@ export default function Header({
                 <ChevronDown className="w-3.5 h-3.5" />
               </button>
 
+              {isToolsDropdownOpen && (
               <div
-                onMouseLeave={() => setIsToolsDropdownOpen(false)}
-                className={`absolute top-full left-0 mt-2 w-76 bg-white rounded-2xl shadow-xl border border-slate-200 p-2 z-50 transition-all ${
-                  isToolsDropdownOpen
-                    ? 'opacity-100 visible translate-y-0'
-                    : 'opacity-0 invisible pointer-events-none -translate-y-2'
-                }`}
+                className="absolute top-full left-0 pt-2 w-76 z-50"
               >
-                <div className="p-1 space-y-1">
+                <div className="bg-white rounded-2xl shadow-xl border border-slate-200 p-2 space-y-1">
                   <a
                     href="/tools/math"
                     onClick={(e) => {
@@ -398,12 +432,13 @@ export default function Header({
                   </a>
                 </div>
               </div>
+              )}
             </div>
 
             {navLinks.filter((l) => l.view !== 'home').map((link) => {
               const isActive =
                 activeView === link.view ||
-                (link.view === 'blog' && activeView.startsWith('blog-'));
+                (link.view === 'blog' && (activeView.startsWith('blog-') || activeView.startsWith('blog/')));
               return (
                 <button
                   key={link.view}
@@ -420,8 +455,10 @@ export default function Header({
               );
             })}
           </nav>
+          )}
 
           {/* Right Action buttons */}
+          {isLgUp && (
           <div className="hidden lg:flex items-center gap-3">
             {currentUser ? (
               <div className="flex items-center gap-3">
@@ -472,8 +509,10 @@ export default function Header({
               </div>
             )}
           </div>
+          )}
 
           {/* Mobile Hamburguer toggle */}
+          {!isLgUp && (
           <div className="flex lg:hidden items-center gap-2">
             {currentUser && (
               <button
@@ -487,12 +526,14 @@ export default function Header({
             <button
               id="mob-nav-menu-toggle"
               onClick={() => setIsMenuOpen(!isMenuOpen)}
+              aria-expanded={isMenuOpen}
               className="text-gray-650 p-2.5 rounded-xl hover:bg-gray-100 transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center cursor-pointer"
               aria-label="Toggle navigation menu"
             >
               {isMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
             </button>
           </div>
+          )}
 
         </div>
       </div>
@@ -667,7 +708,7 @@ export default function Header({
             {navLinks.filter((l) => l.view !== 'home').map((link) => {
               const isActive =
                 activeView === link.view ||
-                (link.view === 'blog' && activeView.startsWith('blog-'));
+                (link.view === 'blog' && (activeView.startsWith('blog-') || activeView.startsWith('blog/')));
               return (
                 <button
                   key={link.view}

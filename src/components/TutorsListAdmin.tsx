@@ -63,24 +63,82 @@ export default function TutorsListAdmin({
   onDeleteUser,
   onAddNewTutor
 }: TutorsListAdminProps) {
-  // Filter for tutors only - matches enum UserRole.TUTOR, string 'tutor', or tutor ID prefixes
-  const allTutors = users.filter(u => {
-    if (!u) return false;
-    const r = (u.role || '').toLowerCase();
-    return r === 'tutor' || u.role === UserRole.TUTOR || u.id.startsWith('tutor_') || u.id.startsWith('tutor-') || !!u.hourlyRate;
-  });
-
+  const [fetchedDirectoryTutors, setFetchedDirectoryTutors] = useState<User[]>([]);
   const [statusFilter, setStatusFilter] = useState<'all' | 'pending' | 'approved' | 'rejected'>('all');
   const [adminCountryFilter, setAdminCountryFilter] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
   const [adminPage, setAdminPage] = useState<number>(1);
-  const adminPageSize = 25;
+  const [adminPageSize, setAdminPageSize] = useState<number>(25);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+
+  // Load all 500+ imported & database tutor records immediately on mount
+  React.useEffect(() => {
+    let active = true;
+    const syncFullTutorsList = async () => {
+      try {
+        const [, fallbackList, res] = await Promise.all([
+          store.ensureFullDirectoryLoaded(),
+          store.loadTrendingTutorsFallback(),
+          apiFetch('/api/users?role=tutor&page=1&limit=2500', { credentials: 'include' }).catch(() => null),
+        ]);
+        const combined = new Map<string, User>();
+        for (const t of fallbackList) {
+          if (t && (String(t.role || '').toLowerCase() === 'tutor' || t.id.startsWith('tutor_') || t.id.startsWith('tutor-'))) {
+            combined.set(t.id, t);
+          }
+        }
+        if (res && res.ok) {
+          const data = await res.json().catch(() => ({}));
+          if (Array.isArray(data?.users)) {
+            for (const u of data.users) {
+              if (u && u.deleted !== true && u.status !== 'deleted') {
+                const existing = combined.get(u.id);
+                combined.set(u.id, existing ? { ...existing, ...u } : u);
+              }
+            }
+          }
+        }
+        if (active && combined.size > 0) {
+          setFetchedDirectoryTutors(Array.from(combined.values()));
+        }
+      } catch {
+        // Ignore transient sync error; prop users still render
+      }
+    };
+    void syncFullTutorsList();
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  // Unify prop users + fetched 500+ tutors (with prop updates taking precedence for instant edits)
+  const allTutors = React.useMemo(() => {
+    const map = new Map<string, User>();
+    const isTutorRecord = (u: User | undefined | null): u is User => {
+      if (!u || (u as any).deleted === true || u.status === ('deleted' as any)) return false;
+      const r = String(u.role || '').toLowerCase();
+      if (r && r !== 'tutor') return false;
+      return r === 'tutor' || u.role === UserRole.TUTOR || u.id.startsWith('tutor_') || u.id.startsWith('tutor-') || Boolean(u.hourlyRate);
+    };
+
+    for (const ft of fetchedDirectoryTutors) {
+      if (isTutorRecord(ft)) map.set(ft.id, ft);
+    }
+    for (const u of users) {
+      if (isTutorRecord(u)) {
+        const prev = map.get(u.id);
+        map.set(u.id, prev ? { ...prev, ...u } : u);
+      }
+    }
+    return Array.from(map.values());
+  }, [users, fetchedDirectoryTutors]);
 
   React.useEffect(() => {
     const timer = setTimeout(() => {
       setDebouncedSearchQuery(searchQuery);
-    }, 300);
+      setAdminPage(1);
+    }, 250);
     return () => clearTimeout(timer);
   }, [searchQuery]);
 
@@ -199,6 +257,34 @@ export default function TutorsListAdmin({
   const approvedCount = allTutors.filter(t => t.isApproved === true || t.status === 'approved' || (t.isApproved === undefined && t.status === undefined)).length;
   const rejectedCount = allTutors.filter(t => t.status === 'rejected').length;
 
+  const matchesAdminCountry = (tutor: User, targetCountry: string): boolean => {
+    if (targetCountry === 'all') return true;
+    const cCode = (tutor.country || '').toLowerCase();
+    const cLoc = ((tutor as any).countryName || (tutor as any).countryFull || tutor.location || (tutor as any).cityLocation || tutor.city || '').toLowerCase();
+    const target = targetCountry.toLowerCase();
+    return (
+      cCode === target ||
+      cLoc.includes(target) ||
+      (target === 'usa' && (cCode === 'us' || cCode === 'usa' || cLoc.includes('united states'))) ||
+      (target === 'uk' && (cCode === 'gb' || cCode === 'uk' || cLoc.includes('united kingdom'))) ||
+      (target === 'australia' && (cCode === 'au' || cCode === 'australia')) ||
+      (target === 'canada' && (cCode === 'ca' || cCode === 'canada')) ||
+      (target === 'singapore' && (cCode === 'sg' || cCode === 'singapore')) ||
+      (target === 'ireland' && (cCode === 'ie' || cCode === 'ireland')) ||
+      (target === 'new zealand' && (cCode === 'nz' || cCode === 'new zealand')) ||
+      (target === 'uae' && (cCode === 'ae' || cCode === 'uae' || cLoc.includes('emirates')))
+    );
+  };
+
+  const countryCounts = React.useMemo(() => {
+    const keys = ['USA', 'UK', 'Australia', 'Canada', 'Singapore', 'Ireland', 'New Zealand', 'UAE'] as const;
+    const counts: Record<string, number> = {};
+    for (const k of keys) {
+      counts[k] = allTutors.filter((t) => matchesAdminCountry(t, k)).length;
+    }
+    return counts;
+  }, [allTutors]);
+
   // Filtered tutors list
   const filteredTutors = allTutors.filter(tutor => {
     const isPending = tutor.status === 'pending' || (tutor.isApproved === false && tutor.status !== 'rejected');
@@ -209,47 +295,36 @@ export default function TutorsListAdmin({
     if (statusFilter === 'approved' && !isApproved) return false;
     if (statusFilter === 'rejected' && !isRejected) return false;
 
-    if (adminCountryFilter !== 'all') {
-      const cCode = (tutor.country || '').toLowerCase();
-      const cLoc = ((tutor as any).countryName || (tutor as any).countryFull || tutor.location || tutor.city || '').toLowerCase();
-      const target = adminCountryFilter.toLowerCase();
-      const matchesCountry = cCode === target || 
-        cLoc.includes(target) || 
-        (target === 'usa' && (cCode === 'us' || cCode === 'usa' || cLoc.includes('united states'))) ||
-        (target === 'uk' && (cCode === 'gb' || cCode === 'uk' || cLoc.includes('united kingdom'))) ||
-        (target === 'australia' && (cCode === 'au' || cCode === 'australia')) ||
-        (target === 'canada' && (cCode === 'ca' || cCode === 'canada')) ||
-        (target === 'singapore' && (cCode === 'sg' || cCode === 'singapore')) ||
-        (target === 'ireland' && (cCode === 'ie' || cCode === 'ireland')) ||
-        (target === 'new zealand' && (cCode === 'nz' || cCode === 'new zealand')) ||
-        (target === 'uae' && (cCode === 'ae' || cCode === 'uae' || cLoc.includes('emirates')));
-      if (!matchesCountry) return false;
-    }
+    if (!matchesAdminCountry(tutor, adminCountryFilter)) return false;
 
     if (debouncedSearchQuery.trim()) {
       const q = debouncedSearchQuery.toLowerCase().trim();
+      const matchId = (tutor.id || '').toLowerCase().includes(q);
       const matchName = (tutor.name || '').toLowerCase().includes(q);
       const matchEmail = (tutor.email || '').toLowerCase().includes(q);
       const matchBio = (tutor.bio || '').toLowerCase().includes(q);
       const matchEdu = (tutor.education || '').toLowerCase().includes(q);
-      const matchExp = (tutor.experiences || tutor.experience || '').toLowerCase().includes(q);
+      const matchExp = (tutor.experiences || tutor.experience || (tutor as any).experienceSummary || '').toLowerCase().includes(q);
       const matchPrim = ((tutor as any).primarySubject || '').toLowerCase().includes(q);
-      const matchTier = ((tutor as any).tutorTier || '').toLowerCase().includes(q);
+      const matchTier = ((tutor as any).tutorTier || (tutor as any).tier || '').toLowerCase().includes(q);
       const subStr = Array.isArray(tutor.subjectExpertise) 
         ? tutor.subjectExpertise.join(' ') 
         : (tutor.subjectExpertise || (Array.isArray(tutor.subjects) ? tutor.subjects.join(' ') : (tutor.subjects || '')));
-      const matchSub = subStr.toLowerCase().includes(q);
+      const matchSub = String(subStr).toLowerCase().includes(q);
+      const matchKw = String((tutor as any).searchableKeywords || '').toLowerCase().includes(q);
       const matchHob = (tutor.hobbies || '').toLowerCase().includes(q);
       const matchCountry = (tutor.country || '').toLowerCase().includes(q);
-      const matchLoc = (tutor.location || tutor.city || (tutor as any).countryName || '').toLowerCase();
-      return matchName || matchEmail || matchBio || matchEdu || matchExp || matchPrim || matchTier || matchSub || matchHob || matchCountry || matchLoc;
+      const matchLoc = (tutor.location || (tutor as any).cityLocation || tutor.city || (tutor as any).countryName || '').toLowerCase().includes(q);
+      return matchId || matchName || matchEmail || matchBio || matchEdu || matchExp || matchPrim || matchTier || matchSub || matchKw || matchHob || matchCountry || matchLoc;
     }
 
     return true;
   });
 
-  const totalAdminPages = Math.ceil(filteredTutors.length / adminPageSize) || 1;
-  const paginatedTutors = filteredTutors.slice((adminPage - 1) * adminPageSize, adminPage * adminPageSize);
+  const effectivePageSize = adminPageSize <= 0 ? Math.max(1, filteredTutors.length) : adminPageSize;
+  const totalAdminPages = Math.ceil(filteredTutors.length / effectivePageSize) || 1;
+  const safeAdminPage = Math.min(adminPage, totalAdminPages);
+  const paginatedTutors = filteredTutors.slice((safeAdminPage - 1) * effectivePageSize, safeAdminPage * effectivePageSize);
 
   const showNotification = (msg: string) => {
     setActionSuccessMsg(msg);
@@ -380,6 +455,9 @@ export default function TutorsListAdmin({
         Object.assign(updatedData, data.tutor);
       }
       // Refresh the tutor/profile data from backend after update
+      setFetchedDirectoryTutors((prev) =>
+        prev.map((item) => (item.id === editingTutor.id ? { ...item, ...updatedData } : item))
+      );
       await store.fetchData();
       onUpdateUserProfile(editingTutor.id, updatedData);
       setEditingTutor(null);
@@ -580,7 +658,10 @@ export default function TutorsListAdmin({
           {/* Status Tabs */}
           <div className="flex flex-wrap items-center gap-1.5 bg-slate-100 p-1.5 rounded-2xl">
             <button
-              onClick={() => setStatusFilter('all')}
+              onClick={() => {
+                setStatusFilter('all');
+                setAdminPage(1);
+              }}
               className={`px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-wider transition-all cursor-pointer ${
                 statusFilter === 'all'
                   ? 'bg-white text-slate-900 shadow-sm'
@@ -590,7 +671,10 @@ export default function TutorsListAdmin({
               All Tutors ({allTutors.length})
             </button>
             <button
-              onClick={() => setStatusFilter('pending')}
+              onClick={() => {
+                setStatusFilter('pending');
+                setAdminPage(1);
+              }}
               className={`px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-wider transition-all cursor-pointer flex items-center gap-1.5 ${
                 statusFilter === 'pending'
                   ? 'bg-amber-500 text-white shadow-sm'
@@ -605,7 +689,10 @@ export default function TutorsListAdmin({
               )}
             </button>
             <button
-              onClick={() => setStatusFilter('approved')}
+              onClick={() => {
+                setStatusFilter('approved');
+                setAdminPage(1);
+              }}
               className={`px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-wider transition-all cursor-pointer ${
                 statusFilter === 'approved'
                   ? 'bg-emerald-600 text-white shadow-sm'
@@ -615,7 +702,10 @@ export default function TutorsListAdmin({
               Live / Approved ({approvedCount})
             </button>
             <button
-              onClick={() => setStatusFilter('rejected')}
+              onClick={() => {
+                setStatusFilter('rejected');
+                setAdminPage(1);
+              }}
               className={`px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-wider transition-all cursor-pointer ${
                 statusFilter === 'rejected'
                   ? 'bg-rose-600 text-white shadow-sm'
@@ -637,14 +727,14 @@ export default function TutorsListAdmin({
               className="text-xs bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 font-semibold text-slate-700 outline-none focus:border-orange-500 cursor-pointer w-full sm:w-auto"
             >
               <option value="all">🌍 All Countries ({allTutors.length})</option>
-              <option value="USA">🇺🇸 USA (210)</option>
-              <option value="UK">🇬🇧 United Kingdom (55)</option>
-              <option value="Australia">🇦🇺 Australia (50)</option>
-              <option value="Canada">🇨🇦 Canada (45)</option>
-              <option value="Singapore">🇸🇬 Singapore (45)</option>
-              <option value="Ireland">🇮🇪 Ireland (35)</option>
-              <option value="New Zealand">🇳🇿 New Zealand (30)</option>
-              <option value="UAE">🇦🇪 UAE (30)</option>
+              <option value="USA">🇺🇸 USA ({countryCounts['USA'] || 0})</option>
+              <option value="UK">🇬🇧 United Kingdom ({countryCounts['UK'] || 0})</option>
+              <option value="Australia">🇦🇺 Australia ({countryCounts['Australia'] || 0})</option>
+              <option value="Canada">🇨🇦 Canada ({countryCounts['Canada'] || 0})</option>
+              <option value="Singapore">🇸🇬 Singapore ({countryCounts['Singapore'] || 0})</option>
+              <option value="Ireland">🇮🇪 Ireland ({countryCounts['Ireland'] || 0})</option>
+              <option value="New Zealand">🇳🇿 New Zealand ({countryCounts['New Zealand'] || 0})</option>
+              <option value="UAE">🇦🇪 UAE ({countryCounts['UAE'] || 0})</option>
             </select>
 
             <div className="relative w-full sm:w-64">
@@ -863,19 +953,36 @@ export default function TutorsListAdmin({
                         <span>Edit Data</span>
                       </button>
 
-                      {/* Delete profile */}
-                      <button
-                        onClick={() => {
-                          if (window.confirm(`Are you sure you want to delete tutor ${tutor.name}?`)) {
-                            onDeleteUser(tutor.id);
-                            showNotification(`Tutor ${tutor.name} has been deleted.`);
-                          }
-                        }}
-                        className="text-slate-400 hover:text-rose-600 p-1.5 rounded-xl hover:bg-rose-50 transition-colors flex items-center justify-center cursor-pointer"
-                        title="Delete tutor profile"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
+                      {/* Delete profile (inline confirmation without window.confirm) */}
+                      {confirmDeleteId === tutor.id ? (
+                        <div className="inline-flex items-center gap-1">
+                          <button
+                            onClick={() => {
+                              setConfirmDeleteId(null);
+                              setFetchedDirectoryTutors((prev) => prev.filter((item) => item.id !== tutor.id));
+                              onDeleteUser(tutor.id);
+                              showNotification(`Tutor ${tutor.name} has been deleted.`);
+                            }}
+                            className="bg-rose-600 hover:bg-rose-700 text-white font-bold text-[11px] px-2.5 py-1.5 rounded-xl cursor-pointer"
+                          >
+                            Confirm Delete
+                          </button>
+                          <button
+                            onClick={() => setConfirmDeleteId(null)}
+                            className="bg-slate-200 hover:bg-slate-300 text-slate-700 font-semibold text-[11px] px-2 py-1.5 rounded-xl cursor-pointer"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      ) : (
+                        <button
+                          onClick={() => setConfirmDeleteId(tutor.id)}
+                          className="text-slate-400 hover:text-rose-600 p-1.5 rounded-xl hover:bg-rose-50 transition-colors flex items-center justify-center cursor-pointer"
+                          title="Delete tutor profile"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      )}
                     </div>
 
                   </div>
@@ -885,42 +992,62 @@ export default function TutorsListAdmin({
           </div>
         )}
 
-        {/* Admin Pagination Controls */}
-        {totalAdminPages > 1 && (
+        {/* Admin Pagination & Page Size Controls */}
+        {filteredTutors.length > 0 && (
           <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-3 mt-4">
-            <span className="text-xs text-slate-500 font-medium">
-              Showing <strong className="text-slate-800">{(adminPage - 1) * adminPageSize + 1}</strong> to <strong className="text-slate-800">{Math.min(adminPage * adminPageSize, filteredTutors.length)}</strong> of <strong className="text-slate-800">{filteredTutors.length}</strong> tutors
-            </span>
-
-            <div className="flex items-center gap-2">
-              <button
-                disabled={adminPage === 1}
-                onClick={() => setAdminPage(prev => Math.max(prev - 1, 1))}
-                className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition-all ${
-                  adminPage === 1 
-                    ? 'text-slate-300 border-slate-200 cursor-not-allowed bg-white' 
-                    : 'text-slate-700 border-slate-200 hover:bg-white cursor-pointer shadow-xs'
-                }`}
-              >
-                Previous
-              </button>
-
-              <span className="text-xs font-bold text-slate-700 px-2">
-                Page {adminPage} / {totalAdminPages}
+            <div className="flex flex-wrap items-center gap-3">
+              <span className="text-xs text-slate-500 font-medium">
+                Showing <strong className="text-slate-800">{(safeAdminPage - 1) * effectivePageSize + 1}</strong> to{' '}
+                <strong className="text-slate-800">{Math.min(safeAdminPage * effectivePageSize, filteredTutors.length)}</strong> of{' '}
+                <strong className="text-slate-800">{filteredTutors.length}</strong> tutors
               </span>
-
-              <button
-                disabled={adminPage === totalAdminPages}
-                onClick={() => setAdminPage(prev => Math.min(prev + 1, totalAdminPages))}
-                className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition-all ${
-                  adminPage === totalAdminPages 
-                    ? 'text-slate-300 border-slate-200 cursor-not-allowed bg-white' 
-                    : 'text-slate-700 border-slate-200 hover:bg-white cursor-pointer shadow-xs'
-                }`}
+              <select
+                value={adminPageSize}
+                onChange={(e) => {
+                  setAdminPageSize(parseInt(e.target.value, 10));
+                  setAdminPage(1);
+                }}
+                aria-label="Tutors per page"
+                className="text-xs bg-white border border-slate-200 rounded-xl px-2.5 py-1.5 font-semibold text-slate-700 outline-none focus:border-orange-500 cursor-pointer"
               >
-                Next
-              </button>
+                <option value={25}>25 per page</option>
+                <option value={50}>50 per page</option>
+                <option value={100}>100 per page</option>
+                <option value={0}>Show All ({filteredTutors.length})</option>
+              </select>
             </div>
+
+            {totalAdminPages > 1 && (
+              <div className="flex items-center gap-2">
+                <button
+                  disabled={safeAdminPage === 1}
+                  onClick={() => setAdminPage(prev => Math.max(prev - 1, 1))}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition-all ${
+                    safeAdminPage === 1 
+                      ? 'text-slate-300 border-slate-200 cursor-not-allowed bg-white' 
+                      : 'text-slate-700 border-slate-200 hover:bg-white cursor-pointer shadow-xs'
+                  }`}
+                >
+                  Previous
+                </button>
+
+                <span className="text-xs font-bold text-slate-700 px-2">
+                  Page {safeAdminPage} / {totalAdminPages}
+                </span>
+
+                <button
+                  disabled={safeAdminPage === totalAdminPages}
+                  onClick={() => setAdminPage(prev => Math.min(prev + 1, totalAdminPages))}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition-all ${
+                    safeAdminPage === totalAdminPages 
+                      ? 'text-slate-300 border-slate-200 cursor-not-allowed bg-white' 
+                      : 'text-slate-700 border-slate-200 hover:bg-white cursor-pointer shadow-xs'
+                  }`}
+                >
+                  Next
+                </button>
+              </div>
+            )}
           </div>
         )}
       </div>

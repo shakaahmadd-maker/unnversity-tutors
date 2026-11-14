@@ -18,6 +18,15 @@ import { runMigrations, verifyUsersTableSchema } from './src/db/migrate';
 import { memoryStore, PrivateFileRecord } from './src/db/memoryStore';
 import { DEFAULT_20_BLOGS } from './src/data/defaultBlogsData';
 import { TRENDING_TUTORS_500, TRENDING_TUTORS_200 } from './src/data/trendingTutors500Data';
+import { CURATED_SPECIALIZED_TUTORS } from './src/data/tutorsDirectoryData';
+import {
+  getOrBuildSitemapPayload,
+  invalidateSitemapCache,
+  ROBOTS_TXT_CONTENT,
+  SitemapBlogInput,
+  SitemapTutorInput,
+} from './src/server/sitemapGenerator';
+import { matchesBlogSlugOrId } from './src/utils/blogSlug';
 
 // Bundler-safe runtime environment reader: reads strictly from process['env'] at runtime (zero hardcoded fallbacks)
 export function readRuntimeEnv(key: string): string {
@@ -3945,6 +3954,64 @@ export async function createApp(options: CreateAppOptions = {}) {
 
   loadPersistedPrivateFiles();
 
+  const parseSubjectsListServer = (raw: unknown, fallbackSubject?: string): string[] => {
+    const collected: string[] = [];
+    const appendValue = (val: unknown) => {
+      if (!val) return;
+      if (Array.isArray(val)) {
+        val.forEach((item) => {
+          if (typeof item === 'string' && item.trim()) collected.push(item.trim());
+        });
+        return;
+      }
+      if (typeof val === 'string') {
+        const trimmed = val.trim();
+        if (!trimmed) return;
+        if (trimmed.startsWith('[')) {
+          try {
+            const parsed = JSON.parse(trimmed);
+            if (Array.isArray(parsed)) {
+              parsed.forEach((item) => {
+                if (typeof item === 'string' && item.trim()) collected.push(item.trim());
+              });
+              return;
+            }
+          } catch {
+            // Fall back to comma split below
+          }
+        }
+        trimmed.split(',').forEach((s) => {
+          const clean = s.replace(/^[\["']+|[\]"']+$/g, '').trim();
+          if (clean) collected.push(clean);
+        });
+      }
+    };
+    appendValue(raw);
+    if (collected.length === 0 && fallbackSubject && fallbackSubject.trim()) {
+      collected.push(fallbackSubject.trim());
+    }
+    const seen = new Set<string>();
+    return collected.filter((s) => {
+      const k = s.toLowerCase();
+      if (seen.has(k)) return false;
+      seen.add(k);
+      return true;
+    });
+  };
+
+  const slugifyTutorIdentifier = (value: string): string =>
+    String(value || '')
+      .toLowerCase()
+      .replace(/^(?:(?:dr|prof|mr|ms|mrs)\.?\s+)+/i, '')
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '');
+
+  const slugifyRawString = (value: string): string =>
+    String(value || '')
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '');
+
   // GET /api/users - role-scoped, paginated user directory
   // Admins/subadmins receive all roles (students, tutors, admins) paginated;
   // Unauthenticated / student / tutor callers receive ONLY public approved tutors (+ own self record if logged in).
@@ -3954,11 +4021,11 @@ export async function createApp(options: CreateAppOptions = {}) {
       const isAdmin = Boolean(caller && (caller.role === 'admin' || caller.role === 'subadmin'));
       const roleFilter = (req.query.role as string || '').toLowerCase().trim();
       const searchFilter = (req.query.search as string || req.query.q as string || '').toLowerCase().trim();
-      const hasExplicitPageOrLimit = Boolean(req.query.limit || req.query.page);
+      const hasExplicitLimit = Boolean(req.query.limit);
       const page = Math.max(1, parseInt((req.query.page as string) || '1', 10) || 1);
-      const limit = hasExplicitPageOrLimit
-        ? Math.min(500, Math.max(1, parseInt((req.query.limit as string) || '50', 10) || 50))
-        : 2000;
+      const limit = hasExplicitLimit
+        ? Math.min(5000, Math.max(1, parseInt((req.query.limit as string) || '2500', 10) || 2500))
+        : 5000;
 
       let dbUsers: any[] = [];
       if (isDbConnected() && db) {
@@ -4001,15 +4068,16 @@ export async function createApp(options: CreateAppOptions = {}) {
       const memUsers = memoryStore.getAllUsers();
       const userMap = new Map<string, any>();
 
-      // 1. Initial seed tutors & Memory store users first (prioritized in directory)
+      // 1. Initial seed tutors & curated specialized tutors
       for (const t of SEED_TUTORS) {
         const { passwordHash: _, ...safeT } = t as any;
         userMap.set(t.id, safeT);
       }
 
-      for (const u of memUsers) {
-        const { passwordHash: _, ...safeU } = u as any;
-        userMap.set(u.id, { ...(userMap.get(u.id) || {}), ...safeU });
+      for (const ct of CURATED_SPECIALIZED_TUTORS) {
+        if (!userMap.has(ct.id)) {
+          userMap.set(ct.id, { ...ct, role: 'tutor', isApproved: ct.isApproved !== false, status: ct.status || 'approved' });
+        }
       }
 
       // 2. Trending 500 Master Tutors dataset
@@ -4017,7 +4085,13 @@ export async function createApp(options: CreateAppOptions = {}) {
         userMap.set(t.id, { ...t, ...(userMap.get(t.id) || {}) });
       }
 
-      // 3. Disk persisted user updates
+      // 3. Memory store users
+      for (const u of memUsers) {
+        const { passwordHash: _, ...safeU } = u as any;
+        userMap.set(u.id, { ...(userMap.get(u.id) || {}), ...safeU });
+      }
+
+      // 4. Disk persisted user updates
       const persistedUpdates = getPersistedUserUpdates();
       for (const [uId, uUpdates] of Object.entries(persistedUpdates)) {
         if (userMap.has(uId)) {
@@ -4027,47 +4101,75 @@ export async function createApp(options: CreateAppOptions = {}) {
         }
       }
 
-      // 4. PostgreSQL database users table
+      // 5. PostgreSQL database users table
       for (const u of dbUsers) {
         const { passwordHash: _, ...safeU } = u as any;
         userMap.set(u.id, { ...(userMap.get(u.id) || {}), ...safeU });
       }
 
-      // 6. PostgreSQL tutors table
+      // 6. PostgreSQL tutors table (complete profile fields, regardless of whether profileImageUrl is set)
       if (isDbConnected() && db) {
         try {
           const dbTutorsList = await withDbTimeout(db.select().from(tutors), 10000, 'Select tutors overlay');
           for (const dt of dbTutorsList) {
-            const existing = userMap.get(dt.id);
-            if (existing) {
-              userMap.set(dt.id, {
-                ...existing,
-                ...(dt.profileImageUrl ? { avatarUrl: dt.profileImageUrl, profileImageUrl: dt.profileImageUrl } : {})
-              });
-            } else if (dt.profileImageUrl) {
-              userMap.set(dt.id, {
-                id: dt.id,
-                name: dt.name,
-                role: 'tutor',
-                avatarUrl: dt.profileImageUrl,
-                profileImageUrl: dt.profileImageUrl,
-                hourlyRate: dt.hourlyRate,
-                rating: dt.rating,
-                location: dt.cityLocation,
-                isApproved: true,
-                status: 'approved'
-              });
-            }
+            const existing = userMap.get(dt.id) || {};
+            const expArr = parseSubjectsListServer(dt.subjectExpertise, dt.primarySubject);
+            userMap.set(dt.id, {
+              ...existing,
+              id: dt.id,
+              role: existing.role || 'tutor',
+              name: dt.name || existing.name || 'Tutor',
+              email: existing.email || `${dt.id}@university-tutors.com`,
+              tutorTier: dt.tier || existing.tutorTier,
+              tier: dt.tier || existing.tier,
+              country: dt.country || existing.country,
+              location: dt.cityLocation || existing.location,
+              cityLocation: dt.cityLocation || existing.cityLocation,
+              hourlyRate: dt.hourlyRate ?? existing.hourlyRate,
+              rating: dt.rating ?? existing.rating ?? 4.9,
+              reviewCount: dt.reviewsCount ?? existing.reviewCount ?? existing.reviewsCount ?? 100,
+              reviewsCount: dt.reviewsCount ?? existing.reviewsCount ?? existing.reviewCount ?? 100,
+              primarySubject: dt.primarySubject || existing.primarySubject,
+              subjectExpertise: expArr.length > 0 ? expArr : existing.subjectExpertise,
+              subjects: expArr.length > 0 ? expArr : existing.subjects,
+              searchableKeywords: dt.searchableKeywords || existing.searchableKeywords,
+              education: dt.education || existing.education,
+              experience: dt.experienceSummary || existing.experience,
+              experienceSummary: dt.experienceSummary || existing.experienceSummary,
+              bio: existing.bio || dt.experienceSummary,
+              availability: dt.availability || existing.availability,
+              canMeet: dt.canMeet || existing.canMeet,
+              hobbies: dt.hobbies || existing.hobbies,
+              verificationStatus: dt.verificationStatus || existing.verificationStatus,
+              isApproved: existing.isApproved !== undefined ? existing.isApproved : true,
+              status: existing.status || 'approved',
+              ...(dt.profileImageUrl ? { avatarUrl: dt.profileImageUrl, profileImageUrl: dt.profileImageUrl } : {}),
+            });
           }
         } catch (tutorDbErr: any) {
           console.warn('[API] DB select from tutors notice:', tutorDbErr.message);
         }
       }
 
-      let resultUsers = Array.from(userMap.values()).map((u) => {
-        const { passwordHash: _, ...safeU } = u;
-        return safeU;
-      });
+      let resultUsers = Array.from(userMap.values())
+        .filter((u) => u && u.deleted !== true && u.status !== 'deleted')
+        .map((u) => {
+          const { passwordHash: _, ...safeU } = u;
+          const parsedExpertise = parseSubjectsListServer(
+            safeU.subjectExpertise || safeU.subjects,
+            safeU.primarySubject
+          );
+          if (parsedExpertise.length > 0) {
+            safeU.subjects = parsedExpertise;
+            safeU.subjectExpertise = parsedExpertise;
+          }
+          if (safeU.reviewsCount !== undefined && safeU.reviewCount === undefined) {
+            safeU.reviewCount = safeU.reviewsCount;
+          } else if (safeU.reviewCount !== undefined && safeU.reviewsCount === undefined) {
+            safeU.reviewsCount = safeU.reviewCount;
+          }
+          return safeU;
+        });
 
       // Strict role/privacy isolation:
       // Non-admin callers only receive approved public tutors (and their own record if logged in) without sensitive contact fields
@@ -4093,8 +4195,17 @@ export async function createApp(options: CreateAppOptions = {}) {
           const name = String(u.name || '').toLowerCase();
           const email = String(u.email || '').toLowerCase();
           const loc = String(u.location || u.cityLocation || u.country || '').toLowerCase();
-          const subj = String(u.primarySubject || u.subjects || u.subjectExpertise || '').toLowerCase();
-          return name.includes(searchFilter) || email.includes(searchFilter) || loc.includes(searchFilter) || subj.includes(searchFilter);
+          const subj = Array.isArray(u.subjectExpertise)
+            ? u.subjectExpertise.join(' ').toLowerCase()
+            : String(u.primarySubject || u.subjects || u.subjectExpertise || '').toLowerCase();
+          const kw = String(u.searchableKeywords || '').toLowerCase();
+          return (
+            name.includes(searchFilter) ||
+            email.includes(searchFilter) ||
+            loc.includes(searchFilter) ||
+            subj.includes(searchFilter) ||
+            kw.includes(searchFilter)
+          );
         });
       }
 
@@ -4140,7 +4251,9 @@ export async function createApp(options: CreateAppOptions = {}) {
       const searchQuery = (req.query.search as string || req.query.q as string || '').toLowerCase().trim();
       const activeOnly = req.query.activeOnly === 'true' || req.query.activeOnly === '1';
       const page = Math.max(1, parseInt(req.query.page as string || '1', 10) || 1);
-      const limit = Math.min(600, Math.max(1, parseInt(req.query.limit as string || '50', 10) || 50));
+      const limit = req.query.limit
+        ? Math.min(5000, Math.max(1, parseInt(req.query.limit as string, 10) || 1000))
+        : 1000;
 
       const tutorMap = new Map<string, any>();
 
@@ -4149,7 +4262,13 @@ export async function createApp(options: CreateAppOptions = {}) {
         tutorMap.set(t.id, { ...t });
       }
 
-      // 2. Initial seed tutors
+      // 2. Curated specialized faculty & initial seed tutors
+      for (const ct of CURATED_SPECIALIZED_TUTORS) {
+        if (!tutorMap.has(ct.id)) {
+          tutorMap.set(ct.id, { ...ct, role: 'tutor' });
+        }
+      }
+
       for (const t of SEED_TUTORS) {
         const { passwordHash: _, ...safeT } = t as any;
         tutorMap.set(t.id, safeT);
@@ -4160,6 +4279,8 @@ export async function createApp(options: CreateAppOptions = {}) {
       for (const [uId, uUpdates] of Object.entries(persistedUpdates)) {
         if (tutorMap.has(uId)) {
           tutorMap.set(uId, { ...tutorMap.get(uId), ...uUpdates });
+        } else if ((uUpdates as any)?.role === 'tutor' || uId.startsWith('tutor')) {
+          tutorMap.set(uId, { id: uId, role: 'tutor', ...uUpdates });
         }
       }
 
@@ -4168,48 +4289,69 @@ export async function createApp(options: CreateAppOptions = {}) {
       for (const u of memoryStore.getAllUsers()) {
         if (u.role === 'tutor' || u.id.startsWith('tutor_') || u.id.startsWith('tutor-') || u.hourlyRate) {
           const { passwordHash: _, ...safeU } = u as any;
-          tutorMap.set(u.id, safeU);
+          tutorMap.set(u.id, { ...(tutorMap.get(u.id) || {}), ...safeU });
           dbAndRegisteredIds.add(u.id);
         }
       }
 
-      // 5. Database persisted tutors from tutors table
+      // 5. Database persisted tutors from users table (where role = 'tutor') and tutors table
       if (isDbConnected() && db) {
         try {
-          const dbTutorsList = await db.select().from(tutors);
+          const dbTutorUsers = await withDbTimeout(
+            db.select().from(users).where(eq(users.role, 'tutor')),
+            8000,
+            'Select tutor users in /api/tutors'
+          );
+          for (const du of dbTutorUsers) {
+            const { passwordHash: _, ...safeDu } = du as any;
+            tutorMap.set(du.id, { ...(tutorMap.get(du.id) || {}), ...safeDu, role: 'tutor' });
+            dbAndRegisteredIds.add(du.id);
+          }
+        } catch (dbUserErr) {
+          console.warn('[API] Notice querying users(role=tutor) in /api/tutors:', dbUserErr);
+        }
+
+        try {
+          const dbTutorsList = await withDbTimeout(
+            db.select().from(tutors),
+            8000,
+            'Select tutors table in /api/tutors'
+          );
           for (const t of dbTutorsList) {
-            let expArr: string[] = [];
-            try {
-              expArr = t.subjectExpertise.startsWith('[') ? JSON.parse(t.subjectExpertise) : t.subjectExpertise.split(',').map((s: string) => s.trim());
-            } catch {
-              expArr = [t.primarySubject];
-            }
+            const existing = tutorMap.get(t.id) || {};
+            const expArr = parseSubjectsListServer(t.subjectExpertise, t.primarySubject);
             tutorMap.set(t.id, {
+              ...existing,
               id: t.id,
-              name: t.name,
-              tutorTier: t.tier,
-              tier: t.tier,
-              country: t.country,
-              countryFull: t.country,
-              location: t.cityLocation,
-              cityLocation: t.cityLocation,
-              rating: t.rating || 4.90,
-              reviewsCount: t.reviewsCount || 0,
-              hourlyRate: t.hourlyRate,
-              primarySubject: t.primarySubject,
+              name: t.name || existing.name,
+              tutorTier: t.tier || existing.tutorTier,
+              tier: t.tier || existing.tier,
+              country: t.country || existing.country,
+              countryFull: t.country || existing.countryFull,
+              location: t.cityLocation || existing.location,
+              cityLocation: t.cityLocation || existing.cityLocation,
+              rating: t.rating || existing.rating || 4.9,
+              reviewsCount: t.reviewsCount ?? existing.reviewsCount ?? existing.reviewCount ?? 0,
+              reviewCount: t.reviewsCount ?? existing.reviewCount ?? existing.reviewsCount ?? 0,
+              hourlyRate: t.hourlyRate ?? existing.hourlyRate,
+              primarySubject: t.primarySubject || existing.primarySubject,
               subjectExpertise: expArr,
-              searchableKeywords: t.searchableKeywords,
-              education: t.education,
-              experience: t.experienceSummary,
-              experienceSummary: t.experienceSummary,
-              availability: t.availability,
-              canMeet: t.canMeet,
-              hobbies: t.hobbies,
-              verificationStatus: t.verificationStatus,
+              subjects: expArr,
+              searchableKeywords: t.searchableKeywords || existing.searchableKeywords,
+              education: t.education || existing.education,
+              experience: t.experienceSummary || existing.experience,
+              experienceSummary: t.experienceSummary || existing.experienceSummary,
+              bio: existing.bio || t.experienceSummary,
+              availability: t.availability || existing.availability,
+              canMeet: t.canMeet || existing.canMeet,
+              hobbies: t.hobbies || existing.hobbies,
+              verificationStatus: t.verificationStatus || existing.verificationStatus,
               isVerified: true,
-              isApproved: true,
-              avatarUrl: t.profileImageUrl,
-              role: 'tutor'
+              isApproved: existing.isApproved !== undefined ? existing.isApproved : true,
+              status: existing.status || 'approved',
+              avatarUrl: t.profileImageUrl || existing.avatarUrl,
+              profileImageUrl: t.profileImageUrl || existing.profileImageUrl,
+              role: 'tutor',
             });
             dbAndRegisteredIds.add(t.id);
           }
@@ -4218,7 +4360,26 @@ export async function createApp(options: CreateAppOptions = {}) {
         }
       }
 
-      let allTutors = Array.from(tutorMap.values());
+      let allTutors = Array.from(tutorMap.values())
+        .filter((t) => t && t.deleted !== true && t.status !== 'deleted')
+        .map((t) => {
+          const { passwordHash: _, email: _e, phoneNumber: _p, ...publicT } = t;
+          const expArr = parseSubjectsListServer(
+            publicT.subjectExpertise || publicT.subjects,
+            publicT.primarySubject
+          );
+          return {
+            ...publicT,
+            role: 'tutor',
+            subjects: expArr,
+            subjectExpertise: expArr,
+            primarySubject: publicT.primarySubject || expArr[0] || 'Academic Mentorship',
+            reviewCount: publicT.reviewCount ?? publicT.reviewsCount ?? 100,
+            reviewsCount: publicT.reviewsCount ?? publicT.reviewCount ?? 100,
+            location: publicT.location || publicT.cityLocation || publicT.city || 'Miami, FL',
+            experience: publicT.experience || publicT.experienceSummary || publicT.bio || '',
+          };
+        });
 
       if (activeOnly) {
         allTutors = allTutors.filter((t) => {
@@ -4266,10 +4427,9 @@ export async function createApp(options: CreateAppOptions = {}) {
       // Filter by subject
       if (subjectQuery && subjectQuery !== 'all') {
         allTutors = allTutors.filter(t => {
-          const subs = Array.isArray(t.subjects) ? t.subjects : (typeof t.subjects === 'string' ? JSON.parse(t.subjects || '[]') : []);
-          const exp = Array.isArray(t.subjectExpertise) ? t.subjectExpertise : (typeof t.subjectExpertise === 'string' ? JSON.parse(t.subjectExpertise || '[]') : []);
-          const prim = t.primarySubject ? [t.primarySubject] : [];
-          const allSubs = [...subs, ...exp, ...prim].map(s => String(s).toLowerCase());
+          const subs = parseSubjectsListServer(t.subjects);
+          const exp = parseSubjectsListServer(t.subjectExpertise, t.primarySubject);
+          const allSubs = [...subs, ...exp].map(s => String(s).toLowerCase());
           return allSubs.some(s => s.includes(subjectQuery));
         });
       }
@@ -4313,7 +4473,7 @@ export async function createApp(options: CreateAppOptions = {}) {
         total,
         page,
         limit,
-        totalPages: Math.ceil(total / limit),
+        totalPages: Math.max(1, Math.ceil(total / limit)),
         tutors: paginatedTutors
       });
     } catch (err: any) {
@@ -4323,43 +4483,79 @@ export async function createApp(options: CreateAppOptions = {}) {
   });
 
   // GET /api/tutors/:id
-  // Retrieves a single tutor profile with authoritative persistence guarantees
+  // Retrieves a single tutor profile by ID or slug with authoritative persistence guarantees
   app.get('/api/tutors/:id', async (req, res) => {
     try {
       res.setHeader('Access-Control-Allow-Origin', '*');
       res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
-      const { id } = req.params;
+      const rawParam = decodeURIComponent(req.params.id || '').trim();
+      const lowerParam = rawParam.toLowerCase();
+      const paramSlug = slugifyTutorIdentifier(rawParam);
+      const rawSlug = slugifyRawString(rawParam);
+
+      const matchesCandidate = (candidate: any): boolean => {
+        if (!candidate) return false;
+        const cid = String(candidate.id || '').trim();
+        if (cid === rawParam || cid.toLowerCase() === lowerParam) return true;
+        if (rawSlug && slugifyRawString(cid) === rawSlug) return true;
+        if (candidate.name) {
+          if (paramSlug && slugifyTutorIdentifier(candidate.name) === paramSlug) return true;
+          if (rawSlug && slugifyRawString(candidate.name) === rawSlug) return true;
+        }
+        return false;
+      };
 
       let tutorRecord: any = null;
 
-      // 1. Check static datasets
-      const trending = TRENDING_TUTORS_500.find(t => t.id === id);
+      // 1. Check static & curated datasets
+      const trending =
+        TRENDING_TUTORS_500.find((t) => t.id === rawParam) ||
+        TRENDING_TUTORS_500.find(matchesCandidate);
       if (trending) tutorRecord = { ...trending };
-      const seed = SEED_TUTORS.find(t => t.id === id);
+
+      const curated =
+        CURATED_SPECIALIZED_TUTORS.find((t) => t.id === rawParam) ||
+        CURATED_SPECIALIZED_TUTORS.find(matchesCandidate);
+      if (curated) tutorRecord = { ...(tutorRecord || {}), ...curated };
+
+      const seed =
+        SEED_TUTORS.find((t) => t.id === rawParam) ||
+        SEED_TUTORS.find(matchesCandidate);
       if (seed) tutorRecord = { ...(tutorRecord || {}), ...seed };
 
+      const resolvedId = tutorRecord?.id || rawParam;
+
       // 2. Memory store
-      const memUser = memoryStore.getUser(id);
+      const memUser =
+        memoryStore.getUser(resolvedId) ||
+        memoryStore.getAllUsers().find((u) => (u.role === 'tutor' || u.id.startsWith('tutor')) && matchesCandidate(u));
       if (memUser) tutorRecord = { ...(tutorRecord || {}), ...memUser };
+
+      const finalId = tutorRecord?.id || resolvedId;
 
       // 3. Disk persisted updates
       const persisted = getPersistedUserUpdates();
-      if (persisted[id]) {
-        tutorRecord = { ...(tutorRecord || {}), ...persisted[id] };
+      if (persisted[finalId]) {
+        tutorRecord = { ...(tutorRecord || {}), ...persisted[finalId] };
       }
 
-      // 4. PostgreSQL database (authoritative source)
+      // 4. PostgreSQL database (users table + tutors table)
       if (isDbConnected() && db) {
         try {
-          const dbRows = await db.select().from(tutors).where(eq(tutors.id, id)).limit(1);
+          const userRows = await db.select().from(users).where(eq(users.id, finalId)).limit(1);
+          if (userRows.length > 0) {
+            const { passwordHash: _, ...safeDbUser } = userRows[0] as any;
+            tutorRecord = { ...(tutorRecord || {}), ...safeDbUser };
+          }
+        } catch (dbUserErr: any) {
+          console.warn('[API] DB notice fetching tutor from users by ID:', dbUserErr.message);
+        }
+
+        try {
+          const dbRows = await db.select().from(tutors).where(eq(tutors.id, finalId)).limit(1);
           if (dbRows.length > 0) {
             const dbT = dbRows[0];
-            let expArr: string[] = [];
-            try {
-              expArr = dbT.subjectExpertise.startsWith('[') ? JSON.parse(dbT.subjectExpertise) : dbT.subjectExpertise.split(',').map((s: string) => s.trim());
-            } catch {
-              expArr = [dbT.primarySubject];
-            }
+            const expArr = parseSubjectsListServer(dbT.subjectExpertise, dbT.primarySubject);
             tutorRecord = {
               ...(tutorRecord || {}),
               id: dbT.id,
@@ -4371,21 +4567,24 @@ export async function createApp(options: CreateAppOptions = {}) {
               cityLocation: dbT.cityLocation,
               rating: dbT.rating || 4.9,
               reviewsCount: dbT.reviewsCount || 0,
+              reviewCount: dbT.reviewsCount || tutorRecord?.reviewCount || 100,
               hourlyRate: dbT.hourlyRate,
               primarySubject: dbT.primarySubject,
               subjectExpertise: expArr,
+              subjects: expArr,
               searchableKeywords: dbT.searchableKeywords,
               education: dbT.education,
               experience: dbT.experienceSummary,
               experienceSummary: dbT.experienceSummary,
+              bio: tutorRecord?.bio || dbT.experienceSummary,
               availability: dbT.availability,
               canMeet: dbT.canMeet,
               hobbies: dbT.hobbies,
               verificationStatus: dbT.verificationStatus,
               isVerified: true,
-              avatarUrl: dbT.profileImageUrl,
-              profileImageUrl: dbT.profileImageUrl,
-              role: 'tutor'
+              avatarUrl: dbT.profileImageUrl || tutorRecord?.avatarUrl,
+              profileImageUrl: dbT.profileImageUrl || tutorRecord?.profileImageUrl,
+              role: 'tutor',
             };
           }
         } catch (dbErr: any) {
@@ -4393,11 +4592,31 @@ export async function createApp(options: CreateAppOptions = {}) {
         }
       }
 
-      if (!tutorRecord) {
-        return res.status(404).json({ error: `Tutor with ID "${id}" not found.` });
+      if (!tutorRecord || tutorRecord.deleted === true || tutorRecord.status === 'deleted') {
+        return res.status(404).json({ error: `Tutor with ID "${rawParam}" not found.` });
       }
 
-      const { passwordHash: _, ...safeTutor } = tutorRecord;
+      const { passwordHash: _, email: _e, phoneNumber: _p, ...safeTutor } = tutorRecord;
+      const normalizedSubjects = parseSubjectsListServer(
+        safeTutor.subjectExpertise || safeTutor.subjects,
+        safeTutor.primarySubject
+      );
+      safeTutor.role = 'tutor';
+      safeTutor.subjects = normalizedSubjects;
+      safeTutor.subjectExpertise = normalizedSubjects;
+      safeTutor.primarySubject = safeTutor.primarySubject || normalizedSubjects[0] || 'Academic Mentorship';
+      safeTutor.reviewCount = safeTutor.reviewCount ?? safeTutor.reviewsCount ?? 120;
+      safeTutor.reviewsCount = safeTutor.reviewsCount ?? safeTutor.reviewCount ?? 120;
+      safeTutor.location = safeTutor.location || safeTutor.cityLocation || safeTutor.city || 'Miami, FL';
+      safeTutor.experience = safeTutor.experience || safeTutor.experienceSummary || safeTutor.bio || '';
+      safeTutor.availability = safeTutor.availability || safeTutor.availabilities || 'Flexible global scheduling';
+      if (safeTutor.avatarUrl && typeof safeTutor.avatarUrl === 'string' && !safeTutor.avatarVariants) {
+        const meta = buildAvatarVariantMetadata(safeTutor.avatarUrl);
+        if (meta) {
+          Object.assign(safeTutor, meta);
+        }
+      }
+
       return res.status(200).json({ success: true, tutor: safeTutor });
     } catch (err: any) {
       console.error('[API] Error in GET /api/tutors/:id:', err);
@@ -4903,7 +5122,11 @@ export async function createApp(options: CreateAppOptions = {}) {
               await db.update(tutors).set(tutorDbUpdates).where(eq(tutors.id, id));
               console.log(`[DB] Successfully updated tutor ${id} in PostgreSQL tutors table.`);
             } else {
-              const baseline: any = TRENDING_TUTORS_500.find(t => t.id === id) || SEED_TUTORS.find(t => t.id === id) || {};
+              const baseline: any =
+                TRENDING_TUTORS_500.find(t => t.id === id) ||
+                CURATED_SPECIALIZED_TUTORS.find(t => t.id === id) ||
+                SEED_TUTORS.find(t => t.id === id) ||
+                {};
               await db.insert(tutors).values({
                 id,
                 name: tutorDbUpdates.name || baseline.name || 'Tutor',
@@ -4911,7 +5134,7 @@ export async function createApp(options: CreateAppOptions = {}) {
                 country: tutorDbUpdates.country || baseline.country || 'USA',
                 cityLocation: tutorDbUpdates.cityLocation || baseline.location || 'Miami, FL',
                 rating: tutorDbUpdates.rating || baseline.rating || 5.0,
-                reviewsCount: tutorDbUpdates.reviewsCount || baseline.reviewsCount || 100,
+                reviewsCount: tutorDbUpdates.reviewsCount || baseline.reviewsCount || baseline.reviewCount || 100,
                 hourlyRate: tutorDbUpdates.hourlyRate || baseline.hourlyRate || 50,
                 primarySubject: tutorDbUpdates.primarySubject || baseline.primarySubject || 'General',
                 subjectExpertise: typeof tutorDbUpdates.subjectExpertise === 'string' ? tutorDbUpdates.subjectExpertise : JSON.stringify(baseline.subjectExpertise || []),
@@ -4942,13 +5165,19 @@ export async function createApp(options: CreateAppOptions = {}) {
           if (updates.bio || updates.experience || updates.experienceSummary) userUpdates.bio = updates.experienceSummary || updates.experience || updates.bio;
           if (updates.education) userUpdates.education = updates.education;
           if (updates.searchableKeywords) userUpdates.searchableKeywords = updates.searchableKeywords;
+          if (updates.isApproved !== undefined) userUpdates.isApproved = Boolean(updates.isApproved);
+          if (updates.status) userUpdates.status = updates.status;
 
           if (Object.keys(userUpdates).length > 0) {
             const existingUser = await db.select().from(users).where(eq(users.id, id));
             if (existingUser.length > 0) {
               await db.update(users).set(userUpdates).where(eq(users.id, id));
             } else {
-              const baseline: any = TRENDING_TUTORS_500.find(t => t.id === id) || SEED_TUTORS.find(t => t.id === id) || {};
+              const baseline: any =
+                TRENDING_TUTORS_500.find(t => t.id === id) ||
+                CURATED_SPECIALIZED_TUTORS.find(t => t.id === id) ||
+                SEED_TUTORS.find(t => t.id === id) ||
+                {};
               await db.insert(users).values({
                 id,
                 role: 'tutor',
@@ -5153,6 +5382,7 @@ export async function createApp(options: CreateAppOptions = {}) {
       }
 
       await logAudit('CREATE_TUTOR_PROFILE', `New tutor profile created: ${cleanEmail} (${name.trim()})`, newTutorId, name.trim(), 'tutor', req);
+      invalidateSitemapCache();
 
       const { passwordHash: _, ...safeTutor } = newTutorRecord;
       return res.status(201).json({
@@ -5255,6 +5485,9 @@ export async function createApp(options: CreateAppOptions = {}) {
 
       const caller = (req as any).user;
       await logAudit('CREATE_PRIVILEGED_USER', `Admin created privileged user: ${cleanEmail} (${role})`, caller?.id || userId, caller?.name || name, caller?.role || 'admin', req);
+      if (role === 'tutor') {
+        invalidateSitemapCache();
+      }
 
       const { passwordHash: _, ...safeUser } = newUser;
       return res.status(200).json({ success: true, user: safeUser });
@@ -5349,9 +5582,19 @@ export async function createApp(options: CreateAppOptions = {}) {
             status: 'approved'
           };
         } else {
-          const seedTutor = SEED_TUTORS.find(t => t.id === id);
-          if (seedTutor) {
-            existingUser = { ...seedTutor };
+          const curatedTutor = CURATED_SPECIALIZED_TUTORS.find(t => t.id === id);
+          if (curatedTutor) {
+            existingUser = {
+              ...curatedTutor,
+              role: 'tutor',
+              subjects: JSON.stringify(curatedTutor.subjectExpertise || curatedTutor.subjects || []),
+              subjectExpertise: JSON.stringify(curatedTutor.subjectExpertise || curatedTutor.subjects || []),
+            };
+          } else {
+            const seedTutor = SEED_TUTORS.find(t => t.id === id);
+            if (seedTutor) {
+              existingUser = { ...seedTutor };
+            }
           }
         }
       }
@@ -5421,10 +5664,55 @@ export async function createApp(options: CreateAppOptions = {}) {
       }
 
       await logAudit('USER_UPDATE', `Updated user ${id} (image/profile update)`, id, undefined, undefined, req);
+      if (mergedUser.role === 'tutor' || String(id).startsWith('tutor')) {
+        invalidateSitemapCache();
+      }
 
       return res.status(200).json({ success: true, user: mergedUser });
     } catch (err: any) {
       return res.status(500).json({ error: err.message });
+    }
+  });
+
+  // DELETE /api/users/:id - Admin/Subadmin soft+DB removal for user/tutor profiles
+  app.delete('/api/users/:id', requireRole('admin', 'subadmin'), async (req, res) => {
+    try {
+      const { id } = req.params;
+      const caller = (req as any).user;
+      if (caller && caller.id === id) {
+        return res.status(400).json({ error: 'Cannot delete your own active administrator account.' });
+      }
+
+      savePersistedUserUpdate(id, {
+        deleted: true,
+        status: 'deleted',
+        suspended: true,
+        isApproved: false,
+      });
+      memoryStore.updateUser(id, {
+        status: 'deleted',
+        suspended: true,
+        isApproved: false,
+      } as any);
+
+      if (isDbConnected() && db) {
+        try {
+          await db.delete(tutors).where(eq(tutors.id, id));
+        } catch (tErr: any) {
+          console.warn('[DB] Notice deleting from tutors table:', tErr.message);
+        }
+        try {
+          await db.delete(users).where(eq(users.id, id));
+        } catch (uErr: any) {
+          console.warn('[DB] Notice deleting from users table:', uErr.message);
+        }
+      }
+
+      invalidateSitemapCache();
+      await logAudit('USER_DELETE', `Deleted user/tutor profile ${id}`, id, undefined, 'admin', req);
+      return res.status(200).json({ success: true, deletedId: id });
+    } catch (err: any) {
+      return res.status(500).json({ error: err.message || 'Failed to delete user profile' });
     }
   });
 
@@ -7116,23 +7404,40 @@ export async function createApp(options: CreateAppOptions = {}) {
     }
   });
 
-  // GET /api/blogs/:id (Public)
+  // GET /api/blogs/:id (Public — supports lookup by either blog ID or canonical slug)
   app.get('/api/blogs/:id', async (req, res) => {
     try {
       const { id } = req.params;
+      const target = decodeURIComponent(String(id || '')).trim();
 
       if (isDbConnected() && db) {
         try {
-          const rows = await db.select().from(blogs).where(eq(blogs.id, id)).limit(1);
+          const rows = await withDbTimeout(
+            db.select().from(blogs).where(eq(blogs.id, target)).limit(1),
+            8000,
+            'Query single blog by id'
+          );
           if (rows.length > 0) {
             return res.status(200).json({ blog: rows[0] });
+          }
+          const allDbBlogs = await withDbTimeout(
+            db.select().from(blogs).orderBy(desc(blogs.publishedAt)),
+            8000,
+            'Query blogs for slug lookup'
+          );
+          const slugMatched = allDbBlogs.find((b) => matchesBlogSlugOrId(b, target));
+          if (slugMatched) {
+            return res.status(200).json({ blog: slugMatched });
           }
         } catch (dbErr: any) {
           console.warn('[API] DB error finding blog:', dbErr.message);
         }
       }
 
-      const memBlog = memoryStore.getBlogById(id);
+      const memBlog =
+        memoryStore.getBlogById(target) ||
+        memoryStore.getBlogs().find((b) => matchesBlogSlugOrId(b, target)) ||
+        DEFAULT_20_BLOGS.find((b) => matchesBlogSlugOrId(b, target));
       if (memBlog) {
         return res.status(200).json({ blog: memBlog });
       }
@@ -7199,6 +7504,7 @@ export async function createApp(options: CreateAppOptions = {}) {
       }
 
       await logAudit('BLOG_CREATE', `Published new blog: "${newBlog.title}" (${newBlog.category})`, user.id, user.name, user.role, req);
+      invalidateSitemapCache();
 
       return res.status(201).json({ success: true, blog: newBlog });
     } catch (err: any) {
@@ -7231,6 +7537,7 @@ export async function createApp(options: CreateAppOptions = {}) {
       }
 
       await logAudit('BLOG_UPDATE', `Updated blog ${id}: "${updates.title || 'updated'}"`, user.id, user.name, user.role, req);
+      invalidateSitemapCache();
 
       return res.status(200).json({ success: true, blog: updated });
     } catch (err: any) {
@@ -7255,6 +7562,7 @@ export async function createApp(options: CreateAppOptions = {}) {
       }
 
       await logAudit('BLOG_DELETE', `Deleted blog ${id}`, user.id, user.name, user.role, req);
+      invalidateSitemapCache();
 
       return res.status(200).json({ success: true });
     } catch (err: any) {
@@ -7304,6 +7612,7 @@ export async function createApp(options: CreateAppOptions = {}) {
       }
 
       await logAudit('BLOG_SYNC_DEFAULTS', `Synchronized and seeded ${syncedBlogs.length} standard educational blogs`, user.id, user.name, user.role, req);
+      invalidateSitemapCache();
 
       return res.status(200).json({
         success: true,
@@ -7312,6 +7621,294 @@ export async function createApp(options: CreateAppOptions = {}) {
       });
     } catch (err: any) {
       return res.status(500).json({ error: err.message });
+    }
+  });
+
+  // ==========================================
+  // DYNAMIC SITEMAP.XML & ROBOTS.TXT (SEO)
+  // ==========================================
+  const loadSitemapDatabaseRecords = async (): Promise<{
+    blogs: SitemapBlogInput[];
+    tutors: SitemapTutorInput[];
+  }> => {
+    // 1. Collect all published blog posts (PostgreSQL + memoryStore + DEFAULT_20_BLOGS fallback)
+    const blogMap = new Map<string, SitemapBlogInput>();
+    let dbBlogsLoaded = false;
+
+    if (isDbConnected() && db) {
+      try {
+        const dbBlogRows = await withDbTimeout(
+          db.select().from(blogs).orderBy(desc(blogs.publishedAt)),
+          8000,
+          'Sitemap query blogs'
+        );
+        if (dbBlogRows.length > 0) {
+          dbBlogsLoaded = true;
+          for (const row of dbBlogRows) {
+            blogMap.set(row.id, {
+              id: row.id,
+              title: row.title,
+              publishedAt: row.publishedAt,
+              createdAt: row.createdAt,
+              updatedAt: row.updatedAt,
+            });
+          }
+        }
+      } catch (err: any) {
+        console.warn('[SITEMAP] Notice querying blogs from DB:', err?.message || err);
+      }
+    }
+
+    const memBlogs = memoryStore.getBlogs();
+    if (!dbBlogsLoaded) {
+      const sourceBlogs = memBlogs.length > 0 ? memBlogs : DEFAULT_20_BLOGS;
+      for (const b of sourceBlogs) {
+        blogMap.set(b.id, {
+          id: b.id,
+          title: b.title,
+          slug: (b as any).slug || null,
+          publishedAt: b.publishedAt,
+          createdAt: (b as any).createdAt || b.publishedAt,
+          updatedAt: (b as any).updatedAt || b.publishedAt,
+        });
+      }
+    } else {
+      for (const b of memBlogs) {
+        if (!blogMap.has(b.id)) {
+          blogMap.set(b.id, {
+            id: b.id,
+            title: b.title,
+            slug: (b as any).slug || null,
+            publishedAt: b.publishedAt,
+            createdAt: (b as any).createdAt || b.publishedAt,
+            updatedAt: (b as any).updatedAt || b.publishedAt,
+          });
+        }
+      }
+    }
+
+    // 2. Collect all active, approved public tutor profiles (matching /api/tutors precedence & deduplication)
+    const tutorMap = new Map<string, any>();
+    for (const t of TRENDING_TUTORS_500) {
+      tutorMap.set(t.id, { ...t });
+    }
+    for (const t of SEED_TUTORS) {
+      const { passwordHash: _, ...safeT } = t as any;
+      tutorMap.set(t.id, safeT);
+    }
+
+    const persistedUpdates = getPersistedUserUpdates();
+    for (const [uId, uUpdates] of Object.entries(persistedUpdates)) {
+      if (tutorMap.has(uId)) {
+        tutorMap.set(uId, { ...tutorMap.get(uId), ...uUpdates });
+      }
+    }
+
+    for (const u of memoryStore.getAllUsers()) {
+      if (u.role === 'tutor' || u.id.startsWith('tutor_') || u.id.startsWith('tutor-') || u.hourlyRate) {
+        const { passwordHash: _, ...safeU } = u as any;
+        tutorMap.set(u.id, { ...(tutorMap.get(u.id) || {}), ...safeU });
+      }
+    }
+
+    if (isDbConnected() && db) {
+      try {
+        const dbTutorUsers = await withDbTimeout(
+          db.select({
+            id: users.id,
+            name: users.name,
+            role: users.role,
+            suspended: users.suspended,
+            isApproved: users.isApproved,
+            status: users.status,
+            location: users.location,
+            subjects: users.subjects,
+            avatarUrl: users.avatarUrl,
+            createdAt: users.createdAt,
+          }).from(users).where(eq(users.role, 'tutor')),
+          8000,
+          'Sitemap query tutor users'
+        );
+        for (const u of dbTutorUsers) {
+          let parsedSub = '';
+          try {
+            const arr = u.subjects ? JSON.parse(u.subjects) : [];
+            if (Array.isArray(arr) && arr[0]) parsedSub = String(arr[0]);
+          } catch {
+            parsedSub = u.subjects || '';
+          }
+          tutorMap.set(u.id, {
+            ...(tutorMap.get(u.id) || {}),
+            id: u.id,
+            name: u.name,
+            role: u.role,
+            suspended: u.suspended,
+            isApproved: u.isApproved,
+            status: u.status,
+            location: u.location || tutorMap.get(u.id)?.location,
+            primarySubject: tutorMap.get(u.id)?.primarySubject || parsedSub,
+            avatarUrl: u.avatarUrl || tutorMap.get(u.id)?.avatarUrl,
+            createdAt: u.createdAt,
+          });
+        }
+      } catch (err: any) {
+        console.warn('[SITEMAP] Notice querying tutor users from DB:', err?.message || err);
+      }
+
+      try {
+        const dbTutorsRows = await withDbTimeout(
+          db.select().from(tutors),
+          8000,
+          'Sitemap query tutors table'
+        );
+        for (const t of dbTutorsRows) {
+          tutorMap.set(t.id, {
+            ...(tutorMap.get(t.id) || {}),
+            id: t.id,
+            name: t.name,
+            primarySubject: t.primarySubject,
+            cityLocation: t.cityLocation,
+            location: t.cityLocation,
+            avatarUrl: t.profileImageUrl,
+            isApproved: tutorMap.get(t.id)?.isApproved ?? true,
+            suspended: tutorMap.get(t.id)?.suspended ?? false,
+            status: tutorMap.get(t.id)?.status || 'approved',
+            createdAt: t.createdAt,
+          });
+        }
+      } catch (err: any) {
+        console.warn('[SITEMAP] Notice querying tutors table from DB:', err?.message || err);
+      }
+    }
+
+    // Filter out inactive, suspended, rejected, or unapproved tutors
+    const activeRawTutors = Array.from(tutorMap.values()).filter((t) => {
+      if (!t || !t.id) return false;
+      if (t.suspended === true) return false;
+      const st = t.status ? String(t.status).toLowerCase() : '';
+      if (st === 'suspended' || st === 'rejected' || st === 'pending') return false;
+      if (t.isApproved === false) return false;
+      return true;
+    });
+
+    // Deduplicate by composite key (name, primarySubject, cityLocation) exactly like GET /api/tutors
+    const uniqueCompositeTutors = new Map<string, any>();
+    for (const t of activeRawTutors) {
+      const cName = String(t.name || '').trim().toLowerCase();
+      const cSub = String(
+        t.primarySubject ||
+          (Array.isArray(t.subjectExpertise) ? t.subjectExpertise[0] : '') ||
+          ''
+      )
+        .trim()
+        .toLowerCase();
+      const cLoc = String(t.cityLocation || t.location || '').trim().toLowerCase();
+      const compositeKey = `${cName}|${cSub}|${cLoc}`;
+      if (!uniqueCompositeTutors.has(compositeKey)) {
+        uniqueCompositeTutors.set(compositeKey, t);
+      } else {
+        const existing = uniqueCompositeTutors.get(compositeKey);
+        if (
+          t.avatarUrl?.includes('/uploads/avatars/') &&
+          !existing.avatarUrl?.includes('/uploads/avatars/')
+        ) {
+          uniqueCompositeTutors.set(compositeKey, t);
+        }
+      }
+    }
+
+    const activeTutors: SitemapTutorInput[] = Array.from(uniqueCompositeTutors.values()).map((t) => ({
+      id: String(t.id),
+      name: t.name || null,
+      updatedAt: t.updatedAt || null,
+      createdAt: t.createdAt || null,
+      suspended: Boolean(t.suspended),
+      isApproved: t.isApproved !== false,
+      status: t.status || 'approved',
+    }));
+
+    return {
+      blogs: Array.from(blogMap.values()),
+      tutors: activeTutors,
+    };
+  };
+
+  app.get('/robots.txt', (_req, res) => {
+    res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+    res.setHeader('Cache-Control', 'public, max-age=3600, stale-while-revalidate=86400');
+    return res.status(200).send(ROBOTS_TXT_CONTENT);
+  });
+
+  const llmsTxtFallback = [
+    '# University Tutors',
+    '',
+    '> Online 1-on-1 academic tutoring, assignment guidance, coursework support, and free client-side student tools.',
+    '',
+    '## Core Services',
+    "- [1-on-1 Live Tutoring](https://university-tutors.com/services/1-on-1-live-tutoring): Personalized sessions with PhD and Master's tutors.",
+    '- [Assignment Guidance](https://university-tutors.com/services/assignment-guidance): Structured academic support and problem-solving.',
+    '- [Coursework Track](https://university-tutors.com/services/coursework-track): Full-semester study management and exam prep.',
+    '- [Essay & Reference Checks](https://university-tutors.com/services/essay-reference-checks): Academic editing and citation verification.',
+    '',
+    '## Platform Pages',
+    '- [How It Works](https://university-tutors.com/how-it-works): Step-by-step guide to booking a tutor.',
+    '- [Pricing](https://university-tutors.com/pricing): Transparent hourly and package rates.',
+    '- [Get a Quote](https://university-tutors.com/get-quote): Request custom academic support.',
+    '- [Find Verified Tutors](https://university-tutors.com/tutors): Browse 500+ vetted university subject mentors.',
+    '- [Student Tools Hub](https://university-tutors.com/tools): Free 100% browser-based academic utilities.',
+    '',
+  ].join('\n');
+
+  let cachedLlmsTxt: string | null = null;
+  app.get('/llms.txt', (_req, res) => {
+    if (!cachedLlmsTxt) {
+      try {
+        const publicLlmsPath = path.resolve(process.cwd(), 'public', 'llms.txt');
+        const distLlmsPath = path.resolve(process.cwd(), 'dist', 'llms.txt');
+        if (fs.existsSync(publicLlmsPath)) {
+          cachedLlmsTxt = fs.readFileSync(publicLlmsPath, 'utf-8');
+        } else if (fs.existsSync(distLlmsPath)) {
+          cachedLlmsTxt = fs.readFileSync(distLlmsPath, 'utf-8');
+        } else {
+          cachedLlmsTxt = llmsTxtFallback;
+        }
+      } catch {
+        cachedLlmsTxt = llmsTxtFallback;
+      }
+    }
+    res.setHeader('Content-Type', 'text/markdown; charset=utf-8');
+    res.setHeader('Cache-Control', 'public, max-age=3600, stale-while-revalidate=86400');
+    return res.status(200).send(cachedLlmsTxt);
+  });
+
+  app.get('/sitemap.xml', async (_req, res) => {
+    try {
+      const payload = await getOrBuildSitemapPayload(loadSitemapDatabaseRecords);
+      res.setHeader('Content-Type', 'application/xml; charset=utf-8');
+      res.setHeader('Cache-Control', 'public, max-age=3600, stale-while-revalidate=86400');
+      res.setHeader('X-Sitemap-Url-Count', String(payload.entries.length));
+      return res.status(200).send(payload.indexOrSingleXml);
+    } catch (err: any) {
+      console.error('[SITEMAP] Error generating /sitemap.xml:', err?.message || err);
+      return res.status(500).type('application/xml').send(
+        '<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"><url><loc>https://university-tutors.com/</loc><changefreq>daily</changefreq><priority>1.0</priority></url></urlset>'
+      );
+    }
+  });
+
+  app.get('/sitemap-:page(\\d+).xml', async (req, res) => {
+    try {
+      const pageNum = parseInt(req.params.page, 10);
+      const payload = await getOrBuildSitemapPayload(loadSitemapDatabaseRecords);
+      if (!pageNum || pageNum < 1 || pageNum > payload.shardsXml.length) {
+        return res.status(404).type('text/plain').send('Sitemap shard not found');
+      }
+      res.setHeader('Content-Type', 'application/xml; charset=utf-8');
+      res.setHeader('Cache-Control', 'public, max-age=3600, stale-while-revalidate=86400');
+      return res.status(200).send(payload.shardsXml[pageNum - 1]);
+    } catch (err: any) {
+      console.error('[SITEMAP] Error generating sitemap shard:', err?.message || err);
+      return res.status(500).type('text/plain').send('Failed to generate sitemap shard');
     }
   });
 

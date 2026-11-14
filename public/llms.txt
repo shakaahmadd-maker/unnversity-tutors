@@ -1,0 +1,30 @@
+# University Tutors
+
+> Online 1-on-1 academic tutoring, assignment guidance, coursework support, and free client-side student tools.
+
+## Core Services
+- [1-on-1 Live Tutoring](https://university-tutors.com/services/1-on-1-live-tutoring): Personalized sessions with PhD and Master's tutors.
+- [Assignment Guidance](https://university-tutors.com/services/assignment-guidance): Structured academic support and problem-solving.
+- [Coursework Track](https://university-tutors.com/services/coursework-track): Full-semester study management and exam prep.
+- [Essay & Reference Checks](https://university-tutors.com/services/essay-reference-checks): Academic editing and citation verification.
+
+## Platform Pages
+- [How It Works](https://university-tutors.com/how-it-works): Step-by-step guide to booking a tutor.
+- [Pricing](https://university-tutors.com/pricing): Transparent hourly and package rates.
+- [Get a Quote](https://university-tutors.com/get-quote): Request custom academic support.
+- [All Tutoring Services Hub](https://university-tutors.com/services): Overview of 1-on-1 tutoring, coursework, and academic writing mentorship.
+- [Find Verified Tutors](https://university-tutors.com/tutors): Browse 500+ vetted university subject mentors across STEM, Humanities, Nursing, and Business.
+- [Academic Blog & Study Guides](https://university-tutors.com/blog): Peer-reviewed guides on citations, dissertations, lab reports, and exam preparation.
+- [About University Tutors](https://university-tutors.com/about): Founding mission, double-vetted instructor standards, and Stripe escrow protection.
+- [Frequently Asked Questions](https://university-tutors.com/faqs): Answers on tutor verification, milestone escrow holds, and academic integrity policies.
+- [Contact 24/7 Academic Advising](https://university-tutors.com/contact): Direct consultation desk and syllabus matching support.
+
+## Free Client-Side Student Tools
+- [Student Tools Hub](https://university-tutors.com/tools): Free 100% browser-based academic utilities with zero file uploads required.
+- [Mathematics & Statistics Hub](https://university-tutors.com/tools/math): 27 interactive algebra, calculus, linear algebra, ODE, and statistics solvers.
+- [Biology Knowledge Hub](https://university-tutors.com/tools/biology): 14 interactive Punnett square, DNA-to-protein, PCR, CRISPR, and lab calculators.
+- [Chemistry Knowledge Hub](https://university-tutors.com/tools/chemistry): 16 interactive periodic table, stoichiometry, pH titration, Nernst, and NMR/IR tools.
+- [Interactive Whiteboard](https://university-tutors.com/tools/whiteboard): Digital drawing, diagramming, and equation canvas for study sessions.
+- [Academic CV Maker](https://university-tutors.com/tools/cv-maker): ATS-ready academic CV and graduate resume builder.
+- [University Grade Converter](https://university-tutors.com/tools/university-grade-converter): International US GPA, UK classification, Canadian, Australian, and ECTS converter.
+- [Academic Paraphraser & Originality Checker](https://university-tutors.com/tools/academic-paraphraser): Scholarly phrasing refiner, burstiness metrics, and n-gram originality check.

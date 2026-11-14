@@ -1,7 +1,8 @@
-import React, { useState, useEffect, useCallback, useMemo, lazy, Suspense } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef, lazy, Suspense } from 'react';
 import Header from './components/Header';
 const Footer = lazy(() => import('./components/Footer'));
 const CookieBanner = lazy(() => import('./components/CookieBanner'));
+const FloatingWhatsAppButton = lazy(() => import('./components/FloatingWhatsAppButton'));
 import ErrorBoundary from './components/ErrorBoundary';
 import { apiFetch } from './lib/apiClient';
 
@@ -39,6 +40,7 @@ import {
   isSpecializedServiceSlug,
 } from './data/toolRouteMatchers';
 import { updatePageSeo } from './utils/seo';
+import { getBlogCanonicalSlug, matchesBlogSlugOrId } from './utils/blogSlug';
 
 import { store } from './lib/store';
 import { UserRole, Chat, User } from './types';
@@ -82,6 +84,7 @@ export default function App() {
   const [locationFilter, setLocationFilter] = useState<string>('');
   const [subjectFilter, setSubjectFilter] = useState<string>('');
   const [selectedTutorProfile, setSelectedTutorProfile] = useState<User | null>(null);
+  const [isLoadingTutorProfile, setIsLoadingTutorProfile] = useState<boolean>(false);
   const [activeChat, setActiveChat] = useState<Chat | null>(null);
   const [isSopModalOpen, setIsSopModalOpen] = useState<boolean>(false);
   const [isAssignModalOpen, setIsAssignModalOpen] = useState<boolean>(false);
@@ -93,6 +96,61 @@ export default function App() {
   const [activeToasts, setActiveToasts] = useState<ToastNotification[]>([]);
   const seenMessageIdsRef = React.useRef<Set<string>>(new Set(store.messages.map(m => m.id)));
   const isInitialMountRef = React.useRef<boolean>(true);
+  const [isIdleWidgetsReady, setIsIdleWidgetsReady] = useState<boolean>(false);
+  const [shouldRenderFooter, setShouldRenderFooter] = useState<boolean>(false);
+  const footerSentinelRef = useRef<HTMLDivElement | null>(null);
+
+  // Defer floating WhatsApp button & CookieBanner until browser idle or first user interaction so LCP renders uncontested
+  useEffect(() => {
+    let activated = false;
+    const activate = () => {
+      if (activated) return;
+      activated = true;
+      setIsIdleWidgetsReady(true);
+    };
+
+    const events = ['scroll', 'pointerdown', 'keydown', 'touchstart'] as const;
+    events.forEach((evt) => window.addEventListener(evt, activate, { once: true, passive: true }));
+
+    let idleHandle: number | null = null;
+    let timeoutHandle: ReturnType<typeof setTimeout> | null = null;
+    const ric = (window as Window & { requestIdleCallback?: (cb: () => void, opts?: { timeout: number }) => number }).requestIdleCallback;
+    const cic = (window as Window & { cancelIdleCallback?: (id: number) => void }).cancelIdleCallback;
+
+    if (typeof ric === 'function') {
+      idleHandle = ric(activate, { timeout: 2500 });
+    } else {
+      timeoutHandle = setTimeout(activate, 2200);
+    }
+
+    return () => {
+      events.forEach((evt) => window.removeEventListener(evt, activate));
+      if (idleHandle !== null && typeof cic === 'function') cic(idleHandle);
+      if (timeoutHandle !== null) clearTimeout(timeoutHandle);
+    };
+  }, []);
+
+  // Gate lazy Footer download & DOM mount until user scrolls near the bottom of the page
+  useEffect(() => {
+    if (shouldRenderFooter) return;
+    const el = footerSentinelRef.current;
+    if (!el) return;
+    if (typeof IntersectionObserver === 'undefined') {
+      setShouldRenderFooter(true);
+      return;
+    }
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((entry) => entry.isIntersecting)) {
+          setShouldRenderFooter(true);
+          observer.disconnect();
+        }
+      },
+      { rootMargin: '500px 0px' }
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [activeView, shouldRenderFooter]);
 
   // Incoming text listener: plays melodic chime ("music") and shows in-app floating banner
   useEffect(() => {
@@ -182,21 +240,54 @@ export default function App() {
         title = dService.seoTitle;
         description = dService.seoDescription;
         canonicalPath = dService.path;
+      } else if (activeView === 'tutor-profile' && selectedTutorProfile) {
+        const primarySubj =
+          selectedTutorProfile.primarySubject ||
+          (Array.isArray(selectedTutorProfile.subjectExpertise) ? selectedTutorProfile.subjectExpertise[0] : '') ||
+          (Array.isArray(selectedTutorProfile.subjects) ? selectedTutorProfile.subjects[0] : '') ||
+          'Academic';
+        title = `${selectedTutorProfile.name} — ${primarySubj} Tutor | University Tutors`;
+        description =
+          selectedTutorProfile.bio ||
+          selectedTutorProfile.experienceSummary ||
+          selectedTutorProfile.experience ||
+          defaultDesc;
+        canonicalPath = `/tutor/${encodeURIComponent(selectedTutorProfile.id)}`;
       } else if (activeView === 'services') {
         title = 'Academic Tutoring Services - University Tutors';
         canonicalPath = '/services';
       } else if (activeView === 'about') {
         title = 'About Us - University Tutors Founding Mission';
-        canonicalPath = '/about-us';
+        canonicalPath = '/about';
       } else if (activeView === 'faqs') {
         title = 'Frequently Asked Questions - University Tutors';
         canonicalPath = '/faqs';
       } else if (activeView === 'contact') {
         title = 'Contact Advising Team - University Tutors';
-        canonicalPath = '/contact-us';
+        canonicalPath = '/contact';
       } else if (activeView === 'blog') {
         title = 'Academic Integrity Blog & Study Guides - University Tutors';
-        canonicalPath = '/our-blog';
+        canonicalPath = '/blog';
+      } else if (activeView.startsWith('blog/')) {
+        const rawBlogSlug = activeView.slice('blog/'.length);
+        const matchedBlog = storeState.blogs.find((b) => matchesBlogSlugOrId(b, rawBlogSlug));
+        if (matchedBlog) {
+          title = `${matchedBlog.title} | University Tutors`;
+          description =
+            matchedBlog.excerpt ||
+            matchedBlog.content.replace(/[#*`>_]/g, '').replace(/\s+/g, ' ').trim().slice(0, 155) ||
+            defaultDesc;
+          canonicalPath = `/blog/${encodeURIComponent(getBlogCanonicalSlug(matchedBlog))}`;
+        } else {
+          title = 'Academic Study Guide & Article | University Tutors';
+          canonicalPath = `/blog/${encodeURIComponent(rawBlogSlug)}`;
+        }
+      } else if (activeView === 'whatsapp') {
+        title = '24/7 WhatsApp Academic Concierge - University Tutors';
+        canonicalPath = '/whatsapp';
+      } else if (activeView === 'google-disclosure') {
+        title = 'Google OAuth Data Disclosure - University Tutors';
+        canonicalPath = '/google-disclosure';
       } else if (activeView === 'tutors-directory' || activeView === 'tutors') {
         title = 'Find Verified University Mentors & Tutors - University Tutors';
         canonicalPath = '/tutors';
@@ -279,7 +370,7 @@ export default function App() {
     return () => {
       cancelled = true;
     };
-  }, [activeView, activeCountryTutoringSlug, activeSpecializedServiceSlug]);
+  }, [activeView, activeCountryTutoringSlug, activeSpecializedServiceSlug, selectedTutorProfile, storeState.blogs]);
 
   useEffect(() => {
     // Sync React state on any store notify() pattern
@@ -354,34 +445,91 @@ export default function App() {
     }
   }, [activeChat]);
 
-  // Load & display an individual tutor profile by ID (works for both store users and live API tutors)
+  // Load & display an individual tutor profile by ID or slug (works for both store users and live API tutors)
   const openTutorProfileById = async (tutorId: string, pushUrl = true) => {
-    const cleanId = tutorId.trim();
+    const cleanId = decodeURIComponent(tutorId || '').trim();
     if (!cleanId) return;
+
+    const slugify = (val: string) =>
+      String(val || '')
+        .toLowerCase()
+        .replace(/^(?:(?:dr|prof|mr|ms|mrs)\.?\s+)+/i, '')
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-+|-+$/g, '');
+    const targetSlug = slugify(cleanId);
+
+    const findInList = (list: User[]) =>
+      list.find(
+        (u) =>
+          u.id === cleanId ||
+          u.id.toLowerCase() === cleanId.toLowerCase() ||
+          (targetSlug && (slugify(u.id) === targetSlug || slugify(u.name) === targetSlug))
+      );
+
     if (pushUrl) {
       window.history.pushState(null, '', `/tutor/${encodeURIComponent(cleanId)}`);
     }
-    const localMatch = store.users.find((u) => u.id === cleanId);
+
+    const localMatch = findInList(store.users);
     if (localMatch) {
-      setSelectedTutorProfile(localMatch);
+      const normalizedLocal = store.upsertTutorPreview(localMatch);
+      setIsLoadingTutorProfile(false);
+      setSelectedTutorProfile(normalizedLocal);
       setActiveView('tutor-profile');
       window.scrollTo({ top: 0, behavior: 'smooth' });
+
+      // Refresh authoritative tutor record from backend quietly without blocking navigation
+      void apiFetch(`/api/tutors/${encodeURIComponent(normalizedLocal.id)}`)
+        .then(async (res) => {
+          if (!res.ok) return;
+          const data = await res.json().catch(() => null);
+          if (data?.tutor) {
+            const enriched = store.upsertTutorPreview(data.tutor);
+            setSelectedTutorProfile((prev) => (prev && prev.id === enriched.id ? enriched : prev));
+          }
+        })
+        .catch(() => {});
       return;
     }
+
+    setIsLoadingTutorProfile(true);
+    setActiveView('tutor-profile');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+
     try {
       const res = await apiFetch(`/api/tutors/${encodeURIComponent(cleanId)}`);
       if (res.ok) {
         const data = await res.json();
         if (data?.tutor) {
-          setSelectedTutorProfile(data.tutor);
+          const normalized = store.upsertTutorPreview(data.tutor);
+          setSelectedTutorProfile(normalized);
+          setIsLoadingTutorProfile(false);
           setActiveView('tutor-profile');
-          window.scrollTo({ top: 0, behavior: 'smooth' });
+          if (normalized.id && normalized.id !== cleanId) {
+            window.history.replaceState(null, '', `/tutor/${encodeURIComponent(normalized.id)}`);
+          }
           return;
         }
       }
     } catch {
-      // Fall back to tutors directory if profile lookup fails
+      // Try client fallback catalog below before redirecting
     }
+
+    try {
+      const fallbackPool = await store.loadTrendingTutorsFallback();
+      const fallbackMatch = findInList(fallbackPool);
+      if (fallbackMatch) {
+        const normalizedFallback = store.upsertTutorPreview(fallbackMatch);
+        setSelectedTutorProfile(normalizedFallback);
+        setIsLoadingTutorProfile(false);
+        setActiveView('tutor-profile');
+        return;
+      }
+    } catch {
+      // Ignore fallback error
+    }
+
+    setIsLoadingTutorProfile(false);
     setSelectedTutorProfile(null);
     setActiveView('tutors-directory');
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -494,10 +642,18 @@ export default function App() {
       return;
     }
 
-    if (view === 'tutors' || view === 'tutors-directory') {
+    if (
+      view === 'tutors' ||
+      view === '/tutors' ||
+      view === 'tutors-directory' ||
+      view === '/tutors-directory' ||
+      view === 'find-a-tutor' ||
+      view === '/find-a-tutor'
+    ) {
       setSelectedTutorProfile(null);
       setLocationFilter('');
       setSubjectFilter('');
+      void store.ensureFullDirectoryLoaded();
       setActiveView('tutors-directory');
       path = '/tutors';
       window.history.pushState(null, '', path);
@@ -508,13 +664,15 @@ export default function App() {
     if (
       view.startsWith('tutor-profile:') ||
       view.startsWith('/tutor-profile/') ||
-      (view.startsWith('/tutor/') && view !== '/tutor/dashboard')
+      (view.startsWith('/tutor/') && view !== '/tutor/dashboard') ||
+      (view.startsWith('/tutors/') && view !== '/tutors-directory')
     ) {
       const tutorId = decodeURIComponent(
         view
-          .replace(/^tutor-profile:/, '')
-          .replace(/^\/tutor-profile\//, '')
-          .replace(/^\/tutor\//, '')
+          .replace(/^tutor-profile:/i, '')
+          .replace(/^\/tutor-profile\//i, '')
+          .replace(/^\/tutors\//i, '')
+          .replace(/^\/tutor\//i, '')
           .split('?')[0]
           .split('#')[0]
           .trim()
@@ -577,26 +735,70 @@ export default function App() {
       return;
     }
 
+    if (
+      view.startsWith('blog/') ||
+      view.startsWith('/blog/') ||
+      view.startsWith('our-blog/') ||
+      view.startsWith('/our-blog/')
+    ) {
+      const cleanBlogSlug = decodeURIComponent(
+        view
+          .replace(/^\/?(blog|our-blog)\//i, '')
+          .split('?')[0]
+          .split('#')[0]
+          .trim()
+      ).toLowerCase();
+      if (cleanBlogSlug) {
+        setSelectedTutorProfile(null);
+        void store.ensureCatalogDataLoaded();
+        window.history.pushState(null, '', `/blog/${encodeURIComponent(cleanBlogSlug)}`);
+        setActiveView(`blog/${cleanBlogSlug}`);
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+        return;
+      }
+    }
+
     if (view === 'home' || view === '') {
       path = '/';
-    } else if (view === 'about') {
-      path = '/about-us';
-    } else if (view === 'get-a-quote') {
-      path = '/get-a-quote';
+    } else if (view === 'how-it-works' || view === '/how-it-works') {
+      window.history.pushState(null, '', '/how-it-works');
+      setActiveView('home');
+      setTimeout(() => {
+        document.getElementById('how-it-works-section')?.scrollIntoView({ behavior: 'smooth' });
+      }, 150);
+      return;
+    } else if (view === 'about' || view === 'about-us') {
+      view = 'about';
+      path = '/about';
+    } else if (
+      view === 'get-a-quote' ||
+      view === 'get-quote' ||
+      view === '/get-quote' ||
+      view === 'pricing' ||
+      view === '/pricing'
+    ) {
+      const isPricing = view === 'pricing' || view === '/pricing';
+      view = 'get-a-quote';
+      path = isPricing ? '/pricing' : '/get-a-quote';
     } else if (view === 'services') {
       path = '/services';
     } else if (view === 'faqs') {
       path = '/faqs';
-    } else if (view === 'contact') {
+    } else if (view === 'contact' || view === 'contact-us') {
+      view = 'contact';
       path = '/contact';
-    } else if (view === 'blog') {
-      path = '/our-blog';
+    } else if (view === 'blog' || view === 'our-blog') {
+      view = 'blog';
+      path = '/blog';
     } else if (view === 'whatsapp') {
       path = '/whatsapp';
     } else if (view === 'privacy') {
       path = '/privacy';
     } else if (view === 'terms') {
       path = '/terms';
+    } else if (view === 'google-disclosure' || view === '/google-disclosure') {
+      view = 'google-disclosure';
+      path = '/google-disclosure';
     } else if (view === 'auth') {
       path = '/auth';
     } else if (view === 'admin-login') {
@@ -653,7 +855,7 @@ export default function App() {
       view.startsWith('online-tutoring-')
     ) {
       void store.ensureFullDirectoryLoaded();
-    } else if (view === 'blog' || view.startsWith('blog-') || view === 'services' || view === 'about') {
+    } else if (view === 'blog' || view.startsWith('blog/') || view.startsWith('blog-') || view === 'services' || view === 'about') {
       void store.ensureCatalogDataLoaded();
     }
 
@@ -671,12 +873,21 @@ export default function App() {
       
       if (
         decodedPath === '/get-a-quote' || 
+        decodedPath === '/get-quote' ||
         decodedPath === '/get a quote' || 
         decodedPath === '/getaquote' || 
+        decodedPath === '/pricing' ||
         hash === '#get-a-quote' ||
-        hash === '#get a quote'
+        hash === '#get-quote' ||
+        hash === '#get a quote' ||
+        hash === '#pricing'
       ) {
         setActiveView('get-a-quote');
+      } else if (decodedPath === '/how-it-works' || hash === '#how-it-works') {
+        setActiveView('home');
+        setTimeout(() => {
+          document.getElementById('how-it-works-section')?.scrollIntoView({ behavior: 'smooth' });
+        }, 180);
       } else if (decodedPath === '/tools' || hash === '#tools') {
         setSelectedTutorProfile(null);
         setActiveView('tools');
@@ -793,7 +1004,22 @@ export default function App() {
         hash === '#our-blog' ||
         hash === '#our blog'
       ) {
+        void store.ensureCatalogDataLoaded();
         setActiveView('blog');
+      } else if (
+        decodedPath.startsWith('/blog/') ||
+        decodedPath.startsWith('/our-blog/') ||
+        hash.startsWith('#blog/')
+      ) {
+        const rawSlug = decodedPath.startsWith('/blog/')
+          ? decodedPath.slice('/blog/'.length)
+          : decodedPath.startsWith('/our-blog/')
+            ? decodedPath.slice('/our-blog/'.length)
+            : hash.slice('#blog/'.length);
+        const cleanSlug = rawSlug.split('?')[0].split('#')[0].trim();
+        void store.ensureCatalogDataLoaded();
+        setSelectedTutorProfile(null);
+        setActiveView(cleanSlug ? `blog/${cleanSlug}` : 'blog');
       } else if (
         decodedPath === '/whatsapp' || 
         decodedPath === '/whatsapp-desk' || 
@@ -804,6 +1030,13 @@ export default function App() {
         setActiveView('privacy');
       } else if (decodedPath === '/terms' || hash === '#terms') {
         setActiveView('terms');
+      } else if (
+        decodedPath === '/google-disclosure' ||
+        decodedPath === '/google-oauth-disclosure' ||
+        hash === '#google-disclosure'
+      ) {
+        setSelectedTutorProfile(null);
+        setActiveView('google-disclosure');
       } else if (decodedPath === '/auth' || hash === '#auth') {
         setActiveView('auth');
       } else if (
@@ -830,14 +1063,16 @@ export default function App() {
         decodedPath === '/tutors directory' ||
         decodedPath === '/find-a-tutor' ||
         hash === '#tutors' || 
-        hash === '#tutors-directory'
+        hash === '#tutors-directory' ||
+        hash === '#find-a-tutor'
       ) {
         const urlParams = new URLSearchParams(window.location.search);
         const loc = urlParams.get('location') || urlParams.get('country') || '';
         const subj = urlParams.get('subject') || urlParams.get('q') || urlParams.get('search') || '';
-        if (loc) setLocationFilter(loc);
-        if (subj) setSubjectFilter(subj);
+        setLocationFilter(loc);
+        setSubjectFilter(subj);
         setSelectedTutorProfile(null);
+        void store.ensureFullDirectoryLoaded();
         setActiveView('tutors-directory');
       } else if (
         decodedPath === '/user-data' || 
@@ -879,6 +1114,7 @@ export default function App() {
         setIsSopModalOpen(true);
       } else if (
         (decodedPath.startsWith('/tutor/') && decodedPath !== '/tutor/dashboard') ||
+        (decodedPath.startsWith('/tutors/') && decodedPath !== '/tutors-directory') ||
         decodedPath.startsWith('/tutor-profile/')
       ) {
         const rawSegments = rawPath.split('/').filter(Boolean);
@@ -902,21 +1138,32 @@ export default function App() {
     window.addEventListener('hashchange', handleUrlChange);
 
     const handleGlobalClick = (e: MouseEvent) => {
-      const target = e.target as HTMLElement;
-      const anchor = target.closest('a');
+      if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) {
+        return;
+      }
+      const target = e.target as HTMLElement | null;
+      const anchor = target?.closest('a');
       if (anchor) {
+        if (anchor.target && anchor.target !== '_self') return;
         let href = anchor.getAttribute('href');
         if (!href) return;
         href = decodeURIComponent(href).toLowerCase().trim();
         
         if (
           href === '/get-a-quote' || 
+          href === '/get-quote' ||
           href === '/get a quote' || 
+          href === '/pricing' ||
           href === '#get-a-quote' ||
-          href === '#get a quote'
+          href === '#get-quote' ||
+          href === '#get a quote' ||
+          href === '#pricing'
         ) {
           e.preventDefault();
           handleNavigate('get-a-quote');
+        } else if (href === '/how-it-works' || href === '#how-it-works') {
+          e.preventDefault();
+          handleNavigate('how-it-works');
         } else if (href === '/tools' || href === '#tools') {
           e.preventDefault();
           handleNavigate('tools');
@@ -979,6 +1226,22 @@ export default function App() {
           e.preventDefault();
           handleNavigate('blog');
         } else if (
+          href.startsWith('/blog/') ||
+          href.startsWith('/our-blog/') ||
+          href.includes('university-tutors.com/blog/')
+        ) {
+          e.preventDefault();
+          const cleanPath = href.split('university-tutors.com').pop() || href;
+          const cleanSlug = cleanPath
+            .replace(/^\/?(blog|our-blog)\//, '')
+            .split('?')[0]
+            .split('#')[0]
+            .trim();
+          handleNavigate(cleanSlug ? `blog/${cleanSlug}` : 'blog');
+        } else if (href === '/google-disclosure' || href === '#google-disclosure') {
+          e.preventDefault();
+          handleNavigate('google-disclosure');
+        } else if (
           href === '/whatsapp' || 
           href === '#whatsapp' || 
           href.endsWith('/whatsapp')
@@ -1025,9 +1288,12 @@ export default function App() {
         } else if (
           href === '/tutors' || 
           href === '/tutors-directory' || 
+          href === '/find-a-tutor' ||
           href === '#tutors' || 
           href === '#tutors-directory' ||
-          href.endsWith('/tutors')
+          href === '#find-a-tutor' ||
+          href.endsWith('/tutors') ||
+          href.endsWith('/find-a-tutor')
         ) {
           e.preventDefault();
           handleNavigate('tutors');
@@ -1060,11 +1326,18 @@ export default function App() {
           window.scrollTo({ top: 0, behavior: 'smooth' });
         } else if (
           (href.startsWith('/tutor/') && href !== '/tutor/dashboard') ||
+          (href.startsWith('/tutors/') && href !== '/tutors-directory') ||
           href.startsWith('/tutor-profile/')
         ) {
           e.preventDefault();
           const rawHref = anchor.getAttribute('href') || href;
-          const cleanId = decodeURIComponent(rawHref.replace(/^\/?(tutor-profile|tutor)\//i, '').split('?')[0].split('#')[0].trim());
+          const cleanId = decodeURIComponent(
+            rawHref
+              .replace(/^\/?(tutor-profile|tutors|tutor)\//i, '')
+              .split('?')[0]
+              .split('#')[0]
+              .trim()
+          );
           if (cleanId) {
             void openTutorProfileById(cleanId, true);
           }
@@ -1412,9 +1685,27 @@ export default function App() {
   }, []);
 
   const handleSelectTutorProfile = useCallback((tutorObj: User) => {
-    setSelectedTutorProfile(tutorObj);
+    const normalized = store.upsertTutorPreview(tutorObj);
+    setIsLoadingTutorProfile(false);
+    setSelectedTutorProfile(normalized);
     setActiveView('tutor-profile');
+    if (typeof window !== 'undefined' && normalized?.id) {
+      window.history.pushState(null, '', `/tutor/${encodeURIComponent(normalized.id)}`);
+    }
     window.scrollTo({ top: 0, behavior: 'smooth' });
+
+    if (normalized?.id) {
+      void apiFetch(`/api/tutors/${encodeURIComponent(normalized.id)}`)
+        .then(async (res) => {
+          if (!res.ok) return;
+          const data = await res.json().catch(() => null);
+          if (data?.tutor) {
+            const enriched = store.upsertTutorPreview(data.tutor);
+            setSelectedTutorProfile((prev) => (prev && prev.id === enriched.id ? enriched : prev));
+          }
+        })
+        .catch(() => {});
+    }
   }, []);
 
   // Separate tutors to pass to dropdown triggers (only approved tutors visible on public website)
@@ -1659,6 +1950,11 @@ export default function App() {
               handleOpenChat(tutor.id);
             }}
           />
+        ) : activeView === 'tutor-profile' && isLoadingTutorProfile ? (
+          <div className="min-h-[75vh] flex flex-col items-center justify-center py-24 gap-3 text-orange-600">
+            <div className="w-8 h-8 border-3 border-orange-500 border-t-transparent rounded-full animate-spin"></div>
+            <span className="text-xs font-semibold text-gray-500">Loading tutor profile...</span>
+          </div>
         ) : activeView === 'country-online-tutoring' || activeView.startsWith('online-tutoring-') ? (
           <CountryOnlineTutoringPage
             countryKey={activeCountryTutoringSlug}
@@ -1668,11 +1964,7 @@ export default function App() {
               setActiveCountryTutoringSlug(slug);
               handleNavigate(`online-tutoring-${slug}`);
             }}
-            onSelectTutorProfile={(tutor) => {
-              setSelectedTutorProfile(tutor);
-              setActiveView('tutor-profile');
-              window.scrollTo({ top: 0, behavior: 'smooth' });
-            }}
+            onSelectTutorProfile={handleSelectTutorProfile}
             onOpenChat={handleOpenChat}
             onSearchCity={(city) => {
               setLocationFilter(city);
@@ -1697,11 +1989,7 @@ export default function App() {
             pageSlug={activeSpecializedServiceSlug}
             tutors={mentorsList}
             onNavigate={handleNavigate}
-            onSelectTutorProfile={(tutor) => {
-              setSelectedTutorProfile(tutor);
-              setActiveView('tutor-profile');
-              window.scrollTo({ top: 0, behavior: 'smooth' });
-            }}
+            onSelectTutorProfile={handleSelectTutorProfile}
             onOpenChat={handleOpenChat}
             onSearchCity={(city) => {
               setLocationFilter(city);
@@ -1725,11 +2013,7 @@ export default function App() {
             locationFilter={locationFilter}
             subjectFilter={subjectFilter}
             onNavigate={handleNavigate}
-            onSelectTutorProfile={(tutor) => {
-              setSelectedTutorProfile(tutor);
-              setActiveView('tutor-profile');
-              window.scrollTo({ top: 0, behavior: 'smooth' });
-            }}
+            onSelectTutorProfile={handleSelectTutorProfile}
             onOpenChat={handleOpenChat}
             allStoreTutors={mentorsList}
           />
@@ -1743,11 +2027,7 @@ export default function App() {
             users={storeState.users}
             currentUser={storeState.currentUser}
             onNavigate={handleNavigate}
-            onSelectTutorProfile={(tutor) => {
-              setSelectedTutorProfile(tutor);
-              setActiveView('tutor-profile');
-              window.scrollTo({ top: 0, behavior: 'smooth' });
-            }}
+            onSelectTutorProfile={handleSelectTutorProfile}
           />
         ) : activeView === 'data-deletion' ? (
           <DataDeletionPage
@@ -1789,55 +2069,51 @@ export default function App() {
         </ErrorBoundary>
       </main>
 
-      {/* Floating WhatsApp Instant Chat Trigger (Bottom Left) */}
-      {!isWhatsAppModalOpen && (
-        <div 
-          className="fixed bottom-3 sm:bottom-6 left-3 sm:left-6 z-40 flex flex-col items-start gap-2" 
-          id="floating-whatsapp-container"
-        >
-          <button
-            id="trigger-whatsapp-chat-modal"
-            onClick={() => setIsWhatsAppModalOpen(true)}
-            className="group bg-emerald-700 hover:bg-emerald-800 active:bg-emerald-900 text-white w-11 h-11 min-w-[44px] min-h-[44px] sm:w-auto sm:h-auto p-2.5 sm:px-4 sm:py-2.5 rounded-full shadow-md sm:shadow-2xl transition-all hover:scale-105 active:scale-95 cursor-pointer flex items-center justify-center font-bold gap-2 border border-emerald-400/40"
-            title="Open WhatsApp Instant Chat"
-          >
-            <div className="relative flex items-center justify-center shrink-0">
-              <svg className="w-4.5 h-4.5 sm:w-5 sm:h-5 fill-white" viewBox="0 0 24 24">
-                <path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946.003-6.556 5.338-11.891 11.893-11.891 3.181.001 6.167 1.24 8.413 3.488 2.245 2.248 3.481 5.236 3.48 8.414-.003 6.557-5.338 11.892-11.893 11.892-1.99-.001-3.951-.5-5.688-1.448l-6.205 1.654zm6.597-3.807c1.676.995 3.276 1.591 5.392 1.592 5.448 0 9.886-4.434 9.889-9.885.002-5.462-4.415-9.89-9.881-9.892-5.452 0-9.887 4.434-9.887 9.884-.001 2.225.651 3.891 1.746 5.634l-.999 3.648 3.742-.981zm11.387-5.464c-.074-.124-.272-.198-.57-.347-.297-.149-1.758-.868-2.031-.967-.272-.099-.47-.149-.669.149-.198.297-.768.967-.941 1.165-.173.198-.347.223-.644.074-.297-.149-1.255-.462-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.297-.347.446-.521.151-.172.2-.296.3-.495.099-.198.05-.372-.025-.521-.075-.148-.669-1.611-.916-2.206-.242-.579-.487-.501-.669-.51l-.57-.01c-.198 0-.52.074-.792.372s-1.04 1.016-1.04 2.479 1.065 2.876 1.213 3.074c.149.198 2.095 3.2 5.076 4.487.709.306 1.263.489 1.694.626.712.226 1.36.194 1.872.118.571-.085 1.758-.719 2.006-1.413.248-.695.248-1.29.173-1.414z"/>
-              </svg>
-              <span className="absolute -top-1 -right-1 w-2 h-2 bg-emerald-300 rounded-full animate-ping"></span>
-            </div>
-            <span className="text-xs font-sans tracking-wide text-white uppercase font-bold hidden sm:inline">Instant Chat</span>
-          </button>
-        </div>
+      {/* Floating WhatsApp Instant Chat Trigger (Bottom Left) — deferred until post-LCP idle or user interaction */}
+      {isIdleWidgetsReady && !isWhatsAppModalOpen && (
+        <Suspense fallback={null}>
+          <FloatingWhatsAppButton onOpen={() => setIsWhatsAppModalOpen(true)} />
+        </Suspense>
       )}
 
-      {/* 2. Footer (lazy-loaded below the fold so initial homepage bundle skips 260 KB+ of footer/tool registries) */}
+      {/* 2. Footer (lazy-loaded & viewport-gated below the fold so initial homepage bundle skips footer/tool chunks and DOM nodes) */}
       {activeView !== 'dashboard' &&
         activeView !== 'tools' &&
         !matchMathRouteView(activeView) &&
         !matchScienceRouteView(activeView) &&
         !matchStudentToolSlug(activeView) && (
-          <Suspense
-            fallback={
+          <div ref={footerSentinelRef}>
+            {shouldRenderFooter ? (
+              <Suspense
+                fallback={
+                  <footer
+                    id="main-footer"
+                    className="min-h-[600px] bg-[#ffeedd] border-t-2 border-[#ffab85]"
+                    aria-hidden="true"
+                  />
+                }
+              >
+                <Footer
+                  onNavigate={handleNavigate}
+                  onOpenBecomeTutor={handleOpenBecomeTutor}
+                />
+              </Suspense>
+            ) : (
               <footer
                 id="main-footer"
-                className="min-h-[900px] bg-[#ffeedd] border-t-2 border-[#ffab85]"
+                className="min-h-[600px] bg-[#ffeedd] border-t-2 border-[#ffab85]"
                 aria-hidden="true"
               />
-            }
-          >
-            <Footer
-              onNavigate={handleNavigate}
-              onOpenBecomeTutor={handleOpenBecomeTutor}
-            />
-          </Suspense>
+            )}
+          </div>
         )}
 
-      {/* 3. Consent cookie banner disclosure */}
-      <Suspense fallback={null}>
-        <CookieBanner />
-      </Suspense>
+      {/* 3. Consent cookie banner disclosure — deferred until post-LCP idle */}
+      {isIdleWidgetsReady && (
+        <Suspense fallback={null}>
+          <CookieBanner />
+        </Suspense>
+      )}
 
       {/* Lazy Modals Suspense container — mounted only when actually opened so homepage skips downloading hidden modal chunks */}
       <Suspense fallback={null}>

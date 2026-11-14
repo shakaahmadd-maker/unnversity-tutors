@@ -1,4 +1,5 @@
-import React from 'react';
+import React, { useState } from 'react';
+import { ChevronDown } from 'lucide-react';
 
 interface FooterLocationsSubjectsProps {
   onNavigateLocation: (locationName: string) => void;
@@ -13,6 +14,8 @@ export default function FooterLocationsSubjects({
   onNavigateCountry,
   onNavigateService
 }: FooterLocationsSubjectsProps) {
+  const [isLocationsOpen, setIsLocationsOpen] = useState(false);
+  const [isSubjectsOpen, setIsSubjectsOpen] = useState(false);
 
   const countriesList = [
     { name: 'USA Online Tutoring', slug: 'usa', flag: '🇺🇸' },
@@ -340,14 +343,31 @@ export default function FooterLocationsSubjects({
           </div>
         </div>
 
-        {/* Popular International Locations (Mobile & Desktop 3-Column Directory Card) */}
+        {/* Popular International Locations (Collapsible 3-Column Directory Card) */}
         <div className="pt-2 border-t border-slate-200/80 space-y-6">
           <div className="bg-white rounded-2xl sm:rounded-3xl p-4 sm:p-7 border border-slate-200/80 shadow-2xs">
-            <h3 className="text-base sm:text-lg font-extrabold text-slate-950 font-sans tracking-tight mb-4 sm:mb-5">
-              Popular International Locations
-            </h3>
+            <button
+              type="button"
+              onClick={() => setIsLocationsOpen((prev) => !prev)}
+              aria-expanded={isLocationsOpen}
+              className="w-full flex items-center justify-between gap-3 text-left min-h-[44px] cursor-pointer"
+            >
+              <div>
+                <h3 className="text-base sm:text-lg font-extrabold text-slate-950 font-sans tracking-tight">
+                  Popular International Locations
+                </h3>
+                <p className="text-xs text-slate-600 mt-0.5">
+                  Browse 100+ city tutoring directories across the US, UK, Canada, Australia, Ireland, UAE &amp; Singapore
+                </p>
+              </div>
+              <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-50 border border-slate-200 text-xs font-bold text-slate-700 shrink-0">
+                <span>{isLocationsOpen ? 'Hide Cities' : 'Show Cities'}</span>
+                <ChevronDown className={`w-4 h-4 transition-transform ${isLocationsOpen ? 'rotate-180' : ''}`} />
+              </span>
+            </button>
 
-            <div className="grid grid-cols-3 gap-x-2.5 sm:gap-x-8 lg:gap-x-12 items-start">
+            {isLocationsOpen && (
+            <div className="grid grid-cols-3 gap-x-2.5 sm:gap-x-8 lg:gap-x-12 items-start mt-4 sm:mt-5 pt-4 border-t border-slate-100">
               {/* Column 1: US USA Cities */}
               <div>
                 <h4 className="border-b border-slate-100 pb-1.5 mb-2 flex flex-wrap items-baseline gap-1 text-slate-900">
@@ -441,15 +461,33 @@ export default function FooterLocationsSubjects({
                 ))}
               </div>
             </div>
+            )}
           </div>
 
           {/* Popular Online Subjects */}
-          <div className="bg-white rounded-2xl sm:rounded-3xl p-4 sm:p-7 border border-slate-200/80 shadow-2xs space-y-4">
-            <h3 className="text-base sm:text-lg font-extrabold text-slate-950 font-sans tracking-tight">
-              Popular Online Subjects
-            </h3>
+          <div className="bg-white rounded-2xl sm:rounded-3xl p-4 sm:p-7 border border-slate-200/80 shadow-2xs">
+            <button
+              type="button"
+              onClick={() => setIsSubjectsOpen((prev) => !prev)}
+              aria-expanded={isSubjectsOpen}
+              className="w-full flex items-center justify-between gap-3 text-left min-h-[44px] cursor-pointer"
+            >
+              <div>
+                <h3 className="text-base sm:text-lg font-extrabold text-slate-950 font-sans tracking-tight">
+                  Popular Online Subjects
+                </h3>
+                <p className="text-xs text-slate-600 mt-0.5">
+                  Explore 22 core university, graduate exam, and STEM subject directories
+                </p>
+              </div>
+              <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-50 border border-slate-200 text-xs font-bold text-slate-700 shrink-0">
+                <span>{isSubjectsOpen ? 'Hide Subjects' : 'Show Subjects'}</span>
+                <ChevronDown className={`w-4 h-4 transition-transform ${isSubjectsOpen ? 'rotate-180' : ''}`} />
+              </span>
+            </button>
 
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-4 sm:gap-x-8 gap-y-1 text-xs">
+            {isSubjectsOpen && (
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-4 sm:gap-x-8 gap-y-1 text-xs mt-4 pt-4 border-t border-slate-100">
               <div className="space-y-0.5">
                 {subjectsCol1.map((subj, idx) => (
                   <button
@@ -489,6 +527,7 @@ export default function FooterLocationsSubjects({
                 ))}
               </div>
             </div>
+            )}
           </div>
         </div>
       </div>

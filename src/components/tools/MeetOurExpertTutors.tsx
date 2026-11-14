@@ -14,6 +14,7 @@ import { User } from '../../types';
 import { ResponsiveAvatar } from '../ResponsiveImage';
 import { apiJson, isAbortError, getFriendlyErrorMessage } from '../../lib/apiClient';
 import { isModifiedAnchorClick } from '../../data/dedicatedServiceRoutes';
+import { store } from '../../lib/store';
 
 interface MeetOurExpertTutorsProps {
   onNavigate: (view: string) => void;
@@ -201,7 +202,41 @@ export default function MeetOurExpertTutors({ onNavigate, subjectHint }: MeetOur
   const handleAnchorNav = (e: React.MouseEvent<HTMLAnchorElement>, view: string) => {
     if (!isModifiedAnchorClick(e)) {
       e.preventDefault();
+      e.stopPropagation();
       onNavigate(view);
+    }
+  };
+
+  const openTutorFullProfile = (tutor: LiveTutorProfile) => {
+    if (!tutor?.id) return;
+    store.upsertTutorPreview(tutor);
+    onNavigate(`tutor-profile:${tutor.id}`);
+  };
+
+  const handleTutorProfileLinkClick = (
+    e: React.MouseEvent<HTMLAnchorElement>,
+    tutor: LiveTutorProfile
+  ) => {
+    if (!isModifiedAnchorClick(e)) {
+      e.preventDefault();
+      e.stopPropagation();
+      openTutorFullProfile(tutor);
+    }
+  };
+
+  const handleCardClick = (e: React.MouseEvent<HTMLElement>, tutor: LiveTutorProfile) => {
+    const target = e.target as HTMLElement | null;
+    if (target?.closest('button, a, input, select, textarea')) {
+      return;
+    }
+    openTutorFullProfile(tutor);
+  };
+
+  const handleCardKeyDown = (e: React.KeyboardEvent<HTMLElement>, tutor: LiveTutorProfile) => {
+    if (e.target !== e.currentTarget) return;
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      openTutorFullProfile(tutor);
     }
   };
 
@@ -355,14 +390,19 @@ export default function MeetOurExpertTutors({ onNavigate, subjectHint }: MeetOur
                 return (
                   <article
                     key={tutor.id}
-                    className="bg-[#F9FAFB] hover:bg-[#FFFFFF] border border-slate-200/90 hover:border-[#F97316] rounded-2xl p-5 flex flex-col justify-between gap-4 transition-colors"
+                    role="link"
+                    tabIndex={0}
+                    aria-label={`View full profile for ${tutor.name}`}
+                    onClick={(e) => handleCardClick(e, tutor)}
+                    onKeyDown={(e) => handleCardKeyDown(e, tutor)}
+                    className="bg-[#F9FAFB] hover:bg-[#FFFFFF] border border-slate-200/90 hover:border-[#F97316] rounded-2xl p-5 flex flex-col justify-between gap-4 transition-colors cursor-pointer"
                   >
                     <div className="space-y-3.5">
                       {/* Avatar + Name + Rate */}
                       <div className="flex items-start gap-3">
                         <a
                           href={`/tutor/${encodeURIComponent(tutor.id)}`}
-                          onClick={(e) => handleAnchorNav(e, `tutor-profile:${tutor.id}`)}
+                          onClick={(e) => handleTutorProfileLinkClick(e, tutor)}
                           className="shrink-0 block cursor-pointer"
                         >
                           <ResponsiveAvatar
@@ -380,7 +420,7 @@ export default function MeetOurExpertTutors({ onNavigate, subjectHint }: MeetOur
                           <div className="flex items-center gap-1">
                             <a
                               href={`/tutor/${encodeURIComponent(tutor.id)}`}
-                              onClick={(e) => handleAnchorNav(e, `tutor-profile:${tutor.id}`)}
+                              onClick={(e) => handleTutorProfileLinkClick(e, tutor)}
                               className="text-sm font-bold text-[#111827] hover:text-[#EA580C] truncate transition-colors cursor-pointer"
                             >
                               {tutor.name}
@@ -433,14 +473,18 @@ export default function MeetOurExpertTutors({ onNavigate, subjectHint }: MeetOur
                     <div className="flex flex-col sm:flex-row lg:flex-col gap-2 pt-3 border-t border-slate-200/70">
                       <a
                         href={`/tutor/${encodeURIComponent(tutor.id)}`}
-                        onClick={(e) => handleAnchorNav(e, `tutor-profile:${tutor.id}`)}
+                        onClick={(e) => handleTutorProfileLinkClick(e, tutor)}
                         className="w-full min-h-[44px] py-2 px-3 rounded-xl bg-white border border-slate-300 hover:border-[#F97316] text-[#111827] hover:text-[#EA580C] text-xs font-semibold inline-flex items-center justify-center transition-colors cursor-pointer whitespace-nowrap"
                       >
-                        View Profile
+                        View Full Profile
                       </a>
                       <button
                         type="button"
-                        onClick={() => onNavigate(`book-tutor:${tutor.id}`)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          store.upsertTutorPreview(tutor);
+                          onNavigate(`book-tutor:${tutor.id}`);
+                        }}
                         className="w-full min-h-[44px] py-2 px-3 rounded-xl bg-[#F97316] hover:bg-[#EA580C] text-white text-xs font-semibold inline-flex items-center justify-center gap-1.5 shadow-2xs transition-colors cursor-pointer whitespace-nowrap"
                       >
                         <span>Book 1-on-1 Session</span>

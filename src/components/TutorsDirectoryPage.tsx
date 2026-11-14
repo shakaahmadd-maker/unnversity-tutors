@@ -22,9 +22,9 @@ import {
   ChevronLeft,
   X
 } from 'lucide-react';
-import { User } from '../types';
+import { User, UserRole } from '../types';
 import { store } from '../lib/store';
-import { getFriendlyErrorMessage } from '../lib/apiClient';
+import { apiFetch, getFriendlyErrorMessage } from '../lib/apiClient';
 import { TabLoadingSkeleton, ErrorStatePanel } from './ui/StatePanels';
 import { getRelevantKeywordsForTutor } from '../data/subjectKeywordsData';
 import { ResponsiveAvatar } from './ResponsiveImage';
@@ -38,16 +38,18 @@ interface TutorsDirectoryPageProps {
   allStoreTutors?: User[];
 }
 
-const COUNTRY_OPTIONS = [
-  { label: 'All Countries', value: 'all', count: 500, flag: '🌍' },
-  { label: 'USA', value: 'USA', code: 'US', count: 210, flag: '🇺🇸' },
-  { label: 'United Kingdom', value: 'UK', code: 'GB', count: 55, flag: '🇬🇧' },
-  { label: 'Australia', value: 'Australia', code: 'AU', count: 50, flag: '🇦🇺' },
-  { label: 'Canada', value: 'Canada', code: 'CA', count: 45, flag: '🇨🇦' },
-  { label: 'Singapore', value: 'Singapore', code: 'SG', count: 45, flag: '🇸🇬' },
-  { label: 'Ireland', value: 'Ireland', code: 'IE', count: 35, flag: '🇮🇪' },
-  { label: 'New Zealand', value: 'New Zealand', code: 'NZ', count: 30, flag: '🇳🇿' },
-  { label: 'UAE', value: 'UAE', code: 'AE', count: 30, flag: '🇦🇪' },
+const MAX_PRICE_LIMIT = 300;
+
+const BASE_COUNTRY_OPTIONS = [
+  { label: 'All Countries', value: 'all', code: 'ALL', flag: '🌍' },
+  { label: 'USA', value: 'USA', code: 'US', flag: '🇺🇸' },
+  { label: 'United Kingdom', value: 'UK', code: 'GB', flag: '🇬🇧' },
+  { label: 'Australia', value: 'Australia', code: 'AU', flag: '🇦🇺' },
+  { label: 'Canada', value: 'Canada', code: 'CA', flag: '🇨🇦' },
+  { label: 'Singapore', value: 'Singapore', code: 'SG', flag: '🇸🇬' },
+  { label: 'Ireland', value: 'Ireland', code: 'IE', flag: '🇮🇪' },
+  { label: 'New Zealand', value: 'New Zealand', code: 'NZ', flag: '🇳🇿' },
+  { label: 'UAE', value: 'UAE', code: 'AE', flag: '🇦🇪' },
 ];
 
 const HIGH_DEMAND_SUBJECTS = [
@@ -113,21 +115,44 @@ export default function TutorsDirectoryPage({
   const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
   const [selectedCountry, setSelectedCountry] = useState<string>('all');
   const [selectedSubject, setSelectedSubject] = useState<string>(subjectFilter || 'All Subjects');
-  const [maxPrice, setMaxPrice] = useState<number>(180);
+  const [maxPrice, setMaxPrice] = useState<number>(MAX_PRICE_LIMIT);
   const [sortBy, setSortBy] = useState<'rating' | 'reviews' | 'price_low' | 'price_high'>('rating');
   const [currentPage, setCurrentPage] = useState<number>(1);
+  const [pageSize, setPageSize] = useState<number>(15);
   const [showMobileFilters, setShowMobileFilters] = useState<boolean>(false);
   const [masterTutors, setMasterTutors] = useState<User[]>([]);
   const [isLoadingDirectory, setIsLoadingDirectory] = useState<boolean>(true);
   const [directoryError, setDirectoryError] = useState<string | null>(null);
-  const pageSize = 15;
 
   const loadDirectoryData = async () => {
     setIsLoadingDirectory(true);
     setDirectoryError(null);
     try {
-      const list = await store.loadTrendingTutorsFallback();
-      setMasterTutors(list);
+      const [apiRes, fallbackList] = await Promise.all([
+        apiFetch('/api/tutors?activeOnly=true&page=1&limit=2500').catch(() => null),
+        store.loadTrendingTutorsFallback().catch(() => [] as User[]),
+      ]);
+
+      let apiTutors: User[] = [];
+      if (apiRes && apiRes.ok) {
+        const payload = await apiRes.json().catch(() => ({}));
+        if (Array.isArray(payload?.tutors)) {
+          apiTutors = payload.tutors as User[];
+        }
+      }
+
+      const combined = new Map<string, User>();
+      for (const ft of fallbackList) {
+        if (ft?.id) combined.set(ft.id, ft);
+      }
+      for (const at of apiTutors) {
+        if (at?.id) {
+          const prev = combined.get(at.id);
+          combined.set(at.id, prev ? { ...prev, ...at } : at);
+        }
+      }
+
+      setMasterTutors(Array.from(combined.values()));
     } catch (err: any) {
       setDirectoryError(getFriendlyErrorMessage(err));
     } finally {
@@ -139,10 +164,32 @@ export default function TutorsDirectoryPage({
     let active = true;
     setIsLoadingDirectory(true);
     setDirectoryError(null);
-    store
-      .loadTrendingTutorsFallback()
-      .then((list) => {
-        if (active) setMasterTutors(list);
+
+    Promise.all([
+      apiFetch('/api/tutors?activeOnly=true&page=1&limit=2500').catch(() => null),
+      store.loadTrendingTutorsFallback().catch(() => [] as User[]),
+    ])
+      .then(async ([apiRes, fallbackList]) => {
+        if (!active) return;
+        let apiTutors: User[] = [];
+        if (apiRes && apiRes.ok) {
+          const payload = await apiRes.json().catch(() => ({}));
+          if (Array.isArray(payload?.tutors)) {
+            apiTutors = payload.tutors as User[];
+          }
+        }
+
+        const combined = new Map<string, User>();
+        for (const ft of fallbackList) {
+          if (ft?.id) combined.set(ft.id, ft);
+        }
+        for (const at of apiTutors) {
+          if (at?.id) {
+            const prev = combined.get(at.id);
+            combined.set(at.id, prev ? { ...prev, ...at } : at);
+          }
+        }
+        setMasterTutors(Array.from(combined.values()));
       })
       .catch((err) => {
         if (active) setDirectoryError(getFriendlyErrorMessage(err));
@@ -150,6 +197,7 @@ export default function TutorsDirectoryPage({
       .finally(() => {
         if (active) setIsLoadingDirectory(false);
       });
+
     return () => {
       active = false;
     };
@@ -179,22 +227,38 @@ export default function TutorsDirectoryPage({
   }, []);
 
   useEffect(() => {
-    if (locationFilter) setSelectedCountry(locationFilter);
+    setSelectedCountry(locationFilter || 'all');
     if (subjectFilter) {
       setSelectedSubject(subjectFilter);
       setSearchTerm(subjectFilter);
+    } else {
+      const params = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
+      if (!params?.get('subject') && !params?.get('q') && !params?.get('search')) {
+        setSelectedSubject('All Subjects');
+      }
     }
+    setCurrentPage(1);
   }, [locationFilter, subjectFilter]);
 
-  // Unify 500 international tutors with any extra store tutors (guaranteeing zero duplicates)
+  const isActiveTutorRecord = (u: User | undefined | null): u is User => {
+    if (!u || (u as any).deleted === true || u.status === ('deleted' as any)) return false;
+    const roleStr = String(u.role || '').toLowerCase();
+    if (roleStr && roleStr !== 'tutor' && u.role !== UserRole.TUTOR) return false;
+    if (u.suspended === true || u.status === ('suspended' as any) || u.status === 'rejected') return false;
+    if (u.isApproved === false || u.status === 'pending') return false;
+    return true;
+  };
+
+  // Unify all 500+ international & database tutors (strictly active tutors, zero duplicates)
   const unifiedTutors = useMemo(() => {
     const map = new Map<string, User>();
-    // Seed the 500 trending master tutors
-    masterTutors.forEach(t => map.set(t.id, t));
-    // Then combine store tutors (override or add)
-    allStoreTutors.forEach(st => {
-      if (st.isApproved !== false) {
-        map.set(st.id, st);
+    masterTutors.forEach((t) => {
+      if (isActiveTutorRecord(t)) map.set(t.id, t);
+    });
+    allStoreTutors.forEach((st) => {
+      if (isActiveTutorRecord(st)) {
+        const prev = map.get(st.id);
+        map.set(st.id, prev ? { ...prev, ...st } : st);
       }
     });
 
@@ -219,6 +283,37 @@ export default function TutorsDirectoryPage({
     return Array.from(uniqueMap.values());
   }, [masterTutors, allStoreTutors]);
 
+  const COUNTRY_OPTIONS = useMemo(() => {
+    const matchesOption = (t: User, optValue: string, optCode?: string) => {
+      if (optValue === 'all') return true;
+      const cCode = String(t.country || '').toUpperCase().trim();
+      const locSpace = [
+        t.country || '',
+        (t as any).countryName || '',
+        (t as any).countryFull || '',
+        t.location || '',
+        (t as any).cityLocation || '',
+        t.city || '',
+      ]
+        .join(' ')
+        .toLowerCase();
+      const target = optValue.toLowerCase();
+      if (optCode && cCode === optCode) return true;
+      if (cCode.toLowerCase() === target) return true;
+      if (target === 'usa' && (cCode === 'US' || cCode === 'USA' || locSpace.includes('united states') || locSpace.includes('usa'))) return true;
+      if (target === 'uk' && (cCode === 'GB' || cCode === 'UK' || locSpace.includes('united kingdom') || locSpace.includes('london'))) return true;
+      if (target === 'uae' && (cCode === 'AE' || cCode === 'UAE' || locSpace.includes('emirates') || locSpace.includes('dubai') || locSpace.includes('abu dhabi'))) return true;
+      return locSpace.includes(target);
+    };
+
+    return BASE_COUNTRY_OPTIONS.map((opt) => ({
+      ...opt,
+      count: opt.value === 'all'
+        ? unifiedTutors.length
+        : unifiedTutors.filter((t) => matchesOption(t, opt.value, opt.code)).length,
+    }));
+  }, [unifiedTutors]);
+
   // Extract all distinct primary subjects across all tutors
   const allDistinctPrimarySubjects = useMemo(() => {
     const set = new Set<string>();
@@ -236,15 +331,15 @@ export default function TutorsDirectoryPage({
       if (selectedSubject !== 'All Subjects') {
         const targetSub = selectedSubject.toLowerCase();
         const primSub = String((t as any).primarySubject || '').toLowerCase();
-        const subs = Array.isArray(t.subjects) ? t.subjects : (t.subjectExpertise || []);
-        const exp = (t as any).subjectExpertise || [];
+        const subs = Array.isArray(t.subjects) ? t.subjects : (typeof t.subjects === 'string' ? [t.subjects] : []);
+        const exp = Array.isArray(t.subjectExpertise) ? t.subjectExpertise : (typeof t.subjectExpertise === 'string' ? [t.subjectExpertise] : []);
         const combined = [primSub, ...subs, ...exp].map(s => String(s).toLowerCase());
         const matchesSubject = combined.some(s => s.includes(targetSub));
         if (!matchesSubject) return false;
       }
 
-      // 3. Max Price Filter
-      if (t.hourlyRate && t.hourlyRate > maxPrice) {
+      // 3. Max Price Filter (only constrain when user lowers slider below MAX_PRICE_LIMIT)
+      if (maxPrice < MAX_PRICE_LIMIT && t.hourlyRate && t.hourlyRate > maxPrice) {
         return false;
       }
 
@@ -335,7 +430,11 @@ export default function TutorsDirectoryPage({
     if (sortBy === 'rating') {
       list.sort((a, b) => (b.rating || 0) - (a.rating || 0));
     } else if (sortBy === 'reviews') {
-      list.sort((a, b) => (b.reviewCount || 0) - (a.reviewCount || 0));
+      list.sort(
+        (a, b) =>
+          ((b as any).reviewsCount ?? b.reviewCount ?? 0) -
+          ((a as any).reviewsCount ?? a.reviewCount ?? 0)
+      );
     } else if (sortBy === 'price_low') {
       list.sort((a, b) => (a.hourlyRate || 0) - (b.hourlyRate || 0));
     } else if (sortBy === 'price_high') {
@@ -345,17 +444,19 @@ export default function TutorsDirectoryPage({
   }, [filteredTutors, sortBy]);
 
   // Pagination calculation
-  const totalPages = Math.ceil(sortedTutors.length / pageSize) || 1;
+  const effectivePageSize = pageSize <= 0 ? Math.max(1, sortedTutors.length) : pageSize;
+  const totalPages = Math.ceil(sortedTutors.length / effectivePageSize) || 1;
+  const safeCurrentPage = Math.min(currentPage, totalPages);
   const paginatedTutors = useMemo(() => {
-    const start = (currentPage - 1) * pageSize;
-    return sortedTutors.slice(start, start + pageSize);
-  }, [sortedTutors, currentPage]);
+    const start = (safeCurrentPage - 1) * effectivePageSize;
+    return sortedTutors.slice(start, start + effectivePageSize);
+  }, [sortedTutors, safeCurrentPage, effectivePageSize]);
 
   const clearAllFilters = () => {
     setSearchTerm('');
     setSelectedCountry('all');
     setSelectedSubject('All Subjects');
-    setMaxPrice(180);
+    setMaxPrice(MAX_PRICE_LIMIT);
     setCurrentPage(1);
   };
 
@@ -364,6 +465,8 @@ export default function TutorsDirectoryPage({
     (selectedCountry && selectedCountry !== 'all'
       ? { label: selectedCountry.split(',')[0].trim(), value: selectedCountry, count: sortedTutors.length, flag: '📍' }
       : COUNTRY_OPTIONS[0]);
+
+  const totalVerifiedSpecialists = unifiedTutors.length || 500;
 
   return (
     <div className="bg-[#FAF9F6] min-h-screen py-10 px-4 sm:px-6 lg:px-8 font-sans text-slate-800">
@@ -375,7 +478,7 @@ export default function TutorsDirectoryPage({
             <div className="flex items-center gap-2">
               <span className="text-[11px] font-bold uppercase tracking-wider text-orange-600 bg-orange-50 px-3 py-1 rounded-full border border-orange-200/80 flex items-center gap-1.5">
                 <Sparkles className="w-3.5 h-3.5 text-[#FF7A00]" />
-                Global Master Faculty &amp; Tutors (500 Specialists)
+                Global Master Faculty &amp; Tutors ({totalVerifiedSpecialists} Specialists)
               </span>
               <span className="text-xs text-slate-400">•</span>
               <span className="text-xs font-semibold text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200">
@@ -386,7 +489,7 @@ export default function TutorsDirectoryPage({
               Find Expert <span className="text-[#FF7A00]">University Tutors</span>
             </h1>
             <p className="text-xs sm:text-sm text-slate-500 font-medium max-w-2xl leading-relaxed">
-              Explore 500 vetted professors, PhD mentors, and executive academic chairs across USA (210), UK (55), Australia (50), Canada (45), Singapore (45), Ireland (35), New Zealand (30), and UAE (30). Master tutors and senior experts with direct subject specialization.
+              Explore {totalVerifiedSpecialists}+ vetted professors, PhD mentors, and executive academic chairs across USA, UK, Australia, Canada, Singapore, Ireland, New Zealand, and UAE. Master tutors and senior experts with direct subject specialization.
             </p>
           </div>
 
@@ -425,7 +528,7 @@ export default function TutorsDirectoryPage({
                   <SlidersHorizontal className="w-4 h-4 text-[#FF7A00]" />
                   <span>Filter Directory</span>
                 </div>
-                {(selectedCountry !== 'all' || selectedSubject !== 'All Subjects' || maxPrice < 120 || searchTerm) && (
+                {(selectedCountry !== 'all' || selectedSubject !== 'All Subjects' || maxPrice < MAX_PRICE_LIMIT || searchTerm) && (
                   <button
                     onClick={clearAllFilters}
                     className="text-xs font-bold text-[#FF7A00] hover:underline cursor-pointer"
@@ -513,13 +616,13 @@ export default function TutorsDirectoryPage({
                   }}
                   className="w-full py-2.5 px-3 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:border-[#FF7A00] focus:bg-white outline-none font-medium cursor-pointer"
                 >
-                  <option value="All Subjects">All Subjects (500 Tutors)</option>
+                  <option value="All Subjects">All Subjects ({totalVerifiedSpecialists} Tutors)</option>
                   <optgroup label="High Demand Subjects">
                     {HIGH_DEMAND_SUBJECTS.filter(s => s !== 'All Subjects').map((sub) => (
                       <option key={sub} value={sub}>{sub}</option>
                     ))}
                   </optgroup>
-                  <optgroup label="All Direct Primary Subjects (77 Disciplines)">
+                  <optgroup label={`All Direct Primary Subjects (${allDistinctPrimarySubjects.length} Disciplines)`}>
                     {allDistinctPrimarySubjects.map((sub) => (
                       <option key={`prim-${sub}`} value={sub}>{sub}</option>
                     ))}
@@ -534,13 +637,13 @@ export default function TutorsDirectoryPage({
                     Max Rate ($/hr)
                   </label>
                   <span className="text-sm font-bold text-[#FF7A00]">
-                    ${maxPrice}/hr
+                    {maxPrice >= MAX_PRICE_LIMIT ? 'Any Rate' : `$${maxPrice}/hr`}
                   </span>
                 </div>
                 <input
                   type="range"
-                  min="40"
-                  max="180"
+                  min="35"
+                  max={MAX_PRICE_LIMIT}
                   step="5"
                   value={maxPrice}
                   onChange={(e) => {
@@ -550,9 +653,9 @@ export default function TutorsDirectoryPage({
                   className="w-full accent-[#FF7A00] cursor-pointer"
                 />
                 <div className="flex justify-between text-[10px] text-slate-400 font-medium">
-                  <span>$40/hr</span>
-                  <span>$110/hr</span>
-                  <span>$180/hr</span>
+                  <span>$35/hr</span>
+                  <span>$165/hr</span>
+                  <span>Any ($300+)</span>
                 </div>
               </div>
 
@@ -574,7 +677,21 @@ export default function TutorsDirectoryPage({
                 )}
               </div>
 
-              <div className="flex items-center gap-2 self-end sm:self-auto">
+              <div className="flex flex-wrap items-center gap-2 self-end sm:self-auto">
+                <select
+                  value={pageSize}
+                  onChange={(e) => {
+                    setPageSize(parseInt(e.target.value, 10));
+                    setCurrentPage(1);
+                  }}
+                  aria-label="Tutors displayed per page"
+                  className="text-xs bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5 font-semibold text-slate-700 outline-none focus:border-[#FF7A00] cursor-pointer"
+                >
+                  <option value={15}>15 / page</option>
+                  <option value={50}>50 / page</option>
+                  <option value={100}>100 / page</option>
+                  <option value={0}>Show All ({sortedTutors.length})</option>
+                </select>
                 <span className="text-[11px] font-bold text-slate-400 uppercase">Sort by:</span>
                 <select
                   value={sortBy}
@@ -643,9 +760,12 @@ export default function TutorsDirectoryPage({
                       {/* Top Row: Avatar + Info + Rate */}
                       <div className="flex items-start gap-3.5">
                         {/* Avatar with Verified Floating Badge */}
-                        <div className="relative shrink-0">
+                        <div
+                          onClick={() => onSelectTutorProfile(tutor)}
+                          className="relative shrink-0 cursor-pointer"
+                        >
                           <ResponsiveAvatar
-                            src={tutor.avatarUrl}
+                            src={tutor.avatarUrl || (tutor as any).profileImageUrl}
                             alt={tutor.name}
                             sizePx={80}
                             fallbackSrc={getFallbackAvatar(tutor.name)}
@@ -680,7 +800,7 @@ export default function TutorsDirectoryPage({
                                   <Star className="w-3 h-3 fill-amber-500 text-amber-500" />
                                   {tutor.rating || '5.0'}
                                 </span>
-                                <span className="text-slate-400 shrink-0">({tutor.reviewCount || 100})</span>
+                                <span className="text-slate-400 shrink-0">({(tutor as any).reviewsCount ?? tutor.reviewCount ?? 100})</span>
                               </div>
                             </div>
 
@@ -783,9 +903,12 @@ export default function TutorsDirectoryPage({
                       <div className="flex flex-col sm:flex-row items-start gap-5">
                         
                         {/* Avatar with Verified Status */}
-                        <div className="relative shrink-0">
+                        <div
+                          onClick={() => onSelectTutorProfile(tutor)}
+                          className="relative shrink-0 cursor-pointer"
+                        >
                           <ResponsiveAvatar
-                            src={tutor.avatarUrl}
+                            src={tutor.avatarUrl || (tutor as any).profileImageUrl}
                             alt={tutor.name}
                             sizePx={96}
                             fallbackSrc={getFallbackAvatar(tutor.name)}
@@ -842,7 +965,7 @@ export default function TutorsDirectoryPage({
                                 <span className="flex items-center gap-1 font-bold text-amber-600">
                                   <Star className="w-3.5 h-3.5 fill-amber-500 text-amber-500" />
                                   {tutor.rating || 4.9}
-                                  <span className="text-slate-400 font-normal">({tutor.reviewCount || 100} reviews)</span>
+                                  <span className="text-slate-400 font-normal">({(tutor as any).reviewsCount ?? tutor.reviewCount ?? 100} reviews)</span>
                                 </span>
                                 <span>•</span>
                                 <span className="text-emerald-700 font-semibold bg-emerald-50 px-2 py-0.2 rounded-md">
@@ -966,13 +1089,13 @@ export default function TutorsDirectoryPage({
             {totalPages > 1 && (
               <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-xs flex items-center justify-between">
                 <button
-                  disabled={currentPage === 1}
+                  disabled={safeCurrentPage === 1}
                   onClick={() => {
                     setCurrentPage(prev => Math.max(prev - 1, 1));
                     window.scrollTo({ top: 120, behavior: 'smooth' });
                   }}
                   className={`flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-bold border transition-all ${
-                    currentPage === 1
+                    safeCurrentPage === 1
                       ? 'text-slate-300 border-slate-150 cursor-not-allowed'
                       : 'text-slate-700 border-slate-200 hover:bg-slate-50 cursor-pointer'
                   }`}
@@ -982,17 +1105,17 @@ export default function TutorsDirectoryPage({
                 </button>
 
                 <div className="text-xs font-bold text-slate-600">
-                  Page <span className="text-[#FF7A00]">{currentPage}</span> of {totalPages}
+                  Page <span className="text-[#FF7A00]">{safeCurrentPage}</span> of {totalPages}
                 </div>
 
                 <button
-                  disabled={currentPage === totalPages}
+                  disabled={safeCurrentPage === totalPages}
                   onClick={() => {
                     setCurrentPage(prev => Math.min(prev + 1, totalPages));
                     window.scrollTo({ top: 120, behavior: 'smooth' });
                   }}
                   className={`flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-bold border transition-all ${
-                    currentPage === totalPages
+                    safeCurrentPage === totalPages
                       ? 'text-slate-300 border-slate-150 cursor-not-allowed'
                       : 'text-slate-700 border-slate-200 hover:bg-slate-50 cursor-pointer'
                   }`}

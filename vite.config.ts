@@ -37,8 +37,13 @@ export default defineConfig(({ command }) => {
       hmr: process.env.DISABLE_HMR !== 'true',
       watch: process.env.DISABLE_HMR === 'true' ? null : {},
     },
+    esbuild: {
+      legalComments: 'none',
+    },
     build: {
       target: 'es2020',
+      minify: 'esbuild',
+      cssMinify: true,
       cssCodeSplit: true,
       chunkSizeWarningLimit: 1000,
       rollupOptions: {

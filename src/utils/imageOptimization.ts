@@ -49,7 +49,10 @@ export function buildUnsplashUrl(
     if (options?.format && options.format !== 'auto') {
       parsed.searchParams.set('fm', options.format);
     }
-    parsed.searchParams.set('q', String(options?.quality ?? (width <= 128 ? 72 : 76)));
+    const existingQ = Number(parsed.searchParams.get('q'));
+    const defaultQ = options?.quality ?? (width <= 128 ? 72 : 76);
+    const finalQ = Number.isFinite(existingQ) && existingQ > 0 ? Math.min(existingQ, defaultQ) : defaultQ;
+    parsed.searchParams.set('q', String(finalQ));
     return parsed.toString();
   } catch {
     return rawUrl;

@@ -72,12 +72,19 @@ export default function UserDataPage({
     return () => clearTimeout(timer);
   }, [searchQuery]);
 
-  // Sync propUsers or store updates
+  // Sync propUsers or store updates, and ensure full 500+ directory is loaded
   useEffect(() => {
     if (propUsers && propUsers.length > 0) {
       setUsersList(propUsers);
     } else if (store.users && store.users.length > 0) {
       setUsersList(store.users);
+    }
+    if ((propUsers?.length || 0) < 500) {
+      void store.ensureFullDirectoryLoaded().then(() => {
+        if (store.users.length > 0) {
+          setUsersList([...store.users]);
+        }
+      });
     }
   }, [propUsers]);
 
@@ -102,7 +109,7 @@ export default function UserDataPage({
     setIsRefreshing(true);
     setRefreshError(null);
     try {
-      const res = await apiFetch('/api/users?limit=500', { credentials: 'include' });
+      const res = await apiFetch('/api/users?limit=2500', { credentials: 'include' });
       const data = await res.json().catch(() => ({}));
       if (res.ok && data.users && Array.isArray(data.users)) {
         setUsersList(data.users);

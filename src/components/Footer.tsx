@@ -12,8 +12,8 @@ import {
 } from 'lucide-react';
 import FooterLocationsSubjects from './FooterLocationsSubjects';
 import { isModifiedAnchorClick } from '../data/dedicatedServiceRoutes';
-import { STUDENT_TOOLS } from '../data/studentToolsData';
-import { MATH_TOOLS_REGISTRY } from '../data/mathToolsRegistry';
+
+const FooterToolDirectories = React.lazy(() => import('./FooterToolDirectories'));
 
 interface FooterProps {
   onNavigate: (view: string) => void;
@@ -22,6 +22,8 @@ interface FooterProps {
 
 export default function Footer({ onNavigate, onOpenBecomeTutor }: FooterProps) {
   const [isDisclosureOpen, setIsDisclosureOpen] = useState(false);
+  const [isMathToolsOpen, setIsMathToolsOpen] = useState(false);
+  const [isStudentToolsOpen, setIsStudentToolsOpen] = useState(false);
 
   // Compliant SEO keywords strictly aligned with Google Ads and Academic Integrity Policies
   const seoKeywords = [
@@ -66,8 +68,7 @@ export default function Footer({ onNavigate, onOpenBecomeTutor }: FooterProps) {
               <picture>
                 <source
                   type="image/avif"
-                  srcSet="/logo-220.avif 220w, /logo-440.avif 440w"
-                  sizes="220px"
+                  srcSet="/logo-440.avif"
                 />
                 <source
                   type="image/webp"
@@ -116,8 +117,8 @@ export default function Footer({ onNavigate, onOpenBecomeTutor }: FooterProps) {
                 { name: 'Essay & Reference Checks', view: 'service-essay', href: '/services/essay-reference-checks' },
                 { name: 'WhatsApp Academic Hotline', view: 'whatsapp', href: '/whatsapp' },
                 { name: 'Become a Tutor (Apply Now)', action: 'become-tutor' },
-                { name: 'About Founding Team', view: 'about', href: '/about-us' },
-                { name: 'Knowledge Center (Blog)', view: 'blog', href: '/our-blog' },
+                { name: 'About Founding Team', view: 'about', href: '/about' },
+                { name: 'Knowledge Center (Blog)', view: 'blog', href: '/blog' },
               ].map((link, idx) => (
                 <li key={idx}>
                   {link.href ? (
@@ -198,7 +199,7 @@ export default function Footer({ onNavigate, onOpenBecomeTutor }: FooterProps) {
 
         {/* Free University Mathematics & Statistics Suite (All 27 Standalone Pages) */}
         <div className="mt-12 pt-8 border-t border-[#ffab85]/55">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3">
             <div>
               <h3 className="text-xs font-display font-bold text-[#331301] uppercase tracking-widest">
                 Free University Mathematics &amp; Statistics Suite (27 Interactive Solvers)
@@ -207,42 +208,41 @@ export default function Footer({ onNavigate, onOpenBecomeTutor }: FooterProps) {
                 100% browser-local Algebra, Trigonometry, Calculus, Linear Algebra, Statistics, ODE, and RSA calculators.
               </p>
             </div>
-            <a
-              href="/tools/math"
-              onClick={(e) => {
-                if (!isModifiedAnchorClick(e)) {
-                  e.preventDefault();
-                  onNavigate('tools/math');
-                }
-              }}
-              className="inline-flex items-center min-h-[32px] py-1 text-xs font-bold text-orange-700 hover:text-orange-900 hover:underline whitespace-nowrap cursor-pointer"
-            >
-              Mathematics &amp; Stats Hub (27 Tools) →
-            </a>
-          </div>
-
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2.5 text-xs">
-            {MATH_TOOLS_REGISTRY.map((mTool) => (
+            <div className="flex flex-wrap items-center gap-3">
               <a
-                key={mTool.slug}
-                href={mTool.path}
+                href="/tools/math"
                 onClick={(e) => {
                   if (!isModifiedAnchorClick(e)) {
                     e.preventDefault();
-                    onNavigate(mTool.viewKey);
+                    onNavigate('tools/math');
                   }
                 }}
-                className="px-3 py-2.5 min-h-[40px] flex items-center rounded-xl bg-[#fffbf7] border border-[#ffab85]/45 hover:border-orange-500 hover:bg-[#ffece1] text-[#542104] hover:text-orange-800 font-semibold transition-colors truncate cursor-pointer"
+                className="inline-flex items-center min-h-[36px] py-1 text-xs font-bold text-orange-700 hover:text-orange-900 hover:underline whitespace-nowrap cursor-pointer"
               >
-                <span className="truncate">{mTool.shortTitle}</span>
+                Mathematics &amp; Stats Hub (27 Tools) →
               </a>
-            ))}
+              <button
+                type="button"
+                onClick={() => setIsMathToolsOpen((prev) => !prev)}
+                aria-expanded={isMathToolsOpen}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 min-h-[36px] rounded-xl bg-[#fffbf7] border border-[#ffab85]/60 hover:border-orange-500 text-xs font-bold text-[#542104] hover:text-orange-800 transition-colors cursor-pointer"
+              >
+                <span>{isMathToolsOpen ? 'Hide 27 Math Solvers' : 'Show All 27 Math Solvers'}</span>
+                <ChevronDown className={`w-3.5 h-3.5 transition-transform ${isMathToolsOpen ? 'rotate-180' : ''}`} />
+              </button>
+            </div>
           </div>
+
+          {isMathToolsOpen && (
+            <React.Suspense fallback={<div className="py-4 text-xs text-[#542104]/80 font-semibold">Loading math solvers directory...</div>}>
+              <FooterToolDirectories mode="math" onNavigate={onNavigate} />
+            </React.Suspense>
+          )}
         </div>
 
         {/* Free Student Tools Global SEO Directory (All Standalone Pages) */}
         <div className="mt-10 pt-8 border-t border-[#ffab85]/55">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3">
             <div>
               <h3 className="text-xs font-display font-bold text-[#331301] uppercase tracking-widest">
                 Free Student Tools Suite (100% Local Browser Utilities)
@@ -300,26 +300,23 @@ export default function Footer({ onNavigate, onOpenBecomeTutor }: FooterProps) {
               >
                 All Student Tools →
               </a>
+              <button
+                type="button"
+                onClick={() => setIsStudentToolsOpen((prev) => !prev)}
+                aria-expanded={isStudentToolsOpen}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 min-h-[36px] rounded-xl bg-[#fffbf7] border border-[#ffab85]/60 hover:border-orange-500 text-xs font-bold text-[#542104] hover:text-orange-800 transition-colors cursor-pointer"
+              >
+                <span>{isStudentToolsOpen ? 'Hide Individual Tools' : 'Show Individual Tools'}</span>
+                <ChevronDown className={`w-3.5 h-3.5 transition-transform ${isStudentToolsOpen ? 'rotate-180' : ''}`} />
+              </button>
             </div>
           </div>
 
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2.5 text-xs">
-            {STUDENT_TOOLS.map((tool) => (
-              <a
-                key={tool.slug}
-                href={tool.path}
-                onClick={(e) => {
-                  if (!isModifiedAnchorClick(e)) {
-                    e.preventDefault();
-                    onNavigate(tool.viewKey);
-                  }
-                }}
-                className="px-3 py-2.5 min-h-[40px] flex items-center rounded-xl bg-[#fffbf7] border border-[#ffab85]/45 hover:border-orange-500 hover:bg-[#ffece1] text-[#542104] hover:text-orange-800 font-semibold transition-colors truncate cursor-pointer"
-              >
-                <span className="truncate">{tool.shortName}</span>
-              </a>
-            ))}
-          </div>
+          {isStudentToolsOpen && (
+            <React.Suspense fallback={<div className="py-4 text-xs text-[#542104]/80 font-semibold">Loading student tools directory...</div>}>
+              <FooterToolDirectories mode="student" onNavigate={onNavigate} />
+            </React.Suspense>
+          )}
         </div>
 
         {/* Gray Unethical Search Term Links Section */}

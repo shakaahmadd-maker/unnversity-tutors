@@ -374,7 +374,7 @@ export class AppStore {
     this.inFlightDirectoryLoad = (async () => {
       try {
         await this.ensureCatalogDataLoaded();
-        const res = await apiFetch('/api/users?page=1&limit=100');
+        const res = await apiFetch('/api/users?page=1&limit=2500');
         if (res.ok) {
           const uData = await res.json();
           if (Array.isArray(uData.users)) {
@@ -392,9 +392,42 @@ export class AppStore {
     return this.inFlightDirectoryLoad;
   }
 
+  public upsertTutorPreview(tutorRaw: any): User {
+    const parsedSubs = this.parseSubjectField(
+      tutorRaw?.subjectExpertise || tutorRaw?.subjects,
+      tutorRaw?.primarySubject
+    );
+    const existing = this.users.find((u) => u.id === tutorRaw?.id);
+    const normalized: User = {
+      ...(existing || {}),
+      ...tutorRaw,
+      id: tutorRaw.id,
+      name: tutorRaw.name || existing?.name || 'Academic Tutor',
+      email: tutorRaw.email || existing?.email || `${tutorRaw.id}@university-tutors.com`,
+      role: UserRole.TUTOR,
+      avatarUrl: tutorRaw.avatarUrl || tutorRaw.profileImageUrl || existing?.avatarUrl || '',
+      subjects: parsedSubs.length > 0 ? parsedSubs : existing?.subjects || [],
+      subjectExpertise: parsedSubs.length > 0 ? parsedSubs : existing?.subjectExpertise || [],
+      reviewCount: tutorRaw.reviewCount ?? tutorRaw.reviewsCount ?? existing?.reviewCount ?? 120,
+      location: tutorRaw.location || tutorRaw.cityLocation || tutorRaw.city || existing?.location || 'Miami, FL',
+      experience: tutorRaw.experience || tutorRaw.experienceSummary || tutorRaw.bio || existing?.experience || '',
+      availability: tutorRaw.availability || tutorRaw.availabilities || existing?.availability || 'Flexible global scheduling',
+      isApproved: tutorRaw.isApproved !== undefined ? tutorRaw.isApproved : true,
+      status: tutorRaw.status || 'approved',
+    };
+    const idx = this.users.findIndex((u) => u.id === normalized.id);
+    if (idx !== -1) {
+      this.users[idx] = normalized;
+    } else {
+      this.users = [normalized, ...this.users];
+    }
+    return normalized;
+  }
+
   public async loadTrendingTutorsFallback(): Promise<User[]> {
     if (this.trendingTutorsLoaded) return this.users;
     try {
+      await this.ensureCatalogDataLoaded();
       const mod = await import('../data/trendingTutors500Data');
       const extra = (mod.TRENDING_TUTORS_500 as unknown) as User[];
       const merged = new Map<string, User>();
@@ -494,13 +527,57 @@ export class AppStore {
     }
   }
 
+  private parseSubjectField(raw: unknown, fallback?: string): string[] {
+    const out: string[] = [];
+    const pushItem = (val: unknown) => {
+      if (!val) return;
+      if (Array.isArray(val)) {
+        val.forEach((v) => {
+          if (typeof v === 'string' && v.trim()) out.push(v.trim());
+        });
+        return;
+      }
+      if (typeof val === 'string') {
+        const trimmed = val.trim();
+        if (!trimmed) return;
+        if (trimmed.startsWith('[')) {
+          try {
+            const parsed = JSON.parse(trimmed);
+            if (Array.isArray(parsed)) {
+              parsed.forEach((v) => {
+                if (typeof v === 'string' && v.trim()) out.push(v.trim());
+              });
+              return;
+            }
+          } catch {
+            // Fall back to comma split
+          }
+        }
+        trimmed.split(',').forEach((part) => {
+          const clean = part.replace(/^[\["']+|[\]"']+$/g, '').trim();
+          if (clean) out.push(clean);
+        });
+      }
+    };
+    pushItem(raw);
+    if (out.length === 0 && fallback && fallback.trim()) {
+      out.push(fallback.trim());
+    }
+    return Array.from(new Set(out));
+  }
+
   private mergeServerUsers(serverUsersRaw: any[]) {
-    const serverUsers = serverUsersRaw.map((u: any) => ({
-      ...u,
-      role: u.role || UserRole.TUTOR,
-      subjects: typeof u.subjects === 'string' ? JSON.parse(u.subjects || '[]') : (u.subjects || []),
-      subjectExpertise: typeof u.subjectExpertise === 'string' ? JSON.parse(u.subjectExpertise || '[]') : (u.subjectExpertise || []),
-    }));
+    const serverUsers = serverUsersRaw.map((u: any) => {
+      const parsedSubjects = this.parseSubjectField(u.subjects, u.primarySubject);
+      const parsedExpertise = this.parseSubjectField(u.subjectExpertise || u.subjects, u.primarySubject);
+      return {
+        ...u,
+        role: u.role || UserRole.TUTOR,
+        subjects: parsedSubjects.length > 0 ? parsedSubjects : parsedExpertise,
+        subjectExpertise: parsedExpertise.length > 0 ? parsedExpertise : parsedSubjects,
+        reviewCount: u.reviewCount ?? u.reviewsCount,
+      };
+    });
 
     const mergedMap = new Map<string, User>();
     for (const initial of INITIAL_TUTORS) {
@@ -518,7 +595,9 @@ export class AppStore {
         mergedMap.set(u.id, u);
       }
     }
-    this.users = Array.from(mergedMap.values());
+    this.users = Array.from(mergedMap.values()).filter(
+      (u: any) => u && u.deleted !== true && u.status !== 'deleted'
+    );
   }
 
   private applyRoomsData(rooms: any[]) {
@@ -641,8 +720,11 @@ export class AppStore {
         }
         if (['dashboard', 'tutors', 'submit'].includes(tab)) {
           tasks.push(
-            safeGet(`/api/users?role=tutor&page=1&limit=100`, (uData) => {
-              if (Array.isArray(uData.users)) this.mergeServerUsers(uData.users);
+            safeGet(`/api/users?role=tutor&page=1&limit=2500`, (uData) => {
+              if (Array.isArray(uData.users)) {
+                this.mergeServerUsers(uData.users);
+                this.fullDirectoryLoaded = true;
+              }
             })
           );
         }
@@ -691,8 +773,11 @@ export class AppStore {
       } else if (role === 'admin' && isStaff) {
         if (['tutors_list', 'users', 'user_data', 'student_profiles'].includes(tab)) {
           tasks.push(
-            safeGet(`/api/users?page=${page}&limit=100${searchQ}`, (uData) => {
-              if (Array.isArray(uData.users)) this.mergeServerUsers(uData.users);
+            safeGet(`/api/users?page=1&limit=2500${searchQ}`, (uData) => {
+              if (Array.isArray(uData.users)) {
+                this.mergeServerUsers(uData.users);
+                this.fullDirectoryLoaded = true;
+              }
             })
           );
         }
@@ -822,12 +907,12 @@ export class AppStore {
         const pathname = typeof window !== 'undefined' ? window.location.pathname.toLowerCase() : '/';
         const needsFullDirectoryImmediately =
           Boolean(this.currentUser) ||
-          /\/(tutors|tutors-directory|user-data|get-a-quote|online-tutoring|services|our-blog|blog|admin|student|tutor)/.test(pathname);
+          /\/(tutors|tutors-directory|find-a-tutor|user-data|get-a-quote|online-tutoring|services|our-blog|blog|admin|student|tutor)/.test(pathname);
         if (needsFullDirectoryImmediately) {
           await this.ensureCatalogDataLoaded();
         }
         const usersUrl = needsFullDirectoryImmediately
-          ? '/api/users?page=1&limit=100'
+          ? '/api/users?page=1&limit=2500'
           : '/api/users?role=tutor&page=1&limit=12';
         const blogsUrl = needsFullDirectoryImmediately
           ? '/api/blogs?page=1&limit=30'

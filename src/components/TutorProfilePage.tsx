@@ -48,22 +48,75 @@ export default function TutorProfilePage({
   const [showAllSubjects, setShowAllSubjects] = useState(false);
   const [showAllKeywords, setShowAllKeywords] = useState(false);
 
-  const rawSubjects = tutor.subjectExpertise || tutor.subjects;
-  const subjects: string[] = Array.isArray(rawSubjects)
-    ? rawSubjects
-    : typeof rawSubjects === 'string' && (rawSubjects as string).trim().length > 0
-    ? (rawSubjects as string).split(',').map(s => s.trim()).filter(Boolean)
-    : [
-        'Math', 'Algebra', 'Calculus', 'Biology', 'Chemistry', 'SAT Prep', 'Essay Writing'
-      ];
+  const parseSubjectList = (raw: unknown, primarySub?: string): string[] => {
+    const out: string[] = [];
+    const append = (val: unknown) => {
+      if (!val) return;
+      if (Array.isArray(val)) {
+        val.forEach((v) => {
+          if (typeof v === 'string' && v.trim()) out.push(v.trim());
+        });
+        return;
+      }
+      if (typeof val === 'string') {
+        const trimmed = val.trim();
+        if (!trimmed) return;
+        if (trimmed.startsWith('[')) {
+          try {
+            const parsed = JSON.parse(trimmed);
+            if (Array.isArray(parsed)) {
+              parsed.forEach((v) => {
+                if (typeof v === 'string' && v.trim()) out.push(v.trim());
+              });
+              return;
+            }
+          } catch {
+            // Fall back to comma split
+          }
+        }
+        trimmed.split(',').forEach((s) => {
+          const clean = s.replace(/^[\["']+|[\]"']+$/g, '').trim();
+          if (clean) out.push(clean);
+        });
+      }
+    };
+    if (primarySub && primarySub.trim()) out.push(primarySub.trim());
+    append(tutor.subjectExpertise);
+    append(tutor.subjects);
+    const seen = new Set<string>();
+    return out.filter((item) => {
+      const k = item.toLowerCase();
+      if (seen.has(k)) return false;
+      seen.add(k);
+      return true;
+    });
+  };
+
+  const parsedSubjects = parseSubjectList(tutor.subjectExpertise || tutor.subjects, tutor.primarySubject);
+  const subjects: string[] =
+    parsedSubjects.length > 0
+      ? parsedSubjects
+      : ['Math', 'Algebra', 'Calculus', 'Biology', 'Chemistry', 'SAT Prep', 'Essay Writing'];
+
+  const avatarSrc = tutor.avatarUrl || (tutor as any).profileImageUrl;
+  const locationDisplay = tutor.location || (tutor as any).cityLocation || tutor.city || 'Miami, FL';
+  const reviewTotal = tutor.reviewCount ?? (tutor as any).reviewsCount ?? 120;
+  const experienceDisplay =
+    tutor.experience ||
+    tutor.experienceSummary ||
+    tutor.experiences ||
+    tutor.bio ||
+    "A patient tutor, I will repeat myself to students multiple times. There are no stupid questions; the only time it's unreasonable to ask a question is if you already know the answer. A believer in interactive learning, I'll walk through anything pertaining to the subject matter...";
+  const availabilityDisplay =
+    tutor.availability || tutor.availabilities || 'Weekdays at any time, Weekends at any time';
 
   const visibleSubjects = showAllSubjects ? subjects : subjects.slice(0, 10);
 
   // Compute relevant keywords for this specific tutor's subject domain
   const relevantKw = getRelevantKeywordsForTutor(
-    tutor.subjectExpertise,
+    subjects,
     tutor.education,
-    tutor.primaryDomain
+    tutor.primaryDomain || tutor.primarySubject
   );
 
   const highSearchKws = tutor.specializedKeywords && tutor.specializedKeywords.length > 0 
@@ -170,7 +223,7 @@ export default function TutorProfilePage({
               <div className="relative shrink-0">
                 <div className="w-20 h-20 rounded-2xl overflow-hidden shadow-inner ring-2 ring-slate-100 bg-slate-200">
                   <ResponsiveAvatar
-                    src={tutor.avatarUrl}
+                    src={avatarSrc}
                     alt={tutor.name}
                     sizePx={80}
                     loading="eager"
@@ -203,7 +256,7 @@ export default function TutorProfilePage({
                 {/* Location */}
                 <div className="mt-1.5 flex items-center text-xs font-medium text-slate-500">
                   <MapPin className="w-3.5 h-3.5 text-blue-500 mr-1.5 shrink-0" />
-                  <span className="truncate">Private tutor in {tutor.location || tutor.city || 'Miami, FL'}</span>
+                  <span className="truncate">Private tutor in {locationDisplay}</span>
                 </div>
               </div>
             </div>
@@ -216,7 +269,7 @@ export default function TutorProfilePage({
                   <Star className="w-4 h-4 fill-amber-500 text-amber-500" />
                   <span className="ml-1 text-sm font-bold text-slate-900">{tutor.rating || '5.0'}</span>
                 </div>
-                <span className="text-xs text-slate-400 font-medium">({tutor.reviewCount || 120} reviews)</span>
+                <span className="text-xs text-slate-400 font-medium">({reviewTotal} reviews)</span>
               </div>
 
               {/* Hourly Rate */}
@@ -237,7 +290,7 @@ export default function TutorProfilePage({
               <div>
                 <div className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Availability</div>
                 <p className="text-xs font-semibold text-slate-800 mt-0.5 leading-relaxed">
-                  {tutor.availability || 'Flexible global scheduling'} <span className="text-blue-600 font-medium">(EST, GMT, GST, AEST)</span>
+                  {availabilityDisplay} <span className="text-blue-600 font-medium">(EST, GMT, GST, AEST)</span>
                 </p>
               </div>
             </div>
@@ -291,7 +344,7 @@ export default function TutorProfilePage({
               <h3>Experience</h3>
             </div>
             <div className="p-3 rounded-xl bg-slate-50/80 border border-slate-100 text-xs font-medium text-slate-700 leading-relaxed whitespace-pre-line">
-              {tutor.experience || tutor.bio || 'Certified information security analyst training students in vulnerability assessments, encryption math, and network packet analysis.'}
+              {experienceDisplay}
             </div>
           </section>
 
@@ -548,7 +601,7 @@ export default function TutorProfilePage({
           </button>
 
           <div className="text-xs text-slate-500 font-medium">
-            <span>Home</span> / <span className="text-blue-600 font-semibold">{tutor.location || 'Miami, FL'} Tutors</span> / <span className="font-bold text-slate-800">{tutor.name}</span>
+            <span>Home</span> / <span className="text-blue-600 font-semibold">{locationDisplay} Tutors</span> / <span className="font-bold text-slate-800">{tutor.name}</span>
           </div>
         </div>
 
@@ -562,7 +615,7 @@ export default function TutorProfilePage({
               {/* Header Info */}
               <div className="flex flex-col sm:flex-row items-start gap-5">
                 <ResponsiveAvatar
-                  src={tutor.avatarUrl}
+                  src={avatarSrc}
                   alt={tutor.name}
                   sizePx={112}
                   loading="eager"
@@ -583,14 +636,14 @@ export default function TutorProfilePage({
 
                   <p className="text-sm font-medium italic text-slate-600 flex items-center gap-1.5">
                     <MapPin className="w-4 h-4 text-blue-600" />
-                    <span>Private tutor in {tutor.location || tutor.city || 'Miami, FL'}</span>
+                    <span>Private tutor in {locationDisplay}</span>
                   </p>
 
                   <div className="flex items-center gap-3 text-xs pt-1">
                     <div className="flex items-center gap-1 font-bold text-amber-600 bg-amber-50 px-2.5 py-1 rounded-lg border border-amber-200">
                       <Star className="w-3.5 h-3.5 fill-amber-500 text-amber-500" />
                       <span>{tutor.rating || 4.9}</span>
-                      <span className="text-slate-400 font-normal">({tutor.reviewCount || 120} reviews)</span>
+                      <span className="text-slate-400 font-normal">({reviewTotal} reviews)</span>
                     </div>
 
                     <span className="font-extrabold text-blue-900 text-sm">
@@ -618,7 +671,7 @@ export default function TutorProfilePage({
                   <span>Experience</span>
                 </h3>
                 <p className="text-xs sm:text-sm text-slate-700 leading-relaxed font-normal bg-white p-4 rounded-2xl border border-slate-200/60 whitespace-pre-line text-justify">
-                  {tutor.experience || "A patient tutor, I will repeat myself to students multiple times. There are no stupid questions; the only time it's unreasonable to ask a question is if you already know the answer. A believer in interactive learning, I'll walk through anything pertaining to the subject matter..."}
+                  {experienceDisplay}
                 </p>
               </div>
 
@@ -663,7 +716,7 @@ export default function TutorProfilePage({
                     <span>Availability</span>
                   </h4>
                   <p className="text-xs text-slate-700 font-medium leading-normal pl-5">
-                    {tutor.availability || 'Weekdays at any time, Weekends at any time'}
+                    {availabilityDisplay}
                   </p>
                 </div>
 
@@ -872,10 +925,10 @@ export default function TutorProfilePage({
         {/* SEO Keyword Links Block (Nearby Cities & Top Subjects) */}
         <div className="pt-4">
           <SEOKeywordLinksBlock 
-            locationName={tutor.location || tutor.city || 'Atlanta, GA'}
+            locationName={locationDisplay}
             tutorName={tutor.name}
-            onNavigateLocation={(loc) => onNavigate('tutors-directory')}
-            onNavigateSubject={(subj) => onNavigate('tutors-directory')}
+            onNavigateLocation={(loc) => onNavigate(`location:${loc}`)}
+            onNavigateSubject={(subj) => onNavigate(`subject:${subj}`)}
             className="rounded-3xl border border-slate-200/80 shadow-xs"
           />
         </div>

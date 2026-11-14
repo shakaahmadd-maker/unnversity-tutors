@@ -1,4 +1,4 @@
-const MATH_TOOL_SLUGS = new Set([
+export const MATH_TOOL_SLUGS = new Set([
   'scientific-expression-evaluator',
   'quadratic-polynomial-solver',
   'linear-equations-system-solver',
@@ -28,7 +28,7 @@ const MATH_TOOL_SLUGS = new Set([
   'number-theory-modular-rsa-calculator',
 ]);
 
-const BIOLOGY_TOOL_SLUGS = new Set([
+export const BIOLOGY_TOOL_SLUGS = new Set([
   'punnett-square-calculator',
   'dna-rna-protein-translator',
   'pcr-master-mix-calculator',
@@ -45,7 +45,7 @@ const BIOLOGY_TOOL_SLUGS = new Set([
   'taxonomic-dichotomous-key-builder',
 ]);
 
-const CHEMISTRY_TOOL_SLUGS = new Set([
+export const CHEMISTRY_TOOL_SLUGS = new Set([
   'interactive-periodic-table',
   'molar-mass-calculator',
   'chemical-equation-balancer',
@@ -64,7 +64,7 @@ const CHEMISTRY_TOOL_SLUGS = new Set([
   'radioactive-decay-halflife-calculator',
 ]);
 
-const STUDENT_TOOL_SLUGS = new Set([
+export const STUDENT_TOOL_SLUGS = new Set([
   'merge-pdf',
   'split-pdf',
   'images-to-pdf',
