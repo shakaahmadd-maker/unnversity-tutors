@@ -27,8 +27,9 @@ ENV UPLOADS_DIR=/app/uploads
 COPY package.json package-lock.json ./
 RUN npm ci --omit=dev
 
-# Copy compiled backend server and static frontend assets
+# Copy compiled backend server, static frontend assets, and SQL migrations
 COPY --from=builder /app/dist ./dist
+COPY --from=builder /app/drizzle ./drizzle
 
 # Create persistent upload folders structure (volume mount point: /app/uploads)
 RUN mkdir -p /app/uploads/avatars /app/uploads/blogs /app/uploads/documents /app/uploads/general
