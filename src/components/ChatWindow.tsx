@@ -78,11 +78,16 @@ export default function ChatWindow({
   const [attachedFile, setAttachedFile] = useState<string>('');
   const [isLocalTyping, setIsLocalTyping] = useState(false);
   
+  const messagesContainerRef = useRef<HTMLDivElement | null>(null);
   const bottomRef = useRef<HTMLDivElement | null>(null);
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Filter messages for this chat
-  const chatMessages = messages.filter(m => m.chatId === chat.id);
+  // Filter and sort messages strictly chronologically (oldest top, newest bottom)
+  const chatMessages = messages
+    .filter(m => m.chatId === chat.id)
+    .slice()
+    .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+  const lastChatMessageId = chatMessages.length > 0 ? chatMessages[chatMessages.length - 1].id : '';
   // Find current pending quote for this chat
   const pendingQuote = quotes.find(q => q.chatId === chat.id && q.status === 'pending');
 
@@ -145,8 +150,15 @@ export default function ChatWindow({
   }, [chat.id, currentUser.role, onSetTypingStatus]);
 
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [chatMessages, isOtherUserTyping]);
+    const raf = requestAnimationFrame(() => {
+      const container = messagesContainerRef.current;
+      if (container) {
+        container.scrollTop = container.scrollHeight;
+      }
+      bottomRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
+    });
+    return () => cancelAnimationFrame(raf);
+  }, [chat.id, chatMessages.length, lastChatMessageId, isOtherUserTyping]);
 
   const handleInputChange = (val: string) => {
     setInputMsg(val);
@@ -243,10 +255,10 @@ export default function ChatWindow({
   };
 
   return (
-    <div className="flex flex-col h-[88vh] max-h-[650px] sm:h-[650px] w-full bg-white border border-gray-150 rounded-2xl sm:rounded-3xl overflow-hidden shadow-xl" id={`chat-window-${chat.id}`}>
+    <div className="flex flex-col h-[calc(100dvh-1rem)] max-h-[680px] sm:h-[650px] w-full bg-white border border-gray-150 rounded-2xl sm:rounded-3xl overflow-hidden shadow-xl" id={`chat-window-${chat.id}`}>
       
       {/* Chat header */}
-      <div className="bg-gray-50 border-b border-gray-150 p-3.5 sm:p-5 flex items-center justify-between pr-10 sm:pr-12">
+      <div className="bg-gray-50 border-b border-gray-150 p-3.5 sm:p-5 flex items-center justify-between pr-10 sm:pr-12 shrink-0">
         <div className="flex items-center gap-3">
           <div className="relative">
             <ResponsiveAvatar
@@ -318,7 +330,7 @@ export default function ChatWindow({
       </div>
 
       {/* Main Messages Body */}
-      <div className="flex-1 overflow-y-auto p-5 space-y-4 bg-gray-50/30 text-xs">
+      <div ref={messagesContainerRef} className="flex-1 min-h-0 overflow-y-auto overscroll-contain p-4 sm:p-5 space-y-3 bg-gray-50/30 text-xs">
         
         {error && (
           <ErrorStatePanel
@@ -368,74 +380,80 @@ export default function ChatWindow({
             <div 
               key={msg.id} 
               id={`message-${msg.id}`}
-              className={`flex gap-3 max-w-xl ${isSelf ? 'ml-auto flex-row-reverse' : 'mr-auto text-left'}`}
+              className={`flex w-full ${isSelf ? 'justify-end' : 'justify-start'}`}
             >
-              {!isSelf && (
-                <div className="flex flex-col items-center self-end shrink-0">
-                  <ResponsiveAvatar
-                    src={msgSender?.avatarUrl || otherUser?.avatarUrl}
-                    alt={msgSender?.name || ''}
-                    sizePx={32}
-                    width={28}
-                    height={28}
-                    fallbackSrc="https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=64&h=64&fit=crop&auto=format&q=75"
-                    className="w-7 h-7 rounded-full object-cover border"
-                  />
-                </div>
-              )}
-              
-              <div className="space-y-1">
-                <div 
-                  className={`p-3.5 rounded-2xl leading-relaxed font-sans ${
-                    isSelf 
-                      ? 'bg-gray-900 text-white rounded-br-none' 
-                      : 'bg-white border border-gray-150 text-gray-800 rounded-bl-none shadow-xs'
-                  }`}
-                >
-                  {!isSelf && (
-                    <div className="flex items-center gap-1.5 mb-1">
-                      <span className="text-[10px] font-bold text-orange-600">
-                        {msgSender?.name || 'Member'}
-                      </span>
-                      {msgSender?.role && (
-                        <span className="text-[8px] uppercase font-bold text-gray-400 font-mono">
-                          • {msgSender.role}
+              <div className={`flex items-end gap-2 max-w-[78%] sm:max-w-[75%] ${isSelf ? 'ml-auto flex-row-reverse' : 'mr-auto'}`}>
+                {!isSelf && (
+                  <div className="flex flex-col items-center shrink-0">
+                    <ResponsiveAvatar
+                      src={msgSender?.avatarUrl || otherUser?.avatarUrl}
+                      alt={msgSender?.name || ''}
+                      sizePx={32}
+                      width={28}
+                      height={28}
+                      fallbackSrc="https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=64&h=64&fit=crop&auto=format&q=75"
+                      className="w-7 h-7 rounded-full object-cover border"
+                    />
+                  </div>
+                )}
+                
+                <div className={`flex flex-col ${isSelf ? 'items-end' : 'items-start'} min-w-0`}>
+                  <div 
+                    className={`px-3.5 py-2.5 rounded-2xl leading-relaxed font-sans shadow-xs break-words ${
+                      isSelf 
+                        ? 'bg-[#F97316] text-white rounded-br-sm' 
+                        : 'bg-[#F3F4F6] border border-gray-200/80 text-slate-900 rounded-bl-sm text-left'
+                    }`}
+                  >
+                    {!isSelf && (
+                      <div className="flex items-center gap-1.5 mb-1">
+                        <span className="text-[10px] font-bold text-orange-600">
+                          {msgSender?.name || 'Member'}
+                        </span>
+                        {msgSender?.role && (
+                          <span className="text-[8px] uppercase font-bold text-gray-500 font-mono">
+                            • {msgSender.role}
+                          </span>
+                        )}
+                      </div>
+                    )}
+                    <p className="whitespace-pre-wrap text-left">{msg.content}</p>
+                    
+                    {/* Embedded PDF/Doc briefs */}
+                    {msg.fileUrl && (
+                      <div className={`mt-2 p-2 rounded-xl border flex items-center justify-between text-[11px] ${
+                        isSelf ? 'bg-white/15 border-white/25 text-white' : 'bg-white border-gray-200 text-slate-800'
+                      }`}>
+                        <div className="flex items-center gap-1.5 truncate max-w-[85%]">
+                          <FileText className={`w-4 h-4 shrink-0 ${isSelf ? 'text-white' : 'text-orange-500'}`} />
+                          <span className="truncate font-mono font-medium">{msg.fileName}</span>
+                        </div>
+                        <a 
+                          id={`download-chat-file-${msg.id}`}
+                          href={msg.fileUrl} 
+                          target="_blank" 
+                          rel="noreferrer" 
+                          className={`hover:underline font-bold shrink-0 ml-2 ${isSelf ? 'text-white' : 'text-orange-600'}`}
+                        >
+                          Open
+                        </a>
+                      </div>
+                    )}
+
+                    <div className={`flex items-center gap-1 mt-1 text-[10px] ${
+                      isSelf ? 'justify-end text-orange-100' : 'justify-start text-slate-400'
+                    }`}>
+                      <span>{new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                      {isSelf && (
+                        <span
+                          className={`font-bold text-[10px] select-none ml-0.5 ${msg.read ? 'text-white' : 'text-orange-100/80'}`}
+                          title={msg.read ? 'Read by recipient' : 'Sent'}
+                        >
+                          ✓✓
                         </span>
                       )}
                     </div>
-                  )}
-                  <p className="whitespace-pre-wrap">{msg.content}</p>
-                  
-                  {/* Embedded PDF/Doc briefs */}
-                  {msg.fileUrl && (
-                    <div className="mt-2.5 p-2 rounded-xl bg-orange-50/10 border border-orange-200/20 flex items-center justify-between text-[11px] bg-white/10">
-                      <div className="flex items-center gap-1.5 truncate max-w-[85%]">
-                        <FileText className="w-4 h-4 text-orange-400 shrink-0" />
-                        <span className="truncate font-mono font-medium">{msg.fileName}</span>
-                      </div>
-                      <a 
-                        id={`download-chat-file-${msg.id}`}
-                        href={msg.fileUrl} 
-                        target="_blank" 
-                        rel="noreferrer" 
-                        className="text-orange-400 hover:underline font-bold shrink-0 ml-2"
-                      >
-                        Open
-                      </a>
-                    </div>
-                  )}
-                </div>
-                <div className="flex items-center justify-end gap-1 px-1">
-                  <span className="text-[9px] text-gray-400 block pb-0.5">
-                    {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                  </span>
-                  {isSelf && (
-                    msg.read ? (
-                      <span className="text-orange-500 font-bold text-[10px] select-none ml-1 cursor-default" title="Read by recipient">✓✓</span>
-                    ) : (
-                      <span className="text-gray-300 font-bold text-[10px] select-none ml-1 cursor-default" title="Sent, unread">✓</span>
-                    )
-                  )}
+                  </div>
                 </div>
               </div>
             </div>
@@ -779,11 +797,11 @@ export default function ChatWindow({
       )}
 
       {/* Input Message Form */}
-      <form onSubmit={handleSend} className="p-4 bg-gray-50 border-t border-gray-150 flex flex-col gap-2">
-        <div className="flex items-center gap-3">
+      <form onSubmit={handleSend} className="p-3 sm:p-4 bg-gray-50 border-t border-gray-150 flex flex-col gap-1.5 shrink-0 w-full">
+        <div className="flex items-center gap-2 w-full min-w-0">
           {/* Attachment upload item */}
-          <div className="relative" title="Upload PDF, DOCS, ZIP, PPT, Image, or any other media">
-            <Upload className="w-5 h-5 text-gray-400 hover:text-orange-500 cursor-pointer" />
+          <div className="relative shrink-0 p-1.5 rounded-lg hover:bg-gray-200/70 transition-colors" title="Upload PDF, DOCS, ZIP, PPT, Image, or any other media">
+            <Upload className="w-5 h-5 text-gray-500 hover:text-orange-500 cursor-pointer" />
             <input 
               type="file" 
               id="chat-attachment-upload"
@@ -796,16 +814,16 @@ export default function ChatWindow({
           <input
             type="text"
             id="chat-input-message"
-            placeholder="Discuss homework prompts or milestones..."
+            placeholder="Type your message..."
             maxLength={5000}
             value={inputMsg}
             onChange={(e) => handleInputChange(e.target.value)}
             disabled={isSending}
-            className="flex-1 bg-white border border-gray-200 focus:border-orange-500 focus:outline-hidden py-2.5 px-4 rounded-xl font-medium disabled:opacity-50"
+            className="flex-1 min-w-0 w-full bg-white border border-gray-200 focus:border-orange-500 focus:outline-hidden py-2.5 px-3.5 rounded-xl font-medium text-xs sm:text-sm disabled:opacity-50"
           />
 
           {attachedFile && (
-            <span className="text-[9px] bg-orange-100 text-orange-700 px-2 py-1.5 rounded-lg max-w-[120px] truncate block font-mono font-bold">
+            <span className="text-[10px] bg-orange-100 text-orange-700 px-2 py-1.5 rounded-lg max-w-[90px] truncate block font-mono font-bold shrink-0">
               ✓ {attachedFile}
             </span>
           )}
@@ -814,7 +832,8 @@ export default function ChatWindow({
             type="submit" 
             id="chat-submit-btn"
             disabled={isSending || (!inputMsg.trim() && !attachedFile)}
-            className="bg-orange-500 hover:bg-orange-600 disabled:opacity-50 text-white p-2.5 rounded-xl transition-all cursor-pointer shadow-sm flex items-center justify-center min-w-[36px]"
+            className="shrink-0 bg-[#F97316] hover:bg-[#EA580C] disabled:bg-gray-200 disabled:text-gray-400 text-white p-2.5 sm:px-3.5 rounded-xl transition-all cursor-pointer shadow-sm flex items-center justify-center gap-1.5"
+            aria-label="Send message"
           >
             {isSending ? (
               <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span>

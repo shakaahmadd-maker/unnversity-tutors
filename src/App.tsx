@@ -171,6 +171,7 @@ export default function App() {
   const [isAssignModalOpen, setIsAssignModalOpen] = useState<boolean>(false);
   const [isBecomeTutorOpen, setIsBecomeTutorOpen] = useState<boolean>(false);
   const [isWhatsAppModalOpen, setIsWhatsAppModalOpen] = useState<boolean>(false);
+  const [hideGlobalWhatsAppForStudentUi, setHideGlobalWhatsAppForStudentUi] = useState<boolean>(false);
   const [prefilledTutorForAssign] = useState<string>('');
   const [hasUserInteracted, setHasUserInteracted] = useState<boolean>(false);
 
@@ -1764,6 +1765,8 @@ export default function App() {
                 onNavigate={handleNavigate}
                 onRefreshData={handleRefreshData}
                 onRequireAuth={() => setActiveView('auth')}
+                onOpenWhatsApp={() => setIsWhatsAppModalOpen(true)}
+                onHideGlobalWhatsAppChange={setHideGlobalWhatsAppForStudentUi}
               />
             ) : activeView === 'get-a-quote' ? (
               <GetQuotePage
@@ -1910,7 +1913,10 @@ export default function App() {
       </main>
 
       {/* Floating WhatsApp Instant Chat Trigger (Bottom Left) — deferred until post-load idle or user interaction */}
-      {isIdleWidgetsReady && !isWhatsAppModalOpen && (
+      {isIdleWidgetsReady &&
+        !isWhatsAppModalOpen &&
+        !liveChat &&
+        !(activeView === 'dashboard' && hideGlobalWhatsAppForStudentUi) && (
         <Suspense fallback={null}>
           <FloatingWhatsAppButton onOpen={() => setIsWhatsAppModalOpen(true)} />
         </Suspense>

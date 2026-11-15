@@ -65,6 +65,8 @@ interface DashboardPortalProps {
   onNavigate: (view: string) => void;
   onRefreshData: () => Promise<void>;
   onRequireAuth: () => void;
+  onOpenWhatsApp?: () => void;
+  onHideGlobalWhatsAppChange?: (hide: boolean) => void;
 }
 
 export default function DashboardPortal({
@@ -79,6 +81,8 @@ export default function DashboardPortal({
   onNavigate,
   onRefreshData,
   onRequireAuth,
+  onOpenWhatsApp,
+  onHideGlobalWhatsAppChange,
 }: DashboardPortalProps) {
   const currentActiveUser = store.currentUser || storeState.currentUser;
 
@@ -311,6 +315,8 @@ export default function DashboardPortal({
         lastSyncTime={storeState.lastSyncTime}
         onPayAdvance={handlePayAdvance}
         onPayBalance={handlePayBalance}
+        onOpenWhatsApp={onOpenWhatsApp}
+        onHideGlobalWhatsAppChange={onHideGlobalWhatsAppChange}
       />
     );
   }

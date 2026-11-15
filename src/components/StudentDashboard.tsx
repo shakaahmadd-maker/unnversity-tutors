@@ -19,36 +19,22 @@ import {
   Search,
   MessageCircle,
   Check,
-  CheckSquare,
   Upload,
   Calendar,
   Paperclip,
   Send,
   Sun,
-  Moon,
   MoreHorizontal,
   AlertTriangle,
   Download,
   ThumbsUp,
   Star,
   CheckCircle,
-  User as UserIcon,
   BookMarked,
-  Sparkles,
   RefreshCw,
   HelpCircle,
   Menu,
   X,
-  Beaker,
-  Terminal,
-  TrendingUp,
-  Languages,
-  Activity,
-  Cpu,
-  Binary,
-  Users,
-  PenTool,
-  Trash2,
   Headset,
   ShieldCheck,
   DollarSign,
@@ -69,6 +55,7 @@ import type { TabLoadState } from '../lib/store';
 import ErrorBoundary from './ErrorBoundary';
 import { TabLoadingSkeleton, ErrorStatePanel, PaginationBar } from './ui/StatePanels';
 import { ResponsiveAvatar } from './ResponsiveImage';
+import StudentOnboardingWizard from './StudentOnboardingWizard';
 import { 
   User, 
   UserRole,
@@ -120,6 +107,8 @@ interface StudentDashboardProps {
   lastSyncTime?: string | null;
   onPayAdvance?: (assignmentId: string, amount: number) => Promise<any>;
   onPayBalance?: (assignmentId: string, amount: number) => Promise<any>;
+  onOpenWhatsApp?: () => void;
+  onHideGlobalWhatsAppChange?: (hide: boolean) => void;
 }
 
 export default function StudentDashboard({
@@ -157,7 +146,9 @@ export default function StudentDashboard({
   syncError = null,
   lastSyncTime,
   onPayAdvance,
-  onPayBalance
+  onPayBalance,
+  onOpenWhatsApp,
+  onHideGlobalWhatsAppChange
 }: StudentDashboardProps) {
 
   // Dynamic Viewport Navigation State matching Sidebar
@@ -176,6 +167,15 @@ export default function StudentDashboard({
       onLoadTab(activeTab);
     }
   }, [activeTab, onLoadTab]);
+
+  useEffect(() => {
+    if (onHideGlobalWhatsAppChange) {
+      onHideGlobalWhatsAppChange(activeTab === 'chat' || activeTab === 'new_request');
+    }
+    return () => {
+      onHideGlobalWhatsAppChange?.(false);
+    };
+  }, [activeTab, onHideGlobalWhatsAppChange]);
 
   useEffect(() => {
     if (activeTab === 'chat' && chats.length > 0) {
@@ -199,17 +199,27 @@ export default function StudentDashboard({
   }, [localSelectedChatId, onSubscribeToChatDetails]);
 
   const selectedChat = chats.find(c => c.id === localSelectedChatId);
-  const activeChatMessages = messages.filter(m => m.chatId === localSelectedChatId).sort(
-    (a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
-  );
+  const activeChatMessages = messages
+    .filter(m => m.chatId === localSelectedChatId)
+    .slice()
+    .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+  const lastActiveChatMessageId = activeChatMessages.length > 0 ? activeChatMessages[activeChatMessages.length - 1].id : '';
 
+  const chatScrollContainerRef = useRef<HTMLDivElement>(null);
   const chatMessagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (activeTab === 'chat' && localSelectedChatId) {
-      chatMessagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+      const raf = requestAnimationFrame(() => {
+        const container = chatScrollContainerRef.current;
+        if (container) {
+          container.scrollTop = container.scrollHeight;
+        }
+        chatMessagesEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
+      });
+      return () => cancelAnimationFrame(raf);
     }
-  }, [activeTab, localSelectedChatId, activeChatMessages.length]);
+  }, [activeTab, localSelectedChatId, activeChatMessages.length, lastActiveChatMessageId]);
   const [showReviewModal, setShowReviewModal] = useState<string | null>(null);
   const [showRevisionModal, setShowRevisionModal] = useState<string | null>(null);
   const [reviewRating, setReviewRating] = useState(5);
@@ -324,178 +334,6 @@ export default function StudentDashboard({
   // Filter notifications for this student
   const userNotifications = appNotifications.filter(n => n.userId === currentUser.id || n.userId === 'all');
   const unreadNotifCount = userNotifications.filter(n => !n.read).length;
-
-  // Matching Funnel States & Configuration Constants
-  const SERVICES = {
-    '1-1-lesson': {
-      title: '1-on-1 Lesson Tutoring',
-      scopeTag: 'Synchronous Live',
-      icon: 'users',
-      description: 'Live interactive video lessons centered directly on your custom curriculum goals.',
-      deliverables: [
-        { id: 'session-rec', name: 'Recorded Video Session Archive', desc: 'Direct access to view or download full session videos', included: true },
-        { id: 'lesson-notes', name: 'Digital Whiteboard Concept Notes', desc: 'Scribbles, formulas, and whiteboard step-by-step PDF notes', included: true },
-        { id: 'practice-prep', name: 'Tailored Practice Problem Packs', desc: 'Targeted custom homework sheets and textbook-style study questions', included: false },
-        { id: 'followup-qa', name: '24-Hour Active Post-Session Q&A', desc: 'Submit follow-up message queries if you hit concept roadblocks later', included: false }
-      ],
-      durationLabel: 'Session Duration Units',
-      durationMin: 1, durationMax: 8, durationDefault: 1, durationStep: 0.5,
-      durationUnit: 'Hour(s)',
-      advice: {
-        1: 'Excellent for resolving a single complex homework task or studying a specific question.',
-        2: 'A standard comprehensive lesson structure. Gives ample time to study theory and practice problems.',
-        4: 'Intensive block session. Ideal for deep exam review preps or structured homework coverage.',
-        8: 'Full block coverage. We highly recommend spreading this over several separate days!'
-      }
-    },
-    'assignment': {
-      title: 'Assignment Tutoring Support',
-      scopeTag: 'Task Milestones',
-      icon: 'file-check-2',
-      description: 'Targeted reviews, practice sheet walk-throughs, and systematic solutions.',
-      deliverables: [
-        { id: 'step-solutions', name: 'Detailed Annotated Analytical Workbook', desc: 'Clean chronological breakdown of methodologies, key steps, and calculations', included: true },
-        { id: 'source-files', name: 'Custom Annotated Source Code / Raw Data Sheets', desc: 'Complete set of structured workspace templates, sheets, or code assets', included: true },
-        { id: 'plagiarism-check', name: 'Certified Originality Similarity Scan', desc: 'Comprehensive report verifying perfect compliance with school standards', included: true },
-        { id: 'abstract', name: 'Abstract', desc: 'Concise summary of your work.', included: false },
-        { id: 'exec-summary', name: 'Executive Summary', desc: 'High-level overview for quick review.', included: false },
-        { id: 'proofread', name: 'Proofread by Editor', desc: 'Editorial pass for grammar and flow.', included: false },
-        { id: 'draft', name: 'Draft', desc: 'Receive an interim draft for review.', included: false },
-        { id: 'daily-update', name: 'Daily Delivery Update', desc: 'Progress updates as the work proceeds.', included: false },
-        { id: 'grammarly-report', name: 'Grammarly Report', desc: 'Quality check with Grammarly.', included: false },
-        { id: 'turnitin-ai', name: 'Turnitin AI Report', desc: 'AI detection insights.', included: false },
-        { id: 'turnitin-similarity', name: 'Turnitin Similarity Report', desc: 'Similarity score report.', included: false },
-        { id: 'toc', name: 'Table of Contents', desc: 'Structured contents page.', included: false }
-      ],
-      durationLabel: 'Expected Project Window',
-      durationMin: 1, durationMax: 14, durationDefault: 3, durationStep: 1,
-      durationUnit: 'Day(s)',
-      advice: {
-        1: 'Express same-day assessment checks. Perfect for simple concept verifications.',
-        3: 'Our recommended baseline window. Allows for detailed proofing and detailed reviews.',
-        7: 'Deep coursework preparation schedule. Ideal for larger homework packs.',
-        14: 'Extensive multi-part portfolio study. Perfect for complex semester milestones.'
-      }
-    },
-    'coursework': {
-      title: 'Sustained Coursework Tutoring',
-      scopeTag: 'Continuous Study',
-      icon: 'calendar-range',
-      description: 'Integrated module-level coverage. Ideal for persistent checks across continuous coursework tasks.',
-      deliverables: [
-        { id: 'weekly-syncs', name: 'Milestone-by-Milestone Syllabus Progress Tracker', desc: 'Interactive study map aligned with your module calendar requirements', included: true },
-        { id: 'milestone-grading', name: 'Weekly Live Concepts Sync & Academic Dashboard', desc: 'Active reviews checking theory comprehension and target parameters', included: true },
-        { id: 'personalized-syllabus', name: 'Pre-Grading Review Checklist & Analytical Feedback', desc: 'In-depth grading rubric checks on homework drafts before submission', included: true },
-        { id: 'abstract', name: 'Abstract', desc: 'Concise summary of your work.', included: false },
-        { id: 'exec-summary', name: 'Executive Summary', desc: 'High-level overview for quick review.', included: false },
-        { id: 'proofread', name: 'Proofread by Editor', desc: 'Editorial pass for grammar and flow.', included: false },
-        { id: 'draft', name: 'Draft', desc: 'Receive an interim draft for review.', included: false },
-        { id: 'daily-update', name: 'Daily Delivery Update', desc: 'Progress updates as the work proceeds.', included: false },
-        { id: 'grammarly-report', name: 'Grammarly Report', desc: 'Quality check with Grammarly.', included: false },
-        { id: 'turnitin-ai', name: 'Turnitin AI Report', desc: 'AI detection insights.', included: false },
-        { id: 'turnitin-similarity', name: 'Turnitin Similarity Report', desc: 'Similarity score report.', included: false },
-        { id: 'toc', name: 'Table of Contents', desc: 'Structured contents page.', included: false }
-      ],
-      durationLabel: 'Module Duration Focus',
-      durationMin: 1, durationMax: 16, durationDefault: 4, durationStep: 1,
-      durationUnit: 'Week(s)',
-      advice: {
-        1: 'A single-week sprint checklist. Best used for end-of-term focus prep.',
-        4: 'One full month of active matching. Exceptional support for module-based courseworks.',
-        8: 'Half-term support cycle. Comprehensive study tracking of major subject items.',
-        16: 'Full semester mentorship support. Ensures continuous oversight and complete syllabus confidence.'
-      }
-    },
-    'writing': {
-      title: 'Essay Writing Coach & Review',
-      scopeTag: 'Line-by-Line Review',
-      icon: 'pen-tool',
-      description: 'Structure advice, thesis creation, proofreading feedback, outlining, and rigorous stylistic edits.',
-      deliverables: [
-        { id: 'structured-draft', name: 'Detailed Thesis Formulation & Structural Blueprint', desc: 'Comprehensive conceptual outline of logical transitions and main claims', included: true },
-        { id: 'citations-bib', name: 'Line-by-Line Editorial Flow & Tone Workbook', desc: 'Paragraph-by-paragraph style critiques to improve structural clarity', included: true },
-        { id: 'editor-review', name: 'Meticulous Bibliography & Citation Reference Audits', desc: 'Full alignment checks (APA, MLA, Harvard, Chicago, etc.) for bibliography lists', included: true },
-        { id: 'abstract', name: 'Abstract', desc: 'Concise summary of your work.', included: false },
-        { id: 'exec-summary', name: 'Executive Summary', desc: 'High-level overview for quick review.', included: false },
-        { id: 'proofread', name: 'Proofread by Editor', desc: 'Editorial pass for grammar and flow.', included: false },
-        { id: 'draft', name: 'Draft', desc: 'Receive an interim draft for review.', included: false },
-        { id: 'daily-update', name: 'Daily Delivery Update', desc: 'Progress updates as the work proceeds.', included: false },
-        { id: 'grammarly-report', name: 'Grammarly Report', desc: 'Quality check with Grammarly.', included: false },
-        { id: 'turnitin-ai', name: 'Turnitin AI Report', desc: 'AI detection insights.', included: false },
-        { id: 'turnitin-similarity', name: 'Turnitin Similarity Report', desc: 'Similarity score report.', included: false },
-        { id: 'toc', name: 'Table of Contents', desc: 'Structured contents page.', included: false }
-      ],
-      durationLabel: 'Target Document Size',
-      durationMin: 1, durationMax: 50, durationDefault: 3, durationStep: 1,
-      durationUnit: 'Page(s) (~275 words)',
-      advice: {
-        1: 'Quick edit review. Perfect for short personal statements or introductory statements.',
-        3: 'A standard essay review length. Allows deep argument outline checks and transition improvements.',
-        10: 'Term paper size review. Excellent support for comprehensive research summaries.',
-        50: 'Sustained dissertation-level feedback. Broken into chapters for rigorous progress checks.'
-      }
-    }
-  };
-
-  const SUBJECT_SUBTOPICS: Record<string, string[]> = {
-    'Mathematics': [
-      'Algebra', 'Calculus', 'Statistics & Probability', 'Geometry', 'Linear Algebra', 
-      'Discrete Math', 'Trigonometry', 'Differential Equations', 'Numerical Analysis', 
-      'Abstract Algebra', 'Real Analysis', 'Complex Variables'
-    ],
-    'Science': [
-      'Physics (Classical & Quantum)', 'Chemistry (Organic & Inorganic)', 'Biology & Genetics', 
-      'Biochemistry', 'Earth Sciences', 'Anatomy & Physiology', 'Astronomy', 
-      'Environmental Science', 'Microbiology', 'Neuroscience', 'Thermodynamics'
-    ],
-    'Computer Science': [
-      'Intro to Programming (Python/Java/C++)', 'Algorithms & Data Structures', 'Web Development (HTML/CSS/JS/React)', 
-      'Machine Learning & Data Science', 'Database Systems (SQL)', 'Cybersecurity', 
-      'Software Engineering', 'Mobile App Development', 'Computer Networks', 'Cloud Computing (AWS/GCP)', 
-      'Operating Systems', 'Artificial Intelligence'
-    ],
-    'Humanities & Social Sciences': [
-      'World History', 'Psychology', 'Sociology', 'English Literature', 'Political Science', 
-      'Economics (Micro & Macro)', 'Philosophy', 'Anthropology', 'International Relations', 
-      'Art History', 'Criminology', 'Linguistics'
-    ],
-    'Business & Finance': [
-      'Financial Accounting', 'Corporate Finance', 'Marketing Strategy', 'Business Law', 
-      'Supply Chain Management', 'Organizational Behavior', 'Managerial Accounting', 
-      'Investment Banking', 'Entrepreneurship', 'International Business', 'Microeconomics', 'Macroeconomics'
-    ],
-    'Languages & Test Prep': [
-      'English (ESL)', 'Spanish Language & Culture', 'French Language & Culture', 
-      'Mandarin Chinese', 'SAT / ACT Prep', 'GRE / GMAT Prep', 'IELTS / TOEFL Prep', 
-      'MCAT Prep', 'LSAT Prep', 'German Language', 'Japanese Language'
-    ]
-  };
-
-  const [funnelStep, setFunnelStep] = useState<number>(1);
-  const [selectedServiceKey, setSelectedServiceKey] = useState<keyof typeof SERVICES>('1-1-lesson');
-  const [selectedSubject, setSelectedSubject] = useState<string>('');
-  const [selectedSubtopic, setSelectedSubtopic] = useState<string>('');
-  const [selectedDuration, setSelectedDuration] = useState<number>(1);
-  const [selectedDate, setSelectedDate] = useState<string>(() => {
-    const tomorrow = new Date();
-    tomorrow.setDate(tomorrow.getDate() + 1);
-    return tomorrow.toISOString().split('T')[0];
-  });
-  const [priorityType, setPriorityType] = useState<string>('standard');
-  const [premiumDeliverables, setPremiumDeliverables] = useState<Record<string, boolean>>({});
-  const [customFocusInput, setCustomFocusInput] = useState<string>('');
-  const [attachedFiles, setAttachedFiles] = useState<Array<{ id: string; name: string; size: string }>>([]);
-  const [studentName, setStudentName] = useState<string>(currentUser.name);
-  const [studentEmail, setStudentEmail] = useState<string>(currentUser.email || '');
-  const [studentLevel, setStudentLevel] = useState<string>('College');
-  const [studentGoal, setStudentGoal] = useState<string>('');
-  
-  // Vetting Loader States
-  const [matchingPhase, setMatchingPhase] = useState<'idle' | 'loading' | 'success'>('idle');
-  const [vettingStepOneCompleted, setVettingStepOneCompleted] = useState<boolean>(false);
-  const [vettingStepTwoCompleted, setVettingStepTwoCompleted] = useState<boolean>(false);
-  const [vettingStepThreeCompleted, setVettingStepThreeCompleted] = useState<boolean>(false);
-  const [alertMessage, setAlertMessage] = useState<string>('');
 
 
   // Filter lists for current student (matching across user ID, email, and display name for funnel submissions)
@@ -974,240 +812,6 @@ export default function StudentDashboard({
     }, 4000);
   };
 
-  const renderServiceIcon = (iconName: string, className = "w-5 h-5") => {
-    if (iconName === 'users') return <Users className={className} />;
-    if (iconName === 'file-check-2') return <CheckSquare className={className} />;
-    if (iconName === 'calendar-range') return <Calendar className={className} />;
-    if (iconName === 'pen-tool') return <PenTool className={className} />;
-    return <BookOpen className={className} />;
-  };
-
-  // Matching Funnel Helpers & Operations Interactivities
-  const selectServicePathway = (serviceKey: keyof typeof SERVICES) => {
-    setSelectedServiceKey(serviceKey);
-    const data = SERVICES[serviceKey];
-    setSelectedDuration(data.durationDefault);
-    setPremiumDeliverables({});
-    setAlertMessage('');
-    setTimeout(() => {
-      setFunnelStep(2);
-    }, 350);
-  };
-
-  const selectFunnelCategory = (subj: string) => {
-    setSelectedSubject(subj);
-    setSelectedSubtopic('');
-    setAlertMessage('');
-  };
-
-  const selectFunnelSubtopic = (subtopic: string) => {
-    setSelectedSubtopic(subtopic);
-    setAlertMessage('');
-    setTimeout(() => {
-      setFunnelStep(3);
-    }, 350);
-  };
-
-  const toggleFunnelDeliverable = (addonId: string, isChecked: boolean) => {
-    setPremiumDeliverables(prev => {
-      const copy = { ...prev };
-      if (isChecked) {
-        copy[addonId] = true;
-      } else {
-        delete copy[addonId];
-      }
-      return copy;
-    });
-  };
-
-  const handleFunnelFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files) {
-      const files = Array.from(e.target.files) as File[];
-      const newFiles = files.map((file: File, idx: number) => ({
-        id: `file-${Date.now()}-${idx}`,
-        name: file.name,
-        size: (file.size / (1024 * 1024)).toFixed(2) + ' MB'
-      }));
-      setAttachedFiles(prev => [...prev, ...newFiles]);
-    }
-  };
-
-  const removeUploadedFile = (fileId: string) => {
-    setAttachedFiles(prev => prev.filter(f => f.id !== fileId));
-  };
-
-  const getTutorForSubject = (subj: string) => {
-    if (subj === 'Mathematics') return tutors.find(t => t.id === 'tutor_liam') || tutors[0];
-    if (subj === 'Science') return tutors.find(t => t.id === 'tutor_siobhan') || tutors.find(t => t.id === 'tutor_nz_kiri') || tutors[0];
-    if (subj === 'Computer Science') return tutors.find(t => t.id === 'tutor_james') || tutors[0];
-    if (subj === 'Humanities & Social Sciences') return tutors.find(t => t.id === 'tutor_clara') || tutors[0];
-    if (subj === 'Business & Finance') return tutors.find(t => t.id === 'tutor_chloe') || tutors[0];
-    if (subj === 'Languages & Test Prep') return tutors.find(t => t.id === 'tutor_clara') || tutors[0];
-    return tutors[0];
-  };
-
-  const calculateMatchIndex = () => {
-    let score = 0;
-    if (selectedServiceKey) score += 25;
-    if (selectedSubject) score += 25;
-    if (selectedSubtopic) score += 15;
-    if (attachedFiles.length > 0) score += 15;
-    if (studentName.trim() && studentEmail.trim()) score += 20;
-    return score > 100 ? 100 : score;
-  };
-
-  const navigateWizard = (direction: number) => {
-    setAlertMessage('');
-    if (direction === 1) {
-      if (funnelStep === 1) {
-        setFunnelStep(2);
-      } else if (funnelStep === 2) {
-        if (!selectedSubject) {
-          setAlertMessage('Please pick an academic subject Category.');
-          return;
-        }
-        if (!selectedSubtopic) {
-          setAlertMessage('Please pick a specific focus subtopic.');
-          return;
-        }
-        setFunnelStep(3);
-      } else if (funnelStep === 3) {
-        setFunnelStep(4);
-      } else if (funnelStep === 4) {
-        setFunnelStep(5);
-      } else if (funnelStep === 5) {
-        if (!studentName.trim()) {
-          setAlertMessage("Please specify your Student Name.");
-          return;
-        }
-        if (!studentEmail.trim()) {
-          setAlertMessage("Please specify your Contact Email.");
-          return;
-        }
-        executeMatchingPipeline();
-      }
-    } else {
-      setFunnelStep(prev => prev - 1);
-    }
-  };
-
-  const executeMatchingPipeline = () => {
-    setMatchingPhase('loading');
-    setVettingStepOneCompleted(false);
-    setVettingStepTwoCompleted(false);
-    setVettingStepThreeCompleted(false);
-
-    // Simulated procedural steps
-    setTimeout(() => {
-      setVettingStepOneCompleted(true);
-    }, 1100);
-
-    setTimeout(() => {
-      setVettingStepTwoCompleted(true);
-    }, 2200);
-
-    setTimeout(() => {
-      setVettingStepThreeCompleted(true);
-    }, 3300);
-
-    setTimeout(() => {
-      setMatchingPhase('success');
-
-      const matchedTutor = getTutorForSubject(selectedSubject);
-      const serviceData = SERVICES[selectedServiceKey];
-      
-      const upgrades = Object.keys(premiumDeliverables)
-        .map(id => {
-          const item = serviceData.deliverables.find(d => d.id === id);
-          return item ? item.name : id;
-        })
-        .join(', ');
-
-      const instructionsBody = `
-=== University-Tutors Matching Funnel Request ===
-TUTORING SERVICE PATTERN: ${serviceData.title}
-ACADEMIC SUBTOPIC FOCUS: ${selectedSubtopic}
-STUDENT LEVEL: ${studentLevel}
-EXPECTED DURATION VALUE: ${selectedDuration} ${serviceData.durationUnit}
-VETTING URGENCY PRIORITY: ${priorityType.toUpperCase()}
-DELIVERABLE UPGRADES SELECTED: ${upgrades || 'None'}
-STUDENT DETAILED GOALS: ${studentGoal || 'None Specified'}
-CUSTOM SYLLABUS DIRECTIVES: ${customFocusInput || 'None'}
-CONTACT EMAIL COMPASS: ${studentEmail}
-      `.trim();
-
-      // Submit actual assignment data payload back to PostgreSQL backend
-      onSubmitAssignment({
-        studentId: currentUser.id,
-        title: `${selectedSubject} (${selectedSubtopic}) ${serviceData.title}`,
-        subject: selectedSubject,
-        deadline: selectedDate,
-        wordCount: selectedServiceKey === 'writing' ? selectedDuration * 275 : 1200,
-        referenceStyle: selectedServiceKey === 'writing' ? 'APA Style' : 'Not Applicable',
-        sourcesCount: 3,
-        instructions: instructionsBody,
-        tutorId: matchedTutor ? matchedTutor.id : undefined,
-        fileUrls: attachedFiles.map(f => f.name.startsWith('http') ? f.name : `https://universitytutors.com/uploads/${encodeURIComponent(f.name)}`),
-        fileNames: attachedFiles.map(f => f.name)
-      });
-
-    }, 4000);
-  };
-
-  const closeSuccessModal = () => {
-    // Record matched variables before clearing
-    const subject = selectedSubject || 'General Study Help';
-    const subtopic = selectedSubtopic || 'General';
-    const duration = selectedDuration || '4 Hours';
-    
-    // e-Optimal Matching Algorithm: automatically match with best qualified specialist
-    const matchedTutor = getTutorForSubject(subject) || tutors[0];
-    const targetTutorId = matchedTutor ? matchedTutor.id : 'admin_shaka';
-
-    setMatchingPhase('idle');
-    setVettingStepOneCompleted(false);
-    setVettingStepTwoCompleted(false);
-    setVettingStepThreeCompleted(false);
-    
-    // Clear forms
-    setSelectedSubject('');
-    setSelectedSubtopic('');
-    setCustomFocusInput('');
-    setStudentGoal('');
-    setAttachedFiles([]);
-    setPremiumDeliverables({});
-    setFunnelStep(1);
-    
-    // Directly route to Chat tab
-    setActiveTab('chat');
-
-    // Trigger dynamic Tutor Chat with the matched specialist & route directly
-    const tutorDisplayName = matchedTutor ? matchedTutor.name : 'Tutor';
-    const messageTemplate = `Hi ${tutorDisplayName}, I was just automatically matched with you through the e-Optimal Matching System for "${subject}" (${subtopic}, scheduled for ${duration}). My Final Draft brief has been secured in our platform workspace. Looking forward to your guidance!`;
-    const createdChat = onOpenChat(targetTutorId, messageTemplate);
-
-    if (createdChat && createdChat.id) {
-      setLocalSelectedChatId(createdChat.id);
-      if (onSubscribeToChatDetails) onSubscribeToChatDetails(createdChat.id);
-    } else {
-      setTimeout(() => {
-        const found = chats.find(c => 
-          (c.studentId === currentUser.id && c.tutorId === targetTutorId) ||
-          (c.studentId === targetTutorId && c.tutorId === currentUser.id)
-        );
-        if (found) {
-          setLocalSelectedChatId(found.id);
-          if (onSubscribeToChatDetails) onSubscribeToChatDetails(found.id);
-        }
-      }, 50);
-    }
-  };
-
-  const submitInlineRequest = (e: React.FormEvent) => {
-    e.preventDefault();
-    executeMatchingPipeline();
-  };
-
   // Filter assignments by debounced text search if provided
   const searchedAssignments = studentAssignments.filter(a => 
     a.title.toLowerCase().includes(debouncedSearchQuery.toLowerCase()) ||
@@ -1239,7 +843,10 @@ CONTACT EMAIL COMPASS: ${studentEmail}
       (activeTab === 'notifications' && userNotifications.length === 0));
 
   return (
-    <div className="flex min-h-screen bg-[#FDF8F6]/30 font-sans" id="student-portal-wrapper">
+    <div
+      className={`flex bg-[#FDF8F6]/30 font-sans ${activeTab === 'chat' ? 'h-[100dvh] overflow-hidden' : 'min-h-screen'}`}
+      id="student-portal-wrapper"
+    >
 
       {/* MOBILE HEADER BAR */}
       <div className="lg:hidden fixed top-0 left-0 right-0 h-16 bg-white border-b border-gray-100 flex items-center justify-between px-4 z-40">
@@ -1377,7 +984,11 @@ CONTACT EMAIL COMPASS: ${studentEmail}
       {/* ============================================== */}
       {/* MAIN VIEWPORT FRAME (SCROLLABLE RIGHT PANEL)  */}
       {/* ============================================== */}
-      <main className="flex-1 bg-[#FAF9F7] min-h-screen flex flex-col relative pt-16 lg:pt-0 overflow-x-hidden">
+      <main
+        className={`flex-1 bg-[#FAF9F7] flex flex-col relative pt-16 lg:pt-0 overflow-x-hidden ${
+          activeTab === 'chat' ? 'h-full min-h-0 overflow-hidden' : 'min-h-screen'
+        }`}
+      >
         
         {/* ============================================== */}
         {/* TOP STATUSHEADER OF THE DASHBOARD             */}
@@ -1533,7 +1144,14 @@ CONTACT EMAIL COMPASS: ${studentEmail}
         {/* ============================================== */}
         {/* WORKSPACE AREA RENDERING VARIOUS VIEWS        */}
         {/* ============================================== */}
-        <div className={`flex-1 ${activeTab === 'chat' ? 'p-3 sm:p-4 md:p-6 overflow-hidden flex flex-col' : 'p-5 md:p-8 overflow-y-auto space-y-8'}`} id="portal-content-body">
+        <div
+          className={`flex-1 ${
+            activeTab === 'chat'
+              ? 'p-2 sm:p-4 md:p-6 min-h-0 overflow-hidden flex flex-col'
+              : 'p-4 sm:p-5 md:p-8 overflow-y-auto space-y-8'
+          }`}
+          id="portal-content-body"
+        >
           <ErrorBoundary compact resetKey={activeTab} onReset={() => onLoadTab?.(activeTab, true)}>
           {(activeTabState?.error || (activeTab === 'chat' && chatError)) && (
             <ErrorStatePanel
@@ -1806,922 +1424,23 @@ CONTACT EMAIL COMPASS: ${studentEmail}
           )}
 
           {/* ================================== */}
-          {/* TAB 2: UNIVERSALLY VETTED MATCHING FUNNEL */}
+          {/* TAB 2: MOBILE-FIRST STUDENT ONBOARDING WIZARD */}
           {/* ================================== */}
           {activeTab === 'new_request' && (
-            <div className="flex flex-col lg:flex-row gap-8 justify-center items-start animate-fade-in" id="funnel-workflow-container">
-              
-              {/* LEFT COLUMN: 5-STEP INTERACTIVE CONVERSION WIZARD */}
-              <div className="flex-1 w-full bg-white border border-orange-100/50 rounded-[32px] shadow-xl shadow-orange-100/5 p-6 md:p-8 flex flex-col justify-between min-h-[620px] relative overflow-hidden text-left">
-                {/* Visual Top Decorative Accent Bar */}
-                <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-orange-500 via-amber-400 to-orange-600"></div>
-
-                <div>
-                  {/* Onboarding Header Dashboard Info */}
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-gray-100 pb-5 mb-6">
-                    <div className="flex items-center space-x-3 text-left">
-                      <div className="p-2.5 bg-orange-50 text-orange-600 rounded-xl">
-                        <GraduationCap className="w-5.5 h-5.5" />
-                      </div>
-                      <div>
-                        <span className="text-base font-black tracking-tight text-gray-900 block leading-tight">University-Tutors</span>
-                        <span className="text-[9px] block text-orange-600 font-extrabold tracking-widest uppercase leading-none mt-1">Cohort Onboarding</span>
-                      </div>
-                    </div>
-                    <div className="flex items-center space-x-3.5 self-start sm:self-center">
-                      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 bg-emerald-50 text-emerald-700 rounded-full text-[9px] font-black uppercase tracking-wider">
-                        <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse"></span> Match Engine Online
-                      </span>
-                      <span className="text-[11.5px] font-bold text-orange-600 bg-orange-50/50 px-2.5 py-0.5 rounded-lg">
-                        Step {funnelStep} of 5 ({funnelStep * 20}%)
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* Progressive Stepper Progress Bar */}
-                  <div className="w-full bg-gray-100 h-1.5 rounded-full mb-8 overflow-hidden relative">
-                    <div 
-                      className="h-full bg-gradient-to-r from-orange-500 via-amber-400 to-orange-600 rounded-full transition-all duration-500" 
-                      style={{ width: `${funnelStep * 20}%` }}
-                    ></div>
-                  </div>
-
-                  {/* Realtime Alert Panel */}
-                  {alertMessage && (
-                    <div className="mb-6 p-4 rounded-xl bg-amber-50 border border-amber-150 text-amber-900 flex items-start gap-3 transition-all">
-                      <AlertTriangle className="w-4.5 h-4.5 text-amber-600 shrink-0 mt-0.5" />
-                      <div className="text-left">
-                        <h4 className="font-extrabold text-[11px] uppercase tracking-wider text-amber-850">Onboarding Checklist</h4>
-                        <p className="text-xs mt-0.5 text-amber-800 font-semibold">{alertMessage}</p>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* FUNNEL PANEL 1: CHOOSE TARGET SERVICE COHORT */}
-                  {funnelStep === 1 && (
-                    <div className="space-y-6 animate-fade-in text-left">
-                      <div className="mb-6">
-                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md text-[9px] font-black uppercase tracking-wider bg-orange-50 text-orange-700">
-                          <Sparkles className="w-3 h-3" /> Step 1: Learning Pathway
-                        </span>
-                        <h2 className="text-2xl font-black text-gray-900 mt-2.5 tracking-tight">How would you like to prepare?</h2>
-                        <p className="text-xs text-gray-500 mt-1.5 leading-relaxed">Select the core tutoring model you need today. This initializes your matching algorithm.</p>
-                      </div>
-
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <button 
-                          type="button" 
-                          onClick={() => selectServicePathway('1-1-lesson')} 
-                          className={`text-left relative block p-5 border-2 rounded-2xl bg-white hover:bg-orange-50/5 hover:border-orange-500 transition-all cursor-pointer group ${
-                            selectedServiceKey === '1-1-lesson' ? 'border-orange-500' : 'border-gray-105 hover:border-orange-200'
-                          }`}
-                        >
-                          <div className="flex items-center justify-between mb-3.5">
-                            <div className="p-2.5 bg-orange-50 text-orange-600 rounded-xl">
-                              <Users className="w-5.5 h-5.5" />
-                            </div>
-                            <span className="inline-flex items-center rounded-full bg-orange-100/60 px-2 py-0.5 text-[8.5px] font-black uppercase tracking-wider text-orange-755 font-mono">
-                              Live Sync
-                            </span>
-                          </div>
-                          <h3 className="font-bold text-gray-950 text-sm">1-on-1 Lesson Tutoring</h3>
-                          <p className="text-[11.5px] text-gray-500 mt-1 leading-relaxed">Live face-to-face classes designed directly around your upcoming lecture curriculum.</p>
-                          <div className="mt-4 pt-3 border-t border-gray-50 flex items-center justify-between text-[9px] uppercase font-black text-gray-400 font-mono tracking-wider">
-                            <span>Matching Window</span>
-                            <span className="text-orange-600 font-extrabold">Instant Allocation</span>
-                          </div>
-                        </button>
-
-                        <button 
-                          type="button" 
-                          onClick={() => selectServicePathway('assignment')} 
-                          className={`text-left relative block p-5 border-2 rounded-2xl bg-white hover:bg-orange-50/5 hover:border-orange-500 transition-all cursor-pointer group ${
-                            selectedServiceKey === 'assignment' ? 'border-orange-500' : 'border-gray-105 hover:border-orange-200'
-                          }`}
-                        >
-                          <div className="flex items-center justify-between mb-3.5">
-                            <div className="p-2.5 bg-orange-50 text-orange-600 rounded-xl">
-                              <CheckSquare className="w-5.5 h-5.5" />
-                            </div>
-                            <span className="inline-flex items-center rounded-full bg-orange-100/60 px-2 py-0.5 text-[8.5px] font-black uppercase tracking-wider text-orange-755 font-mono">
-                              Concept Checklist
-                            </span>
-                          </div>
-                          <h3 className="font-bold text-gray-950 text-sm">Assignment Tutoring</h3>
-                          <p className="text-[11.5px] text-gray-500 mt-1 leading-relaxed">Targeted reviews, step-by-step concepts prep, and practice problem milestones diagnostics.</p>
-                          <div className="mt-4 pt-3 border-t border-gray-50 flex items-center justify-between text-[9px] uppercase font-black text-gray-400 font-mono tracking-wider">
-                            <span>Matching Window</span>
-                            <span className="text-orange-600 font-extrabold">&lt; 15 Mins SLA</span>
-                          </div>
-                        </button>
-
-                        <button 
-                          type="button" 
-                          onClick={() => selectServicePathway('coursework')} 
-                          className={`text-left relative block p-5 border-2 rounded-2xl bg-white hover:bg-orange-50/5 hover:border-orange-500 transition-all cursor-pointer group ${
-                            selectedServiceKey === 'coursework' ? 'border-orange-500' : 'border-gray-105 hover:border-orange-200'
-                          }`}
-                        >
-                          <div className="flex items-center justify-between mb-3.5">
-                            <div className="p-2.5 bg-orange-50 text-orange-600 rounded-xl">
-                              <Calendar className="w-5.5 h-5.5" />
-                            </div>
-                            <span className="inline-flex items-center rounded-full bg-orange-100/60 px-2 py-0.5 text-[8.5px] font-black uppercase tracking-wider text-orange-755 font-mono">
-                              Multi-Week
-                            </span>
-                          </div>
-                          <h3 className="font-bold text-gray-950 text-sm">Coursework Tutoring</h3>
-                          <p className="text-[11.5px] text-gray-500 mt-1 leading-relaxed">Continuous tutor check-ins, curriculum planning maps, and recurring exam module preparation.</p>
-                          <div className="mt-4 pt-3 border-t border-gray-50 flex items-center justify-between text-[9px] uppercase font-black text-gray-400 font-mono tracking-wider">
-                            <span>Matching speed</span>
-                            <span className="text-orange-600 font-extrabold">&lt; 30 Mins SLA</span>
-                          </div>
-                        </button>
-
-                        <button 
-                          type="button" 
-                          onClick={() => selectServicePathway('writing')} 
-                          className={`text-left relative block p-5 border-2 rounded-2xl bg-white hover:bg-orange-50/5 hover:border-orange-500 transition-all cursor-pointer group ${
-                            selectedServiceKey === 'writing' ? 'border-orange-500' : 'border-gray-105 hover:border-orange-200'
-                          }`}
-                        >
-                          <div className="flex items-center justify-between mb-3.5">
-                            <div className="p-2.5 bg-orange-50 text-orange-600 rounded-xl">
-                              <PenTool className="w-5.5 h-5.5" />
-                            </div>
-                            <span className="inline-flex items-center rounded-full bg-orange-100/60 px-2 py-0.5 text-[8.5px] font-black uppercase tracking-wider text-orange-755 font-mono">
-                              Line Review
-                            </span>
-                          </div>
-                          <h3 className="font-bold text-gray-950 text-sm">Essay &amp; Writing Assistance</h3>
-                          <p className="text-[11.5px] text-gray-500 mt-1 leading-relaxed">Argument planning mapping, formatting checklist review, and stylistic revisions tutoring.</p>
-                          <div className="mt-4 pt-3 border-t border-gray-50 flex items-center justify-between text-[9px] uppercase font-black text-gray-400 font-mono tracking-wider">
-                            <span>Matching speed</span>
-                            <span className="text-orange-600 font-extrabold">&lt; 10 Mins SLA</span>
-                          </div>
-                        </button>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* FUNNEL PANEL 2: ACADEMIC FOCUS CATEGORIES & DEEP SUBTOPICS */}
-                  {funnelStep === 2 && (
-                    <div className="space-y-6 animate-fade-in text-left">
-                      <div className="mb-6">
-                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md text-[9px] font-black uppercase tracking-wider bg-amber-50 text-amber-700">
-                          <BookOpen className="w-3" /> Step 2: Subject Domain
-                        </span>
-                        <h2 className="text-2xl font-black text-gray-900 mt-2.5 tracking-tight">What are we studying today?</h2>
-                        <p className="text-xs text-gray-500 mt-1.5 leading-relaxed">Click your primary subject field. Once highlighted, pick your target subtopic focus to advance.</p>
-                      </div>
-
-                      {/* Primary Subject Grid */}
-                      <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                        {[
-                          { key: 'Mathematics', label: 'Mathematics', icon: <Binary className="w-5 h-5" /> },
-                          { key: 'Science', label: 'Science', icon: <Beaker className="w-5 h-5" /> },
-                          { key: 'Computer Science', label: 'Comp Science', icon: <Terminal className="w-5 h-5" /> },
-                          { key: 'Humanities & Social Sciences', label: 'Humanities', icon: <BookMarked className="w-5 h-5" /> },
-                          { key: 'Business & Finance', label: 'Business & Finance', icon: <TrendingUp className="w-5 h-5" /> },
-                          { key: 'Languages & Test Prep', label: 'Languages & Prep', icon: <Languages className="w-5 h-5" /> }
-                        ].map(sub => (
-                          <button
-                            key={sub.key}
-                            type="button"
-                            onClick={() => selectFunnelCategory(sub.key)}
-                            className={`p-4 border-2 rounded-xl flex flex-col items-center gap-2.5 transition-all cursor-pointer ${
-                              selectedSubject === sub.key
-                                ? 'border-orange-500 bg-orange-50/20 text-orange-950 shadow-md scale-[1.01]'
-                                : 'border-gray-100 bg-white hover:border-orange-100 text-gray-700'
-                            }`}
-                          >
-                            <div className="p-2 bg-orange-50 text-orange-600 rounded-lg">
-                              {sub.icon}
-                            </div>
-                            <span className="text-xs font-bold text-center leading-tight">{sub.label}</span>
-                          </button>
-                        ))}
-                      </div>
-
-                      {/* Expanded Subtopic board */}
-                      {selectedSubject && (
-                        <div className="p-5 bg-gray-50/70 border border-gray-100 rounded-2xl animate-fade-in">
-                          <span className="block text-[10.5px] font-black text-gray-400 tracking-wider uppercase mb-3 font-mono">
-                            Select Subtopic Focus (Auto-advances once clicked):
-                          </span>
-                          <div className="flex flex-wrap gap-2">
-                            {SUBJECT_SUBTOPICS[selectedSubject]?.map(subtopic => (
-                              <button
-                                key={subtopic}
-                                type="button"
-                                onClick={() => selectFunnelSubtopic(subtopic)}
-                                className={`inline-flex items-center rounded-xl px-3.5 py-1.5 text-xs font-semibold cursor-pointer transition-all ${
-                                  selectedSubtopic === subtopic
-                                    ? 'bg-orange-500 text-white'
-                                    : 'bg-white border text-gray-700 hover:border-orange-400 hover:bg-orange-50/20'
-                                }`}
-                              >
-                                {selectedSubtopic === subtopic ? (
-                                  <Check className="w-3.5 h-3.5 mr-1.5 text-white" />
-                                ) : (
-                                  <span className="w-1.5 h-1.5 rounded-full bg-orange-500 mr-2"></span>
-                                )}
-                                <span>{subtopic}</span>
-                              </button>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Manual focus notes input */}
-                      <div className="space-y-1">
-                        <label htmlFor="funnel-custom-spec" className="text-[10px] font-black text-gray-500 uppercase tracking-widest block font-mono">
-                          Specific topics or syllabus notes (Optional)
-                        </label>
-                        <input 
-                          type="text" 
-                          id="funnel-custom-spec"
-                          value={customFocusInput}
-                          onChange={(e) => setCustomFocusInput(e.target.value)}
-                          placeholder="e.g. Preparing for derivative proofs, MLA bibliography formatting assistance, etc..."
-                          className="w-full bg-gray-55/60 border border-gray-200 focus:bg-white focus:border-orange-500 rounded-xl py-3 px-4 text-xs font-medium focus:outline-none transition-all"
-                        />
-                      </div>
-                    </div>
-                  )}
-
-                  {/* FUNNEL PANEL 3: study TIMELINE & UNITS SCHEDULING */}
-                  {funnelStep === 3 && (
-                    <div className="space-y-6 animate-fade-in text-left">
-                      <div className="mb-6">
-                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md text-[9px] font-black uppercase tracking-wider bg-orange-55 text-orange-700">
-                          <Calendar className="w-3" /> Step 3: Study Duration
-                        </span>
-                        <h2 className="text-2xl font-black text-gray-900 mt-2.5 tracking-tight">Timeline &amp; Schedule</h2>
-                        <p className="text-xs text-gray-500 mt-1.5 leading-relaxed">Customize your study duration limit and select your target timeline delivery deadline.</p>
-                      </div>
-
-                      {/* Customized Orange Range Slider */}
-                      <div className="p-5 bg-gray-50/60 border border-gray-100 rounded-2xl space-y-4">
-                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5">
-                          <div>
-                            <span className="block text-xs font-black text-gray-800 uppercase tracking-wider font-mono">
-                              {SERVICES[selectedServiceKey]?.durationLabel}
-                            </span>
-                            <p className="text-[10px] text-gray-400 font-bold mt-0.5 uppercase tracking-wider">Drag to adjust required match units.</p>
-                          </div>
-                          <span className="inline-flex items-center rounded-xl bg-orange-50 border border-orange-100/50 px-3.5 py-1.5 text-xs font-black text-orange-700">
-                            {selectedDuration} {SERVICES[selectedServiceKey]?.durationUnit}
-                          </span>
-                        </div>
-
-                        <input 
-                          type="range" 
-                          id="match-dur-slider"
-                          min={SERVICES[selectedServiceKey]?.durationMin}
-                          max={SERVICES[selectedServiceKey]?.durationMax}
-                          step={SERVICES[selectedServiceKey]?.durationStep}
-                          value={selectedDuration}
-                          onChange={(e) => setSelectedDuration(parseFloat(e.target.value))}
-                          className="w-full h-2 rounded-lg appearance-none cursor-pointer accent-orange-500 bg-orange-100" 
-                        />
-
-                        <div className="flex justify-between text-[9px] text-gray-400 font-black tracking-wider uppercase font-mono">
-                          <span>{SERVICES[selectedServiceKey]?.durationMin} unit(s)</span>
-                          <span>{SERVICES[selectedServiceKey]?.durationMax} unit(s)</span>
-                        </div>
-
-                        {/* Slider dynamic Coach advice bubble */}
-                        <div className="pt-4 border-t border-gray-150 flex items-start gap-2.5">
-                          <div className="p-1 px-1.5 text-orange-600 bg-white border rounded-lg shadow-3xs shrink-0">
-                            <MessageSquare className="w-3.5 h-3.5" />
-                          </div>
-                          <p className="text-xs text-gray-655 leading-relaxed">
-                            <span className="font-extrabold text-orange-600">Coach Insight: </span>
-                            {(() => {
-                              const serviceData = SERVICES[selectedServiceKey];
-                              const adviceKeys = Object.keys(serviceData.advice).map(Number).sort((a,b) => b-a);
-                              for (let k of adviceKeys) {
-                                if (selectedDuration >= k) {
-                                  return (serviceData.advice as any)[k];
-                                }
-                              }
-                              return 'Adjusting values...';
-                            })()}
-                          </p>
-                        </div>
-                      </div>
-
-                      {/* Date selection & Priority level Select boxes */}
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div className="space-y-1">
-                          <label htmlFor="funnel-date" className="text-[10px] font-black text-gray-500 uppercase tracking-widest font-mono block">
-                            Target Delivery / Class Date
-                          </label>
-                          <input 
-                            type="date" 
-                            id="funnel-date"
-                            value={selectedDate}
-                            onChange={(e) => setSelectedDate(e.target.value)}
-                            required
-                            className="w-full bg-white border-2 border-gray-100 rounded-xl py-3 px-4 text-xs font-semibold focus:outline-none focus:border-orange-500 transition-all font-mono"
-                          />
-                        </div>
-
-                        <div className="space-y-1">
-                          <label htmlFor="funnel-priority" className="text-[10px] font-black text-gray-500 uppercase tracking-widest font-mono block">
-                            Vetting Urgency SLA
-                          </label>
-                          <select 
-                            id="funnel-priority"
-                            value={priorityType}
-                            onChange={(e) => setPriorityType(e.target.value)}
-                            className="w-full bg-white border-2 border-gray-100 rounded-xl py-3 px-4 text-xs font-semibold focus:outline-none focus:border-orange-500 transition-all"
-                          >
-                            <option value="standard">Standard Priority (24h Match Window)</option>
-                            <option value="high">High Priority (Urgent 4h Match Window)</option>
-                            <option value="critical">Critical Emergency (Immediate 1h Match Window)</option>
-                          </select>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* FUNNEL PANEL 4: deliverables AND drag-DROP uploads */}
-                  {funnelStep === 4 && (
-                    <div className="space-y-6 animate-fade-in text-left">
-                      <div className="mb-6">
-                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md text-[9px] font-black uppercase tracking-wider bg-orange-50 text-orange-700">
-                          <CheckSquare className="w-3" /> Step 4: Deliverables
-                        </span>
-                        <h2 className="text-2xl font-black text-gray-900 mt-2.5 tracking-tight">Select Optional Deliverables</h2>
-                        <p className="text-xs text-gray-500 mt-1.5 leading-relaxed">Select any additional services you require. These will be custom compiled by your assigned expert.</p>
-                      </div>
-
-                      {/* Checklist Cards Grid matching skeuomorphic checkmarks */}
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3" id="match-checklist-grid">
-                        {SERVICES[selectedServiceKey]?.deliverables.map(del => (
-                          <div 
-                            key={del.id}
-                            onClick={() => !del.included && toggleFunnelDeliverable(del.id, !premiumDeliverables[del.id])}
-                            className={`p-4 border-2 rounded-xl transition-all select-none relative flex flex-col justify-between ${
-                              del.included 
-                                ? 'border-orange-100 bg-orange-50/15'
-                                : premiumDeliverables[del.id]
-                                  ? 'border-orange-500 bg-orange-50/20 ring-4 ring-orange-500/10 shadow-xs'
-                                  : 'border-gray-50 hover:border-gray-200 bg-white cursor-pointer'
-                            }`}
-                          >
-                            <div className="flex items-center justify-between gap-1.5 mb-1.5">
-                              <span className={`rounded-md px-1.5 py-0.5 text-[8.5px] font-bold tracking-wider uppercase border leading-none ${
-                                del.included
-                                  ? 'bg-emerald-50 text-emerald-700 border-emerald-100'
-                                  : 'bg-slate-50 text-slate-500 border-slate-100'
-                              }`}>
-                                {del.included ? 'Included with Plan' : 'Optional Upgrade'}
-                              </span>
-                              
-                              <div className="flex items-center justify-center">
-                                {del.included ? (
-                                  <div className="w-4.5 h-4.5 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center">
-                                    <Check className="w-3 h-3 stroke-[3]" />
-                                  </div>
-                                ) : premiumDeliverables[del.id] ? (
-                                  <div className="w-4.5 h-4.5 bg-orange-500 text-white rounded-md flex items-center justify-center shadow-xs">
-                                    <Check className="w-3 h-3 stroke-[4]" />
-                                  </div>
-                                ) : (
-                                  <div className="w-4 h-4 bg-white border border-gray-300 rounded-md hover:border-gray-400"></div>
-                                )}
-                              </div>
-                            </div>
-
-                            <div className="mt-2 text-left">
-                              <h4 className="text-[12.5px] font-black text-gray-850 leading-snug">{del.name}</h4>
-                              <p className="text-[10px] text-gray-400 font-semibold leading-normal mt-1">{del.desc}</p>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-
-                      {/* Drag-drop support files */}
-                      <div className="border-t border-gray-100 pt-5 space-y-3">
-                        <div className="flex items-start gap-2.5">
-                          <div className="p-1.5 bg-orange-50 text-orange-600 rounded-lg shrink-0">
-                            <Paperclip className="w-4 h-4" />
-                          </div>
-                          <div>
-                            <span className="block text-xs font-black text-gray-850 uppercase tracking-widest font-mono">
-                              Supporting Academic Sources
-                            </span>
-                            <p className="text-[10.5px] text-gray-400 mt-0.5">Attach custom lecture slides, rubric details, prompt documents, or templates.</p>
-                          </div>
-                        </div>
-
-                        {/* Interactive upload trigger */}
-                        <div 
-                          onClick={() => document.getElementById('funnel-uploader-file')?.click()}
-                          className="border-2 border-dashed border-gray-200 hover:border-orange-400 rounded-2xl p-6 transition-all text-center bg-gray-50/50 hover:bg-white cursor-pointer group shadow-3xs"
-                        >
-                          <input 
-                            type="file" 
-                            id="funnel-uploader-file" 
-                            className="hidden" 
-                            multiple 
-                            accept=".pdf,.doc,.docx,.zip,.rar,.ppt,.pptx,image/*,audio/*,video/*,application/*"
-                            onChange={handleFunnelFileSelect}
-                          />
-                          <div className="flex flex-col items-center justify-center space-y-2">
-                            <Upload className="w-6.5 h-6.5 text-gray-400 group-hover:text-orange-600 group-hover:scale-105 transition-all" />
-                            <div>
-                              <p className="text-xs font-bold text-gray-700">Drag files here, or <span className="text-orange-600 font-extrabold group-hover:text-orange-700 underline">browse folders</span></p>
-                              <p className="text-[9.5px] text-gray-400 font-black mt-1 font-mono tracking-wider uppercase">PDF, DOCS, ZIP, Image, PPT, Media (Max 15MB)</p>
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* File roster list */}
-                        {attachedFiles.length > 0 && (
-                          <div className="space-y-2">
-                            <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest block font-mono">
-                              Attached References ({attachedFiles.length})
-                            </span>
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                              {attachedFiles.map(file => (
-                                <div key={file.id} className="flex items-center justify-between p-2.5 border border-gray-100 bg-white rounded-xl shadow-3xs animate-fade-in text-[11.5px]">
-                                  <div className="flex items-center space-x-2.5 truncate w-[80%]">
-                                    <div className="p-1.5 bg-rose-50 text-rose-600 rounded-lg">
-                                      <FileText className="w-3.5 h-3.5 text-rose-600" />
-                                    </div>
-                                    <div className="truncate text-left leading-none">
-                                      <p className="font-extrabold text-gray-800 truncate leading-tight mb-0.5">{file.name}</p>
-                                      <span className="text-[9.5px] text-gray-400 font-mono font-bold uppercase">{file.size}</span>
-                                    </div>
-                                  </div>
-                                  <button 
-                                    type="button" 
-                                    onClick={(e) => { e.stopPropagation(); removeUploadedFile(file.id); }}
-                                    className="p-1.5 text-gray-400 hover:text-red-500 rounded-lg hover:bg-gray-50"
-                                  >
-                                    <Trash2 className="w-3.5 h-3.5" />
-                                  </button>
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* FUNNEL PANEL 5: LEAD CONTACT PROFILE & FINAL DRAFT ROUTING */}
-                  {funnelStep === 5 && (
-                    <div className="space-y-6 animate-fade-in text-left">
-                      <div className="mb-6">
-                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md text-[9px] font-black uppercase tracking-wider bg-orange-55 text-orange-700">
-                          <UserIcon className="w-3" /> Step 5: Final Draft &amp; e-Optimal Match
-                        </span>
-                        <h2 className="text-2xl font-black text-gray-900 mt-2.5 tracking-tight">Final Draft Review &amp; e-Optimal Match</h2>
-                        <p className="text-xs text-gray-500 mt-1.5 leading-relaxed">
-                          Your assignment brief is formatted into its Final Draft stage. The e-Optimal matching algorithm will secure your academic lead and route this section directly into your designated tutor's active chat.
-                        </p>
-                      </div>
-
-                      <div className="p-3.5 bg-emerald-50/70 border border-emerald-200/80 rounded-2xl flex items-center gap-3">
-                        <div className="p-2 bg-emerald-100 text-emerald-700 rounded-xl">
-                          <Sparkles className="w-4 h-4 animate-pulse" />
-                        </div>
-                        <div className="text-xs">
-                          <p className="font-bold text-emerald-900">e-Optimal Lead Routing Ready</p>
-                          <p className="text-emerald-700 text-[11px]">Submitting instantly connects you to your matched specialist with continuous escrow protection.</p>
-                        </div>
-                      </div>
-
-                      <div className="space-y-4">
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                          <div className="space-y-1">
-                            <label htmlFor="student-name" className="text-[10px] font-black text-gray-500 uppercase tracking-widest font-mono block">
-                              Student's Full Name
-                            </label>
-                            <input 
-                              type="text" 
-                              id="student-name"
-                              value={studentName}
-                              onChange={(e) => setStudentName(e.target.value)}
-                              placeholder="Alex Mercer"
-                              className="w-full bg-white border-2 border-gray-100 focus:border-orange-500 rounded-xl py-3 px-4 text-xs font-semibold focus:outline-none transition-all placeholder:text-gray-300"
-                            />
-                          </div>
-
-                          <div className="space-y-1">
-                            <label htmlFor="student-email" className="text-[10px] font-black text-gray-500 uppercase tracking-widest font-mono block">
-                              Contact Email Address
-                            </label>
-                            <input 
-                              type="email" 
-                              id="student-email"
-                              value={studentEmail}
-                              onChange={(e) => setStudentEmail(e.target.value)}
-                              placeholder="alex@university.edu"
-                              className="w-full bg-white border-2 border-gray-100 focus:border-orange-500 rounded-xl py-3 px-4 text-xs font-semibold focus:outline-none transition-all placeholder:text-gray-300"
-                            />
-                          </div>
-                        </div>
-
-                        <div className="space-y-1">
-                          <label htmlFor="student-level" className="text-[10px] font-black text-gray-500 uppercase tracking-widest block font-mono">
-                            Current Study Level
-                          </label>
-                          <select 
-                            id="student-level"
-                            value={studentLevel}
-                            onChange={(e) => setStudentLevel(e.target.value)}
-                            className="w-full bg-white border-2 border-gray-100 rounded-xl py-3 px-4 text-xs font-semibold focus:outline-none focus:border-orange-500 transition-all cursor-pointer"
-                          >
-                            <option value="College">College / Undergraduate Level</option>
-                            <option value="High School">High School / AP Prep Level</option>
-                            <option value="Graduate School">Graduate / Doctoral Level</option>
-                            <option value="Professional">Professional Development / Adult Learner</option>
-                          </select>
-                        </div>
-
-                        <div className="space-y-1">
-                          <label htmlFor="student-goal" className="text-[10px] font-black text-gray-500 uppercase tracking-widest font-mono block">
-                            What is your ultimate grade/study goal? (Optional)
-                          </label>
-                          <textarea 
-                            id="student-goal"
-                            rows={3}
-                            value={studentGoal}
-                            onChange={(e) => setStudentGoal(e.target.value)}
-                            placeholder="e.g. I need to achieve an A grade in this module and improve my understanding of calculus proofs..."
-                            className="w-full bg-white border-2 border-gray-100 focus:border-orange-500 rounded-xl py-3 px-4 text-xs font-semibold focus:outline-none transition-all placeholder:text-gray-300 resize-none"
-                          />
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
-                </div>
-
-                {/* BOTTOM NAVIGATION ROW */}
-                <div className="mt-8 pt-5 border-t border-gray-100 flex items-center justify-between">
-                  <button 
-                    type="button"
-                    onClick={() => navigateWizard(-1)}
-                    className={`px-5 py-3 text-xs font-extrabold uppercase tracking-widest text-slate-400 hover:text-slate-800 hover:bg-slate-50 rounded-xl transition-all flex items-center gap-2 ${
-                      funnelStep === 1 ? 'invisible opacity-0 pointer-events-none' : ''
-                    }`}
-                  >
-                    <span>Go Back</span>
-                  </button>
-
-                  <button 
-                    type="button"
-                    onClick={() => navigateWizard(1)}
-                    className={`px-6 py-3.5 text-xs font-black uppercase tracking-widest text-white rounded-xl shadow-lg transition-all flex items-center gap-2 cursor-pointer ${
-                      funnelStep === 5 
-                        ? 'bg-emerald-600 hover:bg-emerald-700 shadow-emerald-100/50'
-                        : 'bg-orange-500 hover:bg-orange-600 shadow-orange-100/50'
-                    }`}
-                  >
-                    {funnelStep === 5 ? (
-                      <>
-                        <span>Execute Match Engine</span>
-                        <Sparkles className="w-4 h-4 animate-pulse" />
-                      </>
-                    ) : (
-                      <>
-                        <span>Continue</span>
-                        <span>&rarr;</span>
-                      </>
-                    )}
-                  </button>
-                </div>
-
-              </div>
-
-              {/* RIGHT COLUMN: SKEUOMORPHIC MATCHING LIVESTATUS DASHBOARD */}
-              <div className="w-full lg:w-[340px] shrink-0 text-left">
-                <div className="sticky top-24 bg-white border border-gray-100 rounded-[28px] shadow-xl overflow-hidden flex flex-col justify-between">
-                  
-                  {/* Dashboard Live ticket Stub Header */}
-                  <div className="p-5 bg-gradient-to-r from-orange-500 via-orange-600 to-amber-500 text-white flex items-center justify-between">
-                    <div className="flex items-center gap-2 text-left leading-none">
-                      <div className="p-2 bg-white/10 rounded-lg">
-                        <Activity className="w-4 h-4 text-white animate-pulse" />
-                      </div>
-                      <span className="text-[11px] font-black uppercase tracking-widest font-mono">Matching Live Panel</span>
-                    </div>
-
-                    <span className={`text-[10px] font-black tracking-wider text-white px-2.5 py-0.5 rounded-full ${
-                      calculateMatchIndex() === 100 ? 'bg-emerald-500 animate-bounce' : 'bg-orange-650'
-                    }`}>
-                      {calculateMatchIndex()}% Match
-                    </span>
-                  </div>
-
-                  {/* Core stub ticket details */}
-                  <div className="p-5 space-y-4 relative">
-                    
-                    {/* User profile brief */}
-                    {funnelStep === 5 && (
-                      <div className="space-y-1.5 animate-fade-in">
-                        <span className="text-[9px] font-black tracking-widest uppercase text-gray-400 block font-mono">Student Profile</span>
-                        <div className="bg-orange-50/45 border border-orange-100/50 p-3 rounded-lg text-left">
-                          <p className="text-xs font-black text-orange-950 truncate leading-none mb-1">{studentName || 'Not specified'}</p>
-                          <p className="text-[9.5px] text-orange-700 font-semibold truncate leading-none">{studentEmail || 'Provide step 5 credentials'}</p>
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Selected Service style pathway block */}
-                    <div className="space-y-1.5">
-                      <span className="text-[9px] font-black tracking-widest uppercase text-gray-400 block font-mono">Selected Pathway</span>
-                      <div className="flex items-center gap-3 p-2.5 bg-gray-50 border border-gray-100 rounded-xl text-left truncate">
-                        <div className="p-2 bg-white text-orange-600 rounded-lg shadow-3xs border border-gray-100">
-                          {renderServiceIcon(SERVICES[selectedServiceKey]?.icon, "w-4 h-4")}
-                        </div>
-                        <div className="truncate leading-none">
-                          <h4 className="text-xs font-black text-gray-950 truncate">{SERVICES[selectedServiceKey]?.title}</h4>
-                          <span className="text-[8.5px] text-orange-600 font-black uppercase tracking-wider block mt-1 font-mono">
-                            {SERVICES[selectedServiceKey]?.scopeTag}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Focus Subject Domain block */}
-                    <div className="space-y-1.5">
-                      <span className="text-[9px] font-black tracking-widest uppercase text-gray-400 block font-mono">Syllabus Focus Domain</span>
-                      <div className="p-3 bg-gray-50/50 rounded-xl border border-dashed border-gray-200">
-                        <p className="text-xs font-black text-gray-800 leading-none truncate">
-                          {selectedSubject ? selectedSubject : 'Not yet selected'}
-                        </p>
-                        <p className="text-[10px] text-gray-500 font-semibold mt-1 leading-none truncate">
-                          {selectedSubtopic ? `Subtopic: ${selectedSubtopic}` : 'Select Step 2 subtopics'}
-                        </p>
-                      </div>
-                    </div>
-
-                    {/* Schedule metrics summary */}
-                    <div className="grid grid-cols-2 gap-3.5 py-3 border-y border-gray-100">
-                      <div>
-                        <span className="text-[9px] font-black tracking-widest uppercase text-gray-400 block font-mono leading-none">Duration</span>
-                        <span className="text-xs font-black text-gray-950 block mt-1 leading-none font-mono">
-                          {selectedDuration} {SERVICES[selectedServiceKey]?.durationUnit}
-                        </span>
-                      </div>
-                      <div>
-                        <span className="text-[9px] font-black tracking-widest uppercase text-gray-400 block font-mono leading-none">Target Date</span>
-                        <span className="text-xs font-black text-gray-950 block mt-1 leading-none font-mono">
-                          {selectedDate ? new Date(selectedDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : 'As scheduled'}
-                        </span>
-                      </div>
-                    </div>
-
-                    {/* Target Milestones upgrades tracker */}
-                    <div className="space-y-2">
-                      <span className="text-[9px] font-black tracking-widest uppercase text-gray-400 block font-mono">Target Study Milestones</span>
-                      <div className="space-y-1.5 max-h-24 overflow-y-auto pr-1">
-                        {SERVICES[selectedServiceKey]?.deliverables.filter(d => d.included).map(d => (
-                          <div key={d.id} className="flex items-center text-[10px] text-gray-650 gap-1.5">
-                            <Check className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
-                            <span className="truncate leading-none">{d.name}</span>
-                          </div>
-                        ))}
-                        {Object.keys(premiumDeliverables).map(addonId => {
-                          const item = SERVICES[selectedServiceKey]?.deliverables.find(d => d.id === addonId);
-                          if (!item) return null;
-                          return (
-                            <div key={addonId} className="flex items-center text-[10px] text-orange-700 gap-1.5 animate-fade-in font-bold">
-                              <Sparkles className="w-3 h-3 text-orange-500 shrink-0" />
-                              <span className="truncate leading-none">{item.name}</span>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
-
-                  </div>
-
-                  {/* Skeuomorphic Ticket Separator dashed Cut line */}
-                  <div className="h-[2px] w-full border-t border-dashed border-gray-200 relative my-0.5">
-                    {/* Left notch */}
-                    <div className="absolute -left-2.5 -top-2.5 h-4 w-4 rounded-full bg-[#FAF9F7] border border-gray-200 shadow-inner"></div>
-                    {/* Right notch */}
-                    <div className="absolute -right-2.5 -top-2.5 h-4 w-4 rounded-full bg-[#FAF9F7] border border-gray-200 shadow-inner"></div>
-                  </div>
-
-                  {/* Active Tutor Prospective Candidates cards */}
-                  <div className="p-5 bg-gray-50/40 space-y-4">
-                    <div className="space-y-2.5">
-                      <span className="text-[9px] font-black tracking-widest uppercase text-gray-400 block font-mono leading-none font-sans">
-                        Prospective Vetted Candidate
-                      </span>
-
-                      {selectedSubject ? (
-                        (() => {
-                          const tutorObj = getTutorForSubject(selectedSubject);
-                          if (!tutorObj) return null;
-                          const initials = tutorObj.name.split(' ').map(n => n[0]).join('').slice(0, 2);
-                          return (
-                            <div className="p-3 bg-white border border-orange-100 rounded-xl flex items-center gap-3 shadow-3xs animate-fade-in">
-                              <div className="relative shrink-0">
-                                <div className="w-9 h-9 rounded-xl bg-orange-50 border border-orange-200 text-orange-600 font-black text-xs flex items-center justify-center">
-                                  {initials}
-                                </div>
-                                <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-emerald-500 border-2 border-white"></span>
-                              </div>
-                              <div className="truncate text-left leading-none">
-                                <p className="text-xs font-black text-gray-800 leading-none truncate mb-1">{tutorObj.name}</p>
-                                <p className="text-[9.5px] text-gray-500 font-bold leading-none truncate mb-1">{tutorObj.subjects?.slice(0, 2).join(' / ')}</p>
-                                <div className="flex items-center gap-1 text-[8.5px] font-black uppercase text-orange-600 tracking-wider">
-                                  <Star className="w-2.5 h-2.5 fill-amber-400 stroke-amber-500" />
-                                  <span>{tutorObj.rating} ({tutorObj.reviewCount} reviews)</span>
-                                </div>
-                              </div>
-                            </div>
-                          );
-                        })()
-                      ) : (
-                        <div className="p-3 bg-white border border-gray-100 rounded-xl flex items-center gap-3 select-none">
-                          <div className="w-8 h-8 rounded-lg bg-gray-100 flex items-center justify-center text-gray-400">
-                            <Users className="w-4.5 h-4.5" />
-                          </div>
-                          <div className="text-left leading-none">
-                            <p className="text-[11px] font-bold text-gray-400 mb-1">Awaiting Academic Subject</p>
-                            <span className="text-[9px] text-gray-400 block">Select step 2 choice</span>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-
-                    <div className="p-3 bg-emerald-50/50 rounded-xl border border-emerald-100/50 flex gap-2">
-                      <Shield className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
-                      <p className="text-[10px] font-medium text-emerald-800 leading-normal text-left">
-                        University-Tutors matching algorithm is compliant with academic standards, ensuring immediate matches to top tutoring rungs.
-                      </p>
-                    </div>
-                  </div>
-
-                </div>
-              </div>
-
-              {/* MODAL / SLIDE-OVER LIGHTBOX FOR ENGINE PROCESSING STATUS */}
-              {matchingPhase !== 'idle' && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-                  <div className="fixed inset-0 bg-slate-950/40 backdrop-blur-xs transition-opacity" onClick={() => matchingPhase === 'success' && closeSuccessModal()}></div>
-                  
-                  <div className="relative transform overflow-hidden rounded-[32px] bg-white text-left shadow-2xl transition-all w-full max-w-sm border border-gray-100 overflow-y-auto">
-                    
-                    {/* LOADING STEPPING PROCESSOR */}
-                    {matchingPhase === 'loading' && (
-                      <div className="p-8 text-center space-y-6 animate-fade-in">
-                        <div className="relative w-16 h-16 mx-auto">
-                          <div className="absolute inset-0 rounded-full border-4 border-orange-55"></div>
-                          <div className="absolute inset-0 rounded-full border-4 border-orange-500 border-t-transparent animate-spin"></div>
-                          <div className="absolute inset-0 flex items-center justify-center text-orange-600">
-                            <Cpu className="w-6.5 h-6.5 animate-bounce" />
-                          </div>
-                        </div>
-
-                        <div>
-                          <h3 className="text-lg font-black text-gray-900 tracking-tight leading-snug">Vetting Best Match Prospects</h3>
-                          <p className="text-xs text-gray-400 mt-1.5 leading-relaxed">Analyzing subject files, calendar preferences, and vetting 142 academic profiles inside our tutoring roster...</p>
-                        </div>
-
-                        {/* Interactive diagnostic checkpoints list */}
-                        <div className="bg-gray-50 border border-gray-150 p-4 rounded-xl text-left space-y-3 font-sans">
-                          <div className={`flex items-center gap-2.5 text-xs font-bold leading-none ${vettingStepOneCompleted ? 'text-gray-800 font-extrabold' : 'text-gray-400'}`}>
-                            {vettingStepOneCompleted ? (
-                              <CheckCircle className="w-4 h-4 text-emerald-500 shrink-0" />
-                            ) : (
-                              <RefreshCw className="w-4 h-4 animate-spin text-orange-600 shrink-0" />
-                            )}
-                            <span>{vettingStepOneCompleted ? 'Credentials validated successfully!' : 'Validating curriculum credentials...'}</span>
-                          </div>
-
-                          <div className={`flex items-center gap-2.5 text-xs font-bold leading-none ${vettingStepTwoCompleted ? 'text-gray-800 font-extrabold' : 'text-gray-400'}`}>
-                            {vettingStepTwoCompleted ? (
-                              <CheckCircle className="w-4 h-4 text-emerald-500 shrink-0" />
-                            ) : vettingStepOneCompleted ? (
-                              <RefreshCw className="w-4 h-4 animate-spin text-orange-600 shrink-0" />
-                            ) : (
-                              <span className="w-4 h-4 bg-gray-100 rounded-full border shrink-0"></span>
-                            )}
-                            <span>{vettingStepTwoCompleted ? 'Subtopic mapped to Stanford core criteria!' : 'Mapping subtopic requirements...'}</span>
-                          </div>
-
-                          <div className={`flex items-center gap-2.5 text-xs font-bold leading-none ${vettingStepThreeCompleted ? 'text-gray-800 font-extrabold' : 'text-gray-400'}`}>
-                            {vettingStepThreeCompleted ? (
-                              <CheckCircle className="w-4 h-4 text-emerald-500 shrink-0" />
-                            ) : vettingStepTwoCompleted ? (
-                              <RefreshCw className="w-4 h-4 animate-spin text-orange-600 shrink-0" />
-                            ) : (
-                              <span className="w-4 h-4 bg-gray-100 rounded-full border shrink-0"></span>
-                            )}
-                            <span>{vettingStepThreeCompleted ? 'Urgent queue matches locked!' : 'Verifying SLA priority queue...'}</span>
-                          </div>
-                        </div>
-                      </div>
-                    )}
-
-                    {/* CONVERSION SUCCESS LOCKIN VIEW */}
-                    {matchingPhase === 'success' && (
-                      <div className="animate-fade-in">
-                        <div className="p-6 md:p-8 text-center space-y-5">
-                          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-emerald-100 text-emerald-600">
-                            <Sparkles className="w-7 h-7" />
-                          </div>
-                          
-                          <div>
-                            <h3 className="text-xl font-black text-gray-900 tracking-tight leading-snug">Optimal Match Secured!</h3>
-                            <p className="text-xs text-gray-500 mt-2 leading-relaxed font-semibold">
-                              We have successfully located a premier tutoring specialist matching your exact parameters.
-                            </p>
-                          </div>
-
-                          {/* Matched Tutor Profile Summary card */}
-                          {(() => {
-                            const tutorObj = getTutorForSubject(selectedSubject);
-                            if (!tutorObj) return null;
-                            const initials = tutorObj.name.split(' ').map(n => n[0]).join('').slice(0, 2);
-                            return (
-                              <div className="border border-emerald-100 rounded-2xl p-4 bg-emerald-50/20 flex items-start gap-3.5 text-left leading-none">
-                                <div className="relative shrink-0">
-                                  <div className="w-12 h-12 rounded-xl bg-orange-50 border border-orange-200 text-orange-600 font-black text-sm flex items-center justify-center">
-                                    {initials}
-                                  </div>
-                                  <div className="absolute -bottom-1 -right-1 bg-emerald-500 text-white rounded-full p-0.5 border">
-                                    <Check className="w-3 h-3 text-white stroke-[3.5]" />
-                                  </div>
-                                </div>
-                                <div className="space-y-1.5 truncate">
-                                  <h4 className="text-sm font-black text-gray-900 truncate leading-none">{tutorObj.name}</h4>
-                                  <p className="text-xs text-gray-500 leading-normal line-clamp-2">{tutorObj.bio || tutorObj.name}</p>
-                                  <div className="flex items-center gap-2 text-[9.5px] text-gray-400 font-black tracking-wider uppercase font-mono mt-1">
-                                    <span className="flex items-center gap-0.5 text-orange-600"><Star className="w-3 h-3 fill-amber-400 stroke-amber-500" /> {tutorObj.rating}</span>
-                                    <span>|</span>
-                                    <span className="text-emerald-755">100% Concept Match</span>
-                                  </div>
-                                </div>
-                              </div>
-                            );
-                          })()}
-
-                          {/* Syllabus Class Ticket details receipt */}
-                          <div className="border border-gray-100 rounded-2xl p-4 bg-gray-50/50 text-xs text-left leading-none space-y-2.5">
-                            <h4 className="text-[9.5px] font-black text-gray-400 uppercase tracking-widest font-mono mb-2">Syllabus Class Ticket</h4>
-                            
-                            <div className="flex justify-between font-semibold leading-tight text-gray-650">
-                              <span>Selected Pathway:</span>
-                              <span className="text-gray-900 font-black text-right truncate max-w-[155px]">{SERVICES[selectedServiceKey]?.title}</span>
-                            </div>
-
-                            <div className="flex justify-between font-semibold leading-tight text-gray-650">
-                              <span>Target Focus:</span>
-                              <span className="text-gray-900 font-black text-right truncate max-w-[150px]">{selectedSubject} ({selectedSubtopic})</span>
-                            </div>
-
-                            <div className="flex justify-between font-semibold leading-tight text-gray-650">
-                              <span>Attached Materials:</span>
-                              <span className="text-gray-900 font-black">{attachedFiles.length > 0 ? `${attachedFiles.length} file reference(s)` : 'None supplied'}</span>
-                            </div>
-
-                            <div className="flex justify-between font-semibold text-gray-650 leading-tight">
-                              <span>Scheduled Duration:</span>
-                              <span className="text-gray-900 font-black">{selectedDuration} {SERVICES[selectedServiceKey]?.durationUnit}</span>
-                            </div>
-
-                            <div className="border-t border-gray-200/50 my-2"></div>
-
-                            <div className="flex justify-between text-[10px] font-black text-orange-700 uppercase tracking-widest font-mono">
-                              <span>Urgency SLA:</span>
-                              <span>{priorityType.toUpperCase()} PRIORITY</span>
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* Portal launcher bottom button */}
-                        <div className="bg-gray-50 px-5 py-4 border-t border-gray-100 text-center">
-                          <button 
-                            type="button" 
-                            onClick={closeSuccessModal}
-                            className="w-full inline-flex items-center justify-center gap-2 bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white font-black text-xs uppercase tracking-widest py-3.5 rounded-xl shadow-md cursor-pointer transition-all active:scale-[0.99]"
-                          >
-                            <span>Connect with Assigned Tutor &amp; View Chat</span>
-                            <Sparkles className="w-4 h-4 animate-pulse" />
-                          </button>
-                        </div>
-                      </div>
-                    )}
-
-                  </div>
-                </div>
-              )}
-
-            </div>
+            <StudentOnboardingWizard
+              currentUser={currentUser}
+              tutors={tutors}
+              onSubmitAssignment={onSubmitAssignment}
+              onOpenChat={onOpenChat}
+              onOpenWhatsApp={onOpenWhatsApp}
+              onOpenMenu={() => setIsMobileSidebarOpen(true)}
+              onExit={() => setActiveTab('dashboard')}
+              onSelectChatId={(chatId) => {
+                setLocalSelectedChatId(chatId);
+                if (onSubscribeToChatDetails) onSubscribeToChatDetails(chatId);
+              }}
+              onGoToChat={() => setActiveTab('chat')}
+            />
           )}
 
           {/* ================================== */}
@@ -3401,10 +2120,10 @@ CONTACT EMAIL COMPASS: ${studentEmail}
           {/* TAB 6: CHAT INTERFACE MESSENGER   */}
           {/* ================================== */}
           {activeTab === 'chat' && (
-            <div className="bg-white border border-slate-200/80 rounded-2xl md:rounded-3xl flex flex-col flex-1 min-h-[480px] overflow-hidden shadow-sm text-left relative animate-fade-in">
+            <div className="bg-white border border-slate-200/80 rounded-2xl md:rounded-3xl flex flex-col flex-1 min-h-0 overflow-hidden shadow-sm text-left relative animate-fade-in">
               
               {/* Discussion Channels + Center Chat Workspace */}
-              <div className="flex-1 flex overflow-hidden w-full relative">
+              <div className="flex-1 min-h-0 flex overflow-hidden w-full relative">
 
                 {/* LEFT SIDEBAR: DISCUSSION CHANNELS */}
                 <aside className={`bg-white border-r border-slate-200/80 flex flex-col shrink-0 shadow-xs overflow-hidden transition-all duration-200 ${
@@ -3675,13 +2394,13 @@ CONTACT EMAIL COMPASS: ${studentEmail}
                 </aside>
 
                 {/* CENTER CHAT DISPLAY WORKSPACE */}
-                <main className="flex-1 bg-white flex flex-col shadow-xs overflow-hidden relative">
+                <main className="flex-1 min-w-0 min-h-0 bg-white flex flex-col shadow-xs overflow-hidden relative">
                   {selectedChat ? (
                     <>
                       {/* CHAT HEADER */}
-                      <div className="px-4 sm:px-5 py-3.5 border-b border-slate-100 bg-white flex items-center justify-between shrink-0 z-10">
+                      <div className="px-3.5 sm:px-5 py-3 border-b border-slate-100 bg-white flex items-center justify-between gap-2 shrink-0 z-10 min-w-0">
                         {/* Active User Details */}
-                        <div className="flex items-center gap-2.5 sm:gap-3">
+                        <div className="flex items-center gap-2.5 sm:gap-3 min-w-0 flex-1">
                           <button 
                             type="button" 
                             onClick={() => setIsMobileChannelsOpen(true)}
@@ -3704,8 +2423,8 @@ CONTACT EMAIL COMPASS: ${studentEmail}
                             />
                             <span className="w-3.5 h-3.5 bg-emerald-500 border-2 border-white rounded-full absolute -bottom-0.5 -right-0.5"></span>
                           </div>
-                          <div className="min-w-0">
-                            <div className="flex items-center gap-2">
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-2 min-w-0">
                               <h3 className="font-bold text-slate-900 text-sm md:text-base leading-tight truncate">
                                 {selectedChat.tutorId.startsWith('admin_') || selectedChat.tutorId === 'admin_emily'
                                   ? 'Official Support Desk (Emily Vance)'
@@ -3722,24 +2441,26 @@ CONTACT EMAIL COMPASS: ${studentEmail}
                         </div>
 
                         {/* Right Quick Toolbar */}
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
                           <button 
+                            type="button"
                             onClick={() => setIsQuoteDrawerOpen(!isQuoteDrawerOpen)} 
-                            className="flex items-center gap-1.5 px-3.5 py-2 bg-gradient-to-r from-orange-50 to-orange-100 hover:from-orange-100 hover:to-orange-200 text-orange-700 border border-orange-200 rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer"
+                            className="flex items-center gap-1.5 px-2.5 sm:px-3.5 py-2 bg-gradient-to-r from-orange-50 to-orange-100 hover:from-orange-100 hover:to-orange-200 text-orange-700 border border-orange-200 rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer whitespace-nowrap"
                           >
-                            <DollarSign className="w-4 h-4 text-orange-600" />
-                            <span>Quote & Files</span>
+                            <DollarSign className="w-4 h-4 text-orange-600 shrink-0" />
+                            <span className="hidden sm:inline">Quote &amp; Files</span>
+                            <span className="sm:hidden">Quote</span>
                           </button>
 
                           <div className="h-5 w-px bg-slate-200 mx-1 hidden md:block"></div>
 
-                          <button className="p-2 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors" title="Voice Call">
+                          <button type="button" className="hidden md:inline-flex p-2 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors" title="Voice Call">
                             <Phone className="w-4 h-4" />
                           </button>
-                          <button className="p-2 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors" title="Video Consultation">
+                          <button type="button" className="hidden md:inline-flex p-2 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors" title="Video Consultation">
                             <Video className="w-4 h-4" />
                           </button>
-                          <button className="p-2 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors" title="More options">
+                          <button type="button" className="hidden sm:inline-flex p-2 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors" title="More options">
                             <MoreVertical className="w-4 h-4" />
                           </button>
                         </div>
@@ -3763,7 +2484,10 @@ CONTACT EMAIL COMPASS: ${studentEmail}
                       )}
 
                       {/* MESSAGE STREAM CANVAS */}
-                      <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-4 bg-slate-50/40">
+                      <div
+                        ref={chatScrollContainerRef}
+                        className="flex-1 min-h-0 overflow-y-auto overscroll-contain p-3.5 sm:p-5 space-y-3 bg-slate-50/40"
+                      >
                         <div className="flex items-center justify-center my-2">
                           <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 bg-slate-200/70 border border-slate-300/40 px-3 py-0.5 rounded-full">
                             Academic Security System • Active Thread
@@ -3773,15 +2497,19 @@ CONTACT EMAIL COMPASS: ${studentEmail}
                         <div className="max-w-xl mx-auto bg-amber-50/80 border border-amber-200 rounded-xl p-3.5 text-xs text-amber-800 flex items-start gap-3 shadow-xs">
                           <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
                           <p className="leading-relaxed">
-                            <strong class="font-bold text-amber-900">Connection established.</strong> Students can discuss assignment details or schedule 1-on-1 tutoring. All messages are encrypted.
+                            <strong className="font-bold text-amber-900">Connection established.</strong> Students can discuss assignment details or schedule 1-on-1 tutoring. All messages are encrypted.
                           </p>
                         </div>
 
                         {activeChatMessages.map((m) => {
                           const isSelf = m.senderId === currentUser.id;
-                          const isSystem = m.senderId === 'system';
+                          const isSystem = m.senderId === 'system' || m.isSystem;
                           const senderObj = isSelf ? currentUser : getTutor(m.senderId);
-                          const senderName = isSystem ? "ACADEMIC SECURITY SYSTEM" : (isSelf ? "YOU" : (senderObj?.name || "Support / Tutor").toUpperCase());
+                          const isStaffAdmin = !isSelf && (m.senderId?.startsWith('admin_') || m.senderId === 'admin_emily' || senderObj?.role === UserRole.ADMIN);
+                          const senderRoleLabel = isStaffAdmin ? 'Admin' : 'Tutor';
+                          const senderDisplayName = isSelf
+                            ? 'You'
+                            : (senderObj?.name || (isStaffAdmin ? 'Platform Support Desk' : 'Academic Tutor'));
 
                           if (isSystem) {
                             return (
@@ -3794,45 +2522,89 @@ CONTACT EMAIL COMPASS: ${studentEmail}
                           }
 
                           return (
-                            <div key={m.id} className={`flex flex-col ${isSelf ? 'items-end' : 'items-start'} gap-1 my-2`}>
-                              {!isSelf && (
-                                <div className="flex items-center gap-2">
+                            <div
+                              key={m.id}
+                              className={`flex w-full ${isSelf ? 'justify-end' : 'justify-start'}`}
+                            >
+                              <div
+                                className={`flex items-end gap-2 max-w-[78%] sm:max-w-[75%] ${
+                                  isSelf ? 'ml-auto flex-row-reverse' : 'mr-auto'
+                                }`}
+                              >
+                                {!isSelf && (
                                   <ResponsiveAvatar
                                     src={senderObj?.avatarUrl}
-                                    alt=""
+                                    alt={senderDisplayName}
                                     sizePx={32}
-                                    width={24}
-                                    height={24}
+                                    width={28}
+                                    height={28}
                                     fallbackSrc="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=64&h=64&fit=crop&auto=format&q=75"
-                                    className="w-6 h-6 rounded-lg object-cover"
+                                    className="w-7 h-7 rounded-full object-cover shrink-0 border border-slate-200"
                                   />
-                                  <span className="text-[10px] font-bold text-slate-500">{senderName}</span>
-                                </div>
-                              )}
-
-                              <div className={`px-4 py-2.5 rounded-2xl max-w-md text-sm shadow-xs ${
-                                isSelf 
-                                  ? 'bg-gradient-to-r from-orange-500 to-orange-600 text-white rounded-br-xs' 
-                                  : 'bg-white border border-slate-200 text-slate-800 rounded-bl-xs'
-                              }`}>
-                                <p className="whitespace-pre-wrap">{m.content}</p>
-                                {m.fileUrl && (
-                                  <div className="mt-2.5 p-2 rounded-xl bg-slate-100/30 border border-slate-200/40 flex items-center justify-between text-xs">
-                                    <div className="flex items-center gap-1.5 truncate">
-                                      <FileText className="w-4 h-4 text-orange-500 shrink-0" />
-                                      <span className="truncate font-mono">{m.fileName || 'Attachment'}</span>
-                                    </div>
-                                    <a href={m.fileUrl} target="_blank" rel="noreferrer" className="text-orange-500 hover:underline font-bold shrink-0 ml-2">
-                                      Download
-                                    </a>
-                                  </div>
                                 )}
-                              </div>
 
-                              <span className="text-[10px] text-slate-400 font-medium flex items-center gap-1">
-                                {isSelf ? 'YOU • ' : ''}{new Date(m.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                                {isSelf && <CheckCheck className="w-3.5 h-3.5 text-orange-500" />}
-                              </span>
+                                <div
+                                  className={`px-3.5 py-2.5 rounded-2xl text-xs sm:text-sm shadow-xs break-words ${
+                                    isSelf
+                                      ? 'bg-[#F97316] text-white rounded-br-sm'
+                                      : 'bg-[#F3F4F6] sm:bg-white border border-slate-200 text-slate-900 rounded-bl-sm'
+                                  }`}
+                                >
+                                  {!isSelf && (
+                                    <div className="flex items-center gap-1.5 mb-1">
+                                      <span className="text-[11px] font-bold text-orange-600 truncate">
+                                        {senderDisplayName}
+                                      </span>
+                                      <span className="text-[9px] font-bold uppercase text-slate-500">
+                                        • {senderRoleLabel}
+                                      </span>
+                                    </div>
+                                  )}
+
+                                  <p className="whitespace-pre-wrap leading-relaxed text-left">{m.content}</p>
+
+                                  {m.fileUrl && (
+                                    <div
+                                      className={`mt-2 p-2 rounded-xl border flex items-center justify-between text-xs ${
+                                        isSelf
+                                          ? 'bg-white/15 border-white/25 text-white'
+                                          : 'bg-white border-slate-200 text-slate-800'
+                                      }`}
+                                    >
+                                      <div className="flex items-center gap-1.5 truncate">
+                                        <FileText className={`w-4 h-4 shrink-0 ${isSelf ? 'text-white' : 'text-orange-500'}`} />
+                                        <span className="truncate font-mono">{m.fileName || 'Attachment'}</span>
+                                      </div>
+                                      <a
+                                        href={m.fileUrl}
+                                        target="_blank"
+                                        rel="noreferrer"
+                                        className={`hover:underline font-bold shrink-0 ml-2 ${
+                                          isSelf ? 'text-white' : 'text-orange-600'
+                                        }`}
+                                      >
+                                        Download
+                                      </a>
+                                    </div>
+                                  )}
+
+                                  <div
+                                    className={`flex items-center gap-1 mt-1 text-[10px] font-medium ${
+                                      isSelf ? 'justify-end text-orange-100' : 'justify-start text-slate-400'
+                                    }`}
+                                  >
+                                    <span>
+                                      {new Date(m.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                    </span>
+                                    {isSelf && (
+                                      <CheckCheck
+                                        className={`w-3.5 h-3.5 shrink-0 ${m.read ? 'text-white' : 'text-orange-100/80'}`}
+                                        aria-label={m.read ? 'Read' : 'Sent'}
+                                      />
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
                             </div>
                           );
                         })}
@@ -3840,33 +2612,33 @@ CONTACT EMAIL COMPASS: ${studentEmail}
                       </div>
 
                       {/* QUICK PROMPT SUGGESTION CHIPS */}
-                      <div className="px-5 py-2 bg-slate-50 border-t border-slate-100 flex items-center gap-2 overflow-x-auto shrink-0">
+                      <div className="px-3 sm:px-5 py-2 bg-slate-50 border-t border-slate-100 flex items-center gap-2 overflow-x-auto shrink-0">
                         <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider shrink-0">Quick Actions:</span>
                         <button 
                           type="button"
                           onClick={() => setStudentReply('Can we review the assignment requirements?')} 
-                          className="px-2.5 py-1 bg-white hover:bg-orange-50 hover:text-orange-600 border border-slate-200 rounded-lg text-xs text-slate-600 whitespace-nowrap transition-colors cursor-pointer"
+                          className="px-2.5 py-1 bg-white hover:bg-orange-50 hover:text-orange-600 border border-slate-200 rounded-lg text-xs text-slate-600 whitespace-nowrap transition-colors cursor-pointer shrink-0"
                         >
                           📋 Request assignment review
                         </button>
                         <button 
                           type="button"
                           onClick={() => setStudentReply('Please send over a formal price quote for this task.')} 
-                          className="px-2.5 py-1 bg-white hover:bg-orange-50 hover:text-orange-600 border border-slate-200 rounded-lg text-xs text-slate-600 whitespace-nowrap transition-colors cursor-pointer"
+                          className="px-2.5 py-1 bg-white hover:bg-orange-50 hover:text-orange-600 border border-slate-200 rounded-lg text-xs text-slate-600 whitespace-nowrap transition-colors cursor-pointer shrink-0"
                         >
                           💰 Request formal quote
                         </button>
                         <button 
                           type="button"
                           onClick={() => setStudentReply('When are you available for a 1-on-1 tutoring session?')} 
-                          className="px-2.5 py-1 bg-white hover:bg-orange-50 hover:text-orange-600 border border-slate-200 rounded-lg text-xs text-slate-600 whitespace-nowrap transition-colors cursor-pointer"
+                          className="px-2.5 py-1 bg-white hover:bg-orange-50 hover:text-orange-600 border border-slate-200 rounded-lg text-xs text-slate-600 whitespace-nowrap transition-colors cursor-pointer shrink-0"
                         >
                           📅 Schedule 1-on-1 session
                         </button>
                       </div>
 
                       {/* CHAT INPUT COMPONENT */}
-                      <div className="p-3 md:p-4 bg-white border-t border-slate-200 shrink-0 sticky bottom-0 z-20 shadow-xs">
+                      <div className="p-2.5 sm:p-4 bg-white border-t border-slate-200 shrink-0 z-20 shadow-xs w-full">
                         <form 
                           onSubmit={(e) => {
                             e.preventDefault();
@@ -3883,29 +2655,33 @@ CONTACT EMAIL COMPASS: ${studentEmail}
                             setStudentReply('');
                             setChatAttachedFileName('');
                           }} 
-                          className="flex items-center gap-2"
+                          className="flex items-center gap-2 w-full min-w-0"
                         >
-                          <div className="flex-1 bg-slate-50 border border-slate-300 rounded-xl px-3 py-1.5 flex items-center gap-2 focus-within:bg-white focus-within:border-orange-500 focus-within:ring-2 focus-within:ring-orange-500/20 transition-all">
-                            <label className="p-1.5 text-slate-500 hover:text-slate-800 rounded-lg hover:bg-slate-200 transition-colors cursor-pointer shrink-0" title="Attach file or coursework document">
-                              <Paperclip className="w-4 h-4" />
-                              <input 
-                                type="file" 
-                                className="hidden" 
-                                onChange={(e) => {
-                                  if (e.target.files && e.target.files[0]) {
-                                    setChatAttachedFileName(e.target.files[0].name);
-                                  }
-                                }} 
-                              />
-                            </label>
+                          <label
+                            className="p-2 text-slate-500 hover:text-orange-600 rounded-xl hover:bg-slate-100 transition-colors cursor-pointer shrink-0 flex items-center justify-center"
+                            title="Attach file or coursework document"
+                            aria-label="Attach file"
+                          >
+                            <Paperclip className="w-4 h-4" />
+                            <input 
+                              type="file" 
+                              className="hidden" 
+                              onChange={(e) => {
+                                if (e.target.files && e.target.files[0]) {
+                                  setChatAttachedFileName(e.target.files[0].name);
+                                }
+                              }} 
+                            />
+                          </label>
 
+                          <div className="flex-1 min-w-0 bg-slate-50 border border-slate-300 rounded-xl px-3 py-1.5 flex items-center gap-2 focus-within:bg-white focus-within:border-orange-500 focus-within:ring-2 focus-within:ring-orange-500/20 transition-all">
                             {chatAttachedFileName && (
-                              <span className="text-[10px] bg-orange-100 text-orange-800 px-2 py-0.5 rounded font-mono font-bold truncate max-w-[130px] flex items-center gap-1 shrink-0">
+                              <span className="text-[10px] bg-orange-100 text-orange-800 px-2 py-0.5 rounded font-mono font-bold truncate max-w-[100px] flex items-center gap-1 shrink-0">
                                 <span className="truncate">{chatAttachedFileName}</span>
                                 <button 
                                   type="button" 
                                   onClick={() => setChatAttachedFileName('')}
-                                  className="text-orange-600 hover:text-red-600 font-bold ml-0.5 cursor-pointer"
+                                  className="text-orange-600 hover:text-red-600 font-bold ml-0.5 cursor-pointer shrink-0"
                                   title="Remove attachment"
                                 >
                                   ×
@@ -3924,11 +2700,11 @@ CONTACT EMAIL COMPASS: ${studentEmail}
                                   if (form) form.requestSubmit();
                                 }
                               }}
-                              placeholder="Type your message here or press Enter to send..." 
-                              className="w-full bg-transparent text-xs sm:text-sm text-slate-800 placeholder-slate-400 outline-none py-1"
+                              placeholder="Type your message..." 
+                              className="flex-1 min-w-0 w-full bg-transparent text-xs sm:text-sm text-slate-800 placeholder-slate-400 outline-none py-1"
                             />
 
-                            <button type="button" className="p-1.5 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-200/60 transition-colors hidden sm:block">
+                            <button type="button" className="p-1.5 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-200/60 transition-colors hidden sm:block shrink-0" title="Emoji">
                               <Smile className="w-4 h-4" />
                             </button>
                           </div>
@@ -3936,12 +2712,13 @@ CONTACT EMAIL COMPASS: ${studentEmail}
                           <button 
                             type="submit" 
                             disabled={!studentReply.trim() && !chatAttachedFileName}
-                            className={`p-3 rounded-xl shadow-xs flex items-center gap-1.5 transition-all transform active:scale-95 cursor-pointer shrink-0 ${
+                            className={`p-2.5 sm:px-3.5 sm:py-2.5 rounded-xl shadow-xs flex items-center justify-center gap-1.5 transition-all transform active:scale-95 cursor-pointer shrink-0 ${
                               (!studentReply.trim() && !chatAttachedFileName)
-                                ? 'bg-slate-200 text-slate-400 cursor-not-allowed opacity-60'
-                                : 'bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white shadow-orange-500/20'
+                                ? 'bg-slate-200 text-slate-400 cursor-not-allowed opacity-70'
+                                : 'bg-[#F97316] hover:bg-[#EA580C] text-white shadow-orange-500/20'
                             }`}
                             title="Send Message"
+                            aria-label="Send message"
                           >
                             <Send className="w-4 h-4" />
                             <span className="hidden sm:inline font-bold text-xs">Send</span>
@@ -4528,20 +3305,23 @@ CONTACT EMAIL COMPASS: ${studentEmail}
 
         {/* ======================================================== */}
         {/* FLOATING DIRECT LIVE CHAT ASSISTANCE WIDGET (CSR)      */}
+        {/* Hidden in chat and onboarding views to avoid overlap   */}
         {/* ======================================================== */}
-        <button
-          onClick={() => {
-            setActiveTab('chat');
-            onOpenChat('admin_shaka'); // Directly link support chat
-          }}
-          className="fixed bottom-6 right-6 bg-[#FF8A00] hover:bg-[#E05216] text-white p-4 rounded-full shadow-2xl z-40 transition-all cursor-pointer flex items-center justify-center gap-2 font-bold font-sans tracking-wide text-xs group"
-          id="floating-live-chat"
-        >
-          <MessageCircle className="w-5 h-5 shrink-0" />
-          <span className="max-w-0 overflow-hidden group-hover:max-w-[100px] transition-all duration-300 ease-out whitespace-nowrap">
-            Live Chat
-          </span>
-        </button>
+        {activeTab !== 'chat' && activeTab !== 'new_request' && (
+          <button
+            onClick={() => {
+              setActiveTab('chat');
+              onOpenChat('admin_shaka'); // Directly link support chat
+            }}
+            className="fixed bottom-6 right-6 bg-[#FF8A00] hover:bg-[#E05216] text-white p-4 rounded-full shadow-2xl z-40 transition-all cursor-pointer flex items-center justify-center gap-2 font-bold font-sans tracking-wide text-xs group"
+            id="floating-live-chat"
+          >
+            <MessageCircle className="w-5 h-5 shrink-0" />
+            <span className="max-w-0 overflow-hidden group-hover:max-w-[100px] transition-all duration-300 ease-out whitespace-nowrap">
+              Live Chat
+            </span>
+          </button>
+        )}
 
       </main>
 

@@ -977,6 +977,7 @@ export default function AdminDashboard({
   };
 
   const [selectedActionSuccess, setSelectedActionSuccess] = useState<string | null>(null);
+  const [isLedgerExpanded, setIsLedgerExpanded] = useState(false);
 
   const handleAddTopicSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -991,8 +992,15 @@ export default function AdminDashboard({
     }
   };
 
+  const isAssignmentsFullWidth = activeTab === 'assignments' && isLedgerExpanded;
+
   return (
-    <div className="container mx-auto px-4 md:px-8 py-8 max-w-7xl font-sans text-left min-h-[75vh]" id="admin-workspace">
+    <div
+      className={`container mx-auto px-4 md:px-8 py-8 font-sans text-left min-h-[75vh] transition-all ${
+        isAssignmentsFullWidth ? 'max-w-[1600px]' : 'max-w-7xl'
+      }`}
+      id="admin-workspace"
+    >
       
       {/* Admin Workspace header banner */}
       <div className="bg-gray-950 text-white rounded-3xl p-6 md:p-8 mb-8 border border-gray-800 flex flex-col md:flex-row justify-between items-start md:items-center gap-6 relative overflow-hidden">
@@ -1066,11 +1074,12 @@ export default function AdminDashboard({
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-8 items-start">
         
         {/* Left Sticky Admin Sidebar Navigation Panel */}
-        <aside 
-          id="admin-dashboard-sidebar"
-          aria-label="Admin Navigation Panel"
-          className="lg:col-span-1 lg:sticky lg:top-24 space-y-4 max-h-[calc(100vh-7rem)] overflow-y-auto overscroll-contain pr-1.5 [scrollbar-width:thin] [scrollbar-color:#e2e8f0_transparent] z-20"
-        >
+        {!isAssignmentsFullWidth && (
+          <aside 
+            id="admin-dashboard-sidebar"
+            aria-label="Admin Navigation Panel"
+            className="lg:col-span-1 lg:sticky lg:top-24 space-y-4 max-h-[calc(100vh-7rem)] overflow-y-auto overscroll-contain pr-1.5 [scrollbar-width:thin] [scrollbar-color:#e2e8f0_transparent] z-20"
+          >
           <div className="bg-white rounded-2xl border border-gray-150 p-4 space-y-1 shadow-xs">
             <span className="text-[9px] font-bold text-gray-400 uppercase px-3 pb-1 block tracking-wider">Academics & Tutors</span>
             {[
@@ -1198,10 +1207,11 @@ export default function AdminDashboard({
               </button>
             ))}
           </div>
-        </aside>
+          </aside>
+        )}
 
         {/* Content switch displays */}
-        <div className="lg:col-span-3 space-y-6 min-w-0">
+        <div className={`${isAssignmentsFullWidth ? 'lg:col-span-4' : 'lg:col-span-3'} space-y-6 min-w-0`}>
           <ErrorBoundary compact resetKey={activeTab} onReset={() => onLoadTab?.(activeTab, true)}>
             {tabStates[`admin:${activeTab}`]?.error && (
               <ErrorStatePanel
@@ -2114,6 +2124,33 @@ export default function AdminDashboard({
                   const sName = student?.name || (a.studentId.includes('@') ? a.studentId.split('@')[0] : a.studentId);
                   const sEmail = student?.email || (a.studentId.includes('@') ? a.studentId : `${a.studentId.replace(/\s+/g, '.').toLowerCase()}@universitytutors.com`);
                   
+                  const matchingChat = chats.find(
+                    c =>
+                      (c.studentId.toLowerCase() === a.studentId.toLowerCase() ||
+                        c.studentId.toLowerCase() === sEmail.toLowerCase()) &&
+                      (!a.title || c.subject?.toLowerCase() === a.title.toLowerCase() || !c.subject)
+                  );
+                  const liveMessages = matchingChat
+                    ? messages
+                        .filter(m => m.chatId === matchingChat.id)
+                        .map(m => {
+                          const isStudentMsg =
+                            m.senderId.toLowerCase() === a.studentId.toLowerCase() ||
+                            m.senderId.toLowerCase() === sEmail.toLowerCase();
+                          const isAdminMsg = m.senderId === currentUser.id;
+                          return {
+                            sender: isStudentMsg ? 'student' : isAdminMsg ? 'admin' : 'tutor',
+                            roleLabel: isStudentMsg
+                              ? `${sName} (Student)`
+                              : isAdminMsg
+                              ? 'Admin'
+                              : `${tutor?.name || 'Assigned Tutor'} (Tutor)`,
+                            text: m.content,
+                            time: m.timestamp ? new Date(m.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Recent'
+                          };
+                        })
+                    : [];
+
                   return {
                     id: a.id,
                     studentName: sName,
@@ -2125,7 +2162,7 @@ export default function AdminDashboard({
                     gpa: "3.85",
                     subject: a.subject,
                     title: a.title,
-                    pattern: a.instructions ? (a.instructions.slice(0, 100) + '...') : "=== University-Tutors Matching Funnel Request === TUTORING SERVICE PATTERN: Coursework Guidance...",
+                    pattern: a.instructions ? a.instructions : "Coursework Guidance",
                     fullDescription: a.instructions || "Comprehensive academic tutoring and guidance requested by student.",
                     documentName: (a.fileNames && a.fileNames[0]) ? a.fileNames[0] : "Assignment_Brief.pdf",
                     documentSize: "2.4 MB",
@@ -2135,13 +2172,15 @@ export default function AdminDashboard({
                     price: a.quoteAmount ? Number(a.quoteAmount) : null,
                     assignedTutor: tutor?.name || (a.tutorId ? "Assigned Specialist" : ""),
                     tutorRating: tutor?.rating || 4.9,
-                    chatHistory: [
-                      { sender: "admin", roleLabel: "Admin", text: `Hello ${sName}, we received your coursework brief for "${a.title}".`, time: "10:30 AM" },
-                      { sender: "student", roleLabel: "Student", text: "Thank you! Looking forward to working with my tutor.", time: "10:35 AM" }
-                    ],
+                    chatHistory: liveMessages.length > 0
+                      ? liveMessages
+                      : [
+                          { sender: "admin", roleLabel: "Admin", text: `Hello ${sName}, we received your coursework brief for "${a.title}".`, time: "10:30 AM" },
+                          { sender: "student", roleLabel: "Student", text: "Thank you! Looking forward to working with my tutor.", time: "10:35 AM" }
+                        ],
                     submissionHistory: assignments
                       .filter(x => x.studentId === a.studentId)
-                      .map((x, idx) => ({
+                      .map((x) => ({
                         id: x.id,
                         title: x.title,
                         date: x.createdAt ? x.createdAt.slice(0, 10) : "2026-11-01",
@@ -2169,6 +2208,8 @@ export default function AdminDashboard({
                 setSelectedChatId={setSelectedChatId}
                 setReplyAsTutor={setReplyAsTutor}
                 toStoreStatus={toStoreStatus}
+                isPageExpanded={isLedgerExpanded}
+                onTogglePageExpand={() => setIsLedgerExpanded(prev => !prev)}
                 onSeedMockStudentData={async () => {
                   try {
                     await store.addAssignment(
