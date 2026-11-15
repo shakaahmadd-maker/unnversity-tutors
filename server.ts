@@ -26,7 +26,14 @@ import {
   SitemapBlogInput,
   SitemapTutorInput,
 } from './src/server/sitemapGenerator';
-import { matchesBlogSlugOrId } from './src/utils/blogSlug';
+import { getBlogCanonicalSlug, matchesBlogSlugOrId } from './src/utils/blogSlug';
+import {
+  getIndexNowKey,
+  getIndexNowStatusSummary,
+  queueIndexNowSubmission,
+  submitToIndexNow,
+  syncDiscoveredPagesWithIndexNow,
+} from './src/server/indexNow';
 import {
   assignUniqueTutorSlugs,
   getTutorCanonicalSlug,
@@ -4438,6 +4445,21 @@ export async function createApp(options: CreateAppOptions = {}) {
     };
   };
 
+  const notifyTutorProfileIndexNow = async (tutorId: string, reason: string): Promise<void> => {
+    try {
+      const { allTutors, canonicalByRawId } = await loadMergedPublicTutorCatalog({ activeOnly: true });
+      const matched =
+        canonicalByRawId.get(tutorId) ||
+        canonicalByRawId.get(String(tutorId).toLowerCase()) ||
+        allTutors.find((t) => String(t.id) === String(tutorId));
+      if (matched && matched.slug) {
+        queueIndexNowSubmission([`/tutor/${encodeURIComponent(matched.slug)}`, '/tutors'], reason);
+      }
+    } catch (err: any) {
+      console.warn(`[INDEXNOW] Notice resolving tutor slug for ${tutorId}:`, err?.message || err);
+    }
+  };
+
   // GET /api/tutors
   // Public directory search with CORS, searchable keywords matching, unique name-based slugs, and zero duplicates
   app.get('/api/tutors', async (req, res) => {
@@ -4952,6 +4974,8 @@ export async function createApp(options: CreateAppOptions = {}) {
       savePersistedUserUpdate(tutorId, { avatarUrl: finalImageUrl, profileImageUrl: finalImageUrl });
 
       await logAudit('CREATE_TUTOR_PROFILE', `Admin created tutor profile: ${cleanName} (${cleanSubject})`, tutorId, cleanName, 'admin', req);
+      invalidateSitemapCache();
+      void notifyTutorProfileIndexNow(tutorId, 'admin_create_tutor');
 
       return res.status(201).json({
         success: true,
@@ -5148,6 +5172,8 @@ export async function createApp(options: CreateAppOptions = {}) {
       }
 
       await logAudit('TUTOR_PROFILE_UPDATED', `Admin updated tutor profile ${id}`, id, updates.name, 'admin', req);
+      invalidateSitemapCache();
+      void notifyTutorProfileIndexNow(id, 'admin_update_tutor');
 
       return res.status(200).json({
         success: true,
@@ -5262,6 +5288,10 @@ export async function createApp(options: CreateAppOptions = {}) {
         savePersistedUserUpdate(existingAccount.id, updates);
 
         await logAudit('TUTOR_PROFILE_UPDATED', `Updated existing tutor profile: ${cleanEmail}`, caller.id, caller.name, caller.role, req);
+        invalidateSitemapCache();
+        if (isApp) {
+          void notifyTutorProfileIndexNow(existingAccount.id, 'tutor_updated_or_approved');
+        }
 
         const { passwordHash: _, ...safeTutor } = fullUpdated;
         return res.status(200).json({
@@ -5323,6 +5353,9 @@ export async function createApp(options: CreateAppOptions = {}) {
 
       await logAudit('CREATE_TUTOR_PROFILE', `New tutor profile created: ${cleanEmail} (${name.trim()})`, newTutorId, name.trim(), 'tutor', req);
       invalidateSitemapCache();
+      if (isApp) {
+        void notifyTutorProfileIndexNow(newTutorId, 'tutor_created_approved');
+      }
 
       const { passwordHash: _, ...safeTutor } = newTutorRecord;
       return res.status(201).json({
@@ -5427,6 +5460,7 @@ export async function createApp(options: CreateAppOptions = {}) {
       await logAudit('CREATE_PRIVILEGED_USER', `Admin created privileged user: ${cleanEmail} (${role})`, caller?.id || userId, caller?.name || name, caller?.role || 'admin', req);
       if (role === 'tutor') {
         invalidateSitemapCache();
+        void notifyTutorProfileIndexNow(userId, 'privileged_tutor_created');
       }
 
       const { passwordHash: _, ...safeUser } = newUser;
@@ -5606,6 +5640,7 @@ export async function createApp(options: CreateAppOptions = {}) {
       await logAudit('USER_UPDATE', `Updated user ${id} (image/profile update)`, id, undefined, undefined, req);
       if (mergedUser.role === 'tutor' || String(id).startsWith('tutor')) {
         invalidateSitemapCache();
+        void notifyTutorProfileIndexNow(id, 'tutor_user_profile_updated');
       }
 
       return res.status(200).json({ success: true, user: mergedUser });
@@ -7445,6 +7480,10 @@ export async function createApp(options: CreateAppOptions = {}) {
 
       await logAudit('BLOG_CREATE', `Published new blog: "${newBlog.title}" (${newBlog.category})`, user.id, user.name, user.role, req);
       invalidateSitemapCache();
+      queueIndexNowSubmission(
+        [`/blog/${encodeURIComponent(getBlogCanonicalSlug(newBlog))}`, '/blog'],
+        'blog_published'
+      );
 
       return res.status(201).json({ success: true, blog: newBlog });
     } catch (err: any) {
@@ -7478,6 +7517,15 @@ export async function createApp(options: CreateAppOptions = {}) {
 
       await logAudit('BLOG_UPDATE', `Updated blog ${id}: "${updates.title || 'updated'}"`, user.id, user.name, user.role, req);
       invalidateSitemapCache();
+      const blogForSlug =
+        updated ||
+        (updates.title ? { id, title: String(updates.title), slug: updates.slug || null } : null);
+      if (blogForSlug && blogForSlug.title) {
+        queueIndexNowSubmission(
+          [`/blog/${encodeURIComponent(getBlogCanonicalSlug(blogForSlug))}`, '/blog'],
+          'blog_updated'
+        );
+      }
 
       return res.status(200).json({ success: true, blog: updated });
     } catch (err: any) {
@@ -7553,6 +7601,10 @@ export async function createApp(options: CreateAppOptions = {}) {
 
       await logAudit('BLOG_SYNC_DEFAULTS', `Synchronized and seeded ${syncedBlogs.length} standard educational blogs`, user.id, user.name, user.role, req);
       invalidateSitemapCache();
+      queueIndexNowSubmission(
+        ['/blog', ...syncedBlogs.map((b: any) => `/blog/${encodeURIComponent(getBlogCanonicalSlug(b))}`)],
+        'blog_sync_defaults'
+      );
 
       return res.status(200).json({
         success: true,
@@ -7648,6 +7700,82 @@ export async function createApp(options: CreateAppOptions = {}) {
       tutors: activeTutors,
     };
   };
+
+  // IndexNow plain-text root verification file: /<INDEXNOW_KEY>.txt -> exact key string
+  app.use((req, res, next) => {
+    if (req.method !== 'GET' && req.method !== 'HEAD') return next();
+    const activeIndexNowKey = getIndexNowKey();
+    if (req.path === `/${activeIndexNowKey}.txt`) {
+      res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+      res.setHeader('Cache-Control', 'public, max-age=86400');
+      return res.status(200).send(activeIndexNowKey);
+    }
+    return next();
+  });
+
+  // Admin & CI/CD IndexNow diagnostic & manual/bulk submission endpoints
+  app.get('/api/admin/indexnow', requireRole('admin', 'subadmin'), (_req, res) => {
+    return res.status(200).json({
+      success: true,
+      ...getIndexNowStatusSummary(),
+    });
+  });
+
+  app.post('/api/admin/indexnow', async (req, res) => {
+    try {
+      const caller = (req as any).user;
+      const isAdminCaller = Boolean(caller && (caller.role === 'admin' || caller.role === 'subadmin'));
+      const headerKey = String(req.headers['x-indexnow-key'] || '').trim();
+      const bearerHeader = String(req.headers['authorization'] || '').trim();
+      const bearerToken = bearerHeader.toLowerCase().startsWith('bearer ')
+        ? bearerHeader.slice(7).trim()
+        : '';
+      const expectedKey = getIndexNowKey();
+      const hasValidKeyAuth =
+        (headerKey && headerKey === expectedKey) || (bearerToken && bearerToken === expectedKey);
+
+      if (!isAdminCaller && !hasValidKeyAuth) {
+        return res.status(401).json({
+          error: 'Unauthorized: Administrator session or valid X-IndexNow-Key header required.',
+        });
+      }
+
+      const { urls, scope } = req.body || {};
+      let targetUrls: string[] = [];
+
+      if (urls && (typeof urls === 'string' || Array.isArray(urls))) {
+        targetUrls = Array.isArray(urls) ? urls : [urls];
+      } else {
+        const requestedScope = String(scope || 'all').toLowerCase();
+        const payload = await getOrBuildSitemapPayload(loadSitemapDatabaseRecords, true);
+        const allLocs = payload.entries.map((e) => e.loc);
+
+        if (requestedScope === 'tools') {
+          targetUrls = allLocs.filter((loc) => loc.includes('/tools'));
+        } else if (requestedScope === 'blogs') {
+          targetUrls = allLocs.filter((loc) => loc.includes('/blog'));
+        } else if (requestedScope === 'tutors') {
+          targetUrls = allLocs.filter((loc) => loc.includes('/tutor/') || loc.endsWith('/tutors'));
+        } else {
+          targetUrls = allLocs;
+        }
+      }
+
+      const result = await submitToIndexNow(targetUrls, {
+        force: true,
+        reason: `manual_api_${scope || 'custom'}`,
+      });
+
+      return res.status(200).json({
+        success: result.submitted,
+        ...result,
+      });
+    } catch (err: any) {
+      return res.status(500).json({
+        error: err?.message || 'Failed to submit URLs to IndexNow',
+      });
+    }
+  });
 
   app.get('/robots.txt', (_req, res) => {
     res.setHeader('Content-Type', 'text/plain; charset=utf-8');
@@ -8045,6 +8173,7 @@ export async function startServer() {
   });
   app.listen(PORT, '0.0.0.0', () => {
     console.log(`[FULLSTACK] Server running on http://0.0.0.0:${PORT} in ${NODE_ENV} mode.`);
+    void syncDiscoveredPagesWithIndexNow(UPLOADS_DIR);
   });
 }
 

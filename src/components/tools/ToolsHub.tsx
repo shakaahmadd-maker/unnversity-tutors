@@ -1,5 +1,6 @@
 import React, { useState, useEffect, lazy, Suspense } from 'react';
-import { Search, ShieldCheck, Star, ArrowRight, Dna, FlaskConical, Sigma } from 'lucide-react';
+import { Search, ShieldCheck, Star, ArrowRight } from 'lucide-react';
+import { ScienceCategoryIcon } from './ScienceHubVisuals';
 import {
   STUDENT_TOOLS,
   STUDENT_TOOLS_BY_SLUG,
@@ -12,6 +13,7 @@ import { isModifiedAnchorClick } from '../../data/dedicatedServiceRoutes';
 import ToolPageLayout, { renderToolIcon } from './ToolPageLayout';
 import MeetOurExpertTutors from './MeetOurExpertTutors';
 import SiteFooter from './SiteFooter';
+import { MathCategoryIcon } from './math/MathHubVisuals';
 
 // Route-level code splitting for every individual student tool
 const PdfToolkit = lazy(() => import('./PdfToolkit'));
@@ -277,7 +279,7 @@ export default function ToolsHub({
             <div className="space-y-2.5">
               <div className="flex items-center justify-between">
                 <span className="inline-flex items-center gap-1.5 text-xs font-bold text-[#EA580C] bg-[#FFF7ED] border border-orange-200 px-3 py-1 rounded-lg">
-                  <Sigma className="w-3.5 h-3.5" />
+                  <MathCategoryIcon categoryId="all" className="w-4 h-4 text-[#EA580C]" />
                   <span>Math &amp; Stats Hub · 27 Tools</span>
                 </span>
                 <span className="font-mono text-xs text-slate-400">/tools/math</span>
@@ -303,7 +305,7 @@ export default function ToolsHub({
             <div className="space-y-2.5">
               <div className="flex items-center justify-between">
                 <span className="inline-flex items-center gap-1.5 text-xs font-bold text-[#EA580C] bg-[#FFF7ED] border border-orange-200 px-3 py-1 rounded-lg">
-                  <Dna className="w-3.5 h-3.5" />
+                  <ScienceCategoryIcon category="Biology" subCategory="All" className="w-4 h-4 text-[#EA580C]" />
                   <span>Biology Knowledge Hub · 14 Tools</span>
                 </span>
                 <span className="font-mono text-xs text-slate-400">/tools/biology</span>
@@ -329,7 +331,7 @@ export default function ToolsHub({
             <div className="space-y-2.5">
               <div className="flex items-center justify-between">
                 <span className="inline-flex items-center gap-1.5 text-xs font-bold text-[#EA580C] bg-[#FFF7ED] border border-orange-200 px-3 py-1 rounded-lg">
-                  <FlaskConical className="w-3.5 h-3.5" />
+                  <ScienceCategoryIcon category="Chemistry" subCategory="All" className="w-4 h-4 text-[#EA580C]" />
                   <span>Chemistry Knowledge Hub · 16 Tools</span>
                 </span>
                 <span className="font-mono text-xs text-slate-400">/tools/chemistry</span>

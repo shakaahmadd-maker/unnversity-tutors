@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, lazy, Suspense } from 'react';
 import {
   ChevronRight,
   ChevronDown,
@@ -15,9 +15,13 @@ import {
   SCIENCE_TUTOR_BRANDING,
 } from '../../data/scienceToolsRegistry';
 import { isModifiedAnchorClick } from '../../data/dedicatedServiceRoutes';
-import { downloadAcademicReportPdf } from '../../utils/pdfReportGenerator';
+import { downloadAcademicReportPdf, getBrandLogoForPdf } from '../../utils/pdfReportGenerator';
 import MeetOurExpertTutors from './MeetOurExpertTutors';
 import SiteFooter from '../SiteFooter';
+
+const PunnettRealLifeExamples = lazy(() => import('./biology/PunnettRealLifeExamples'));
+const BiologyRealLifeExamples = lazy(() => import('./biology/BiologyRealLifeExamples'));
+const ChemistryRealLifeExamples = lazy(() => import('./chemistry/ChemistryRealLifeExamples'));
 
 interface ScienceToolLayoutProps {
   tool: ScienceToolItem;
@@ -43,7 +47,21 @@ export default function ScienceToolLayout({
     .map((slug) => SCIENCE_TOOLS_BY_SLUG[slug])
     .filter(Boolean);
 
+  useEffect(() => {
+    void getBrandLogoForPdf();
+  }, []);
+
   const handleDownloadLabPdf = () => {
+    if (typeof window !== 'undefined') {
+      const customEvent = new CustomEvent('ut-tool-pdf-export', {
+        cancelable: true,
+        detail: { tool },
+      });
+      if (!window.dispatchEvent(customEvent)) {
+        return;
+      }
+    }
+
     const liveLines: string[] = [];
     if (workspaceRef.current) {
       const inputs = Array.from(
@@ -66,7 +84,7 @@ export default function ScienceToolLayout({
       });
     }
 
-    downloadAcademicReportPdf({
+    void downloadAcademicReportPdf({
       filename: `${tool.slug}-report.pdf`,
       title: tool.title,
       subtitle: `${tool.category} — ${tool.subCategory} · Core Relation: ${tool.formulaBadge}`,
@@ -254,7 +272,7 @@ export default function ScienceToolLayout({
 
       {/* 3. Interactive Tool Slot (Above the Fold) */}
       <section className="max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div ref={workspaceRef}>{children}</div>
+        <div ref={workspaceRef} id="tool-workspace-anchor">{children}</div>
 
         {/* Quick Inline Conversion Strip */}
         <div className="mt-6 bg-[#FFF7ED] border border-orange-200/80 rounded-2xl px-5 py-4 flex flex-col sm:flex-row items-center justify-between gap-3">
@@ -273,6 +291,23 @@ export default function ScienceToolLayout({
           </a>
         </div>
       </section>
+
+      {/* 4. Real-Life Biology Visual Examples */}
+      {tool.slug === 'punnett-square-calculator' && (
+        <Suspense fallback={null}>
+          <PunnettRealLifeExamples onNavigate={onNavigate} />
+        </Suspense>
+      )}
+      {tool.category === 'Biology' && tool.slug !== 'punnett-square-calculator' && (
+        <Suspense fallback={null}>
+          <BiologyRealLifeExamples slug={tool.slug} onNavigate={onNavigate} />
+        </Suspense>
+      )}
+      {tool.category === 'Chemistry' && (
+        <Suspense fallback={null}>
+          <ChemistryRealLifeExamples slug={tool.slug} onNavigate={onNavigate} />
+        </Suspense>
+      )}
 
       {/* 5. Worked Example & Academic FAQs */}
       <section className="max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-10">

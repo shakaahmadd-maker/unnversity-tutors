@@ -1,5 +1,7 @@
-import React, { useState, useMemo } from 'react';
-import { Sparkles, CheckCircle2, AlertCircle } from 'lucide-react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
+import { CheckCircle2, AlertCircle } from 'lucide-react';
+import { downloadBiologyStructuredPdf } from '../../../utils/pdfReportGenerator';
+import { BiologyToolShell } from './BiologyToolShell';
 
 // ============================================================================
 // 7. SERIAL DILUTION & LAB MOLARITY (C1V1 = C2V2) CALCULATOR
@@ -38,7 +40,31 @@ export function SerialDilutionMolarityCalculator() {
   const [transferVolUl, setTransferVolUl] = useState(100);
   const [numTubes, setNumTubes] = useState(6);
 
-  const loadExample = () => {
+  const tubeSvgRef = useRef<SVGSVGElement | null>(null);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent<Record<string, unknown>>).detail;
+      if (detail?.slug !== 'serial-dilution-molarity-calculator') return;
+      if (detail.tab === 'c1v1' || detail.tab === 'serial') setTab(detail.tab);
+      if (typeof detail.c1 === 'number') setC1(detail.c1);
+      if (typeof detail.c1Unit === 'string') setC1Unit(detail.c1Unit as ConcUnit);
+      if (typeof detail.c2 === 'number') setC2(detail.c2);
+      if (typeof detail.c2Unit === 'string') setC2Unit(detail.c2Unit as ConcUnit);
+      if (typeof detail.v2 === 'number') setV2(detail.v2);
+      if (typeof detail.v2Unit === 'string') setV2Unit(detail.v2Unit as VolUnit);
+      if (typeof detail.startConc === 'number') setStartConc(detail.startConc);
+      if (typeof detail.startUnit === 'string') setStartUnit(detail.startUnit as ConcUnit);
+      if (typeof detail.dilutionFactor === 'number') setDilutionFactor(detail.dilutionFactor);
+      if (typeof detail.transferVolUl === 'number') setTransferVolUl(detail.transferVolUl);
+      if (typeof detail.numTubes === 'number') setNumTubes(detail.numTubes);
+    };
+    window.addEventListener('ut-bio-load-preset', handler as EventListener);
+    return () => window.removeEventListener('ut-bio-load-preset', handler as EventListener);
+  }, []);
+
+  const handleReset = () => {
     if (tab === 'c1v1') {
       setC1(10);
       setC1Unit('mM');
@@ -96,7 +122,7 @@ export function SerialDilutionMolarityCalculator() {
     const vTrans = Math.max(1, transferVolUl);
     const totalTubeVolUl = vTrans * df;
     const bufferVolUl = totalTubeVolUl - vTrans;
-    const count = Math.min(12, Math.max(2, Math.round(numTubes)));
+    const count = Math.min(10, Math.max(2, Math.round(numTubes)));
 
     const rows = Array.from({ length: count }, (_, idx) => {
       const tubeNum = idx + 1;
@@ -126,14 +152,98 @@ export function SerialDilutionMolarityCalculator() {
     return `${molar.toExponential(2)} M`;
   };
 
+  const handleExportPdf = () => {
+    if (tab === 'c1v1') {
+      void downloadBiologyStructuredPdf({
+        filename: `stock-dilution-${c2}${c2Unit}-${v2}${v2Unit}.pdf`,
+        badgeText: 'BIOLOGY · LAB PREPARATION REPORT',
+        title: 'Stock Dilution & Buffer Preparation Report (C1V1 = C2V2)',
+        subtitle: `Prepare ${v2} ${v2Unit} of ${c2} ${c2Unit} working solution from ${c1} ${c1Unit} stock`,
+        parameters: [
+          { label: 'Stock Concentration (C1)', value: `${c1} ${c1Unit}` },
+          { label: 'Target Concentration (C2)', value: `${c2} ${c2Unit}` },
+          { label: 'Final Target Volume (V2)', value: `${v2} ${v2Unit}` },
+          { label: 'Governing Equation', value: 'V1 = (C2 x V2) / C1' },
+        ],
+        kpis: c1v1Calc.valid
+          ? [
+              { label: 'Stock Volume (V1)', value: c1v1Calc.v1Text || '-', sublabel: 'Pipette from stock', accent: true },
+              { label: 'Diluent / Buffer Volume', value: c1v1Calc.diluentText || '-', sublabel: 'V2 - V1 solvent' },
+              { label: 'Dilution Factor', value: `1 : ${c1v1Calc.foldDilution?.toFixed(2)}x`, sublabel: 'C1 / C2 ratio' },
+            ]
+          : [],
+        callout: c1v1Calc.valid
+          ? {
+              title: 'Bench Preparation Protocol',
+              body: `Measure ${c1v1Calc.diluentText} of sterile buffer/solvent into a clean vessel, then pipette ${c1v1Calc.v1Text} of your ${c1} ${c1Unit} stock and mix thoroughly to reach ${v2} ${v2Unit} at ${c2} ${c2Unit}.`,
+              tone: 'emerald',
+            }
+          : {
+              title: 'Input Error',
+              body: c1v1Calc.error || 'Invalid inputs.',
+              tone: 'amber',
+            },
+        workedExample: {
+          problem: 'How much 10 mM stock antibiotic (C1) is required to prepare 50 mL (V2) of 25 uM working medium (C2)?',
+          steps: [
+            'Convert concentrations to a common unit (uM): C1 = 10,000 uM; C2 = 25 uM.',
+            'Rearrange C1V1 = C2V2: V1 = (25 uM x 50 mL) / 10,000 uM = 0.125 mL = 125 uL.',
+            'Combine 125 uL stock + 49.875 mL sterile medium to reach 50.0 mL.',
+          ],
+          answer: 'Pipette 125.0 uL of 10 mM stock + 49.875 mL diluent',
+        },
+      });
+    } else {
+      void downloadBiologyStructuredPdf({
+        filename: `serial-dilution-${serialTable.rows.length}tubes.pdf`,
+        badgeText: 'BIOLOGY · SERIAL DILUTION PROTOCOL',
+        title: 'Multi-Tube Serial Dilution Bench Protocol',
+        subtitle: `${serialTable.rows.length} tubes · 1 : ${serialTable.df} step dilution · Starting stock ${startConc} ${startUnit}`,
+        parameters: [
+          { label: 'Starting Stock Conc.', value: `${startConc} ${startUnit}` },
+          { label: 'Step Dilution Factor', value: `1 : ${serialTable.df} per tube` },
+          { label: 'Transfer Volume', value: `${serialTable.vTrans.toFixed(1)} uL` },
+          { label: 'Diluent Buffer / Tube', value: `${serialTable.bufferVolUl.toFixed(1)} uL` },
+        ],
+        svgFigure: {
+          title: 'Visual Serial Dilution Tube Gradient',
+          svgElement: tubeSvgRef.current,
+          maxHeightMm: 46,
+        },
+        tables: [
+          {
+            title: 'Step-by-Step Serial Dilution Tube Table',
+            headers: ['Tube #', 'Transfer Source', 'Transfer (uL)', 'Buffer (uL)', 'Tube Conc.', 'Cumulative DF'],
+            rows: serialTable.rows.map((r) => [
+              `Tube ${r.tubeNum}`,
+              r.source,
+              `${r.transferUl.toFixed(1)} uL`,
+              `${r.bufferUl.toFixed(1)} uL`,
+              formatAutoConc(r.conc, startUnit),
+              `1 : ${r.cumulativeDf.toLocaleString()}`,
+            ]),
+            colWidths: [14, 20, 16, 16, 18, 16],
+            alignRightCols: [2, 3, 4, 5],
+            monospaceCols: [2, 3, 4, 5],
+          },
+        ],
+      });
+    }
+  };
+
   return (
-    <div className="bg-[#FFFFFF] border border-slate-200 rounded-3xl p-6 sm:p-8 space-y-6 shadow-2xs">
-      <div className="flex flex-wrap items-center justify-between gap-3 pb-4 border-b border-slate-100">
-        <div className="inline-flex p-1 rounded-xl bg-[#F9FAFB] border border-slate-200">
+    <BiologyToolShell
+      slug="serial-dilution-molarity-calculator"
+      title="Serial Dilution & C₁V₁ = C₂V₂"
+      onReset={handleReset}
+      onExportPdf={handleExportPdf}
+      headerControls={
+        <div className="inline-flex p-1 rounded-xl bg-[#F9FAFB] border border-slate-200 max-w-full overflow-x-auto no-scrollbar">
           <button
             type="button"
             onClick={() => setTab('c1v1')}
-            className={`px-4 py-2 rounded-lg text-xs font-bold transition-colors cursor-pointer ${
+            aria-pressed={tab === 'c1v1'}
+            className={`px-3 py-2 min-h-[40px] rounded-lg text-xs font-bold whitespace-nowrap transition-colors cursor-pointer ${
               tab === 'c1v1' ? 'bg-[#F97316] text-white' : 'text-slate-600 hover:text-slate-900'
             }`}
           >
@@ -142,44 +252,91 @@ export function SerialDilutionMolarityCalculator() {
           <button
             type="button"
             onClick={() => setTab('serial')}
-            className={`px-4 py-2 rounded-lg text-xs font-bold transition-colors cursor-pointer ${
+            aria-pressed={tab === 'serial'}
+            className={`px-3 py-2 min-h-[40px] rounded-lg text-xs font-bold whitespace-nowrap transition-colors cursor-pointer ${
               tab === 'serial' ? 'bg-[#F97316] text-white' : 'text-slate-600 hover:text-slate-900'
             }`}
           >
-            Multi-Tube Serial Dilution Series
+            Serial Dilution Series
           </button>
         </div>
-
-        <button
-          type="button"
-          onClick={loadExample}
-          className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-[#FFF7ED] hover:bg-orange-100 border border-orange-200 text-[#EA580C] text-xs font-bold transition-colors cursor-pointer"
-        >
-          <Sparkles className="w-3.5 h-3.5" />
-          <span>Load Example</span>
-        </button>
-      </div>
-
+      }
+      presetsLabel="Lab Presets:"
+      presets={[
+        {
+          label: '250 µM Antibiotic (50 mL)',
+          active: tab === 'c1v1' && c1 === 10 && c2 === 250 && v2 === 50,
+          onClick: () => {
+            setTab('c1v1');
+            setC1(10);
+            setC1Unit('mM');
+            setC2(250);
+            setC2Unit('µM');
+            setV2(50);
+            setV2Unit('mL');
+          },
+        },
+        {
+          label: '10× PBS → 1× Buffer (500 mL)',
+          active: tab === 'c1v1' && c1 === 10 && c2 === 1 && v2 === 500,
+          onClick: () => {
+            setTab('c1v1');
+            setC1(10);
+            setC1Unit('M');
+            setC2(1);
+            setC2Unit('M');
+            setV2(500);
+            setV2Unit('mL');
+          },
+        },
+        {
+          label: '1:10 Log Serial (6 Tubes)',
+          active: tab === 'serial' && dilutionFactor === 10 && numTubes === 6,
+          onClick: () => {
+            setTab('serial');
+            setStartConc(100);
+            setStartUnit('mM');
+            setDilutionFactor(10);
+            setTransferVolUl(100);
+            setNumTubes(6);
+          },
+        },
+        {
+          label: '1:2 ELISA Standard Curve',
+          active: tab === 'serial' && dilutionFactor === 2 && numTubes === 7,
+          onClick: () => {
+            setTab('serial');
+            setStartConc(200);
+            setStartUnit('nM');
+            setDilutionFactor(2);
+            setTransferVolUl(250);
+            setNumTubes(7);
+          },
+        },
+      ]}
+    >
       {tab === 'c1v1' ? (
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-          <div className="lg:col-span-5 bg-[#F9FAFB] border border-slate-200 rounded-2xl p-5 space-y-4">
+          <div className="lg:col-span-5 bg-[#F9FAFB] border border-slate-200 rounded-2xl p-4 sm:p-5 space-y-4">
             <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">
+              <label htmlFor="dil-c1" className="block text-xs font-bold text-slate-700 mb-1">
                 Stock Concentration (C₁)
               </label>
               <div className="flex gap-2">
                 <input
+                  id="dil-c1"
                   type="number"
                   min={0.0001}
                   step="any"
                   value={c1}
                   onChange={(e) => setC1(Number(e.target.value))}
-                  className="flex-1 px-3 py-2 rounded-xl bg-white border border-slate-300 font-mono text-sm focus:border-[#F97316] focus:outline-none tabular-nums"
+                  className="flex-1 min-h-[44px] px-3 py-2 rounded-xl bg-white border border-slate-300 font-mono text-sm focus:border-[#F97316] focus:outline-none tabular-nums"
                 />
                 <select
+                  aria-label="C1 unit"
                   value={c1Unit}
                   onChange={(e) => setC1Unit(e.target.value as ConcUnit)}
-                  className="px-3 py-2 rounded-xl bg-white border border-slate-300 text-xs font-bold focus:border-[#F97316] focus:outline-none"
+                  className="min-h-[44px] px-3 py-2 rounded-xl bg-white border border-slate-300 text-xs font-bold focus:border-[#F97316] focus:outline-none"
                 >
                   {(['M', 'mM', 'µM', 'nM'] as ConcUnit[]).map((u) => (
                     <option key={u} value={u}>
@@ -191,22 +348,24 @@ export function SerialDilutionMolarityCalculator() {
             </div>
 
             <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">
+              <label htmlFor="dil-c2" className="block text-xs font-bold text-slate-700 mb-1">
                 Desired Working Concentration (C₂)
               </label>
               <div className="flex gap-2">
                 <input
+                  id="dil-c2"
                   type="number"
                   min={0.0001}
                   step="any"
                   value={c2}
                   onChange={(e) => setC2(Number(e.target.value))}
-                  className="flex-1 px-3 py-2 rounded-xl bg-white border border-slate-300 font-mono text-sm focus:border-[#F97316] focus:outline-none tabular-nums"
+                  className="flex-1 min-h-[44px] px-3 py-2 rounded-xl bg-white border border-slate-300 font-mono text-sm focus:border-[#F97316] focus:outline-none tabular-nums"
                 />
                 <select
+                  aria-label="C2 unit"
                   value={c2Unit}
                   onChange={(e) => setC2Unit(e.target.value as ConcUnit)}
-                  className="px-3 py-2 rounded-xl bg-white border border-slate-300 text-xs font-bold focus:border-[#F97316] focus:outline-none"
+                  className="min-h-[44px] px-3 py-2 rounded-xl bg-white border border-slate-300 text-xs font-bold focus:border-[#F97316] focus:outline-none"
                 >
                   {(['M', 'mM', 'µM', 'nM'] as ConcUnit[]).map((u) => (
                     <option key={u} value={u}>
@@ -218,22 +377,24 @@ export function SerialDilutionMolarityCalculator() {
             </div>
 
             <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">
+              <label htmlFor="dil-v2" className="block text-xs font-bold text-slate-700 mb-1">
                 Final Target Volume (V₂)
               </label>
               <div className="flex gap-2">
                 <input
+                  id="dil-v2"
                   type="number"
                   min={0.001}
                   step="any"
                   value={v2}
                   onChange={(e) => setV2(Number(e.target.value))}
-                  className="flex-1 px-3 py-2 rounded-xl bg-white border border-slate-300 font-mono text-sm focus:border-[#F97316] focus:outline-none tabular-nums"
+                  className="flex-1 min-h-[44px] px-3 py-2 rounded-xl bg-white border border-slate-300 font-mono text-sm focus:border-[#F97316] focus:outline-none tabular-nums"
                 />
                 <select
+                  aria-label="V2 unit"
                   value={v2Unit}
                   onChange={(e) => setV2Unit(e.target.value as VolUnit)}
-                  className="px-3 py-2 rounded-xl bg-white border border-slate-300 text-xs font-bold focus:border-[#F97316] focus:outline-none"
+                  className="min-h-[44px] px-3 py-2 rounded-xl bg-white border border-slate-300 text-xs font-bold focus:border-[#F97316] focus:outline-none"
                 >
                   {(['L', 'mL', 'µL'] as VolUnit[]).map((u) => (
                     <option key={u} value={u}>
@@ -308,24 +469,26 @@ export function SerialDilutionMolarityCalculator() {
         </div>
       ) : (
         <div className="space-y-5">
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 bg-[#F9FAFB] border border-slate-200 rounded-2xl p-5">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5 bg-[#F9FAFB] border border-slate-200 rounded-2xl p-4 sm:p-5">
             <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">
+              <label htmlFor="ser-conc" className="block text-xs font-bold text-slate-700 mb-1">
                 Stock Concentration
               </label>
               <div className="flex gap-2">
                 <input
+                  id="ser-conc"
                   type="number"
                   min={0.001}
                   step="any"
                   value={startConc}
                   onChange={(e) => setStartConc(Number(e.target.value))}
-                  className="flex-1 px-3 py-2 rounded-xl bg-white border border-slate-300 font-mono text-sm tabular-nums focus:border-[#F97316] focus:outline-none"
+                  className="flex-1 min-h-[44px] px-3 py-2 rounded-xl bg-white border border-slate-300 font-mono text-sm tabular-nums focus:border-[#F97316] focus:outline-none"
                 />
                 <select
+                  aria-label="Stock concentration unit"
                   value={startUnit}
                   onChange={(e) => setStartUnit(e.target.value as ConcUnit)}
-                  className="px-2.5 py-2 rounded-xl bg-white border border-slate-300 text-xs font-bold"
+                  className="min-h-[44px] px-2.5 py-2 rounded-xl bg-white border border-slate-300 text-xs font-bold"
                 >
                   {(['M', 'mM', 'µM', 'nM'] as ConcUnit[]).map((u) => (
                     <option key={u} value={u}>
@@ -337,48 +500,93 @@ export function SerialDilutionMolarityCalculator() {
             </div>
 
             <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">
+              <label htmlFor="ser-df" className="block text-xs font-bold text-slate-700 mb-1">
                 Step Dilution Factor (1:X)
               </label>
               <input
+                id="ser-df"
                 type="number"
                 min={2}
                 max={1000}
                 step={1}
                 value={dilutionFactor}
                 onChange={(e) => setDilutionFactor(Number(e.target.value))}
-                className="w-full px-3 py-2 rounded-xl bg-white border border-slate-300 font-mono text-sm tabular-nums focus:border-[#F97316] focus:outline-none"
+                className="w-full min-h-[44px] px-3 py-2 rounded-xl bg-white border border-slate-300 font-mono text-sm tabular-nums focus:border-[#F97316] focus:outline-none"
               />
             </div>
 
             <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">
+              <label htmlFor="ser-trans" className="block text-xs font-bold text-slate-700 mb-1">
                 Transfer Volume per Step (µL)
               </label>
               <input
+                id="ser-trans"
                 type="number"
                 min={1}
                 max={50000}
                 step={10}
                 value={transferVolUl}
                 onChange={(e) => setTransferVolUl(Number(e.target.value))}
-                className="w-full px-3 py-2 rounded-xl bg-white border border-slate-300 font-mono text-sm tabular-nums focus:border-[#F97316] focus:outline-none"
+                className="w-full min-h-[44px] px-3 py-2 rounded-xl bg-white border border-slate-300 font-mono text-sm tabular-nums focus:border-[#F97316] focus:outline-none"
               />
             </div>
 
             <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">
+              <label htmlFor="ser-tubes" className="block text-xs font-bold text-slate-700 mb-1">
                 Number of Dilution Tubes
               </label>
               <input
+                id="ser-tubes"
                 type="number"
                 min={2}
                 max={10}
                 value={numTubes}
                 onChange={(e) => setNumTubes(Number(e.target.value))}
-                className="w-full px-3 py-2 rounded-xl bg-white border border-slate-300 font-mono text-sm tabular-nums focus:border-[#F97316] focus:outline-none"
+                className="w-full min-h-[44px] px-3 py-2 rounded-xl bg-white border border-slate-300 font-mono text-sm tabular-nums focus:border-[#F97316] focus:outline-none"
               />
             </div>
+          </div>
+
+          {/* Visual Tube Gradient Diagram */}
+          <div className="bg-[#F9FAFB] border border-slate-200 rounded-2xl p-4 overflow-x-auto">
+            <svg
+              ref={tubeSvgRef}
+              viewBox={`0 0 ${Math.max(460, (serialTable.rows.length + 1) * 70 + 20)} 115`}
+              className="w-full min-w-[440px] h-28"
+            >
+              <rect x="0" y="0" width={Math.max(460, (serialTable.rows.length + 1) * 70 + 20)} height="115" fill="#F9FAFB" />
+              {/* Stock Tube */}
+              <g>
+                <rect x="16" y="24" width="32" height="58" rx="8" fill="#EA580C" stroke="#111827" strokeWidth="1.8" />
+                <text x="32" y="16" textAnchor="middle" fontSize="9" fontWeight="700" fill="#111827" fontFamily="monospace">
+                  Stock
+                </text>
+                <text x="32" y="98" textAnchor="middle" fontSize="8.5" fontWeight="700" fill="#EA580C" fontFamily="monospace">
+                  {startConc} {startUnit}
+                </text>
+              </g>
+              {serialTable.rows.map((r, idx) => {
+                const x = 86 + idx * 70;
+                const opacity = Math.max(0.12, 0.85 - idx * 0.11);
+                return (
+                  <g key={r.tubeNum}>
+                    <path d={`M ${x - 36} 22 Q ${x - 18} 8 ${x} 22`} fill="none" stroke="#EA580C" strokeWidth="1.6" />
+                    <polygon points={`${x + 2},23 ${x - 5},18 ${x - 3},25`} fill="#EA580C" />
+                    <text x={x - 18} y="10" textAnchor="middle" fontSize="7.5" fill="#EA580C" fontFamily="monospace">
+                      {r.transferUl}µL
+                    </text>
+                    <rect x={x} y="24" width="32" height="58" rx="8" fill="#FFFFFF" stroke="#64748B" strokeWidth="1.6" />
+                    <rect x={x + 2} y="38" width="28" height="42" rx="6" fill="#F97316" fillOpacity={opacity} />
+                    <text x={x + 16} y="100" textAnchor="middle" fontSize="8" fontWeight="700" fill="#111827" fontFamily="monospace">
+                      T{r.tubeNum}: {formatAutoConc(r.conc, startUnit).split(' ')[0]}
+                    </text>
+                    <text x={x + 16} y="110" textAnchor="middle" fontSize="7" fill="#64748B" fontFamily="monospace">
+                      1:{r.cumulativeDf.toLocaleString()}
+                    </text>
+                  </g>
+                );
+              })}
+            </svg>
           </div>
 
           <div className="border border-slate-200 rounded-2xl overflow-x-auto">
@@ -417,7 +625,7 @@ export function SerialDilutionMolarityCalculator() {
           </div>
         </div>
       )}
-    </div>
+    </BiologyToolShell>
   );
 }
 
@@ -434,10 +642,30 @@ export function CellGrowthCfuCalculator() {
 
   // Viable plate count state
   const [colonies, setColonies] = useState(148);
-  const [dilutionExponent, setDilutionExponent] = useState(-5); // 10^-5
+  const [dilutionExponent, setDilutionExponent] = useState(-5);
   const [volumePlatedMl, setVolumePlatedMl] = useState(0.1);
 
-  const loadExample = () => {
+  const growthSvgRef = useRef<SVGSVGElement | null>(null);
+  const plateSvgRef = useRef<SVGSVGElement | null>(null);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent<Record<string, unknown>>).detail;
+      if (detail?.slug !== 'cell-growth-cfu-calculator') return;
+      if (detail.tab === 'growth' || detail.tab === 'cfu') setTab(detail.tab);
+      if (typeof detail.n0 === 'number') setN0(detail.n0);
+      if (typeof detail.nt === 'number') setNt(detail.nt);
+      if (typeof detail.elapsedMinutes === 'number') setElapsedMinutes(detail.elapsedMinutes);
+      if (typeof detail.colonies === 'number') setColonies(detail.colonies);
+      if (typeof detail.dilutionExponent === 'number') setDilutionExponent(detail.dilutionExponent);
+      if (typeof detail.volumePlatedMl === 'number') setVolumePlatedMl(detail.volumePlatedMl);
+    };
+    window.addEventListener('ut-bio-load-preset', handler as EventListener);
+    return () => window.removeEventListener('ut-bio-load-preset', handler as EventListener);
+  }, []);
+
+  const handleReset = () => {
     if (tab === 'growth') {
       setN0(2.5e5);
       setNt(1.6e7);
@@ -460,7 +688,6 @@ export function CellGrowthCfuCalculator() {
     const doublingTimeMin = elapsedMinutes / generations;
     const muPerHour = (Math.LN2 / doublingTimeMin) * 60;
 
-    // Curve points
     const points = Array.from({ length: 25 }, (_, i) => {
       const t = (elapsedMinutes * i) / 24;
       const val = n0 * Math.pow(2, t / doublingTimeMin);
@@ -471,95 +698,216 @@ export function CellGrowthCfuCalculator() {
   }, [n0, nt, elapsedMinutes]);
 
   const cfuStats = useMemo(() => {
-    const df = Math.pow(10, dilutionExponent); // e.g., 10^-5
+    const df = Math.pow(10, dilutionExponent);
     const vol = Math.max(0.001, volumePlatedMl);
     const cfuPerMl = colonies / (df * vol);
     const countable = colonies >= 30 && colonies <= 300;
     const statusLabel =
       colonies < 30
-        ? 'TFTB — Too Few To Count (< 30 colonies; higher statistical variance)'
+        ? 'TFTB — Too Few To Count (< 30 colonies; high Poisson variance)'
         : colonies > 300
-        ? 'TNTC — Too Numerous To Count (> 300 colonies; crowding inhibition likely)'
+        ? 'TNTC — Too Numerous To Count (> 300 colonies; crowding overlap)'
         : 'Optimal Countable Range (30–300 colonies)';
     return { cfuPerMl, countable, statusLabel };
   }, [colonies, dilutionExponent, volumePlatedMl]);
 
+  // Deterministic pseudo-random colony dots for agar plate visual
+  const plateDots = useMemo(() => {
+    const shown = Math.min(180, Math.max(1, Math.round(colonies)));
+    return Array.from({ length: shown }, (_, i) => {
+      const angle = i * 2.399963; // golden angle
+      const radius = 58 * Math.sqrt((i + 0.5) / shown);
+      return {
+        cx: 75 + radius * Math.cos(angle),
+        cy: 75 + radius * Math.sin(angle),
+      };
+    });
+  }, [colonies]);
+
+  const handleExportPdf = () => {
+    if (tab === 'growth') {
+      void downloadBiologyStructuredPdf({
+        filename: 'bacterial-growth-kinetics-report.pdf',
+        badgeText: 'BIOLOGY · MICROBIOLOGY GROWTH REPORT',
+        title: 'Bacterial Exponential Growth & Doubling Time Report',
+        subtitle: `Log-phase kinetics from N0 = ${n0.toExponential(2)} to Nt = ${nt.toExponential(2)} over ${elapsedMinutes} min`,
+        parameters: [
+          { label: 'Initial Cell Density (N0)', value: `${n0.toExponential(2)} cells/mL` },
+          { label: 'Final Cell Density (Nt)', value: `${nt.toExponential(2)} cells/mL` },
+          { label: 'Elapsed Log Time (t)', value: `${elapsedMinutes} minutes (${(elapsedMinutes / 60).toFixed(2)} hr)` },
+          { label: 'Growth Equation', value: 'Nt = N0 x 2^n' },
+        ],
+        kpis: growthStats.valid
+          ? [
+              { label: 'Generations (n)', value: growthStats.generations?.toFixed(2) || '-', sublabel: 'log2(Nt / N0)' },
+              { label: 'Doubling Time (g)', value: `${growthStats.doublingTimeMin?.toFixed(1)} min`, sublabel: 't / n', accent: true },
+              { label: 'Specific Growth Rate (mu)', value: `${growthStats.muPerHour?.toFixed(3)} /hr`, sublabel: 'ln(2) / g' },
+            ]
+          : [],
+        svgFigure: {
+          title: 'Exponential Bacterial Growth Curve N(t) = N0 · 2^(t/g)',
+          svgElement: growthSvgRef.current,
+          maxHeightMm: 55,
+        },
+        workedExample: {
+          problem: 'An E. coli culture grows from N0 = 1.0 x 10^4 to Nt = 6.4 x 10^5 cells/mL in 180 minutes. Find doubling time g.',
+          steps: [
+            'Generations n = log2(6.4 x 10^5 / 1.0 x 10^4) = log2(64) = 6.0 generations.',
+            'Doubling time g = t / n = 180 min / 6.0 = 30.0 minutes.',
+            'Specific growth rate mu = ln(2) / 0.5 hr = 1.386 hr^-1.',
+          ],
+          answer: 'n = 6.0 generations · g = 30.0 min · mu = 1.39 hr^-1',
+        },
+      });
+    } else {
+      void downloadBiologyStructuredPdf({
+        filename: `viable-plate-count-cfu-${colonies}.pdf`,
+        badgeText: 'BIOLOGY · VIABLE PLATE COUNT REPORT',
+        title: 'Agar Plate Viable Titer (CFU/mL) Report',
+        subtitle: `${colonies} colonies at 10^(${dilutionExponent}) dilution · ${volumePlatedMl} mL plated`,
+        parameters: [
+          { label: 'Colony Count', value: `${colonies} CFU` },
+          { label: 'Tube Dilution Plated', value: `10^(${dilutionExponent})` },
+          { label: 'Spread / Pour Volume', value: `${volumePlatedMl} mL` },
+          { label: 'Formula', value: 'CFU/mL = Colonies / (DF x Volume)' },
+        ],
+        kpis: [
+          { label: 'Original Culture Titer', value: `${cfuStats.cfuPerMl.toExponential(2)} CFU/mL`, sublabel: `${Math.round(cfuStats.cfuPerMl).toLocaleString()} CFU/mL`, accent: true },
+          { label: 'Plate Quality Status', value: cfuStats.countable ? 'Countable' : colonies < 30 ? 'TFTC (<30)' : 'TNTC (>300)', sublabel: 'Standard 30-300 rule' },
+        ],
+        callout: {
+          title: 'Microbiology Quality Control Assessment',
+          body: cfuStats.statusLabel,
+          tone: cfuStats.countable ? 'emerald' : 'amber',
+        },
+        svgFigure: {
+          title: 'Simulated Agar Plate Colony Distribution',
+          svgElement: plateSvgRef.current,
+          maxHeightMm: 52,
+        },
+      });
+    }
+  };
+
   return (
-    <div className="bg-[#FFFFFF] border border-slate-200 rounded-3xl p-6 sm:p-8 space-y-6 shadow-2xs">
-      <div className="flex flex-wrap items-center justify-between gap-3 pb-4 border-b border-slate-100">
-        <div className="inline-flex p-1 rounded-xl bg-[#F9FAFB] border border-slate-200">
+    <BiologyToolShell
+      slug="cell-growth-cfu-calculator"
+      title="Bacterial Growth & CFU/mL"
+      onReset={handleReset}
+      onExportPdf={handleExportPdf}
+      headerControls={
+        <div className="inline-flex p-1 rounded-xl bg-[#F9FAFB] border border-slate-200 max-w-full overflow-x-auto no-scrollbar">
           <button
             type="button"
             onClick={() => setTab('growth')}
-            className={`px-4 py-2 rounded-lg text-xs font-bold transition-colors cursor-pointer ${
+            aria-pressed={tab === 'growth'}
+            className={`px-3 py-2 min-h-[40px] rounded-lg text-xs font-bold whitespace-nowrap transition-colors cursor-pointer ${
               tab === 'growth' ? 'bg-[#F97316] text-white' : 'text-slate-600 hover:text-slate-900'
             }`}
           >
-            Exponential Growth &amp; Doubling Time
+            Exponential Growth
           </button>
           <button
             type="button"
             onClick={() => setTab('cfu')}
-            className={`px-4 py-2 rounded-lg text-xs font-bold transition-colors cursor-pointer ${
+            aria-pressed={tab === 'cfu'}
+            className={`px-3 py-2 min-h-[40px] rounded-lg text-xs font-bold whitespace-nowrap transition-colors cursor-pointer ${
               tab === 'cfu' ? 'bg-[#F97316] text-white' : 'text-slate-600 hover:text-slate-900'
             }`}
           >
-            Viable Plate Count (CFU/mL)
+            Viable Plate (CFU/mL)
           </button>
         </div>
-
-        <button
-          type="button"
-          onClick={loadExample}
-          className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-[#FFF7ED] hover:bg-orange-100 border border-orange-200 text-[#EA580C] text-xs font-bold transition-colors cursor-pointer"
-        >
-          <Sparkles className="w-3.5 h-3.5" />
-          <span>Load Example</span>
-        </button>
-      </div>
-
+      }
+      presetsLabel="Culture Presets:"
+      presets={[
+        {
+          label: 'E. coli LB Broth (30 min)',
+          active: tab === 'growth' && n0 === 2.5e5 && nt === 1.6e7,
+          onClick: () => {
+            setTab('growth');
+            setN0(2.5e5);
+            setNt(1.6e7);
+            setElapsedMinutes(180);
+          },
+        },
+        {
+          label: 'S. cerevisiae Yeast (90 min)',
+          active: tab === 'growth' && n0 === 1.0e5 && nt === 1.6e6,
+          onClick: () => {
+            setTab('growth');
+            setN0(1.0e5);
+            setNt(1.6e6);
+            setElapsedMinutes(360);
+          },
+        },
+        {
+          label: 'Countable Plate (148 CFU @ 10⁻⁵)',
+          active: tab === 'cfu' && colonies === 148,
+          onClick: () => {
+            setTab('cfu');
+            setColonies(148);
+            setDilutionExponent(-5);
+            setVolumePlatedMl(0.1);
+          },
+        },
+        {
+          label: 'TNTC Overcrowded (420 CFU)',
+          active: tab === 'cfu' && colonies === 420,
+          onClick: () => {
+            setTab('cfu');
+            setColonies(420);
+            setDilutionExponent(-3);
+            setVolumePlatedMl(0.1);
+          },
+        },
+      ]}
+    >
       {tab === 'growth' ? (
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-          <div className="lg:col-span-5 bg-[#F9FAFB] border border-slate-200 rounded-2xl p-5 space-y-4">
+          <div className="lg:col-span-5 bg-[#F9FAFB] border border-slate-200 rounded-2xl p-4 sm:p-5 space-y-4">
             <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">
+              <label htmlFor="cg-n0" className="block text-xs font-bold text-slate-700 mb-1">
                 Initial Cell Density N₀ (cells/mL or OD₆₀₀)
               </label>
               <input
+                id="cg-n0"
                 type="number"
                 min={0.001}
                 step="any"
                 value={n0}
                 onChange={(e) => setN0(Number(e.target.value))}
-                className="w-full px-3 py-2 rounded-xl bg-white border border-slate-300 font-mono text-sm tabular-nums focus:border-[#F97316] focus:outline-none"
+                className="w-full min-h-[44px] px-3 py-2 rounded-xl bg-white border border-slate-300 font-mono text-sm tabular-nums focus:border-[#F97316] focus:outline-none"
               />
             </div>
 
             <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">
+              <label htmlFor="cg-nt" className="block text-xs font-bold text-slate-700 mb-1">
                 Final Cell Density Nₜ (cells/mL or OD₆₀₀)
               </label>
               <input
+                id="cg-nt"
                 type="number"
                 min={0.002}
                 step="any"
                 value={nt}
                 onChange={(e) => setNt(Number(e.target.value))}
-                className="w-full px-3 py-2 rounded-xl bg-white border border-slate-300 font-mono text-sm tabular-nums focus:border-[#F97316] focus:outline-none"
+                className="w-full min-h-[44px] px-3 py-2 rounded-xl bg-white border border-slate-300 font-mono text-sm tabular-nums focus:border-[#F97316] focus:outline-none"
               />
             </div>
 
             <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">
+              <label htmlFor="cg-time" className="block text-xs font-bold text-slate-700 mb-1">
                 Elapsed Log-Phase Time t (minutes)
               </label>
               <input
+                id="cg-time"
                 type="number"
                 min={1}
                 step={5}
                 value={elapsedMinutes}
                 onChange={(e) => setElapsedMinutes(Number(e.target.value))}
-                className="w-full px-3 py-2 rounded-xl bg-white border border-slate-300 font-mono text-sm tabular-nums focus:border-[#F97316] focus:outline-none"
+                className="w-full min-h-[44px] px-3 py-2 rounded-xl bg-white border border-slate-300 font-mono text-sm tabular-nums focus:border-[#F97316] focus:outline-none"
               />
             </div>
           </div>
@@ -606,7 +954,8 @@ export function CellGrowthCfuCalculator() {
                     </span>
                     <span className="font-mono">0 → {elapsedMinutes} min</span>
                   </div>
-                  <svg viewBox="0 0 420 150" className="w-full h-36">
+                  <svg ref={growthSvgRef} viewBox="0 0 420 150" className="w-full h-36">
+                    <rect x="0" y="0" width="420" height="150" fill="#F9FAFB" />
                     <line x1="40" y1="125" x2="400" y2="125" stroke="#CBD5E1" strokeWidth="1.5" />
                     <line x1="40" y1="15" x2="40" y2="125" stroke="#CBD5E1" strokeWidth="1.5" />
                     <polyline
@@ -637,29 +986,31 @@ export function CellGrowthCfuCalculator() {
         </div>
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-          <div className="lg:col-span-5 bg-[#F9FAFB] border border-slate-200 rounded-2xl p-5 space-y-4">
+          <div className="lg:col-span-5 bg-[#F9FAFB] border border-slate-200 rounded-2xl p-4 sm:p-5 space-y-4">
             <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">
+              <label htmlFor="cfu-colonies" className="block text-xs font-bold text-slate-700 mb-1">
                 Counted Colonies on Agar Plate
               </label>
               <input
+                id="cfu-colonies"
                 type="number"
                 min={1}
                 max={2000}
                 value={colonies}
                 onChange={(e) => setColonies(Number(e.target.value))}
-                className="w-full px-3 py-2 rounded-xl bg-white border border-slate-300 font-mono text-sm tabular-nums focus:border-[#F97316] focus:outline-none"
+                className="w-full min-h-[44px] px-3 py-2 rounded-xl bg-white border border-slate-300 font-mono text-sm tabular-nums focus:border-[#F97316] focus:outline-none"
               />
             </div>
 
             <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">
+              <label htmlFor="cfu-df" className="block text-xs font-bold text-slate-700 mb-1">
                 Tube Dilution Plated (10ⁿ)
               </label>
               <select
+                id="cfu-df"
                 value={dilutionExponent}
                 onChange={(e) => setDilutionExponent(Number(e.target.value))}
-                className="w-full px-3 py-2 rounded-xl bg-white border border-slate-300 font-mono text-sm focus:border-[#F97316] focus:outline-none"
+                className="w-full min-h-[44px] px-3 py-2 rounded-xl bg-white border border-slate-300 font-mono text-sm focus:border-[#F97316] focus:outline-none"
               >
                 {[-1, -2, -3, -4, -5, -6, -7, -8, -9].map((exp) => (
                   <option key={exp} value={exp}>
@@ -670,52 +1021,75 @@ export function CellGrowthCfuCalculator() {
             </div>
 
             <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">
+              <label htmlFor="cfu-vol" className="block text-xs font-bold text-slate-700 mb-1">
                 Volume Spread / Plated (mL)
               </label>
               <input
+                id="cfu-vol"
                 type="number"
                 min={0.01}
                 max={5}
                 step={0.05}
                 value={volumePlatedMl}
                 onChange={(e) => setVolumePlatedMl(Number(e.target.value))}
-                className="w-full px-3 py-2 rounded-xl bg-white border border-slate-300 font-mono text-sm tabular-nums focus:border-[#F97316] focus:outline-none"
+                className="w-full min-h-[44px] px-3 py-2 rounded-xl bg-white border border-slate-300 font-mono text-sm tabular-nums focus:border-[#F97316] focus:outline-none"
               />
             </div>
           </div>
 
-          <div className="lg:col-span-7 space-y-4 tabular-nums">
-            <div className="bg-[#FFF7ED] border border-orange-200 rounded-2xl p-6 space-y-2">
-              <span className="text-xs font-bold text-[#EA580C] block">
-                Original Culture Viable Titer (CFU/mL)
+          <div className="lg:col-span-7 grid grid-cols-1 sm:grid-cols-12 gap-4 items-center tabular-nums">
+            <div className="sm:col-span-5 flex flex-col items-center bg-[#F9FAFB] border border-slate-200 rounded-2xl p-4">
+              <svg ref={plateSvgRef} viewBox="0 0 150 150" className="w-36 h-36">
+                <circle cx="75" cy="75" r="68" fill="#FEF3C7" stroke="#94A3B8" strokeWidth="3" />
+                <circle cx="75" cy="75" r="62" fill="#FFFBEB" stroke="#E2E8F0" strokeWidth="1" />
+                {plateDots.map((pt, idx) => (
+                  <circle
+                    key={idx}
+                    cx={pt.cx}
+                    cy={pt.cy}
+                    r={colonies > 300 ? 1.8 : 2.3}
+                    fill={cfuStats.countable ? '#EA580C' : colonies < 30 ? '#0284C7' : '#DC2626'}
+                    fillOpacity="0.85"
+                  />
+                ))}
+              </svg>
+              <span className="text-[11px] font-mono text-slate-600 mt-1">
+                Agar Plate Preview ({colonies} CFU)
               </span>
-              <p className="text-2xl sm:text-3xl font-mono font-bold text-[#111827]">
-                {cfuStats.cfuPerMl.toExponential(2)} CFU/mL
-              </p>
-              <p className="text-xs font-mono text-slate-600">
-                = {Math.round(cfuStats.cfuPerMl).toLocaleString()} colony-forming units per mL
-              </p>
             </div>
 
-            <div
-              className={`rounded-2xl p-4 border text-xs font-semibold flex items-center gap-2.5 ${
-                cfuStats.countable
-                  ? 'bg-emerald-50 border-emerald-200 text-emerald-900'
-                  : 'bg-amber-50 border-amber-200 text-amber-900'
-              }`}
-            >
-              {cfuStats.countable ? (
-                <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-              ) : (
-                <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
-              )}
-              <span>{cfuStats.statusLabel}</span>
+            <div className="sm:col-span-7 space-y-3">
+              <div className="bg-[#FFF7ED] border border-orange-200 rounded-2xl p-5 space-y-1.5">
+                <span className="text-xs font-bold text-[#EA580C] block">
+                  Original Culture Viable Titer (CFU/mL)
+                </span>
+                <p className="text-2xl font-mono font-bold text-[#111827]">
+                  {cfuStats.cfuPerMl.toExponential(2)} CFU/mL
+                </p>
+                <p className="text-xs font-mono text-slate-600">
+                  = {Math.round(cfuStats.cfuPerMl).toLocaleString()} CFU per mL
+                </p>
+              </div>
+
+              <div
+                className={`rounded-2xl p-4 border text-xs font-semibold flex items-center gap-2.5 ${
+                  cfuStats.countable
+                    ? 'bg-emerald-50 border-emerald-200 text-emerald-900'
+                    : 'bg-amber-50 border-amber-200 text-amber-900'
+                }`}
+              >
+                {cfuStats.countable ? (
+                  <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                ) : (
+                  <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
+                )}
+                <span>{cfuStats.statusLabel}</span>
+              </div>
             </div>
           </div>
         </div>
       )}
-    </div>
+    </BiologyToolShell>
   );
 }
 
@@ -728,8 +1102,24 @@ export function MicroscopeFovCalculator() {
   const [calibFovMm, setCalibFovMm] = useState(4.5);
   const [workingObjMag, setWorkingObjMag] = useState(40);
   const [cellsAcrossDiameter, setCellsAcrossDiameter] = useState(6);
+  const reticleSvgRef = useRef<SVGSVGElement | null>(null);
 
-  const loadExample = () => {
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent<Record<string, unknown>>).detail;
+      if (detail?.slug !== 'microscope-fov-calculator') return;
+      if (typeof detail.ocularMag === 'number') setOcularMag(detail.ocularMag);
+      if (typeof detail.calibObjMag === 'number') setCalibObjMag(detail.calibObjMag);
+      if (typeof detail.calibFovMm === 'number') setCalibFovMm(detail.calibFovMm);
+      if (typeof detail.workingObjMag === 'number') setWorkingObjMag(detail.workingObjMag);
+      if (typeof detail.cellsAcrossDiameter === 'number') setCellsAcrossDiameter(detail.cellsAcrossDiameter);
+    };
+    window.addEventListener('ut-bio-load-preset', handler as EventListener);
+    return () => window.removeEventListener('ut-bio-load-preset', handler as EventListener);
+  }, []);
+
+  const handleReset = () => {
     setOcularMag(10);
     setCalibObjMag(4);
     setCalibFovMm(4.5);
@@ -743,7 +1133,7 @@ export function MicroscopeFovCalculator() {
     const fov2Mm = calibFovMm * (calibObjMag / Math.max(1, workingObjMag));
     const fov2Um = fov2Mm * 1000;
     const cellSizeUm = fov2Um / Math.max(0.25, cellsAcrossDiameter);
-    const percentOccupied = Math.min(100, (100 / Math.max(1, cellsAcrossDiameter)));
+    const percentOccupied = Math.min(100, 100 / Math.max(1, cellsAcrossDiameter));
 
     return {
       m1,
@@ -755,38 +1145,101 @@ export function MicroscopeFovCalculator() {
     };
   }, [ocularMag, calibObjMag, calibFovMm, workingObjMag, cellsAcrossDiameter]);
 
-  return (
-    <div className="bg-[#FFFFFF] border border-slate-200 rounded-3xl p-6 sm:p-8 space-y-6 shadow-2xs">
-      <div className="flex flex-wrap items-center justify-between gap-3 pb-4 border-b border-slate-100">
-        <div>
-          <h2 className="text-base font-display font-bold text-[#111827]">
-            Compound Light Microscope FOV &amp; Specimen Micrometer Solver
-          </h2>
-          <p className="text-xs text-slate-500">
-            Inversely scales field diameter with objective power: FOV₂ = FOV₁ × (M₁ / M₂).
-          </p>
-        </div>
-        <button
-          type="button"
-          onClick={loadExample}
-          className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-[#FFF7ED] hover:bg-orange-100 border border-orange-200 text-[#EA580C] text-xs font-bold transition-colors cursor-pointer"
-        >
-          <Sparkles className="w-3.5 h-3.5" />
-          <span>Load Example</span>
-        </button>
-      </div>
+  const handleExportPdf = () => {
+    void downloadBiologyStructuredPdf({
+      filename: `microscope-fov-${fovData.m2}x.pdf`,
+      badgeText: 'BIOLOGY · MICROSCOPY LAB REPORT',
+      title: 'Compound Microscope FOV & Specimen Size Report',
+      subtitle: `${fovData.m2}x Total Magnification (${ocularMag}x Ocular × ${workingObjMag}x Objective)`,
+      parameters: [
+        { label: 'Calibrated Low Power (M1 / FOV1)', value: `${fovData.m1}x · ${calibFovMm.toFixed(2)} mm` },
+        { label: 'Working Magnification (M2)', value: `${fovData.m2}x (${ocularMag}x × ${workingObjMag}x)` },
+        { label: 'Cells Across FOV Diameter', value: `${cellsAcrossDiameter} specimens` },
+        { label: 'Governing Scaling Law', value: 'FOV2 = FOV1 x (M1 / M2)' },
+      ],
+      kpis: [
+        { label: 'Total Magnification', value: `${fovData.m2}x`, sublabel: `${ocularMag}x ocular × ${workingObjMag}x obj` },
+        { label: 'Working FOV Diameter', value: `${fovData.fov2Um.toFixed(1)} um`, sublabel: `${fovData.fov2Mm.toFixed(3)} mm` },
+        { label: 'Estimated Specimen Length', value: `${fovData.cellSizeUm.toFixed(1)} um`, sublabel: `${fovData.percentOccupied.toFixed(1)}% of FOV diameter`, accent: true },
+      ],
+      svgFigure: {
+        title: 'Ocular Reticle Field-of-View Simulation',
+        svgElement: reticleSvgRef.current,
+        maxHeightMm: 62,
+      },
+      workedExample: {
+        problem: 'With a 10x ocular and 4x objective, FOV1 = 4.5 mm. Find FOV2 at 40x objective and length of a cell spanning 25% of FOV2.',
+        steps: [
+          'Total magnification increases 10-fold from M1 = 40x to M2 = 400x.',
+          'FOV2 = 4.5 mm x (40 / 400) = 0.45 mm = 450 um.',
+          'Specimen length = 25% x 450 um = 112.5 um.',
+        ],
+        answer: '400x Total Mag · FOV = 450 um · Specimen Length = 112.5 um',
+      },
+    });
+  };
 
+  return (
+    <BiologyToolShell
+      slug="microscope-fov-calculator"
+      title="Microscope FOV & Specimen Micrometer"
+      subtitle="Inversely scales field diameter with objective power: FOV₂ = FOV₁ × (M₁ / M₂)."
+      onReset={handleReset}
+      onExportPdf={handleExportPdf}
+      presetsLabel="Slide Specimens:"
+      presets={[
+        {
+          label: 'Human Cheek Cell (400×)',
+          active: workingObjMag === 40 && cellsAcrossDiameter === 6,
+          onClick: handleReset,
+        },
+        {
+          label: 'Onion Epidermis (400×)',
+          active: workingObjMag === 40 && cellsAcrossDiameter === 2,
+          onClick: () => {
+            setOcularMag(10);
+            setCalibObjMag(4);
+            setCalibFovMm(4.5);
+            setWorkingObjMag(40);
+            setCellsAcrossDiameter(2);
+          },
+        },
+        {
+          label: 'Red Blood Cell (1000× Oil)',
+          active: workingObjMag === 100 && cellsAcrossDiameter === 24,
+          onClick: () => {
+            setOcularMag(10);
+            setCalibObjMag(4);
+            setCalibFovMm(4.5);
+            setWorkingObjMag(100);
+            setCellsAcrossDiameter(24);
+          },
+        },
+        {
+          label: 'Paramecium (100×)',
+          active: workingObjMag === 10 && cellsAcrossDiameter === 8,
+          onClick: () => {
+            setOcularMag(10);
+            setCalibObjMag(4);
+            setCalibFovMm(4.5);
+            setWorkingObjMag(10);
+            setCellsAcrossDiameter(8);
+          },
+        },
+      ]}
+    >
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-center">
-        <div className="lg:col-span-5 bg-[#F9FAFB] border border-slate-200 rounded-2xl p-5 space-y-3.5">
+        <div className="lg:col-span-5 bg-[#F9FAFB] border border-slate-200 rounded-2xl p-4 sm:p-5 space-y-3.5">
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">
+              <label htmlFor="fov-ocular" className="block text-xs font-bold text-slate-700 mb-1">
                 Ocular Lens (×)
               </label>
               <select
+                id="fov-ocular"
                 value={ocularMag}
                 onChange={(e) => setOcularMag(Number(e.target.value))}
-                className="w-full px-3 py-2 rounded-xl bg-white border border-slate-300 font-mono text-sm"
+                className="w-full min-h-[44px] px-3 py-2 rounded-xl bg-white border border-slate-300 font-mono text-sm"
               >
                 {[5, 10, 15, 20].map((v) => (
                   <option key={v} value={v}>
@@ -796,13 +1249,14 @@ export function MicroscopeFovCalculator() {
               </select>
             </div>
             <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">
+              <label htmlFor="fov-calib-obj" className="block text-xs font-bold text-slate-700 mb-1">
                 Calibrated Low Obj (×)
               </label>
               <select
+                id="fov-calib-obj"
                 value={calibObjMag}
                 onChange={(e) => setCalibObjMag(Number(e.target.value))}
-                className="w-full px-3 py-2 rounded-xl bg-white border border-slate-300 font-mono text-sm"
+                className="w-full min-h-[44px] px-3 py-2 rounded-xl bg-white border border-slate-300 font-mono text-sm"
               >
                 {[4, 10].map((v) => (
                   <option key={v} value={v}>
@@ -814,31 +1268,33 @@ export function MicroscopeFovCalculator() {
           </div>
 
           <div>
-            <label className="block text-xs font-bold text-slate-700 mb-1">
+            <label htmlFor="fov-low-mm" className="block text-xs font-bold text-slate-700 mb-1">
               Measured Low-Power FOV₁ Diameter (mm)
             </label>
             <input
+              id="fov-low-mm"
               type="number"
               min={0.5}
               max={10}
               step={0.1}
               value={calibFovMm}
               onChange={(e) => setCalibFovMm(Number(e.target.value))}
-              className="w-full px-3 py-2 rounded-xl bg-white border border-slate-300 font-mono text-sm tabular-nums focus:border-[#F97316] focus:outline-none"
+              className="w-full min-h-[44px] px-3 py-2 rounded-xl bg-white border border-slate-300 font-mono text-sm tabular-nums focus:border-[#F97316] focus:outline-none"
             />
           </div>
 
           <div>
-            <label className="block text-xs font-bold text-slate-700 mb-1">
+            <span className="block text-xs font-bold text-slate-700 mb-1">
               Active Working Objective Lens (×)
-            </label>
+            </span>
             <div className="grid grid-cols-4 gap-2">
               {[4, 10, 40, 100].map((obj) => (
                 <button
                   key={obj}
                   type="button"
                   onClick={() => setWorkingObjMag(obj)}
-                  className={`py-2 rounded-xl text-xs font-mono font-bold border cursor-pointer transition-colors ${
+                  aria-pressed={workingObjMag === obj}
+                  className={`min-h-[44px] py-2 rounded-xl text-xs font-mono font-bold border cursor-pointer transition-colors ${
                     workingObjMag === obj
                       ? 'bg-[#F97316] text-white border-[#F97316]'
                       : 'bg-white text-slate-700 border-slate-300 hover:border-orange-300'
@@ -851,17 +1307,18 @@ export function MicroscopeFovCalculator() {
           </div>
 
           <div>
-            <label className="block text-xs font-bold text-slate-700 mb-1">
+            <label htmlFor="fov-cells-across" className="block text-xs font-bold text-slate-700 mb-1">
               Cells Fitting End-to-End Across FOV Diameter
             </label>
             <input
+              id="fov-cells-across"
               type="number"
               min={0.5}
               max={100}
               step={0.5}
               value={cellsAcrossDiameter}
               onChange={(e) => setCellsAcrossDiameter(Number(e.target.value))}
-              className="w-full px-3 py-2 rounded-xl bg-white border border-slate-300 font-mono text-sm tabular-nums focus:border-[#F97316] focus:outline-none"
+              className="w-full min-h-[44px] px-3 py-2 rounded-xl bg-white border border-slate-300 font-mono text-sm tabular-nums focus:border-[#F97316] focus:outline-none"
             />
           </div>
         </div>
@@ -869,7 +1326,7 @@ export function MicroscopeFovCalculator() {
         <div className="lg:col-span-7 grid grid-cols-1 sm:grid-cols-12 gap-5 items-center">
           {/* Ocular Reticle SVG */}
           <div className="sm:col-span-5 flex flex-col items-center">
-            <svg viewBox="0 0 200 200" className="w-44 h-44">
+            <svg ref={reticleSvgRef} viewBox="0 0 200 200" className="w-44 h-44">
               <circle
                 cx="100"
                 cy="100"
@@ -878,7 +1335,6 @@ export function MicroscopeFovCalculator() {
                 stroke="#111827"
                 strokeWidth="5"
               />
-              {/* Micrometer Reticle Line */}
               <line
                 x1="14"
                 y1="100"
@@ -888,7 +1344,6 @@ export function MicroscopeFovCalculator() {
                 strokeWidth="1"
                 strokeDasharray="3 3"
               />
-              {/* Sample cells across FOV */}
               {(() => {
                 const renderedCount = Math.min(14, Math.max(1, Math.round(cellsAcrossDiameter)));
                 const cellW = 168 / renderedCount;
@@ -962,7 +1417,7 @@ export function MicroscopeFovCalculator() {
           </div>
         </div>
       </div>
-    </div>
+    </BiologyToolShell>
   );
 }
 
@@ -1137,32 +1592,104 @@ const CELL_ORGANELLES: Record<CellTypeKey, OrganelleInfo[]> = {
 export function InteractiveCellExplorer() {
   const [cellType, setCellType] = useState<CellTypeKey>('animal');
   const [selectedId, setSelectedId] = useState<string>('mitochondria');
+  const cellSvgRef = useRef<SVGSVGElement | null>(null);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent<Record<string, unknown>>).detail;
+      if (detail?.slug !== 'interactive-cell-explorer') return;
+      if (detail.cellType === 'animal' || detail.cellType === 'plant' || detail.cellType === 'bacterial') {
+        const key = detail.cellType;
+        setCellType(key);
+        const targetOrg =
+          typeof detail.organelleId === 'string'
+            ? CELL_ORGANELLES[key].find((o) => o.id === detail.organelleId)
+            : undefined;
+        setSelectedId(targetOrg ? targetOrg.id : CELL_ORGANELLES[key][0].id);
+      }
+    };
+    window.addEventListener('ut-bio-load-preset', handler as EventListener);
+    return () => window.removeEventListener('ut-bio-load-preset', handler as EventListener);
+  }, []);
 
   const organelles = CELL_ORGANELLES[cellType];
-  const activeOrg =
-    organelles.find((o) => o.id === selectedId) || organelles[0];
+  const activeOrg = organelles.find((o) => o.id === selectedId) || organelles[0];
 
   const handleSelectCellType = (type: CellTypeKey) => {
     setCellType(type);
     setSelectedId(CELL_ORGANELLES[type][0].id);
   };
 
+  const handleReset = () => {
+    setCellType('animal');
+    setSelectedId('mitochondria');
+  };
+
+  const handleExportPdf = () => {
+    const cellLabel =
+      cellType === 'animal'
+        ? 'Animal Eukaryotic Cell'
+        : cellType === 'plant'
+        ? 'Plant Eukaryotic Cell'
+        : 'Bacterial Prokaryotic Cell';
+    void downloadBiologyStructuredPdf({
+      filename: `cell-explorer-${cellType}-${activeOrg.id}.pdf`,
+      badgeText: 'BIOLOGY · CELL ULTRASTRUCTURE STUDY GUIDE',
+      title: `${cellLabel} — Organelle Ultrastructure Report`,
+      subtitle: `Featured Organelle: ${activeOrg.name} · University-Tutors.com Study Guide`,
+      parameters: [
+        { label: 'Active Cell Model', value: cellLabel },
+        { label: 'Inspected Organelle', value: activeOrg.name },
+      ],
+      callout: {
+        title: `High-Yield Exam Distinction (${activeOrg.name})`,
+        body: activeOrg.examNotes,
+        tone: 'emerald',
+      },
+      svgFigure: {
+        title: `Interactive ${cellLabel} Schematic`,
+        svgElement: cellSvgRef.current,
+        maxHeightMm: 62,
+      },
+      tables: [
+        {
+          title: `Complete ${cellLabel} Organelle Reference`,
+          headers: ['#', 'Organelle', 'Ultrastructure', 'Biochemical Function'],
+          rows: organelles.map((o, idx) => [
+            String(idx + 1),
+            o.name,
+            o.structure,
+            o.functionText,
+          ]),
+          colWidths: [6, 24, 35, 35],
+          monospaceCols: [0],
+        },
+      ],
+    });
+  };
+
   return (
-    <div className="bg-[#FFFFFF] border border-slate-200 rounded-3xl p-6 sm:p-8 space-y-6 shadow-2xs">
-      <div className="flex flex-wrap items-center justify-between gap-3 pb-4 border-b border-slate-100">
-        <div className="inline-flex p-1 rounded-xl bg-[#F9FAFB] border border-slate-200">
+    <BiologyToolShell
+      slug="interactive-cell-explorer"
+      title="Interactive Cell Organelle Explorer"
+      onReset={handleReset}
+      onExportPdf={handleExportPdf}
+      headerControls={
+        <div className="inline-flex p-1 rounded-xl bg-[#F9FAFB] border border-slate-200 max-w-full overflow-x-auto no-scrollbar">
           {(
             [
-              { key: 'animal', label: 'Animal Cell (Eukaryote)' },
-              { key: 'plant', label: 'Plant Cell (Eukaryote)' },
-              { key: 'bacterial', label: 'Bacterial Cell (Prokaryote)' },
+              { key: 'animal', label: 'Animal Cell' },
+              { key: 'plant', label: 'Plant Cell' },
+              { key: 'bacterial', label: 'Bacterial Cell' },
             ] as { key: CellTypeKey; label: string }[]
           ).map((item) => (
             <button
               key={item.key}
               type="button"
               onClick={() => handleSelectCellType(item.key)}
-              className={`px-3.5 py-2 rounded-lg text-xs font-bold transition-colors cursor-pointer ${
+              aria-pressed={cellType === item.key}
+              className={`px-3 py-2 min-h-[40px] rounded-lg text-xs font-bold whitespace-nowrap transition-colors cursor-pointer ${
                 cellType === item.key
                   ? 'bg-[#F97316] text-white'
                   : 'text-slate-600 hover:text-slate-900'
@@ -1172,21 +1699,48 @@ export function InteractiveCellExplorer() {
             </button>
           ))}
         </div>
-
-        <button
-          type="button"
-          onClick={() => handleSelectCellType('plant')}
-          className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-[#FFF7ED] hover:bg-orange-100 border border-orange-200 text-[#EA580C] text-xs font-bold transition-colors cursor-pointer"
-        >
-          <Sparkles className="w-3.5 h-3.5" />
-          <span>Load Example (Plant Cell)</span>
-        </button>
-      </div>
-
+      }
+      presetsLabel="Exam Focus:"
+      presets={[
+        {
+          label: 'Animal Mitochondria (ATP)',
+          active: cellType === 'animal' && activeOrg.id === 'mitochondria',
+          onClick: () => {
+            setCellType('animal');
+            setSelectedId('mitochondria');
+          },
+        },
+        {
+          label: 'Animal Secretory (RER → Golgi)',
+          active: cellType === 'animal' && activeOrg.id === 'golgi',
+          onClick: () => {
+            setCellType('animal');
+            setSelectedId('golgi');
+          },
+        },
+        {
+          label: 'Plant Chloroplast + Vacuole',
+          active: cellType === 'plant' && activeOrg.id === 'chloroplast',
+          onClick: () => {
+            setCellType('plant');
+            setSelectedId('chloroplast');
+          },
+        },
+        {
+          label: 'Bacterial 70S & Peptidoglycan',
+          active: cellType === 'bacterial' && activeOrg.id === 'ribosome70s',
+          onClick: () => {
+            setCellType('bacterial');
+            setSelectedId('ribosome70s');
+          },
+        },
+      ]}
+    >
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-center">
         {/* Interactive SVG Cell Diagram */}
         <div className="lg:col-span-6 bg-[#F9FAFB] border border-slate-200 rounded-2xl p-4 flex flex-col items-center">
-          <svg viewBox="0 0 340 235" className="w-full max-w-md h-auto">
+          <svg ref={cellSvgRef} viewBox="0 0 340 235" className="w-full max-w-md h-auto">
+            <rect x="0" y="0" width="340" height="235" fill="#F9FAFB" />
             {cellType === 'animal' && (
               <g>
                 <ellipse
@@ -1198,7 +1752,6 @@ export function InteractiveCellExplorer() {
                   stroke="#EA580C"
                   strokeWidth="3.5"
                 />
-                {/* ER */}
                 <path
                   d="M112 88 C95 105, 95 135, 115 150"
                   fill="none"
@@ -1206,10 +1759,8 @@ export function InteractiveCellExplorer() {
                   strokeWidth="5"
                   strokeLinecap="round"
                 />
-                {/* Nucleus */}
                 <circle cx="155" cy="115" r="32" fill="#FED7AA" stroke="#C2410C" strokeWidth="2.5" />
                 <circle cx="155" cy="115" r="11" fill="#EA580C" />
-                {/* Mitochondrion */}
                 <ellipse
                   cx="245"
                   cy="85"
@@ -1220,7 +1771,6 @@ export function InteractiveCellExplorer() {
                   strokeWidth="2"
                 />
                 <path d="M230 85 L238 80 L245 90 L252 80 L260 85" fill="none" stroke="#9A3412" strokeWidth="1.5" />
-                {/* Golgi */}
                 <path
                   d="M208 148 Q225 140 242 148 M206 156 Q225 148 244 156 M210 164 Q225 156 240 164"
                   fill="none"
@@ -1228,7 +1778,6 @@ export function InteractiveCellExplorer() {
                   strokeWidth="3"
                   strokeLinecap="round"
                 />
-                {/* Lysosome */}
                 <circle cx="105" cy="175" r="11" fill="#FDE68A" stroke="#B45309" strokeWidth="2" />
               </g>
             )}
@@ -1255,7 +1804,6 @@ export function InteractiveCellExplorer() {
                   stroke="#86EFAC"
                   strokeWidth="2"
                 />
-                {/* Central Vacuole */}
                 <rect
                   x="125"
                   y="88"
@@ -1266,19 +1814,15 @@ export function InteractiveCellExplorer() {
                   stroke="#3B82F6"
                   strokeWidth="2"
                 />
-                {/* Nucleus */}
                 <circle cx="95" cy="85" r="24" fill="#FED7AA" stroke="#C2410C" strokeWidth="2.5" />
                 <circle cx="95" cy="85" r="8" fill="#EA580C" />
-                {/* Chloroplast */}
                 <ellipse cx="245" cy="68" rx="24" ry="13" fill="#86EFAC" stroke="#166534" strokeWidth="2" />
-                {/* Mitochondrion */}
                 <ellipse cx="100" cy="172" rx="18" ry="10" fill="#FDBA74" stroke="#9A3412" strokeWidth="2" />
               </g>
             )}
 
             {cellType === 'bacterial' && (
               <g>
-                {/* Flagellum */}
                 <path
                   d="M282 118 Q305 95 318 118 T336 118"
                   fill="none"
@@ -1296,16 +1840,13 @@ export function InteractiveCellExplorer() {
                   stroke="#C2410C"
                   strokeWidth="5"
                 />
-                {/* Nucleoid */}
                 <path
                   d="M135 115 C145 92, 185 95, 190 118 C195 140, 140 142, 135 115 Z"
                   fill="none"
                   stroke="#EA580C"
                   strokeWidth="2.5"
                 />
-                {/* Plasmid */}
                 <circle cx="105" cy="145" r="11" fill="none" stroke="#059669" strokeWidth="2.5" />
-                {/* Ribosomes */}
                 <circle cx="225" cy="95" r="4" fill="#111827" />
                 <circle cx="238" cy="105" r="4" fill="#111827" />
                 <circle cx="215" cy="108" r="4" fill="#111827" />
@@ -1324,7 +1865,7 @@ export function InteractiveCellExplorer() {
                   <circle
                     cx={org.cx}
                     cy={org.cy}
-                    r={isSelected ? 13 : 10}
+                    r={isSelected ? 14 : 11}
                     fill={isSelected ? '#F97316' : '#111827'}
                     stroke="#FFFFFF"
                     strokeWidth="2.5"
@@ -1351,7 +1892,8 @@ export function InteractiveCellExplorer() {
                 key={org.id}
                 type="button"
                 onClick={() => setSelectedId(org.id)}
-                className={`px-2.5 py-1 rounded-lg text-xs font-semibold border transition-colors cursor-pointer ${
+                aria-pressed={activeOrg.id === org.id}
+                className={`px-3 py-1.5 min-h-[40px] rounded-xl text-xs font-semibold border transition-colors cursor-pointer ${
                   activeOrg.id === org.id
                     ? 'bg-[#F97316] text-white border-[#F97316]'
                     : 'bg-white text-slate-700 border-slate-200 hover:border-orange-300'
@@ -1365,7 +1907,7 @@ export function InteractiveCellExplorer() {
 
         {/* Organelle Study Card */}
         <div className="lg:col-span-6 space-y-4">
-          <div className="bg-[#FFF7ED] border border-orange-200 rounded-2xl p-5 space-y-3">
+          <div className="bg-[#FFF7ED] border border-orange-200 rounded-2xl p-4 sm:p-5 space-y-3">
             <span className="text-xs font-bold text-[#EA580C] block">
               Selected Organelle Study Card
             </span>
@@ -1394,6 +1936,6 @@ export function InteractiveCellExplorer() {
           </div>
         </div>
       </div>
-    </div>
+    </BiologyToolShell>
   );
 }

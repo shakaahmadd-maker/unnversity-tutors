@@ -7,6 +7,7 @@ import {
   formatComplex,
 } from '../../../utils/mathEngine';
 import { MathWorkspaceBar, fmtNum } from './MathWorkspaceHeader';
+import { MathFormula, MathText } from './MathTypeset';
 
 // ============================================================================
 // TOOL 6: INTERACTIVE UNIT CIRCLE & TRIGONOMETRY EXPLORER
@@ -123,7 +124,7 @@ export const InteractiveUnitCircleExplorer: React.FC = () => {
         modeLabel={`θ = ${trig.normDeg}°`}
       />
 
-      <div className="p-6 grid grid-cols-1 lg:grid-cols-12 gap-6">
+      <div className="p-4 sm:p-6 grid grid-cols-1 lg:grid-cols-12 gap-5 sm:gap-6">
         <div className="lg:col-span-6 space-y-4">
           <div className="p-4 rounded-2xl bg-[#F9FAFB] border border-gray-200 flex flex-col items-center">
             <p className="text-xs font-medium text-gray-500 mb-2">
@@ -200,36 +201,56 @@ export const InteractiveUnitCircleExplorer: React.FC = () => {
                 Reference Angle α = {fmtNum(trig.refAngle, 1)}°
               </span>
             </div>
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 text-xs font-mono tabular-nums">
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 text-xs tabular-nums">
               <div className="p-3 bg-white rounded-xl border border-orange-200/80">
-                <span className="text-sky-700 font-semibold block">cos(θ) [x]</span>
-                <span className="text-base font-bold text-gray-900">
-                  {trig.special ? trig.special.exactCos : fmtNum(trig.cosV, 4)}
+                <span className="text-sky-700 font-semibold block mb-1">
+                  <MathFormula latex="\cos(\theta)" /> [x]
                 </span>
-                {trig.special && <span className="block text-gray-400">≈ {fmtNum(trig.cosV, 4)}</span>}
+                <div className="text-base font-bold text-gray-900">
+                  {trig.special ? (
+                    <MathFormula expr={trig.special.exactCos} />
+                  ) : (
+                    <span className="font-mono">{fmtNum(trig.cosV, 4)}</span>
+                  )}
+                </div>
+                {trig.special && <span className="block font-mono text-gray-400 mt-0.5">≈ {fmtNum(trig.cosV, 4)}</span>}
               </div>
               <div className="p-3 bg-white rounded-xl border border-orange-200/80">
-                <span className="text-emerald-700 font-semibold block">sin(θ) [y]</span>
-                <span className="text-base font-bold text-gray-900">
-                  {trig.special ? trig.special.exactSin : fmtNum(trig.sinV, 4)}
+                <span className="text-emerald-700 font-semibold block mb-1">
+                  <MathFormula latex="\sin(\theta)" /> [y]
                 </span>
-                {trig.special && <span className="block text-gray-400">≈ {fmtNum(trig.sinV, 4)}</span>}
+                <div className="text-base font-bold text-gray-900">
+                  {trig.special ? (
+                    <MathFormula expr={trig.special.exactSin} />
+                  ) : (
+                    <span className="font-mono">{fmtNum(trig.sinV, 4)}</span>
+                  )}
+                </div>
+                {trig.special && <span className="block font-mono text-gray-400 mt-0.5">≈ {fmtNum(trig.sinV, 4)}</span>}
               </div>
               <div className="p-3 bg-white rounded-xl border border-orange-200/80">
-                <span className="text-[#EA580C] font-semibold block">tan(θ) [y/x]</span>
-                <span className="text-base font-bold text-gray-900">{fmtNum(trig.tanV, 4)}</span>
+                <span className="text-[#EA580C] font-semibold block mb-1">
+                  <MathFormula latex="\tan(\theta) = \frac{y}{x}" />
+                </span>
+                <span className="text-base font-bold font-mono text-gray-900">{fmtNum(trig.tanV, 4)}</span>
               </div>
               <div className="p-3 bg-white rounded-xl border border-gray-200">
-                <span className="text-gray-500 block">sec(θ) [1/x]</span>
-                <span className="font-semibold text-gray-900">{fmtNum(trig.secV, 4)}</span>
+                <span className="text-gray-500 block mb-0.5">
+                  <MathFormula latex="\sec(\theta) = \frac{1}{x}" />
+                </span>
+                <span className="font-mono font-semibold text-gray-900">{fmtNum(trig.secV, 4)}</span>
               </div>
               <div className="p-3 bg-white rounded-xl border border-gray-200">
-                <span className="text-gray-500 block">csc(θ) [1/y]</span>
-                <span className="font-semibold text-gray-900">{fmtNum(trig.cscV, 4)}</span>
+                <span className="text-gray-500 block mb-0.5">
+                  <MathFormula latex="\csc(\theta) = \frac{1}{y}" />
+                </span>
+                <span className="font-mono font-semibold text-gray-900">{fmtNum(trig.cscV, 4)}</span>
               </div>
               <div className="p-3 bg-white rounded-xl border border-gray-200">
-                <span className="text-gray-500 block">cot(θ) [x/y]</span>
-                <span className="font-semibold text-gray-900">{fmtNum(trig.cotV, 4)}</span>
+                <span className="text-gray-500 block mb-0.5">
+                  <MathFormula latex="\cot(\theta) = \frac{x}{y}" />
+                </span>
+                <span className="font-mono font-semibold text-gray-900">{fmtNum(trig.cotV, 4)}</span>
               </div>
             </div>
           </div>
@@ -500,7 +521,7 @@ export const TriangleLawSinesCosinesSolver: React.FC = () => {
         modeLabel={`Congruence Mode: ${mode}`}
       />
 
-      <div className="p-6 grid grid-cols-1 lg:grid-cols-12 gap-6">
+      <div className="p-4 sm:p-6 grid grid-cols-1 lg:grid-cols-12 gap-5 sm:gap-6">
         <div className="lg:col-span-5 space-y-4">
           <div className="inline-flex p-1 bg-[#F9FAFB] border border-gray-200 rounded-xl">
             {(['SAS', 'SSS', 'ASA', 'AAS'] as const).map((m) => (
@@ -508,7 +529,7 @@ export const TriangleLawSinesCosinesSolver: React.FC = () => {
                 key={m}
                 type="button"
                 onClick={() => setMode(m)}
-                className={`px-3.5 py-1.5 text-xs font-semibold rounded-lg ${
+                className={`px-3.5 py-2 min-h-[38px] text-xs font-semibold rounded-lg cursor-pointer ${
                   mode === m ? 'bg-[#F97316] text-white' : 'text-gray-600'
                 }`}
               >
@@ -567,9 +588,9 @@ export const TriangleLawSinesCosinesSolver: React.FC = () => {
 
               <div className="p-3.5 rounded-xl bg-[#F9FAFB] border border-gray-200 space-y-1.5">
                 {tri.steps.map((s, idx) => (
-                  <div key={idx} className="text-xs font-mono text-gray-700 bg-white px-3 py-1.5 rounded-lg border border-gray-200">
+                  <div key={idx} className="text-xs sm:text-sm text-gray-800 bg-white px-3 py-2 rounded-lg border border-gray-200">
                     <span className="text-[#F97316] font-bold mr-1.5">{idx + 1}.</span>
-                    {s}
+                    <MathText text={s} />
                   </div>
                 ))}
               </div>
@@ -843,7 +864,7 @@ export const ConicSectionsVisualizer: React.FC = () => {
         modeLabel={`Eccentricity e = ${fmtNum(geom.ecc, 3)}`}
       />
 
-      <div className="p-6 grid grid-cols-1 lg:grid-cols-12 gap-6">
+      <div className="p-4 sm:p-6 grid grid-cols-1 lg:grid-cols-12 gap-5 sm:gap-6">
         <div className="lg:col-span-6 space-y-4">
           <div className="inline-flex flex-wrap p-1 bg-[#F9FAFB] border border-gray-200 rounded-xl gap-1">
             {(['ellipse', 'hyperbola', 'parabola', 'circle'] as const).map((t) => (
@@ -851,7 +872,7 @@ export const ConicSectionsVisualizer: React.FC = () => {
                 key={t}
                 type="button"
                 onClick={() => setConic(t)}
-                className={`px-3.5 py-1.5 text-xs font-semibold rounded-lg capitalize ${
+                className={`px-3.5 py-2 min-h-[38px] text-xs font-semibold rounded-lg capitalize cursor-pointer ${
                   conic === t ? 'bg-[#F97316] text-white' : 'text-gray-600'
                 }`}
               >
@@ -922,26 +943,51 @@ export const ConicSectionsVisualizer: React.FC = () => {
             )}
           </div>
 
-          <div className="p-5 rounded-2xl bg-[#FFF7ED] border border-orange-200 space-y-2.5 text-xs">
+          <div className="p-4 sm:p-5 rounded-2xl bg-[#FFF7ED] border border-orange-200 space-y-2.5 text-xs">
             <div>
-              <span className="text-[#EA580C] font-semibold block">Canonical Equation</span>
-              <span className="text-lg font-bold font-mono text-gray-900">{geom.eq}</span>
+              <span className="text-[#EA580C] font-semibold block mb-1">Canonical Standard Equation</span>
+              <div className="text-base sm:text-lg font-bold text-gray-900">
+                <MathFormula
+                  latex={(() => {
+                    const xTerm = geom.h === 0 ? 'x^2' : `(x ${geom.h > 0 ? '-' : '+'} ${Math.abs(geom.h)})^2`;
+                    const yTerm = geom.k === 0 ? 'y^2' : `(y ${geom.k > 0 ? '-' : '+'} ${Math.abs(geom.k)})^2`;
+                    if (conic === 'circle') return `${xTerm} + ${yTerm} = ${fmtNum(geom.a * geom.a, 3)}`;
+                    if (conic === 'ellipse')
+                      return `\\frac{${xTerm}}{${fmtNum(geom.a * geom.a, 2)}} + \\frac{${yTerm}}{${fmtNum(
+                        geom.b * geom.b,
+                        2
+                      )}} = 1`;
+                    if (conic === 'hyperbola')
+                      return `\\frac{${xTerm}}{${fmtNum(geom.a * geom.a, 2)}} - \\frac{${yTerm}}{${fmtNum(
+                        geom.b * geom.b,
+                        2
+                      )}} = 1`;
+                    const yLin = geom.k === 0 ? 'y' : `(y ${geom.k > 0 ? '-' : '+'} ${Math.abs(geom.k)})`;
+                    return `${xTerm} = ${fmtNum(4 * geom.p, 2)}${yLin}`;
+                  })()}
+                  displayMode
+                />
+              </div>
             </div>
-            <div className="grid grid-cols-2 gap-2 pt-2 border-t border-orange-200/70 font-mono tabular-nums">
+            <div className="grid grid-cols-2 gap-2 pt-2 border-t border-orange-200/70 tabular-nums">
               <div>
                 <span className="font-sans text-gray-500 block">Foci Coordinates</span>
-                <span className="font-semibold text-gray-900">{geom.foci}</span>
+                <span className="font-mono font-semibold text-gray-900">{geom.foci}</span>
               </div>
               <div>
-                <span className="font-sans text-gray-500 block">Eccentricity e</span>
-                <span className="font-semibold text-gray-900">{fmtNum(geom.ecc, 4)}</span>
+                <span className="font-sans text-gray-500 block">Eccentricity <MathFormula latex="e" /></span>
+                <span className="font-semibold text-gray-900">
+                  <MathFormula latex={`e = ${fmtNum(geom.ecc, 4)}`} />
+                </span>
               </div>
             </div>
             <div className="font-mono text-gray-700 pt-1">
               <span className="font-sans text-gray-500">Vertices: </span>
               {geom.vertices}
             </div>
-            <div className="font-mono text-gray-700">{geom.extra}</div>
+            <div className="text-gray-800">
+              <MathText text={geom.extra} />
+            </div>
           </div>
         </div>
 
@@ -1048,7 +1094,7 @@ export const ComplexNumberPolarConverter: React.FC = () => {
         modeLabel={`Argand Plane · ${data.k} Roots`}
       />
 
-      <div className="p-6 grid grid-cols-1 lg:grid-cols-12 gap-6">
+      <div className="p-4 sm:p-6 grid grid-cols-1 lg:grid-cols-12 gap-5 sm:gap-6">
         <div className="lg:col-span-6 space-y-4">
           <div className="p-4 rounded-xl bg-[#F9FAFB] border border-gray-200 grid grid-cols-2 sm:grid-cols-4 gap-3">
             <div>
@@ -1093,36 +1139,53 @@ export const ComplexNumberPolarConverter: React.FC = () => {
             </div>
           </div>
 
-          <div className="p-5 rounded-2xl bg-[#FFF7ED] border border-orange-200 space-y-2.5 text-xs font-mono tabular-nums">
-            <div className="grid grid-cols-2 gap-3">
+          <div className="p-4 sm:p-5 rounded-2xl bg-[#FFF7ED] border border-orange-200 space-y-2.5 text-xs tabular-nums">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
-                <span className="font-sans text-[#EA580C] font-semibold block">Polar Phasor Form</span>
-                <span className="text-base font-bold text-gray-900">
-                  {fmtNum(data.polar.r, 4)} ∠ {fmtNum(data.polar.thetaDeg, 2)}°
-                </span>
+                <span className="font-sans text-[#EA580C] font-semibold block mb-0.5">Polar Phasor Form</span>
+                <div className="text-base font-bold text-gray-900">
+                  <MathFormula
+                    latex={`${fmtNum(data.polar.r, 4)}\\,\\angle\\,${fmtNum(data.polar.thetaDeg, 2)}^\\circ`}
+                  />
+                </div>
               </div>
               <div>
-                <span className="font-sans text-[#EA580C] font-semibold block">Euler Exponential</span>
-                <span className="text-base font-bold text-gray-900">
-                  {fmtNum(data.polar.r, 4)} · e^({fmtNum(data.polar.thetaRad, 3)}i)
-                </span>
+                <span className="font-sans text-[#EA580C] font-semibold block mb-0.5">Euler Exponential</span>
+                <div className="text-base font-bold text-gray-900">
+                  <MathFormula
+                    latex={`${fmtNum(data.polar.r, 4)}\\,e^{${fmtNum(data.polar.thetaRad, 3)}i}`}
+                  />
+                </div>
               </div>
             </div>
             <div className="pt-2 border-t border-orange-200/70">
-              <span className="font-sans text-gray-500 block">De Moivre Power z^{data.n}:</span>
-              <span className="text-sm font-bold text-gray-900">{formatComplex(data.zn, 5)}</span>
+              <span className="font-sans text-gray-500 block mb-0.5">
+                De Moivre Power <MathFormula latex={`z^{${data.n}}`} />:
+              </span>
+              <div className="text-sm sm:text-base font-bold text-gray-900">
+                <MathFormula
+                  latex={`z^{${data.n}} = ${fmtNum(data.zn.re, 5)} ${data.zn.im >= 0 ? '+' : '-'} ${fmtNum(
+                    Math.abs(data.zn.im),
+                    5
+                  )}i`}
+                />
+              </div>
             </div>
           </div>
 
           <div className="p-4 rounded-xl bg-[#F9FAFB] border border-gray-200">
             <p className="text-xs font-semibold text-gray-700 mb-2">
-              All {data.k} Distinct Complex Roots (w_m^({data.k}) = z)
+              All {data.k} Distinct Complex Roots (<MathFormula latex={`w_m^{${data.k}} = z`} />)
             </p>
-            <div className="grid grid-cols-2 gap-2 text-xs font-mono tabular-nums">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs tabular-nums">
               {data.roots.map((rt, idx) => (
                 <div key={idx} className="px-3 py-2 bg-white rounded-lg border border-gray-200">
-                  <span className="text-[#F97316] font-bold mr-1.5">w_{idx}:</span>
-                  {formatComplex(rt, 4)}
+                  <MathFormula
+                    latex={`w_{${idx}} = ${fmtNum(rt.re, 4)} ${rt.im >= 0 ? '+' : '-'} ${fmtNum(
+                      Math.abs(rt.im),
+                      4
+                    )}i`}
+                  />
                 </div>
               ))}
             </div>

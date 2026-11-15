@@ -12,6 +12,7 @@ import {
   simplifyAst,
 } from '../../../utils/mathEngine';
 import { MathWorkspaceBar, fmtNum } from './MathWorkspaceHeader';
+import { MathFormula, MathMatrixDisplay, asciiMathToLatex } from './MathTypeset';
 
 // ============================================================================
 // TOOL 15: MATRIX ALGEBRA, RREF, DETERMINANT & INVERSE LAB
@@ -60,22 +61,10 @@ export const MatrixAlgebraRrefLab: React.FC = () => {
     );
   };
 
-  const renderMatrixTable = (M: number[][], title: string) => (
-    <div className="p-3.5 rounded-xl bg-white border border-gray-200">
+  const renderMatrixTable = (M: number[][], title: string, latexLabel?: string) => (
+    <div className="p-3.5 rounded-xl bg-white border border-gray-200 overflow-x-auto">
       <p className="text-xs font-semibold text-gray-600 mb-2">{title}</p>
-      <table className="w-full text-xs font-mono tabular-nums">
-        <tbody>
-          {M.map((row, r) => (
-            <tr key={r} className="border-b last:border-b-0 border-gray-100">
-              {row.map((v, c) => (
-                <td key={c} className="px-2 py-1.5 text-right text-gray-900">
-                  {fmtNum(v, 4)}
-                </td>
-              ))}
-            </tr>
-          ))}
-        </tbody>
-      </table>
+      <MathMatrixDisplay matrix={M} label={latexLabel} precision={4} />
     </div>
   );
 
@@ -136,7 +125,7 @@ export const MatrixAlgebraRrefLab: React.FC = () => {
         modeLabel={`${size}×${size} Matrix Lab`}
       />
 
-      <div className="p-6 grid grid-cols-1 lg:grid-cols-12 gap-6">
+      <div className="p-4 sm:p-6 grid grid-cols-1 lg:grid-cols-12 gap-5 sm:gap-6">
         <div className="lg:col-span-6 space-y-4">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div className="inline-flex p-1 bg-[#F9FAFB] border border-gray-200 rounded-xl">
@@ -145,7 +134,7 @@ export const MatrixAlgebraRrefLab: React.FC = () => {
                   key={n}
                   type="button"
                   onClick={() => setSize(n)}
-                  className={`px-3 py-1.5 text-xs font-semibold rounded-lg ${
+                  className={`px-3 py-1.5 min-h-[38px] text-xs font-semibold rounded-lg cursor-pointer ${
                     size === n ? 'bg-[#F97316] text-white' : 'text-gray-600'
                   }`}
                 >
@@ -154,7 +143,7 @@ export const MatrixAlgebraRrefLab: React.FC = () => {
               ))}
             </div>
 
-            <div className="inline-flex p-1 bg-[#F9FAFB] border border-gray-200 rounded-xl">
+            <div className="inline-flex flex-wrap p-1 bg-[#F9FAFB] border border-gray-200 rounded-xl gap-0.5">
               {(
                 [
                   { id: 'A_PROPS', lbl: 'RREF & A⁻¹' },
@@ -167,7 +156,7 @@ export const MatrixAlgebraRrefLab: React.FC = () => {
                   key={m.id}
                   type="button"
                   onClick={() => setOp(m.id)}
-                  className={`px-3 py-1.5 text-xs font-semibold rounded-lg whitespace-nowrap ${
+                  className={`px-3 py-1.5 min-h-[38px] text-xs font-semibold rounded-lg whitespace-nowrap cursor-pointer ${
                     op === m.id ? 'bg-gray-900 text-white' : 'text-gray-600'
                   }`}
                 >
@@ -219,17 +208,23 @@ export const MatrixAlgebraRrefLab: React.FC = () => {
         </div>
 
         <div className="lg:col-span-6 space-y-4">
-          <div className="p-5 rounded-2xl bg-[#FFF7ED] border border-orange-200 grid grid-cols-3 gap-3 text-xs font-mono tabular-nums">
+          <div className="p-4 sm:p-5 rounded-2xl bg-[#FFF7ED] border border-orange-200 grid grid-cols-3 gap-3 text-xs font-mono tabular-nums">
             <div>
-              <span className="font-sans text-[#EA580C] font-semibold block">det(A)</span>
+              <span className="font-sans text-[#EA580C] font-semibold block mb-0.5">
+                <MathFormula latex="\det(A)" />
+              </span>
               <span className="text-xl font-bold text-gray-900">{fmtNum(lab.detA, 4)}</span>
             </div>
             <div>
-              <span className="font-sans text-[#EA580C] font-semibold block">trace(A)</span>
+              <span className="font-sans text-[#EA580C] font-semibold block mb-0.5">
+                <MathFormula latex="\operatorname{tr}(A)" />
+              </span>
               <span className="text-xl font-bold text-gray-900">{fmtNum(lab.traceA, 4)}</span>
             </div>
             <div>
-              <span className="font-sans text-[#EA580C] font-semibold block">rank(A) / nullity</span>
+              <span className="font-sans text-[#EA580C] font-semibold block mb-0.5">
+                <MathFormula latex="\operatorname{rank}(A)" /> / nullity
+              </span>
               <span className="text-xl font-bold text-gray-900">
                 {lab.rrefRes.rank} / {size - lab.rrefRes.rank}
               </span>
@@ -238,20 +233,21 @@ export const MatrixAlgebraRrefLab: React.FC = () => {
 
           {op === 'A_PROPS' ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              {renderMatrixTable(lab.rrefRes.rref, 'RREF(A)')}
+              {renderMatrixTable(lab.rrefRes.rref, 'Reduced Row Echelon Form', '\\text{RREF}(A)')}
               {lab.invA ? (
-                renderMatrixTable(lab.invA, 'Inverse Matrix A⁻¹')
+                renderMatrixTable(lab.invA, 'Inverse Matrix', 'A^{-1}')
               ) : (
                 <div className="p-3.5 rounded-xl bg-red-50 border border-red-200 text-xs text-red-700 flex items-center">
-                  Matrix A is singular (det(A) = 0); inverse A⁻¹ does not exist.
+                  Matrix A is singular (<MathFormula latex="\det(A) = 0" />); inverse <MathFormula latex="A^{-1}" /> does not exist.
                 </div>
               )}
-              {renderMatrixTable(lab.transA, 'Transpose Aᵀ')}
+              {renderMatrixTable(lab.transA, 'Matrix Transpose', 'A^T')}
             </div>
           ) : (
             renderMatrixTable(
               op === 'MUL' ? lab.mulAB : op === 'ADD' ? lab.addAB : lab.subAB,
-              op === 'MUL' ? 'Product Matrix A · B' : op === 'ADD' ? 'Sum A + B' : 'Difference A − B'
+              op === 'MUL' ? 'Product Matrix A · B' : op === 'ADD' ? 'Sum A + B' : 'Difference A − B',
+              op === 'MUL' ? 'A\\cdot B' : op === 'ADD' ? 'A + B' : 'A - B'
             )
           )}
         </div>
@@ -299,7 +295,7 @@ export const EigenvaluesEigenvectorsCalculator: React.FC = () => {
     // Nullspace vector for real eigenvalues
     const eigenPairs = roots.map((lam) => {
       if (Math.abs(lam.im) > 1e-5) {
-        return { lambda: lam, vectorStr: 'Complex Conjugate Eigenspace' };
+        return { lambda: lam, vec: null as number[] | null, vectorStr: 'Complex Conjugate Eigenspace' };
       }
       const shifted = A.map((row, r) => row.map((v, c) => (r === c ? v - lam.re : v)));
       const { rref, pivotCols } = computeRrefWithSteps(shifted);
@@ -311,6 +307,7 @@ export const EigenvaluesEigenvectorsCalculator: React.FC = () => {
       });
       return {
         lambda: lam,
+        vec,
         vectorStr: `[${vec.map((x) => fmtNum(x, 4)).join(', ')}]ᵀ`,
       };
     });
@@ -375,7 +372,7 @@ export const EigenvaluesEigenvectorsCalculator: React.FC = () => {
         modeLabel={`${size}×${size} Spectral Solver`}
       />
 
-      <div className="p-6 grid grid-cols-1 lg:grid-cols-12 gap-6">
+      <div className="p-4 sm:p-6 grid grid-cols-1 lg:grid-cols-12 gap-5 sm:gap-6">
         <div className="lg:col-span-5 space-y-4">
           <div className="inline-flex p-1 bg-[#F9FAFB] border border-gray-200 rounded-xl">
             {([2, 3] as const).map((n) => (
@@ -383,7 +380,7 @@ export const EigenvaluesEigenvectorsCalculator: React.FC = () => {
                 key={n}
                 type="button"
                 onClick={() => setSize(n)}
-                className={`px-4 py-1.5 text-xs font-semibold rounded-lg ${
+                className={`px-4 py-1.5 min-h-[38px] text-xs font-semibold rounded-lg cursor-pointer ${
                   size === n ? 'bg-[#F97316] text-white' : 'text-gray-600'
                 }`}
               >
@@ -418,33 +415,52 @@ export const EigenvaluesEigenvectorsCalculator: React.FC = () => {
         </div>
 
         <div className="lg:col-span-7 space-y-4">
-          <div className="p-5 rounded-2xl bg-[#FFF7ED] border border-orange-200 space-y-2">
+          <div className="p-4 sm:p-5 rounded-2xl bg-[#FFF7ED] border border-orange-200 space-y-2.5">
             <span className="text-xs font-semibold text-[#EA580C] block">
-              Characteristic Polynomial det(A − λI) = 0
+              Characteristic Polynomial <MathFormula latex="\det(A - \lambda I) = 0" />
             </span>
-            <div className="text-base font-bold font-mono text-gray-900">{eig.charStr}</div>
-            <div className="pt-2 border-t border-orange-200/70 flex gap-6 text-xs font-mono text-gray-700 tabular-nums">
-              <span>Σ λ_i = trace(A) = {fmtNum(eig.tr, 4)}</span>
-              <span>Π λ_i = det(A) = {fmtNum(eig.det, 4)}</span>
+            <div className="px-3 py-2 bg-white/90 rounded-xl border border-orange-200/70 text-sm sm:text-base font-bold text-gray-900">
+              <MathFormula expr={eig.charStr} displayMode />
+            </div>
+            <div className="pt-2 border-t border-orange-200/70 flex flex-wrap gap-6 text-xs text-gray-800">
+              <MathFormula latex={`\\sum \\lambda_i = \\operatorname{tr}(A) = ${fmtNum(eig.tr, 4)}`} />
+              <MathFormula latex={`\\prod \\lambda_i = \\det(A) = ${fmtNum(eig.det, 4)}`} />
             </div>
           </div>
 
           <div className="space-y-2.5">
-            {eig.eigenPairs.map((pair, idx) => (
-              <div
-                key={idx}
-                className="p-4 rounded-xl bg-[#F9FAFB] border border-gray-200 flex flex-wrap items-center justify-between gap-2 font-mono text-xs tabular-nums"
-              >
-                <div>
-                  <span className="text-gray-500 font-sans block">Eigenvalue λ_{idx + 1}</span>
-                  <span className="text-base font-bold text-[#111827]">{formatComplex(pair.lambda, 5)}</span>
+            {eig.eigenPairs.map((pair, idx) => {
+              const lamLatex =
+                Math.abs(pair.lambda.im) < 1e-6
+                  ? `\\lambda_{${idx + 1}} = ${fmtNum(pair.lambda.re, 5)}`
+                  : `\\lambda_{${idx + 1}} = ${fmtNum(pair.lambda.re, 4)} ${
+                      pair.lambda.im >= 0 ? '+' : '-'
+                    } ${fmtNum(Math.abs(pair.lambda.im), 4)}i`;
+              return (
+                <div
+                  key={idx}
+                  className="p-4 rounded-xl bg-[#F9FAFB] border border-gray-200 flex flex-wrap items-center justify-between gap-3 text-xs tabular-nums"
+                >
+                  <div>
+                    <span className="text-gray-500 font-sans block mb-1">Eigenvalue</span>
+                    <MathFormula latex={lamLatex} className="text-base font-bold text-[#111827]" />
+                  </div>
+                  <div className="text-right">
+                    <span className="text-gray-500 font-sans block mb-1">Basis Eigenvector</span>
+                    {pair.vec ? (
+                      <MathFormula
+                        latex={`\\mathbf{v}_{${idx + 1}} = \\begin{bmatrix} ${pair.vec
+                          .map((x) => fmtNum(x, 4))
+                          .join(' \\\\ ')} \\end{bmatrix}`}
+                        className="text-sm font-semibold text-[#EA580C]"
+                      />
+                    ) : (
+                      <span className="font-mono text-sm font-semibold text-[#EA580C]">{pair.vectorStr}</span>
+                    )}
+                  </div>
                 </div>
-                <div className="text-right">
-                  <span className="text-gray-500 font-sans block">Basis Eigenvector v_{idx + 1}</span>
-                  <span className="text-sm font-semibold text-[#EA580C]">{pair.vectorStr}</span>
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       </div>
@@ -538,11 +554,13 @@ export const Vector3dDotCrossVisualizer: React.FC = () => {
         modeLabel={`Angle θ = ${fmtNum(vec.angleDeg, 1)}°`}
       />
 
-      <div className="p-6 grid grid-cols-1 lg:grid-cols-12 gap-6">
+      <div className="p-4 sm:p-6 grid grid-cols-1 lg:grid-cols-12 gap-5 sm:gap-6">
         <div className="lg:col-span-6 space-y-4">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="p-3.5 rounded-xl bg-[#F9FAFB] border border-gray-200 space-y-2">
-              <p className="text-xs font-semibold text-[#EA580C]">Vector u = ⟨u_x, u_y, u_z⟩</p>
+              <p className="text-xs font-semibold text-[#EA580C]">
+                Vector <MathFormula latex="\mathbf{u} = \langle u_x, u_y, u_z \rangle" />
+              </p>
               <div className="grid grid-cols-3 gap-2">
                 {(['x', 'y', 'z'] as const).map((ax, i) => (
                   <input
@@ -558,7 +576,9 @@ export const Vector3dDotCrossVisualizer: React.FC = () => {
               </div>
             </div>
             <div className="p-3.5 rounded-xl bg-[#F9FAFB] border border-gray-200 space-y-2">
-              <p className="text-xs font-semibold text-sky-700">Vector v = ⟨v_x, v_y, v_z⟩</p>
+              <p className="text-xs font-semibold text-sky-700">
+                Vector <MathFormula latex="\mathbf{v} = \langle v_x, v_y, v_z \rangle" />
+              </p>
               <div className="grid grid-cols-3 gap-2">
                 {(['x', 'y', 'z'] as const).map((ax, i) => (
                   <input
@@ -575,26 +595,40 @@ export const Vector3dDotCrossVisualizer: React.FC = () => {
             </div>
           </div>
 
-          <div className="p-5 rounded-2xl bg-[#FFF7ED] border border-orange-200 grid grid-cols-2 gap-3 text-xs font-mono tabular-nums">
+          <div className="p-4 sm:p-5 rounded-2xl bg-[#FFF7ED] border border-orange-200 grid grid-cols-2 gap-3 text-xs tabular-nums">
             <div>
-              <span className="font-sans text-gray-500 block">Dot Product u · v</span>
-              <span className="text-lg font-bold text-gray-900">{fmtNum(vec.dot, 4)}</span>
+              <span className="font-sans text-gray-500 block mb-0.5">
+                Dot Product <MathFormula latex="\mathbf{u} \cdot \mathbf{v}" />
+              </span>
+              <span className="text-lg font-bold font-mono text-gray-900">{fmtNum(vec.dot, 4)}</span>
             </div>
             <div>
-              <span className="font-sans text-gray-500 block">Angle θ Between u & v</span>
-              <span className="text-lg font-bold text-[#EA580C]">{fmtNum(vec.angleDeg, 2)}°</span>
+              <span className="font-sans text-gray-500 block mb-0.5">
+                Angle <MathFormula latex="\theta" /> Between Vectors
+              </span>
+              <span className="text-lg font-bold font-mono text-[#EA580C]">{fmtNum(vec.angleDeg, 2)}°</span>
             </div>
             <div className="col-span-2 pt-2 border-t border-orange-200/70">
-              <span className="font-sans text-gray-500 block">Cross Product u × v (Orthogonal Normal)</span>
-              <span className="text-base font-bold text-emerald-800">
-                ⟨{vec.cross.map((c) => fmtNum(c, 4)).join(', ')}⟩  (Area = {fmtNum(vec.areaPara, 4)})
+              <span className="font-sans text-gray-500 block mb-1">
+                Cross Product <MathFormula latex="\mathbf{u} \times \mathbf{v}" /> (Orthogonal Normal)
               </span>
+              <div className="text-sm sm:text-base font-bold text-emerald-800">
+                <MathFormula
+                  latex={`\\mathbf{u} \\times \\mathbf{v} = \\langle ${vec.cross
+                    .map((c) => fmtNum(c, 4))
+                    .join(',\\, ')} \\rangle,\\quad \\text{Area} = ${fmtNum(vec.areaPara, 4)}`}
+                />
+              </div>
             </div>
-            <div className="col-span-2">
-              <span className="font-sans text-gray-500 block">Vector Projection proj_v(u)</span>
-              <span className="font-semibold text-gray-900">
-                ⟨{vec.projUonV.map((c) => fmtNum(c, 4)).join(', ')}⟩
+            <div className="col-span-2 pt-1">
+              <span className="font-sans text-gray-500 block mb-1">
+                Vector Projection <MathFormula latex="\operatorname{proj}_{\mathbf{v}}(\mathbf{u})" />
               </span>
+              <div className="text-sm font-semibold text-gray-900">
+                <MathFormula
+                  latex={`\\langle ${vec.projUonV.map((c) => fmtNum(c, 4)).join(',\\, ')} \\rangle`}
+                />
+              </div>
             </div>
           </div>
         </div>
@@ -772,12 +806,12 @@ export const VectorCalculusGradDivCurl: React.FC = () => {
         modeLabel="Symbolic Partial Derivatives"
       />
 
-      <div className="p-6 grid grid-cols-1 lg:grid-cols-12 gap-6">
+      <div className="p-4 sm:p-6 grid grid-cols-1 lg:grid-cols-12 gap-5 sm:gap-6">
         <div className="lg:col-span-6 space-y-4">
           <div className="p-4 rounded-xl bg-[#F9FAFB] border border-gray-200 space-y-3">
             <div>
               <label className="block text-xs font-semibold text-gray-700 mb-1">
-                Scalar Potential f(x, y, z)
+                Scalar Potential <MathFormula latex="f(x, y, z)" />
               </label>
               <input
                 type="text"
@@ -788,7 +822,7 @@ export const VectorCalculusGradDivCurl: React.FC = () => {
             </div>
 
             <p className="text-xs font-semibold text-gray-700 pt-1">
-              3D Vector Field F(x, y, z) = ⟨P, Q, R⟩
+              3D Vector Field <MathFormula latex="\mathbf{F}(x, y, z) = \langle P, Q, R \rangle" />
             </p>
             <div className="grid grid-cols-3 gap-2">
               <div>
@@ -841,36 +875,50 @@ export const VectorCalculusGradDivCurl: React.FC = () => {
         <div className="lg:col-span-6 space-y-3">
           {calc.ok ? (
             <>
-              <div className="p-4 rounded-2xl bg-[#FFF7ED] border border-orange-200 space-y-2 text-xs font-mono">
+              <div className="p-4 rounded-2xl bg-[#FFF7ED] border border-orange-200 space-y-2 text-xs">
                 <span className="font-sans font-semibold text-[#EA580C] block">
-                  Gradient ∇f & Laplacian ∇²f
+                  Gradient <MathFormula latex="\nabla f" /> & Laplacian <MathFormula latex="\nabla^2 f" />
                 </span>
-                <div className="text-gray-900 break-all">∇f = {calc.gradSym}</div>
+                <div className="text-sm text-gray-900">
+                  <MathFormula latex={`\\nabla f = ${asciiMathToLatex(calc.gradSym)}`} />
+                </div>
                 <div className="font-bold text-gray-900 tabular-nums">
-                  At P₀: ∇f = ⟨{calc.gradAt.map((v) => fmtNum(v, 4)).join(', ')}⟩ · ∇²f = {fmtNum(calc.lapAt, 4)}
+                  <MathFormula
+                    latex={`\\nabla f(P_0) = \\langle ${calc.gradAt
+                      .map((v) => fmtNum(v, 4))
+                      .join(',\\, ')} \\rangle,\\quad \\nabla^2 f = ${fmtNum(calc.lapAt, 4)}`}
+                  />
                 </div>
               </div>
 
-              <div className="p-4 rounded-xl bg-[#F9FAFB] border border-gray-200 space-y-1.5 text-xs font-mono">
+              <div className="p-4 rounded-xl bg-[#F9FAFB] border border-gray-200 space-y-1.5 text-xs">
                 <span className="font-sans font-semibold text-gray-700 block">
-                  Divergence ∇ · F (Scalar Flux Density)
+                  Divergence <MathFormula latex="\nabla \cdot \mathbf{F}" /> (Scalar Flux Density)
                 </span>
-                <div className="text-gray-700 break-all">{calc.divSym}</div>
+                <div className="text-sm text-gray-800">
+                  <MathFormula latex={`\\nabla \\cdot \\mathbf{F} = ${asciiMathToLatex(calc.divSym)}`} />
+                </div>
                 <div className="font-bold text-gray-900 tabular-nums">
-                  ∇ · F(P₀) = {fmtNum(calc.divAt, 4)}{' '}
+                  <MathFormula latex={`(\\nabla \\cdot \\mathbf{F})(P_0) = ${fmtNum(calc.divAt, 4)}`} />{' '}
                   <span className="font-sans font-normal text-gray-500">
                     ({Math.abs(calc.divAt) < 1e-8 ? 'Locally Incompressible / Solenoidal' : calc.divAt > 0 ? 'Net Source' : 'Net Sink'})
                   </span>
                 </div>
               </div>
 
-              <div className="p-4 rounded-xl bg-[#F9FAFB] border border-gray-200 space-y-1.5 text-xs font-mono">
+              <div className="p-4 rounded-xl bg-[#F9FAFB] border border-gray-200 space-y-1.5 text-xs">
                 <span className="font-sans font-semibold text-gray-700 block">
-                  Curl ∇ × F (Vorticity / Circulation)
+                  Curl <MathFormula latex="\nabla \times \mathbf{F}" /> (Vorticity / Circulation)
                 </span>
-                <div className="text-gray-700 break-all">{calc.curlSym}</div>
+                <div className="text-sm text-gray-800">
+                  <MathFormula latex={`\\nabla \\times \\mathbf{F} = ${asciiMathToLatex(calc.curlSym)}`} />
+                </div>
                 <div className="font-bold text-emerald-800 tabular-nums">
-                  ∇ × F(P₀) = ⟨{calc.curlAt.map((v) => fmtNum(v, 4)).join(', ')}⟩{' '}
+                  <MathFormula
+                    latex={`(\\nabla \\times \\mathbf{F})(P_0) = \\langle ${calc.curlAt
+                      .map((v) => fmtNum(v, 4))
+                      .join(',\\, ')} \\rangle`}
+                  />{' '}
                   {Math.hypot(...calc.curlAt) < 1e-8 && (
                     <span className="font-sans text-emerald-700">(Irrotational / Conservative)</span>
                   )}

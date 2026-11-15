@@ -1,0 +1,667 @@
+```html
+<!DOCTYPE html>
+<html lang="en" class="scroll-smooth">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- Primary SEO Meta Tags -->
+    <title>Real-Life Punnett Square Examples & Charts | Visual Biology Study Guides | University Tutors</title>
+    <meta name="description" content="Explore real-life Punnett Square examples and visual genetics charts by University Tutors. Detailed guides on Dihybrid Crosses (9:3:3:1), ABO Blood Type Antigens, and Baby Eye Color Probability.">
+    <meta name="keywords" content="punnett square examples, dihybrid cross 9:3:3:1 chart, blood type punnett square practice, baby eye color predictor chart, mendelian genetics study guide, university tutors biology">
+    <meta name="author" content="University Tutors">
+    <link rel="canonical" href="https://university-tutors.com/tools/biology/punnett-square-calculator">
+
+    <!-- Fonts & Tailwind CSS -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- Tailwind Config for Orange & White Brand Styling -->
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                        mono: ['JetBrains Mono', 'monospace'],
+                    },
+                    colors: {
+                        brand: {
+                            50: '#fff7ed',
+                            100: '#ffedd5',
+                            200: '#fed7aa',
+                            300: '#fdba74',
+                            400: '#fb923c',
+                            500: '#f97316',
+                            600: '#ea580c',
+                            700: '#c2410c',
+                            800: '#9a3412',
+                            900: '#7c2d12',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+<body class="bg-white text-slate-800 antialiased selection:bg-brand-600 selection:text-white">
+
+    <!-- ===================================================================== -->
+    <!-- VISUAL BIOLOGY STUDY GUIDES: REAL-LIFE PUNNETT SQUARE EXAMPLES        -->
+    <!-- ===================================================================== -->
+    <main id="real-life-examples" class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 space-y-16">
+        
+        <!-- Section Intro -->
+        <div class="text-center max-w-3xl mx-auto">
+            <span class="inline-block px-3.5 py-1 rounded-full bg-brand-50 border border-brand-200 text-xs font-extrabold uppercase tracking-widest text-brand-600 mb-3">
+                Visual Biology Study Guides • university-tutors.com
+            </span>
+            <h1 class="text-3xl sm:text-5xl font-extrabold text-slate-900 tracking-tight leading-tight mb-4">
+                Real-Life Punnett Square Examples & Charts
+            </h1>
+            <p class="text-slate-600 text-base sm:text-lg leading-relaxed">
+                Master Mendelian and human inheritance with high-resolution visual genetics diagrams, genotype breakdowns, and phenotype ratio tables curated by <strong class="text-brand-600">university-tutors.com</strong>.
+            </p>
+        </div>
+
+        <!-- ========================================================= -->
+        <!-- EXAMPLE 1: DIHYBRID CROSS AaBb x AaBb (9:3:3:1 PEA PLANT) -->
+        <!-- ========================================================= -->
+        <article id="dihybrid-guide" class="bg-white rounded-3xl shadow-lg border-2 border-brand-100 overflow-hidden">
+            <div class="bg-gradient-to-r from-brand-600 to-orange-500 px-6 sm:px-10 py-6 text-white">
+                <span class="inline-block px-3 py-1 rounded-full bg-white/20 border border-white/30 text-white text-xs font-bold mb-2">
+                    Example 1 • Mendelian Two-Trait Inheritance
+                </span>
+                <h2 class="text-2xl sm:text-3xl font-extrabold">Dihybrid Cross: AaBb × AaBb (9:3:3:1 Ratio)</h2>
+            </div>
+
+            <div class="p-6 sm:p-10 space-y-8 bg-white">
+                <!-- SEO Rich Explanation -->
+                <div class="prose max-w-none text-slate-600 grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    <div class="lg:col-span-2 space-y-3">
+                        <h3 class="text-lg font-bold text-slate-900">How Mendel's Law of Independent Assortment Works</h3>
+                        <p class="text-sm leading-relaxed">
+                            A <strong>dihybrid cross</strong> tracks the inheritance of two independent traits simultaneously—such as pea seed shape (<strong>Round <code class="text-brand-600 font-bold">A</code></strong> vs. <strong>Wrinkled <code class="text-slate-700 font-bold">a</code></strong>) and seed color (<strong>Yellow <code class="text-amber-600 font-bold">B</code></strong> vs. <strong>Green <code class="text-emerald-700 font-bold">b</code></strong>). When two heterozygous parents (<code class="font-mono font-bold text-slate-900">AaBb × AaBb</code>) are crossed, each parent produces four distinct gamete combinations (<code class="font-mono">AB, Ab, aB, ab</code>), yielding <strong>16 possible offspring genotypes</strong> and the classic <strong>9:3:3:1 phenotypic ratio</strong>.
+                        </p>
+                    </div>
+                    <div class="bg-brand-50/70 p-4 rounded-2xl border border-brand-200 text-xs space-y-2">
+                        <div class="font-bold text-brand-900 uppercase tracking-wider">Key Exam Takeaways</div>
+                        <ul class="space-y-1.5 text-slate-700 list-disc pl-4">
+                            <li><strong>9/16 (56.25%):</strong> Round, Yellow (<code class="font-mono text-brand-700 font-semibold">A_B_</code>)</li>
+                            <li><strong>3/16 (18.75%):</strong> Round, Green (<code class="font-mono text-brand-700 font-semibold">A_bb</code>)</li>
+                            <li><strong>3/16 (18.75%):</strong> Wrinkled, Yellow (<code class="font-mono text-brand-700 font-semibold">aaB_</code>)</li>
+                            <li><strong>1/16 (6.25%):</strong> Wrinkled, Green (<code class="font-mono text-brand-700 font-semibold">aabb</code>)</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- VISUAL INFOGRAPHIC DIAGRAM: DIHYBRID CROSS AaBb x AaBb -->
+                <div class="bg-brand-50/40 rounded-2xl border-2 border-brand-200 p-4 sm:p-6">
+                    <div class="text-center mb-5">
+                        <span class="text-[11px] font-bold uppercase tracking-widest text-brand-600">university-tutors.com Visual Reference Diagram</span>
+                        <h3 class="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">DIHYBRID CROSS: AaBb × AaBb</h3>
+                        <p class="text-xs font-semibold text-brand-700">Punnett Square Analysis (16 Possible Offspring)</p>
+                    </div>
+
+                    <!-- Top Parents & Traits Bar -->
+                    <div class="grid grid-cols-1 md:grid-cols-12 gap-4 items-center mb-6">
+                        <!-- Parent 1 Card -->
+                        <div class="md:col-span-3 bg-white rounded-xl border border-brand-200 overflow-hidden shadow-sm text-center">
+                            <div class="bg-brand-600 text-white text-xs font-bold py-1">PARENT 1</div>
+                            <div class="p-3">
+                                <div class="font-mono font-black text-lg text-slate-900">AaBb</div>
+                                <div class="flex justify-center gap-3 my-2">
+                                    <div class="text-center">
+                                        <span class="inline-block w-7 h-7 rounded-full bg-gradient-to-br from-yellow-300 to-amber-500 border border-amber-600 shadow-sm"></span>
+                                        <span class="block text-[10px] font-semibold text-slate-600">Round (A)</span>
+                                    </div>
+                                    <div class="text-center">
+                                        <span class="inline-block w-7 h-7 rounded-full bg-gradient-to-br from-yellow-300 to-amber-500 border border-amber-600 shadow-sm"></span>
+                                        <span class="block text-[10px] font-semibold text-slate-600">Yellow (B)</span>
+                                    </div>
+                                </div>
+                                <div class="text-[10px] text-slate-500">Heterozygous for both traits</div>
+                            </div>
+                        </div>
+
+                        <!-- Traits Legend Card -->
+                        <div class="md:col-span-6 bg-white rounded-xl border border-brand-200 p-4 shadow-sm">
+                            <div class="text-center text-xs font-extrabold uppercase tracking-wider text-brand-700 border-b border-brand-100 pb-1.5 mb-3">TRAITS</div>
+                            <div class="grid grid-cols-2 gap-4 text-xs">
+                                <div class="space-y-1.5">
+                                    <div class="flex items-center gap-2"><span class="font-mono font-bold text-brand-600">A</span> = Round (Dominant)</div>
+                                    <div class="flex items-center gap-2"><span class="font-mono font-bold text-slate-500">a</span> = Wrinkled (Recessive)</div>
+                                </div>
+                                <div class="space-y-1.5">
+                                    <div class="flex items-center gap-2"><span class="font-mono font-bold text-amber-600">B</span> = Yellow (Dominant)</div>
+                                    <div class="flex items-center gap-2"><span class="font-mono font-bold text-emerald-600">b</span> = Green (Recessive)</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Parent 2 Card -->
+                        <div class="md:col-span-3 bg-white rounded-xl border border-brand-200 overflow-hidden shadow-sm text-center">
+                            <div class="bg-brand-600 text-white text-xs font-bold py-1">PARENT 2</div>
+                            <div class="p-3">
+                                <div class="font-mono font-black text-lg text-slate-900">AaBb</div>
+                                <div class="flex justify-center gap-3 my-2">
+                                    <div class="text-center">
+                                        <span class="inline-block w-7 h-7 rounded-full bg-gradient-to-br from-yellow-300 to-amber-500 border border-amber-600 shadow-sm"></span>
+                                        <span class="block text-[10px] font-semibold text-slate-600">Round (A)</span>
+                                    </div>
+                                    <div class="text-center">
+                                        <span class="inline-block w-7 h-7 rounded-full bg-gradient-to-br from-yellow-300 to-amber-500 border border-amber-600 shadow-sm"></span>
+                                        <span class="block text-[10px] font-semibold text-slate-600">Yellow (B)</span>
+                                    </div>
+                                </div>
+                                <div class="text-[10px] text-slate-500">Heterozygous for both traits</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Center 4x4 Visual Pea Matrix + Sidebars -->
+                    <div class="grid grid-cols-1 xl:grid-cols-12 gap-4 items-start">
+                        <!-- Left How It Works Sidebar -->
+                        <div class="xl:col-span-2 space-y-3">
+                            <div class="bg-white rounded-xl border border-brand-200 overflow-hidden shadow-sm">
+                                <div class="bg-brand-600 text-white text-[11px] font-bold px-3 py-1.5">HOW IT WORKS</div>
+                                <div class="p-3 space-y-2.5 text-[11px] text-slate-600">
+                                    <p><strong class="text-brand-600">1.</strong> Each parent produces 4 types of gametes (AB, Ab, aB, ab).</p>
+                                    <p><strong class="text-brand-600">2.</strong> Gametes combine randomly at fertilization.</p>
+                                    <p><strong class="text-brand-600">3.</strong> The Punnett square shows all 16 combinations.</p>
+                                </div>
+                            </div>
+                            <div class="bg-white rounded-xl border border-brand-200 overflow-hidden shadow-sm">
+                                <div class="bg-orange-500 text-white text-[11px] font-bold px-3 py-1.5">KEY CONCEPT</div>
+                                <div class="p-3 text-[11px] text-slate-600">
+                                    Genes for different traits assort independently (<strong>Law of Independent Assortment</strong>).
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Center 4x4 Punnett Grid with Pea Visuals -->
+                        <div class="xl:col-span-8 overflow-x-auto">
+                            <table class="w-full border-collapse bg-white rounded-xl overflow-hidden shadow-sm border border-brand-200 text-center">
+                                <thead>
+                                    <tr class="bg-brand-50">
+                                        <th class="p-2 border border-brand-200 text-[10px] font-bold text-brand-800 uppercase">Gametes</th>
+                                        <th class="p-2 border border-brand-200"><span class="inline-flex w-8 h-8 rounded-full border-2 border-brand-500 items-center justify-center font-mono font-bold text-xs text-brand-700 bg-white">AB</span></th>
+                                        <th class="p-2 border border-brand-200"><span class="inline-flex w-8 h-8 rounded-full border-2 border-emerald-500 items-center justify-center font-mono font-bold text-xs text-emerald-700 bg-white">Ab</span></th>
+                                        <th class="p-2 border border-brand-200"><span class="inline-flex w-8 h-8 rounded-full border-2 border-amber-500 items-center justify-center font-mono font-bold text-xs text-amber-700 bg-white">aB</span></th>
+                                        <th class="p-2 border border-brand-200"><span class="inline-flex w-8 h-8 rounded-full border-2 border-orange-500 items-center justify-center font-mono font-bold text-xs text-orange-700 bg-white">ab</span></th>
+                                    </tr>
+                                </thead>
+                                <tbody id="static-dihybrid-visual-body" class="text-xs">
+                                    <!-- Populated via JS for crisp 16-cell rendering -->
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <!-- Right Phenotypes & Genotype Notation Sidebar -->
+                        <div class="xl:col-span-2 space-y-3">
+                            <div class="bg-white rounded-xl border border-brand-200 overflow-hidden shadow-sm">
+                                <div class="bg-brand-600 text-white text-[11px] font-bold px-3 py-1.5">PHENOTYPES</div>
+                                <div class="p-3 space-y-2.5 text-[11px]">
+                                    <div class="flex items-center gap-2">
+                                        <span class="w-5 h-5 rounded-full bg-gradient-to-br from-yellow-300 to-amber-500 border border-amber-600 shrink-0"></span>
+                                        <div><strong class="block text-slate-800">Round, Yellow</strong><span class="text-slate-500">(Dominant)</span></div>
+                                    </div>
+                                    <div class="flex items-center gap-2">
+                                        <span class="w-5 h-5 rounded-full bg-gradient-to-br from-lime-400 to-green-600 border border-green-700 shrink-0"></span>
+                                        <div><strong class="block text-slate-800">Round, Green</strong><span class="text-slate-500">(Recessive)</span></div>
+                                    </div>
+                                    <div class="flex items-center gap-2">
+                                        <span class="w-5 h-5 rounded-full bg-amber-400 border-2 border-dashed border-amber-700 shrink-0"></span>
+                                        <div><strong class="block text-slate-800">Wrinkled, Yellow</strong><span class="text-slate-500">(Recessive)</span></div>
+                                    </div>
+                                    <div class="flex items-center gap-2">
+                                        <span class="w-5 h-5 rounded-full bg-green-500 border-2 border-dashed border-green-800 shrink-0"></span>
+                                        <div><strong class="block text-slate-800">Wrinkled, Green</strong><span class="text-slate-500">(Recessive)</span></div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="bg-white rounded-xl border border-brand-200 overflow-hidden shadow-sm">
+                                <div class="bg-orange-500 text-white text-[11px] font-bold px-3 py-1.5">GENOTYPE NOTATION</div>
+                                <div class="p-3 font-mono text-[10px] space-y-1 text-slate-700">
+                                    <div><strong>AA, Aa</strong> = Round</div>
+                                    <div><strong>aa</strong> = Wrinkled</div>
+                                    <div><strong>BB, Bb</strong> = Yellow</div>
+                                    <div><strong>bb</strong> = Green</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Bottom Ratio Cards (9:3:3:1 + Genotype Ratio + Total 16) -->
+                    <div class="grid grid-cols-1 md:grid-cols-12 gap-4 mt-6">
+                        <!-- Phenotype Ratio Banner -->
+                        <div class="md:col-span-6 bg-white rounded-xl border border-brand-200 overflow-hidden shadow-sm flex flex-col justify-between">
+                            <div class="bg-brand-600 text-white text-center text-xs font-bold py-1.5 tracking-wider">PHENOTYPE RATIO</div>
+                            <div class="p-4 grid grid-cols-4 gap-2 text-center items-center">
+                                <div>
+                                    <span class="inline-block w-8 h-8 rounded-full bg-gradient-to-br from-yellow-300 to-amber-500 border border-amber-600"></span>
+                                    <div class="text-[11px] font-semibold text-slate-700 mt-1">Round, Yellow</div>
+                                    <div class="text-xl font-black text-slate-900">9</div>
+                                </div>
+                                <div>
+                                    <span class="inline-block w-8 h-8 rounded-full bg-gradient-to-br from-lime-400 to-green-600 border border-green-700"></span>
+                                    <div class="text-[11px] font-semibold text-slate-700 mt-1">Round, Green</div>
+                                    <div class="text-xl font-black text-slate-900">3</div>
+                                </div>
+                                <div>
+                                    <span class="inline-block w-8 h-8 rounded-full bg-amber-400 border-2 border-dashed border-amber-700"></span>
+                                    <div class="text-[11px] font-semibold text-slate-700 mt-1">Wrinkled, Yellow</div>
+                                    <div class="text-xl font-black text-slate-900">3</div>
+                                </div>
+                                <div>
+                                    <span class="inline-block w-8 h-8 rounded-full bg-green-500 border-2 border-dashed border-green-800"></span>
+                                    <div class="text-[11px] font-semibold text-slate-700 mt-1">Wrinkled, Green</div>
+                                    <div class="text-xl font-black text-slate-900">1</div>
+                                </div>
+                            </div>
+                            <div class="bg-brand-700 text-white text-center text-sm font-extrabold py-1.5 tracking-widest">RATIO = 9 : 3 : 3 : 1</div>
+                        </div>
+
+                        <!-- Genotype Ratio (Out of 16) -->
+                        <div class="md:col-span-4 bg-white rounded-xl border border-brand-200 overflow-hidden shadow-sm">
+                            <div class="bg-orange-500 text-white text-center text-xs font-bold py-1.5 tracking-wider">GENOTYPE RATIO (OUT OF 16)</div>
+                            <div class="p-3 font-mono text-[11px] space-y-1 text-slate-700">
+                                <div class="flex justify-between"><span>AABB: 1</span><span class="text-slate-500">6.25%</span></div>
+                                <div class="flex justify-between"><span>AABb: 2</span><span class="text-slate-500">12.5%</span></div>
+                                <div class="flex justify-between"><span>AaBB: 2</span><span class="text-slate-500">12.5%</span></div>
+                                <div class="flex justify-between font-bold text-brand-600"><span>AaBb: 4</span><span>25.0%</span></div>
+                                <div class="flex justify-between"><span>AAbb: 1 | Aabb: 2</span><span class="text-slate-500">18.75%</span></div>
+                                <div class="flex justify-between"><span>aaBB: 1 | aaBb: 2</span><span class="text-slate-500">18.75%</span></div>
+                                <div class="flex justify-between"><span>aabb: 1</span><span class="text-slate-500">6.25%</span></div>
+                            </div>
+                        </div>
+
+                        <!-- Total Offspring Card -->
+                        <div class="md:col-span-2 bg-white rounded-xl border border-brand-200 p-4 shadow-sm flex flex-col items-center justify-center text-center">
+                            <div class="text-[11px] font-bold uppercase text-brand-600">Total Offspring</div>
+                            <div class="text-4xl font-black text-brand-700 my-1">16</div>
+                            <div class="text-2xl my-1">🫛</div>
+                            <p class="text-[10px] text-slate-500 leading-tight">Four different phenotypes appear in the classic 9:3:3:1 Mendelian ratio.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </article>
+
+        <!-- ========================================================= -->
+        <!-- EXAMPLE 2: BLOOD TYPE PUNNETT SQUARE & ANTIGENS CHART     -->
+        <!-- ========================================================= -->
+        <article id="blood-type-guide" class="bg-white rounded-3xl shadow-lg border-2 border-brand-100 overflow-hidden">
+            <div class="bg-gradient-to-r from-orange-600 to-brand-700 px-6 sm:px-10 py-6 text-white">
+                <span class="inline-block px-3 py-1 rounded-full bg-white/20 border border-white/30 text-white text-xs font-bold mb-2">
+                    Example 2 • Multiple Alleles & Co-Dominance
+                </span>
+                <h2 class="text-2xl sm:text-3xl font-extrabold">Blood Type Punnett Square Practice & Antigens</h2>
+            </div>
+
+            <div class="p-6 sm:p-10 space-y-8 bg-white">
+                <!-- Educational Study Sheet Matching Reference Diagram -->
+                <div class="bg-brand-50/40 rounded-2xl border-2 border-brand-200 p-6 sm:p-8 space-y-8">
+                    <div class="max-w-3xl space-y-3">
+                        <h3 class="text-xl font-extrabold text-slate-900">Human ABO Blood Group Genetics (Iᴬ, Iᴮ, i)</h3>
+                        <p class="text-sm text-slate-700 leading-relaxed">
+                            There are four major human blood groups determined by the presence or absence of two antigens (proteins)—<strong>A and B</strong>—on the surface of red blood cells:
+                        </p>
+                        <ul class="grid grid-cols-1 sm:grid-cols-2 gap-2.5 text-xs text-slate-700 pt-1">
+                            <li class="p-3 bg-white rounded-xl border border-brand-200"><strong class="text-brand-700">Group A:</strong> Has only the <strong>A antigen</strong> on red cells (and B antibody in the plasma).</li>
+                            <li class="p-3 bg-white rounded-xl border border-brand-200"><strong class="text-brand-700">Group B:</strong> Has only the <strong>B antigen</strong> on red cells (and A antibody in the plasma).</li>
+                            <li class="p-3 bg-white rounded-xl border border-brand-200"><strong class="text-brand-700">Group AB:</strong> Has <strong>both A and B antigens</strong> on red cells (but neither A nor B antibody in the plasma).</li>
+                            <li class="p-3 bg-white rounded-xl border border-brand-200"><strong class="text-brand-700">Group O:</strong> Has <strong>neither A nor B antigens</strong> on red cells (but both A and B antibody in the plasma).</li>
+                        </ul>
+                        <p class="text-xs text-slate-600 pt-1">
+                            Since foreign antigens can trigger a patient's immune system to attack the transfused blood with antibodies, safe blood transfusions depend on careful blood typing and cross-matching. There are 3 alleles of the gene that controls blood type: <code class="font-mono font-bold text-brand-700">Iᴬ, Iᴮ, i</code> (<strong>I</strong> stands for <em>immunoglobulin</em>). <code class="font-mono font-bold">Iᴬ</code> and <code class="font-mono font-bold">Iᴮ</code> are <strong>Co-Dominant genes</strong>, meaning when inherited together, they are both fully expressed, not blended as in Incomplete Dominance. <code class="font-mono font-bold">"i"</code> is the recessive form of the allele.
+                        </p>
+                    </div>
+
+                    <!-- Visual Grid: Genotypes + 4 Red Blood Cell Antigen Diagrams + Agglutination -->
+                    <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-center">
+                        <!-- Genotypes Table -->
+                        <div class="lg:col-span-4 bg-white rounded-xl border border-brand-200 overflow-hidden shadow-sm">
+                            <div class="bg-brand-600 text-white text-xs font-bold px-4 py-2">POSSIBLE GENOTYPES</div>
+                            <table class="w-full text-xs text-left">
+                                <thead class="bg-brand-50 border-b border-brand-200 text-brand-900">
+                                    <tr>
+                                        <th class="px-4 py-2">Genotypes</th>
+                                        <th class="px-4 py-2">Blood Type</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-brand-100 font-mono">
+                                    <tr><td class="px-4 py-2.5 font-bold text-slate-800">IᴬIᴬ or Iᴬi</td><td class="px-4 py-2.5 font-sans font-bold text-brand-700">A</td></tr>
+                                    <tr><td class="px-4 py-2.5 font-bold text-slate-800">IᴮIᴮ or Iᴮi</td><td class="px-4 py-2.5 font-sans font-bold text-orange-600">B</td></tr>
+                                    <tr><td class="px-4 py-2.5 font-bold text-slate-800">IᴬIᴮ</td><td class="px-4 py-2.5 font-sans font-bold text-amber-700">AB</td></tr>
+                                    <tr><td class="px-4 py-2.5 font-bold text-slate-800">ii</td><td class="px-4 py-2.5 font-sans font-bold text-slate-700">O</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <!-- 4 Red Blood Cell Antigens SVG Diagram -->
+                        <div class="lg:col-span-5 bg-white rounded-xl border border-brand-200 p-4 shadow-sm">
+                            <div class="text-center text-xs font-bold uppercase tracking-wider text-brand-700 mb-3">Red Blood Cell Surface Antigens</div>
+                            <div class="grid grid-cols-2 gap-4 text-center">
+                                <!-- Type A RBC -->
+                                <div class="p-2 rounded-lg bg-brand-50/50 border border-brand-100">
+                                    <svg class="w-16 h-16 mx-auto" viewBox="0 0 80 80">
+                                        <circle cx="40" cy="40" r="22" fill="#ef4444" stroke="#991b1b" stroke-width="2"/>
+                                        <circle cx="40" cy="40" r="12" fill="#dc2626" opacity="0.6"/>
+                                        <polygon points="40,8 35,18 45,18" fill="#ea580c"/>
+                                        <polygon points="40,72 35,62 45,62" fill="#ea580c"/>
+                                        <polygon points="8,40 18,35 18,45" fill="#ea580c"/>
+                                        <polygon points="72,40 62,35 62,45" fill="#ea580c"/>
+                                    </svg>
+                                    <div class="text-xs font-bold text-slate-800 mt-1">Blood type A</div>
+                                    <div class="text-[10px] text-brand-600 font-semibold">A antigen</div>
+                                </div>
+                                <!-- Type B RBC -->
+                                <div class="p-2 rounded-lg bg-brand-50/50 border border-brand-100">
+                                    <svg class="w-16 h-16 mx-auto" viewBox="0 0 80 80">
+                                        <circle cx="40" cy="40" r="22" fill="#ef4444" stroke="#991b1b" stroke-width="2"/>
+                                        <circle cx="40" cy="40" r="12" fill="#dc2626" opacity="0.6"/>
+                                        <circle cx="40" cy="13" r="5" fill="#10b981"/>
+                                        <circle cx="40" cy="67" r="5" fill="#10b981"/>
+                                        <circle cx="13" cy="40" r="5" fill="#10b981"/>
+                                        <circle cx="67" cy="40" r="5" fill="#10b981"/>
+                                    </svg>
+                                    <div class="text-xs font-bold text-slate-800 mt-1">Blood type B</div>
+                                    <div class="text-[10px] text-emerald-600 font-semibold">B antigen</div>
+                                </div>
+                                <!-- Type AB RBC -->
+                                <div class="p-2 rounded-lg bg-brand-50/50 border border-brand-100">
+                                    <svg class="w-16 h-16 mx-auto" viewBox="0 0 80 80">
+                                        <circle cx="40" cy="40" r="22" fill="#ef4444" stroke="#991b1b" stroke-width="2"/>
+                                        <circle cx="40" cy="40" r="12" fill="#dc2626" opacity="0.6"/>
+                                        <polygon points="40,8 35,18 45,18" fill="#ea580c"/>
+                                        <polygon points="40,72 35,62 45,62" fill="#ea580c"/>
+                                        <circle cx="13" cy="40" r="5" fill="#10b981"/>
+                                        <circle cx="67" cy="40" r="5" fill="#10b981"/>
+                                    </svg>
+                                    <div class="text-xs font-bold text-slate-800 mt-1">Blood type AB</div>
+                                    <div class="text-[10px] text-amber-700 font-semibold">AB antigens</div>
+                                </div>
+                                <!-- Type O RBC -->
+                                <div class="p-2 rounded-lg bg-brand-50/50 border border-brand-100">
+                                    <svg class="w-16 h-16 mx-auto" viewBox="0 0 80 80">
+                                        <circle cx="40" cy="40" r="22" fill="#ef4444" stroke="#991b1b" stroke-width="2"/>
+                                        <circle cx="40" cy="40" r="12" fill="#dc2626" opacity="0.6"/>
+                                    </svg>
+                                    <div class="text-xs font-bold text-slate-800 mt-1">Blood type O</div>
+                                    <div class="text-[10px] text-slate-500 font-semibold">No antigens</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Agglutination Diagram -->
+                        <div class="lg:col-span-3 bg-white rounded-xl border border-brand-200 p-4 shadow-sm text-center">
+                            <div class="text-xs font-extrabold text-brand-700 mb-2">Agglutination</div>
+                            <svg class="w-32 h-32 mx-auto" viewBox="0 0 120 120">
+                                <circle cx="35" cy="35" r="14" fill="#86efac" stroke="#166534" stroke-width="2"/>
+                                <circle cx="85" cy="35" r="14" fill="#86efac" stroke="#166534" stroke-width="2"/>
+                                <circle cx="60" cy="80" r="14" fill="#86efac" stroke="#166534" stroke-width="2"/>
+                                <path d="M49 35 L60 35 L71 35 M60 35 L60 22" stroke="#ea580c" stroke-width="2.5" fill="none"/>
+                                <path d="M43 47 L52 66 M77 47 L68 66" stroke="#ea580c" stroke-width="2.5" fill="none"/>
+                            </svg>
+                            <p class="text-[11px] text-slate-600 mt-2 leading-snug">
+                                Plasma <strong>antibodies</strong> bind to foreign RBC <strong>antigens</strong>, causing clumping (agglutination).
+                            </p>
+                        </div>
+                    </div>
+
+                    <!-- Full Compatibility Table -->
+                    <div class="overflow-x-auto bg-white rounded-xl border border-brand-200 shadow-sm">
+                        <table class="w-full text-xs text-center border-collapse">
+                            <thead class="bg-brand-600 text-white">
+                                <tr>
+                                    <th class="p-3 border-r border-brand-500">Blood Type</th>
+                                    <th class="p-3 border-r border-brand-500">Antigen (RBC Membrane)</th>
+                                    <th class="p-3 border-r border-brand-500">Antibody (Plasma)</th>
+                                    <th class="p-3 border-r border-brand-500">Can Receive Blood From</th>
+                                    <th class="p-3">Can Donate Blood To</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-brand-100">
+                                <tr>
+                                    <td class="p-3 font-extrabold text-brand-700 border-r border-brand-100">A (40%)</td>
+                                    <td class="p-3 font-semibold border-r border-brand-100">A antigen</td>
+                                    <td class="p-3 text-slate-600 border-r border-brand-100">Anti-B antibodies</td>
+                                    <td class="p-3 font-bold text-slate-800 border-r border-brand-100">A, O</td>
+                                    <td class="p-3 font-bold text-slate-800">A, AB</td>
+                                </tr>
+                                <tr class="bg-brand-50/40">
+                                    <td class="p-3 font-extrabold text-orange-600 border-r border-brand-100">B (10%)</td>
+                                    <td class="p-3 font-semibold border-r border-brand-100">B antigen</td>
+                                    <td class="p-3 text-slate-600 border-r border-brand-100">Anti-A antibodies</td>
+                                    <td class="p-3 font-bold text-slate-800 border-r border-brand-100">B, O</td>
+                                    <td class="p-3 font-bold text-slate-800">B, AB</td>
+                                </tr>
+                                <tr>
+                                    <td class="p-3 font-extrabold text-amber-700 border-r border-brand-100">AB (4%)</td>
+                                    <td class="p-3 font-semibold border-r border-brand-100">A antigen, B antigen</td>
+                                    <td class="p-3 text-emerald-700 font-semibold border-r border-brand-100">No antibodies</td>
+                                    <td class="p-3 font-bold text-slate-800 border-r border-brand-100">A, B, AB, O</td>
+                                    <td class="p-3 font-bold text-slate-800">AB</td>
+                                </tr>
+                                <tr class="bg-brand-50/40">
+                                    <td class="p-3 font-extrabold text-slate-800 border-r border-brand-100">O (46%)</td>
+                                    <td class="p-3 text-slate-500 border-r border-brand-100">No antigen</td>
+                                    <td class="p-3 text-slate-600 border-r border-brand-100">Both Anti-A and Anti-B antibodies</td>
+                                    <td class="p-3 font-bold text-slate-800 border-r border-brand-100">O</td>
+                                    <td class="p-3 font-bold text-slate-800">O, A, B, AB</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </article>
+
+        <!-- ========================================================= -->
+        <!-- EXAMPLE 3: BABY EYE COLOR PREDICTOR CHART                 -->
+        <!-- ========================================================= -->
+        <article id="eye-color-guide" class="bg-white rounded-3xl shadow-lg border-2 border-brand-100 overflow-hidden">
+            <div class="bg-gradient-to-r from-brand-600 to-orange-500 px-6 sm:px-10 py-6 text-white">
+                <span class="inline-block px-3 py-1 rounded-full bg-white/20 border border-white/30 text-white text-xs font-bold mb-2">
+                    Example 3 • Polygenic Human Inheritance (OCA2 & HERC2 Genes)
+                </span>
+                <h2 class="text-2xl sm:text-3xl font-extrabold">Baby Eye Color Predictor Chart & Probability Guide</h2>
+            </div>
+
+            <div class="p-6 sm:p-10 grid grid-cols-1 lg:grid-cols-12 gap-8 items-center bg-white">
+                <!-- Left Text Explanation -->
+                <div class="lg:col-span-5 space-y-4">
+                    <h3 class="text-xl font-extrabold text-slate-900">How Parental Eye Colors Predict a Baby's Eye Color</h3>
+                    <p class="text-sm text-slate-600 leading-relaxed">
+                        Human eye color is controlled primarily by melanin production regulated by the <strong>OCA2</strong> and <strong>HERC2</strong> genes on chromosome 15. While simplified classroom Punnett squares model <strong>Brown (<code class="font-mono font-bold text-brand-700">B</code>)</strong> as dominant over <strong>Green (<code class="font-mono font-bold text-brand-700">G</code>)</strong> and <strong>Blue (<code class="font-mono font-bold text-brand-700">b</code>)</strong>, real-world polygenic inheritance allows two brown-eyed heterozygous parents (<code class="font-mono font-bold text-brand-700">Bb × Bb</code>) to have a <strong>25% combined chance</strong> of having a blue-eyed (6.25%) or green-eyed (18.75%) baby.
+                    </p>
+                    <div class="p-4 rounded-2xl bg-brand-50 border border-brand-200 space-y-2 text-xs text-slate-800">
+                        <div class="font-bold text-brand-800">Why Two Blue-Eyed Parents Have 99% Blue-Eyed Babies:</div>
+                        <p>Blue eyes result from low melanin concentration (homozygous recessive alleles). Without dominant melanin-producing alleles from either parent, there is a ~99% probability the child will inherit blue eyes and ~1% chance of green.</p>
+                    </div>
+                </div>
+
+                <!-- Right Recreated Visual Baby Eye Color Predictor Chart -->
+                <div class="lg:col-span-7 bg-brand-50/60 rounded-2xl border-2 border-brand-200 p-6 sm:p-8">
+                    <div class="text-center mb-6">
+                        <h3 class="text-2xl font-serif font-bold text-slate-900">Baby Eye Color Predictor Chart</h3>
+                        <p class="text-xs font-semibold text-brand-600 mt-1">university-tutors.com Genetics Reference • Probability Distribution</p>
+                    </div>
+
+                    <div class="grid grid-cols-12 text-center text-xs font-bold uppercase tracking-wider text-brand-800 pb-3 border-b border-brand-200">
+                        <div class="col-span-5">Parents' Eyes</div>
+                        <div class="col-span-1"></div>
+                        <div class="col-span-6">Child's Eyes</div>
+                    </div>
+
+                    <div class="divide-y divide-brand-200/70 text-xs font-bold text-slate-800 bg-white rounded-xl px-3 mt-2 border border-brand-100">
+                        <!-- Row 1: Brown + Brown -->
+                        <div class="grid grid-cols-12 items-center py-3">
+                            <div class="col-span-5 flex items-center justify-center gap-2">
+                                <span class="w-8 h-8 rounded-full bg-amber-900 border-4 border-amber-700 flex items-center justify-center shadow"><span class="w-3 h-3 rounded-full bg-black"></span></span>
+                                <span class="text-brand-500">+</span>
+                                <span class="w-8 h-8 rounded-full bg-amber-900 border-4 border-amber-700 flex items-center justify-center shadow"><span class="w-3 h-3 rounded-full bg-black"></span></span>
+                            </div>
+                            <div class="col-span-1 text-brand-500 font-black">=</div>
+                            <div class="col-span-6 grid grid-cols-3 gap-1 text-center">
+                                <div>
+                                    <span class="w-7 h-7 mx-auto rounded-full bg-amber-900 border-2 border-amber-700 flex items-center justify-center"><span class="w-2.5 h-2.5 rounded-full bg-black"></span></span>
+                                    <span class="block mt-1">75%</span>
+                                </div>
+                                <div>
+                                    <span class="w-7 h-7 mx-auto rounded-full bg-emerald-600 border-2 border-emerald-500 flex items-center justify-center"><span class="w-2.5 h-2.5 rounded-full bg-black"></span></span>
+                                    <span class="block mt-1">18.75%</span>
+                                </div>
+                                <div>
+                                    <span class="w-7 h-7 mx-auto rounded-full bg-sky-500 border-2 border-sky-400 flex items-center justify-center"><span class="w-2.5 h-2.5 rounded-full bg-black"></span></span>
+                                    <span class="block mt-1">6.25%</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Row 2: Green + Brown -->
+                        <div class="grid grid-cols-12 items-center py-3">
+                            <div class="col-span-5 flex items-center justify-center gap-2">
+                                <span class="w-8 h-8 rounded-full bg-emerald-600 border-4 border-emerald-500 flex items-center justify-center shadow"><span class="w-3 h-3 rounded-full bg-black"></span></span>
+                                <span class="text-brand-500">+</span>
+                                <span class="w-8 h-8 rounded-full bg-amber-900 border-4 border-amber-700 flex items-center justify-center shadow"><span class="w-3 h-3 rounded-full bg-black"></span></span>
+                            </div>
+                            <div class="col-span-1 text-brand-500 font-black">=</div>
+                            <div class="col-span-6 grid grid-cols-3 gap-1 text-center">
+                                <div><span class="w-7 h-7 mx-auto rounded-full bg-amber-900 border-2 border-amber-700 flex items-center justify-center"><span class="w-2.5 h-2.5 rounded-full bg-black"></span></span><span class="block mt-1">50%</span></div>
+                                <div><span class="w-7 h-7 mx-auto rounded-full bg-emerald-600 border-2 border-emerald-500 flex items-center justify-center"><span class="w-2.5 h-2.5 rounded-full bg-black"></span></span><span class="block mt-1">37.5%</span></div>
+                                <div><span class="w-7 h-7 mx-auto rounded-full bg-sky-500 border-2 border-sky-400 flex items-center justify-center"><span class="w-2.5 h-2.5 rounded-full bg-black"></span></span><span class="block mt-1">12.5%</span></div>
+                            </div>
+                        </div>
+
+                        <!-- Row 3: Blue + Brown -->
+                        <div class="grid grid-cols-12 items-center py-3">
+                            <div class="col-span-5 flex items-center justify-center gap-2">
+                                <span class="w-8 h-8 rounded-full bg-sky-500 border-4 border-sky-400 flex items-center justify-center shadow"><span class="w-3 h-3 rounded-full bg-black"></span></span>
+                                <span class="text-brand-500">+</span>
+                                <span class="w-8 h-8 rounded-full bg-amber-900 border-4 border-amber-700 flex items-center justify-center shadow"><span class="w-3 h-3 rounded-full bg-black"></span></span>
+                            </div>
+                            <div class="col-span-1 text-brand-500 font-black">=</div>
+                            <div class="col-span-6 grid grid-cols-3 gap-1 text-center">
+                                <div><span class="w-7 h-7 mx-auto rounded-full bg-amber-900 border-2 border-amber-700 flex items-center justify-center"><span class="w-2.5 h-2.5 rounded-full bg-black"></span></span><span class="block mt-1">50%</span></div>
+                                <div><span class="w-7 h-7 mx-auto rounded-full bg-emerald-600 border-2 border-emerald-500 flex items-center justify-center opacity-40"><span class="w-2.5 h-2.5 rounded-full bg-black"></span></span><span class="block mt-1 text-slate-400">0%</span></div>
+                                <div><span class="w-7 h-7 mx-auto rounded-full bg-sky-500 border-2 border-sky-400 flex items-center justify-center"><span class="w-2.5 h-2.5 rounded-full bg-black"></span></span><span class="block mt-1">50%</span></div>
+                            </div>
+                        </div>
+
+                        <!-- Row 4: Green + Green -->
+                        <div class="grid grid-cols-12 items-center py-3">
+                            <div class="col-span-5 flex items-center justify-center gap-2">
+                                <span class="w-8 h-8 rounded-full bg-emerald-600 border-4 border-emerald-500 flex items-center justify-center shadow"><span class="w-3 h-3 rounded-full bg-black"></span></span>
+                                <span class="text-brand-500">+</span>
+                                <span class="w-8 h-8 rounded-full bg-emerald-600 border-4 border-emerald-500 flex items-center justify-center shadow"><span class="w-3 h-3 rounded-full bg-black"></span></span>
+                            </div>
+                            <div class="col-span-1 text-brand-500 font-black">=</div>
+                            <div class="col-span-6 grid grid-cols-3 gap-1 text-center">
+                                <div><span class="w-7 h-7 mx-auto rounded-full bg-amber-900 border-2 border-amber-700 flex items-center justify-center opacity-40"><span class="w-2.5 h-2.5 rounded-full bg-black"></span></span><span class="block mt-1 text-slate-400">&lt;1%</span></div>
+                                <div><span class="w-7 h-7 mx-auto rounded-full bg-emerald-600 border-2 border-emerald-500 flex items-center justify-center"><span class="w-2.5 h-2.5 rounded-full bg-black"></span></span><span class="block mt-1">75%</span></div>
+                                <div><span class="w-7 h-7 mx-auto rounded-full bg-sky-500 border-2 border-sky-400 flex items-center justify-center"><span class="w-2.5 h-2.5 rounded-full bg-black"></span></span><span class="block mt-1">25%</span></div>
+                            </div>
+                        </div>
+
+                        <!-- Row 5: Green + Blue -->
+                        <div class="grid grid-cols-12 items-center py-3">
+                            <div class="col-span-5 flex items-center justify-center gap-2">
+                                <span class="w-8 h-8 rounded-full bg-emerald-600 border-4 border-emerald-500 flex items-center justify-center shadow"><span class="w-3 h-3 rounded-full bg-black"></span></span>
+                                <span class="text-brand-500">+</span>
+                                <span class="w-8 h-8 rounded-full bg-sky-500 border-4 border-sky-400 flex items-center justify-center shadow"><span class="w-3 h-3 rounded-full bg-black"></span></span>
+                            </div>
+                            <div class="col-span-1 text-brand-500 font-black">=</div>
+                            <div class="col-span-6 grid grid-cols-3 gap-1 text-center">
+                                <div><span class="w-7 h-7 mx-auto rounded-full bg-amber-900 border-2 border-amber-700 flex items-center justify-center opacity-40"><span class="w-2.5 h-2.5 rounded-full bg-black"></span></span><span class="block mt-1 text-slate-400">0%</span></div>
+                                <div><span class="w-7 h-7 mx-auto rounded-full bg-emerald-600 border-2 border-emerald-500 flex items-center justify-center"><span class="w-2.5 h-2.5 rounded-full bg-black"></span></span><span class="block mt-1">50%</span></div>
+                                <div><span class="w-7 h-7 mx-auto rounded-full bg-sky-500 border-2 border-sky-400 flex items-center justify-center"><span class="w-2.5 h-2.5 rounded-full bg-black"></span></span><span class="block mt-1">50%</span></div>
+                            </div>
+                        </div>
+
+                        <!-- Row 6: Blue + Blue -->
+                        <div class="grid grid-cols-12 items-center py-3">
+                            <div class="col-span-5 flex items-center justify-center gap-2">
+                                <span class="w-8 h-8 rounded-full bg-sky-500 border-4 border-sky-400 flex items-center justify-center shadow"><span class="w-3 h-3 rounded-full bg-black"></span></span>
+                                <span class="text-brand-500">+</span>
+                                <span class="w-8 h-8 rounded-full bg-sky-500 border-4 border-sky-400 flex items-center justify-center shadow"><span class="w-3 h-3 rounded-full bg-black"></span></span>
+                            </div>
+                            <div class="col-span-1 text-brand-500 font-black">=</div>
+                            <div class="col-span-6 grid grid-cols-3 gap-1 text-center">
+                                <div><span class="w-7 h-7 mx-auto rounded-full bg-amber-900 border-2 border-amber-700 flex items-center justify-center opacity-40"><span class="w-2.5 h-2.5 rounded-full bg-black"></span></span><span class="block mt-1 text-slate-400">0%</span></div>
+                                <div><span class="w-7 h-7 mx-auto rounded-full bg-emerald-600 border-2 border-emerald-500 flex items-center justify-center opacity-60"><span class="w-2.5 h-2.5 rounded-full bg-black"></span></span><span class="block mt-1">1%</span></div>
+                                <div><span class="w-7 h-7 mx-auto rounded-full bg-sky-500 border-2 border-sky-400 flex items-center justify-center"><span class="w-2.5 h-2.5 rounded-full bg-black"></span></span><span class="block mt-1 text-brand-600 font-black">99%</span></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </article>
+
+    </main>
+
+    <!-- Script to render the 16-cell Dihybrid Pea Infographic -->
+    <script>
+        function sortAllelePair(a1, a2) {
+            if (a1 === a2) return a1 + a2;
+            if (a1.toUpperCase() === a2.toUpperCase()) {
+                return a1 === a1.toUpperCase() ? a1 + a2 : a2 + a1;
+            }
+            return [a1, a2].sort().join('');
+        }
+
+        function renderStaticDihybridInfographic() {
+            const gametes = ['AB', 'Ab', 'aB', 'ab'];
+            const tbody = document.getElementById('static-dihybrid-visual-body');
+            let html = '';
+
+            gametes.forEach(rowG => {
+                html += `<tr>
+                    <td class="p-2 border border-brand-200 bg-brand-50 font-mono font-bold text-brand-800">${rowG}</td>`;
+                gametes.forEach(colG => {
+                    const t1 = sortAllelePair(colG[0], rowG[0]);
+                    const t2 = sortAllelePair(colG[1], rowG[1]);
+                    const geno = t1 + t2;
+                    const isRound = /[A-Z]/.test(t1);
+                    const isYellow = /[A-Z]/.test(t2);
+
+                    let peaVisual = '';
+                    let label = '';
+                    let cellBg = '';
+
+                    if (isRound && isYellow) {
+                        peaVisual = `<span class="inline-block w-6 h-6 rounded-full bg-gradient-to-br from-yellow-300 to-amber-500 border border-amber-600 shadow-sm"></span>`;
+                        label = 'Round, Yellow';
+                        cellBg = 'bg-orange-50/40';
+                    } else if (isRound && !isYellow) {
+                        peaVisual = `<span class="inline-block w-6 h-6 rounded-full bg-gradient-to-br from-lime-400 to-green-600 border border-green-700 shadow-sm"></span>`;
+                        label = 'Round, Green';
+                        cellBg = 'bg-white';
+                    } else if (!isRound && isYellow) {
+                        peaVisual = `<span class="inline-block w-6 h-6 rounded-full bg-amber-400 border-2 border-dashed border-amber-700 shadow-sm"></span>`;
+                        label = 'Wrinkled, Yellow';
+                        cellBg = 'bg-amber-50/50';
+                    } else {
+                        peaVisual = `<span class="inline-block w-6 h-6 rounded-full bg-green-500 border-2 border-dashed border-green-800 shadow-sm"></span>`;
+                        label = 'Wrinkled, Green';
+                        cellBg = 'bg-brand-50/60';
+                    }
+
+                    html += `<td class="p-2 border border-brand-200 ${cellBg}">
+                        <div class="font-mono font-bold text-slate-900 text-xs">${geno}</div>
+                        <div class="my-1">${peaVisual}</div>
+                        <div class="text-[9px] font-medium text-slate-600 leading-tight">${label}</div>
+                    </td>`;
+                });
+                html += `</tr>`;
+            });
+            tbody.innerHTML = html;
+        }
+
+        window.addEventListener('DOMContentLoaded', renderStaticDihybridInfographic);
+    </script>
+</body>
+</html>
+```

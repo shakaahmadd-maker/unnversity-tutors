@@ -231,10 +231,18 @@ export const SCIENCE_TOOLS_REGISTRY: ScienceToolItem[] = [
     category: 'Biology',
     subCategory: 'Genetics & Molecular Biology',
     formulaBadge: 'Aa × Aa → 1:2:1',
-    seoKeywords: ['punnett square calculator', 'dihybrid cross calculator', 'monohybrid genotype ratio', 'mendelian genetics solver'],
-    seoTitle: 'Free Punnett Square & Dihybrid Genetics Calculator | University Tutors',
+    seoKeywords: [
+      'punnett square calculator',
+      'dihybrid cross calculator AaBb x AaBb',
+      'baby eye color predictor punnett square chart',
+      'blood type punnett square calculator ABO codominance',
+      'monohybrid genotype ratio 1:2:1',
+      'mendelian genetics 9:3:3:1 solver',
+    ],
+    seoTitle:
+      'Punnett Square Calculator & Real-Life Genetics Examples (Eye Color, Dihybrid, Blood Type) | University-Tutors.com',
     seoDescription:
-      'Interactive Monohybrid and Dihybrid Punnett Square calculator for biology students. Compute exact genotype frequencies and 3:1 or 9:3:3:1 phenotype ratios instantly.',
+      'Interactive Monohybrid (2×2) and Dihybrid (4×4) Punnett Square calculator with real-life eye color probability charts, 9:3:3:1 pea genetics, ABO blood type codominance examples, and instant branded PDF reports by University-Tutors.com.',
     path: '/tools/biology/punnett-square-calculator',
     viewKey: 'tools/biology/punnett-square-calculator',
     workedExample: {
@@ -275,10 +283,16 @@ export const SCIENCE_TOOLS_REGISTRY: ScienceToolItem[] = [
     category: 'Biology',
     subCategory: 'Genetics & Molecular Biology',
     formulaBadge: '5′ DNA → mRNA → Polypeptide',
-    seoKeywords: ['dna to rna to protein translator', 'codon chart translator', 'mrna amino acid converter', 'central dogma calculator'],
-    seoTitle: 'Free DNA to mRNA to Protein Sequence Translator | University Tutors',
+    seoKeywords: [
+      'dna to rna to protein translator',
+      'codon chart translator',
+      'sickle cell mutation codon example',
+      'mrna amino acid converter',
+      'central dogma calculator',
+    ],
+    seoTitle: 'DNA to RNA to Protein Translator & Real-Life Mutation Examples | University-Tutors.com',
     seoDescription:
-      'Transcribe 5′→3′ DNA sequences into complementary DNA, mRNA triplets, and 3-letter/1-letter amino acid chains with BRCA1 and Human Insulin presets.',
+      'Transcribe 5′→3′ DNA sequences into mRNA codons and amino acid chains with real-life Sickle-Cell (HbS) & Insulin examples, mobile full-screen mode, and branded PDF reports by University-Tutors.com.',
     path: '/tools/biology/dna-rna-protein-translator',
     viewKey: 'tools/biology/dna-rna-protein-translator',
     workedExample: {
@@ -319,10 +333,16 @@ export const SCIENCE_TOOLS_REGISTRY: ScienceToolItem[] = [
     category: 'Biology',
     subCategory: 'Genetics & Molecular Biology',
     formulaBadge: 'Tm = 2(A+T) + 4(G+C)',
-    seoKeywords: ['pcr master mix calculator', 'primer tm calculator', 'annealing temperature calculator', 'wallace rule tm'],
-    seoTitle: 'Free PCR Master Mix & Primer Tm Annealing Calculator | University Tutors',
+    seoKeywords: [
+      'pcr master mix calculator',
+      'primer tm calculator',
+      'annealing temperature calculator',
+      'thermal cycler protocol graph',
+      'wallace rule tm',
+    ],
+    seoTitle: 'PCR Master Mix & Primer Tm Calculator with Real-Life Assay Examples | University-Tutors.com',
     seoDescription:
-      'Calculate exact PCR master mix volumes with 10% pipetting overage and analyze forward/reverse primer GC% and melting temperatures (Tm) in your browser.',
+      'Calculate PCR master mix volumes with 10% overage, primer GC% and annealing Tm, real-life 96-well diagnostic and 16S rRNA presets, and formatted PDF protocols by University-Tutors.com.',
     path: '/tools/biology/pcr-master-mix-calculator',
     viewKey: 'tools/biology/pcr-master-mix-calculator',
     workedExample: {
@@ -363,10 +383,16 @@ export const SCIENCE_TOOLS_REGISTRY: ScienceToolItem[] = [
     category: 'Biology',
     subCategory: 'Genetics & Molecular Biology',
     formulaBadge: 'p² + 2pq + q² = 1',
-    seoKeywords: ['hardy weinberg calculator', 'allele frequency p and q', 'chi square hardy weinberg', 'population genetics solver'],
-    seoTitle: 'Free Hardy-Weinberg Equilibrium & Chi-Square Calculator | University Tutors',
+    seoKeywords: [
+      'hardy weinberg calculator',
+      'allele frequency p and q',
+      'chi square hardy weinberg',
+      'cystic fibrosis carrier frequency example',
+      'sickle cell heterozygote advantage',
+    ],
+    seoTitle: 'Hardy-Weinberg Equilibrium & Chi-Square Calculator with Real-Life Examples | University-Tutors.com',
     seoDescription:
-      'Calculate allele frequencies (p and q), expected Hardy-Weinberg genotype counts, and Chi-square (df = 1) statistical significance from observed population data.',
+      'Solve allele frequencies (p, q), genotype ratios (p², 2pq, q²), and Chi-square (df = 1) tests with Peppered Moth, Malaria HbS, and Cystic Fibrosis examples by University-Tutors.com.',
     path: '/tools/biology/hardy-weinberg-calculator',
     viewKey: 'tools/biology/hardy-weinberg-calculator',
     workedExample: {
@@ -407,10 +433,16 @@ export const SCIENCE_TOOLS_REGISTRY: ScienceToolItem[] = [
     category: 'Biology',
     subCategory: 'Genetics & Molecular Biology',
     formulaBadge: 'log₁₀(bp) ∝ Migration',
-    seoKeywords: ['restriction digest simulator', 'gel electrophoresis simulator', 'ecori bamhi hindiii cutter', 'plasmid digest bands'],
-    seoTitle: 'Free Restriction Enzyme Digest & Agarose Gel Simulator | University Tutors',
+    seoKeywords: [
+      'restriction digest simulator',
+      'gel electrophoresis simulator',
+      'ecori bamhi hindiii cutter',
+      'puc19 cloning gel bands example',
+      'plasmid digest bands',
+    ],
+    seoTitle: 'Restriction Enzyme Digest & Agarose Gel Simulator with Examples | University-Tutors.com',
     seoDescription:
-      'Simulate DNA restriction digests with EcoRI, BamHI, HindIII, and NotI. View exact cut positions, fragment lengths (bp), and an interactive 1kb ladder gel.',
+      'Simulate DNA restriction digests with EcoRI, BamHI, HindIII, NotI, PstI & XbaI, visualize 1kb ladder agarose gels, export branded PDFs, and test pUC19 cloning examples at University-Tutors.com.',
     path: '/tools/biology/restriction-digest-gel-simulator',
     viewKey: 'tools/biology/restriction-digest-gel-simulator',
     workedExample: {
@@ -451,10 +483,16 @@ export const SCIENCE_TOOLS_REGISTRY: ScienceToolItem[] = [
     category: 'Biology',
     subCategory: 'Genetics & Molecular Biology',
     formulaBadge: '5′-N₂₀-NGG-3′ (SpCas9)',
-    seoKeywords: ['crispr grna finder', 'pam site finder ngg', 'spcas9 guide rna calculator', 'protospacer gc content'],
-    seoTitle: 'Free CRISPR Guide RNA (gRNA) & NGG PAM Finder | University Tutors',
+    seoKeywords: [
+      'crispr grna finder',
+      'pam site finder ngg',
+      'spcas9 guide rna calculator',
+      'bcl11a pcsk9 crispr example',
+      'protospacer gc content',
+    ],
+    seoTitle: 'CRISPR Guide RNA (gRNA) & NGG PAM Finder with Gene Therapy Examples | University-Tutors.com',
     seoDescription:
-      'Scan forward and reverse DNA strands for SpCas9 5′-NGG-3′ PAM motifs. Rank 20-nt CRISPR guide RNAs by GC% efficiency and poly-T termination risk.',
+      'Scan forward and reverse DNA strands for SpCas9 5′-NGG-3′ PAM motifs, inspect BCL11A & PCSK9 CRISPR editing graphics, and export formatted gRNA PDFs at University-Tutors.com.',
     path: '/tools/biology/crispr-grna-finder',
     viewKey: 'tools/biology/crispr-grna-finder',
     workedExample: {
@@ -495,10 +533,16 @@ export const SCIENCE_TOOLS_REGISTRY: ScienceToolItem[] = [
     category: 'Biology',
     subCategory: 'Cell Biology & Lab Prep',
     formulaBadge: 'C₁V₁ = C₂V₂',
-    seoKeywords: ['c1v1 c2v2 calculator', 'serial dilution calculator', 'stock solution dilution', 'lab molarity dilution'],
-    seoTitle: 'Free Serial Dilution & C₁V₁ = C₂V₂ Lab Calculator | University Tutors',
+    seoKeywords: [
+      'c1v1 c2v2 calculator',
+      'serial dilution calculator',
+      'stock solution dilution',
+      'elisa serial dilution bench example',
+      'lab molarity dilution',
+    ],
+    seoTitle: 'Serial Dilution & C₁V₁ = C₂V₂ Lab Calculator with Wet-Lab Examples | University-Tutors.com',
     seoDescription:
-      'Calculate stock transfer volumes with C₁V₁ = C₂V₂ unit conversion (M, mM, µM, nM; L, mL, µL) and build step-by-step serial dilution tube tables.',
+      'Solve C₁V₁ = C₂V₂ dilutions and multi-tube logarithmic dilution racks with Ampicillin LB plate & ELISA curve graphics and branded PDF bench sheets by University-Tutors.com.',
     path: '/tools/biology/serial-dilution-molarity-calculator',
     viewKey: 'tools/biology/serial-dilution-molarity-calculator',
     workedExample: {
@@ -539,10 +583,16 @@ export const SCIENCE_TOOLS_REGISTRY: ScienceToolItem[] = [
     category: 'Biology',
     subCategory: 'Cell Biology & Lab Prep',
     formulaBadge: 'Nₜ = N₀ · 2ⁿ',
-    seoKeywords: ['bacterial doubling time calculator', 'cfu ml calculator', 'generation time microbiology', 'specific growth rate mu'],
-    seoTitle: 'Free Bacterial Doubling Time & CFU/mL Plate Calculator | University Tutors',
+    seoKeywords: [
+      'bacterial doubling time calculator',
+      'cfu ml calculator',
+      'generation time microbiology',
+      'e coli growth curve example',
+      'specific growth rate mu',
+    ],
+    seoTitle: 'Bacterial Doubling Time & CFU/mL Calculator with Lab Examples | University-Tutors.com',
     seoDescription:
-      'Compute microbial generation time (g), number of doublings (n), specific growth rate (μ), and viable colony-forming units (CFU/mL) from serial dilutions.',
+      'Calculate bacterial generation time (g), growth rate (μ), and viable CFU/mL plate counts with E. coli log-phase curves, milk QC examples, and PDF lab reports by University-Tutors.com.',
     path: '/tools/biology/cell-growth-cfu-calculator',
     viewKey: 'tools/biology/cell-growth-cfu-calculator',
     workedExample: {
@@ -583,10 +633,16 @@ export const SCIENCE_TOOLS_REGISTRY: ScienceToolItem[] = [
     category: 'Biology',
     subCategory: 'Cell Biology & Lab Prep',
     formulaBadge: 'FOV₂ = FOV₁ × (M₁ / M₂)',
-    seoKeywords: ['microscope fov calculator', 'field of view micrometer calculator', 'total magnification biology', 'cell size microscope'],
-    seoTitle: 'Free Microscope Field-of-View (FOV) & Cell Size Calculator | University Tutors',
+    seoKeywords: [
+      'microscope fov calculator',
+      'field of view micrometer calculator',
+      'total magnification biology',
+      'rbc cheek onion cell size example',
+      'cell size microscope',
+    ],
+    seoTitle: 'Microscope Field-of-View (FOV) & Cell Size Calculator with Examples | University-Tutors.com',
     seoDescription:
-      'Calculate compound microscope total magnification, high-power FOV diameter in millimeters and micrometers (µm), and actual specimen length.',
+      'Compute microscope total magnification, FOV diameter (µm), and actual cell size with RBC, cheek cell, and onion epidermis visual scale guides and PDF reports by University-Tutors.com.',
     path: '/tools/biology/microscope-fov-calculator',
     viewKey: 'tools/biology/microscope-fov-calculator',
     workedExample: {
@@ -627,10 +683,16 @@ export const SCIENCE_TOOLS_REGISTRY: ScienceToolItem[] = [
     category: 'Biology',
     subCategory: 'Cell Biology & Lab Prep',
     formulaBadge: 'Animal · Plant · Prokaryote',
-    seoKeywords: ['interactive cell diagram', 'eukaryotic vs prokaryotic organelles', 'animal plant bacterial cell explorer', 'organelle function study tool'],
-    seoTitle: 'Interactive Animal, Plant & Bacterial Cell Organelle Explorer | University Tutors',
+    seoKeywords: [
+      'interactive cell diagram',
+      'eukaryotic vs prokaryotic organelles',
+      'animal plant bacterial cell explorer',
+      'endomembrane insulin pathway example',
+      'organelle function study tool',
+    ],
+    seoTitle: 'Interactive Animal, Plant & Bacterial Cell Explorer with Diagrams | University-Tutors.com',
     seoDescription:
-      'Explore interactive Animal, Plant, and Prokaryotic cell SVG diagrams. Click any organelle to review structure, ATP/protein pathways, and exam comparisons.',
+      'Explore interactive Animal, Plant, and Bacterial SVG cell diagrams, Endosymbiotic & Endomembrane secretory pathways, and export branded study sheets at University-Tutors.com.',
     path: '/tools/biology/interactive-cell-explorer',
     viewKey: 'tools/biology/interactive-cell-explorer',
     workedExample: {
@@ -671,10 +733,16 @@ export const SCIENCE_TOOLS_REGISTRY: ScienceToolItem[] = [
     category: 'Biology',
     subCategory: 'Ecology, Botany & Physiology',
     formulaBadge: "H' = −Σ pᵢ ln(pᵢ)",
-    seoKeywords: ['shannon wiener index calculator', 'simpson diversity index calculator', 'species evenness calculator', 'ecology quadrat diversity'],
-    seoTitle: "Free Shannon-Wiener (H') & Simpson's Biodiversity Calculator | University Tutors",
+    seoKeywords: [
+      'shannon wiener index calculator',
+      'simpson diversity index calculator',
+      'species evenness calculator',
+      'forest vs algal bloom biodiversity example',
+      'ecology quadrat diversity',
+    ],
+    seoTitle: "Shannon-Wiener (H') & Simpson's Biodiversity Calculator with Examples | University-Tutors.com",
     seoDescription:
-      "Compute Species Richness (S), Shannon-Wiener Index (H'), Evenness (E), and Simpson's Diversity Index (1 − D) from ecological field sampling tables.",
+      "Calculate Species Richness (S), Shannon-Wiener (H'), Evenness (E), and Simpson's Diversity (1 − D) with Old-Growth Forest & Stream Bioindicator examples at University-Tutors.com.",
     path: '/tools/biology/biodiversity-index-calculator',
     viewKey: 'tools/biology/biodiversity-index-calculator',
     workedExample: {
@@ -715,10 +783,16 @@ export const SCIENCE_TOOLS_REGISTRY: ScienceToolItem[] = [
     category: 'Biology',
     subCategory: 'Ecology, Botany & Physiology',
     formulaBadge: 'Ψ = Ψs + Ψp = −iCRT + Ψp',
-    seoKeywords: ['water potential calculator', 'solute potential icrt calculator', 'plant osmosis turgor pressure', 'ap biology water potential'],
-    seoTitle: 'Free Plant Water Potential (Ψ = −iCRT + Ψp) Calculator | University Tutors',
+    seoKeywords: [
+      'water potential calculator',
+      'solute potential icrt calculator',
+      'potato core osmosis lab example',
+      'plant osmosis turgor pressure',
+      'ap biology water potential',
+    ],
+    seoTitle: 'Plant Water Potential (Ψ = −iCRT + Ψp) Calculator & Potato Osmosis Guide | University-Tutors.com',
     seoDescription:
-      'Solve solute potential (Ψs = −iCRT), pressure potential (Ψp), total water potential (bars & MPa), and osmotic direction between plant cells and solutions.',
+      'Solve solute potential (Ψs = −iCRT), turgor pressure (Ψp), and osmotic direction with Potato Core sucrose lab curve graphics and branded PDF reports at University-Tutors.com.',
     path: '/tools/biology/water-potential-osmolarity-calculator',
     viewKey: 'tools/biology/water-potential-osmolarity-calculator',
     workedExample: {
@@ -759,10 +833,16 @@ export const SCIENCE_TOOLS_REGISTRY: ScienceToolItem[] = [
     category: 'Biology',
     subCategory: 'Ecology, Botany & Physiology',
     formulaBadge: 'CO = HR × SV · MAP',
-    seoKeywords: ['cardiac output calculator', 'mean arterial pressure map calculator', 'spirometry vital capacity fev1', 'mifflin st jeor bmr physiology'],
-    seoTitle: 'Free Human Physiology Calculator — CO, MAP, BMR & Spirometry | University Tutors',
+    seoKeywords: [
+      'cardiac output calculator',
+      'mean arterial pressure map calculator',
+      'spirometry vital capacity fev1',
+      'athlete bradycardia asthma fev1 example',
+      'mifflin st jeor bmr physiology',
+    ],
+    seoTitle: 'Human Physiology Calculators (CO, MAP, BMR & Spirometry) with Cases | University-Tutors.com',
     seoDescription:
-      'Calculate Cardiac Output, Ejection Fraction, Mean Arterial Pressure (MAP), Mifflin-St Jeor BMR, and Spirometry Vital Capacity / FEV1% for physiology labs.',
+      'Solve Cardiac Output, MAP, Mifflin-St Jeor BMR, and FEV1/FVC spirometry with Athlete Heart & Asthma lung curve graphics and formatted PDF lab reports at University-Tutors.com.',
     path: '/tools/biology/human-physiology-calculators',
     viewKey: 'tools/biology/human-physiology-calculators',
     workedExample: {
@@ -803,10 +883,16 @@ export const SCIENCE_TOOLS_REGISTRY: ScienceToolItem[] = [
     category: 'Biology',
     subCategory: 'Ecology, Botany & Physiology',
     formulaBadge: 'Domain → Genus species',
-    seoKeywords: ['dichotomous key builder', 'taxonomic hierarchy explorer', 'linnaean classification tool', 'binomial nomenclature formatter'],
-    seoTitle: 'Free Taxonomic Hierarchy & Dichotomous Key Builder | University Tutors',
+    seoKeywords: [
+      'dichotomous key builder',
+      'taxonomic hierarchy explorer',
+      'linnaean classification tool',
+      'plant phyla dichotomous tree example',
+      'binomial nomenclature formatter',
+    ],
+    seoTitle: 'Taxonomic Hierarchy & Dichotomous Key Builder with Examples | University-Tutors.com',
     seoDescription:
-      'Explore 8-rank Linnaean taxonomy (Domain to Species) for model organisms and test or build step-by-step dichotomous identification keys.',
+      'Explore 8-rank Linnaean taxonomy (Domain to Species), build interactive dichotomous identification keys with Plant Phyla decision trees, and export PDFs at University-Tutors.com.',
     path: '/tools/biology/taxonomic-dichotomous-key-builder',
     viewKey: 'tools/biology/taxonomic-dichotomous-key-builder',
     workedExample: {

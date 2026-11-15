@@ -9,8 +9,14 @@ import {
   ChevronUp,
   Eye,
   Atom,
+  Maximize2,
+  Minimize2,
 } from 'lucide-react';
-import { downloadCanvasFigurePdf } from '../../../utils/pdfReportGenerator';
+import {
+  downloadChemistryStructuredPdf,
+  getBrandLogoForPdf,
+} from '../../../utils/pdfReportGenerator';
+import { SCIENCE_TOOLS_BY_SLUG } from '../../../data/scienceToolsRegistry';
 
 // ============================================================================
 // CPK ELEMENT PALETTE & COVALENT RADII
@@ -865,6 +871,7 @@ export function VseprMolecularGeometryVisualizer() {
   const [autoRotate, setAutoRotate] = useState<boolean>(true);
   const [hudCollapsed, setHudCollapsed] = useState<boolean>(false);
   const [webglLost, setWebglLost] = useState<boolean>(false);
+  const [isFullScreen, setIsFullScreen] = useState<boolean>(false);
 
   const vsepr = useMemo(() => {
     return (
@@ -877,12 +884,65 @@ export function VseprMolecularGeometryVisualizer() {
     return vsepr.molecules.find((m) => m.id === selectedMoleculeId) || vsepr.molecules[0];
   }, [vsepr, selectedMoleculeId]);
 
+  useEffect(() => {
+    void getBrandLogoForPdf();
+  }, []);
+
   // Keep selectedMoleculeId synced when VSEPR class changes
   useEffect(() => {
     if (!vsepr.molecules.some((m) => m.id === selectedMoleculeId)) {
       setSelectedMoleculeId(vsepr.molecules[0].id);
     }
   }, [vsepr, selectedMoleculeId]);
+
+  // Body scroll lock & Escape exit for mobile/desktop full-screen expansion
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      requestAnimationFrame(() => window.dispatchEvent(new Event('resize')));
+    }
+    if (!isFullScreen || typeof document === 'undefined') return;
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+
+    const onEsc = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setIsFullScreen(false);
+      }
+    };
+    window.addEventListener('keydown', onEsc);
+    return () => {
+      document.body.style.overflow = prevOverflow;
+      window.removeEventListener('keydown', onEsc);
+    };
+  }, [isFullScreen]);
+
+  // Listen to ut-chem-load-preset from ChemistryRealLifeExamples
+  useEffect(() => {
+    const onPreset = (e: Event) => {
+      const detail = (e as CustomEvent<Record<string, unknown>>).detail;
+      if (!detail || detail.slug !== 'vsepr-molecular-geometry-visualizer') return;
+      if (typeof detail.moleculeId === 'string') {
+        const targetId = detail.moleculeId.toLowerCase();
+        for (const cls of VSEPR_CLASSES) {
+          const found = cls.molecules.find((m) => m.id.toLowerCase() === targetId);
+          if (found) {
+            setBonds(cls.bonds);
+            setLonePairs(cls.lonePairs);
+            setSelectedMoleculeId(found.id);
+            break;
+          }
+        }
+      } else if (typeof detail.bonds === 'number' && typeof detail.lonePairs === 'number') {
+        setBonds(detail.bonds);
+        setLonePairs(detail.lonePairs);
+      }
+      if (detail.modelStyle === 'ball-stick' || detail.modelStyle === 'space-fill') {
+        setModelStyle(detail.modelStyle);
+      }
+    };
+    window.addEventListener('ut-chem-load-preset', onPreset as EventListener);
+    return () => window.removeEventListener('ut-chem-load-preset', onPreset as EventListener);
+  }, []);
 
   // Keyboard shortcut 'H' for collapsing/expanding the 3D bottom control dock
   useEffect(() => {
@@ -1478,128 +1538,240 @@ export function VseprMolecularGeometryVisualizer() {
     link.click();
   };
 
-  const handleExportPdf = () => {
-    if (!threeRef.current) return;
-    const { renderer, scene, camera } = threeRef.current;
-    renderer.render(scene, camera);
-    const pngDataUrl = renderer.domElement.toDataURL('image/png');
-    downloadCanvasFigurePdf({
+  const handleExportPdf = useCallback(() => {
+    let pngDataUrl = '';
+    let imgWidthPx = 800;
+    let imgHeightPx = 560;
+    if (threeRef.current) {
+      const { renderer, scene, camera } = threeRef.current;
+      renderer.render(scene, camera);
+      pngDataUrl = renderer.domElement.toDataURL('image/png');
+      imgWidthPx = renderer.domElement.width || 800;
+      imgHeightPx = renderer.domElement.height || 560;
+    }
+
+    const tool = SCIENCE_TOOLS_BY_SLUG['vsepr-molecular-geometry-visualizer'];
+    void downloadChemistryStructuredPdf({
       filename: `VSEPR-${activeMolecule.id}-${vsepr.code}.pdf`,
-      title: `VSEPR 3D Molecular Geometry — ${activeMolecule.formulaDisplay} (${activeMolecule.name})`,
-      subtitle: `${vsepr.displayCode} · ${vsepr.molecularGeo} · ${vsepr.hybridization} · Bond Angle: ${vsepr.bondAngle} · ${activeMolecule.polarity}`,
-      pngDataUrl,
-      imgWidthPx: renderer.domElement.width || 800,
-      imgHeightPx: renderer.domElement.height || 600,
-      landscape: true,
+      badgeText: 'CHEMISTRY · 3D VSEPR MOLECULAR GEOMETRY',
+      title: `VSEPR Molecular Geometry — ${activeMolecule.formulaDisplay} (${activeMolecule.name})`,
+      subtitle: `${vsepr.displayCode} · ${vsepr.molecularGeo} · ${vsepr.hybridization} Hybridized · ${activeMolecule.polarity}`,
+      parameters: [
+        { label: 'Example Molecule', value: `${activeMolecule.formulaDisplay} (${activeMolecule.name})` },
+        { label: 'VSEPR Formula Class', value: `${vsepr.displayCode} (Bonding = ${bonds}, Lone Pairs = ${lonePairs}, Steric # = ${bonds + lonePairs})` },
+        { label: 'Electron-Domain Geometry', value: `${vsepr.electronGeo} (${vsepr.hybridization})` },
+        { label: '3D Display Mode', value: modelStyle === 'ball-stick' ? 'Ball & Stick + Orbital Lobes' : 'Space-Filling Van der Waals' },
+      ],
+      kpis: [
+        { label: 'Molecular Shape', value: vsepr.molecularGeo, accent: true },
+        { label: 'Hybridization', value: vsepr.hybridization },
+        { label: 'Bond Angle(s)', value: activeMolecule.bondAngleLabel },
+      ],
+      callout: {
+        title: `Molecular Polarity & Repulsion Notes: ${activeMolecule.polarity}`,
+        body: activeMolecule.notes,
+        tone: activeMolecule.polarity.includes('Nonpolar') ? 'emerald' : 'orange',
+      },
+      canvasFigure: pngDataUrl
+        ? {
+            title: `3D WebGL Geometry Render — ${activeMolecule.formulaDisplay} (${vsepr.molecularGeo})`,
+            pngDataUrl,
+            imgWidthPx,
+            imgHeightPx,
+            maxHeightMm: 78,
+          }
+        : undefined,
+      workedExample: tool?.workedExample,
     });
-  };
+  }, [activeMolecule, vsepr, bonds, lonePairs, modelStyle]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const onPdf = (e: Event) => {
+      const ce = e as CustomEvent<{ tool?: { slug?: string } }>;
+      if (ce.detail?.tool?.slug === 'vsepr-molecular-geometry-visualizer') {
+        e.preventDefault();
+        handleExportPdf();
+      }
+    };
+    window.addEventListener('ut-tool-pdf-export', onPdf as EventListener);
+    return () => window.removeEventListener('ut-tool-pdf-export', onPdf as EventListener);
+  }, [handleExportPdf]);
 
   return (
-    <div className="bg-[#FFFFFF] border border-slate-200 rounded-3xl p-5 sm:p-8 space-y-6 shadow-2xs">
-      {/* Row 1: All 13 VSEPR Geometry Class Selector Buttons */}
-      <div className="space-y-2.5 pb-4 border-b border-slate-100">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <span className="text-xs font-bold text-[#111827]">
-            Select VSEPR Class (AXₘEₙ) or Adjust Domains Below
-          </span>
-          <span className="text-xs text-slate-500 font-mono tabular-nums">
-            Steric Number = {bonds + lonePairs} · {vsepr.hybridization} Hybridized
-          </span>
+    <div
+      data-fullscreen={isFullScreen ? 'true' : 'false'}
+      className={
+        isFullScreen
+          ? 'fixed inset-0 z-[120] w-screen h-[100dvh] bg-[#FFFFFF] flex flex-col overflow-hidden'
+          : 'bg-[#FFFFFF] border border-slate-200 rounded-3xl p-4 sm:p-6 lg:p-8 space-y-5 shadow-2xs'
+      }
+    >
+      {/* Top Toolbar (Always accessible on Mobile + Desktop Full Screen) */}
+      <div
+        className={`flex flex-wrap items-center justify-between gap-2.5 ${
+          isFullScreen
+            ? 'shrink-0 px-3.5 sm:px-6 py-2.5 bg-[#FFFFFF] border-b border-slate-200 shadow-2xs'
+            : 'pb-3 border-b border-slate-100'
+        }`}
+      >
+        <div className="min-w-0">
+          <h2 className="text-sm sm:text-base font-display font-bold text-[#111827] truncate">
+            3D VSEPR Molecular Geometry &amp; Hybridization Studio ({activeMolecule.formulaDisplay})
+          </h2>
+          {!isFullScreen && (
+            <p className="text-xs text-slate-500">
+              Drag to orbit 3D orbitals, scroll to zoom, or toggle 2D exam wedge-dash views
+            </p>
+          )}
         </div>
 
-        <div className="flex flex-wrap gap-1.5">
-          {VSEPR_CLASSES.map((item) => {
-            const isSelected = vsepr.code === item.code;
-            return (
-              <button
-                key={item.code}
-                type="button"
-                onClick={() => selectVseprClass(item)}
-                className={`px-2.5 py-1.5 rounded-xl text-xs font-mono font-bold border transition-colors cursor-pointer whitespace-nowrap shrink-0 ${
-                  isSelected
-                    ? 'bg-[#F97316] text-white border-[#F97316]'
-                    : 'bg-[#F9FAFB] hover:bg-[#FFF7ED] text-slate-700 border-slate-200 hover:border-orange-300'
-                }`}
-              >
-                {item.displayCode}
-              </button>
-            );
-          })}
+        <div className="flex items-center gap-1.5 shrink-0">
+          <button
+            type="button"
+            onClick={handleExportPng}
+            aria-label="Export 3D molecule as PNG"
+            title="Export PNG"
+            className="inline-flex items-center justify-center gap-1.5 min-h-[44px] min-w-[44px] sm:min-w-0 sm:px-3 py-2 rounded-xl bg-[#F9FAFB] hover:bg-slate-100 border border-slate-200 text-xs font-semibold text-slate-700 transition-colors cursor-pointer whitespace-nowrap"
+          >
+            <Download className="w-3.5 h-3.5 text-[#F97316]" />
+            <span className="hidden sm:inline">PNG</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={handleExportPdf}
+            aria-label="Download VSEPR Chemistry PDF report"
+            title="Download PDF"
+            className="inline-flex items-center justify-center gap-1.5 min-h-[44px] min-w-[44px] sm:min-w-0 sm:px-3 py-2 rounded-xl bg-[#F97316] hover:bg-[#EA580C] text-white text-xs font-semibold transition-colors cursor-pointer whitespace-nowrap"
+          >
+            <FileDown className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">PDF</span>
+          </button>
+
+          <button
+            type="button"
+            id="vsepr-molecular-geometry-visualizer-fullscreen-toggle-btn"
+            onClick={() => setIsFullScreen((fs) => !fs)}
+            aria-pressed={isFullScreen}
+            aria-label={isFullScreen ? 'Exit full screen 3D VSEPR visualizer' : 'Expand 3D VSEPR visualizer to full screen'}
+            title={isFullScreen ? 'Exit Full Screen' : 'Expand Full Screen'}
+            className={`inline-flex items-center justify-center gap-1.5 min-h-[44px] rounded-xl border text-xs font-semibold transition-colors cursor-pointer whitespace-nowrap ${
+              isFullScreen
+                ? 'px-3 bg-[#111827] border-[#111827] text-white hover:bg-slate-800'
+                : 'min-w-[44px] sm:min-w-0 sm:px-3 py-2 bg-[#FFF7ED] border-orange-200 text-[#EA580C] hover:bg-orange-100/70'
+            }`}
+          >
+            {isFullScreen ? (
+              <>
+                <Minimize2 className="w-4 h-4 shrink-0" />
+                <span>Exit</span>
+              </>
+            ) : (
+              <>
+                <Maximize2 className="w-4 h-4 shrink-0" />
+                <span className="hidden sm:inline">Full Screen</span>
+              </>
+            )}
+          </button>
         </div>
       </div>
 
-      {/* Row 2: Two-Zone Interactive 3D Molecular Stage + Parameter & Stereochemistry Deck */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
-        {/* LEFT / PRIMARY ZONE (7 Cols): Interactive 3D Molecular Geometry Viewport */}
-        <div className="lg:col-span-7 flex flex-col gap-3">
-          {/* Example Molecule Selector Strip for Current VSEPR Class */}
-          <div className="bg-[#F9FAFB] border border-slate-200 rounded-2xl px-4 py-2.5 flex flex-wrap items-center justify-between gap-2">
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="inline-flex items-center gap-1.5 text-xs font-bold text-[#111827]">
-                <Atom className="w-4 h-4 text-[#F97316]" />
-                <span>3D Model:</span>
-              </span>
-              {vsepr.molecules.map((mol) => {
-                const active = activeMolecule.id === mol.id;
-                return (
-                  <button
-                    key={mol.id}
-                    type="button"
-                    onClick={() => setSelectedMoleculeId(mol.id)}
-                    className={`px-3 py-1 rounded-lg text-xs font-semibold transition-colors cursor-pointer whitespace-nowrap ${
-                      active
-                        ? 'bg-[#111827] text-white'
-                        : 'bg-[#FFFFFF] text-slate-700 border border-slate-200 hover:border-orange-300'
-                    }`}
-                  >
-                    {mol.formulaDisplay} ({mol.name})
-                  </button>
-                );
-              })}
-            </div>
-
-            <div className="flex flex-wrap items-center gap-1.5">
-              <button
-                type="button"
-                onClick={handleExportPng}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 min-h-[44px] sm:min-h-0 rounded-lg bg-[#FFFFFF] hover:bg-slate-50 border border-slate-200 text-xs font-semibold text-slate-700 transition-colors cursor-pointer whitespace-nowrap shrink-0"
-              >
-                <Download className="w-3.5 h-3.5 text-[#F97316]" />
-                <span>Export PNG</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={handleExportPdf}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 min-h-[44px] sm:min-h-0 rounded-lg bg-[#F97316] hover:bg-[#EA580C] text-white text-xs font-semibold transition-colors cursor-pointer whitespace-nowrap shrink-0"
-              >
-                <FileDown className="w-3.5 h-3.5" />
-                <span>Download PDF</span>
-              </button>
-            </div>
+      {/* Scrollable Inner Workspace (Supports 100dvh Full-Screen on Mobile) */}
+      <div
+        className={
+          isFullScreen
+            ? 'flex-1 min-h-0 overflow-y-auto overscroll-contain p-3.5 sm:p-6 pb-8 space-y-5'
+            : 'space-y-5'
+        }
+      >
+        {/* Row 1: All 13 VSEPR Geometry Class Selector Buttons */}
+        <div className="space-y-2.5 pb-3 border-b border-slate-100">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <span className="text-xs font-bold text-[#111827]">
+              Select VSEPR Class (AXₘEₙ) or Adjust Domains Below
+            </span>
+            <span className="text-xs text-slate-500 font-mono tabular-nums">
+              Steric Number = {bonds + lonePairs} · {vsepr.hybridization} Hybridized
+            </span>
           </div>
 
-          {/* 3D WebGL Viewport Container */}
-          <div className="relative rounded-2xl border border-slate-800 bg-[#0B1120] overflow-hidden min-h-[430px] flex-1">
-            {/* Semantic Top-Left Molecule Spec Overlay */}
-            <div className="absolute top-3.5 left-3.5 z-10 pointer-events-none space-y-0.5 bg-slate-950/85 border border-slate-800 rounded-xl px-3.5 py-2">
-              <div className="flex items-center gap-2 text-xs">
-                <span className="font-display font-bold text-white text-sm">
-                  {activeMolecule.formulaDisplay}
+          <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar sm:flex-wrap pb-0.5">
+            {VSEPR_CLASSES.map((item) => {
+              const isSelected = vsepr.code === item.code;
+              return (
+                <button
+                  key={item.code}
+                  type="button"
+                  onClick={() => selectVseprClass(item)}
+                  className={`px-3 py-1.5 min-h-[40px] rounded-xl text-xs font-mono font-bold border transition-colors cursor-pointer whitespace-nowrap shrink-0 ${
+                    isSelected
+                      ? 'bg-[#F97316] text-white border-[#F97316]'
+                      : 'bg-[#F9FAFB] hover:bg-[#FFF7ED] text-slate-700 border-slate-200 hover:border-orange-300'
+                  }`}
+                >
+                  {item.displayCode}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Row 2: Two-Zone Interactive 3D Molecular Stage + Parameter & Stereochemistry Deck */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
+          {/* LEFT / PRIMARY ZONE (7 Cols): Interactive 3D Molecular Geometry Viewport */}
+          <div className="lg:col-span-7 flex flex-col gap-3">
+            {/* Example Molecule Selector Strip for Current VSEPR Class */}
+            <div className="bg-[#F9FAFB] border border-slate-200 rounded-2xl px-4 py-2.5 flex flex-wrap items-center justify-between gap-2">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="inline-flex items-center gap-1.5 text-xs font-bold text-[#111827]">
+                  <Atom className="w-4 h-4 text-[#F97316]" />
+                  <span>3D Model:</span>
                 </span>
-                <span className="text-slate-500">·</span>
-                <span className="font-semibold text-orange-400">{vsepr.molecularGeo}</span>
+                {vsepr.molecules.map((mol) => {
+                  const active = activeMolecule.id === mol.id;
+                  return (
+                    <button
+                      key={mol.id}
+                      type="button"
+                      onClick={() => setSelectedMoleculeId(mol.id)}
+                      className={`px-3 py-1.5 min-h-[40px] rounded-lg text-xs font-semibold transition-colors cursor-pointer whitespace-nowrap ${
+                        active
+                          ? 'bg-[#111827] text-white'
+                          : 'bg-[#FFFFFF] text-slate-700 border border-slate-200 hover:border-orange-300'
+                      }`}
+                    >
+                      {mol.formulaDisplay} ({mol.name})
+                    </button>
+                  );
+                })}
               </div>
-              <div className="text-[11px] text-slate-300 font-mono tabular-nums">
-                {vsepr.displayCode} · {vsepr.hybridization} · {activeMolecule.polarity}
-              </div>
+              <span className="text-[11px] font-mono text-slate-500">
+                Drag to rotate · Scroll to zoom
+              </span>
             </div>
 
-            {/* Dedicated Empty Mount Container for Three.js WebGLRenderer */}
-            <div
-              ref={mountRef}
-              className="w-full h-full min-h-[430px] cursor-grab active:cursor-grabbing touch-none"
-            />
+            {/* 3D WebGL Viewport Container */}
+            <div className="relative rounded-2xl border border-slate-800 bg-[#0B1120] overflow-hidden min-h-[380px] sm:min-h-[430px] flex-1">
+              {/* Semantic Top-Left Molecule Spec Overlay */}
+              <div className="absolute top-3.5 left-3.5 z-10 pointer-events-none space-y-0.5 bg-slate-950/85 border border-slate-800 rounded-xl px-3.5 py-2">
+                <div className="flex items-center gap-2 text-xs">
+                  <span className="font-display font-bold text-white text-sm">
+                    {activeMolecule.formulaDisplay}
+                  </span>
+                  <span className="text-slate-500">·</span>
+                  <span className="font-semibold text-orange-400">{vsepr.molecularGeo}</span>
+                </div>
+                <div className="text-[11px] text-slate-300 font-mono tabular-nums">
+                  {vsepr.displayCode} · {vsepr.hybridization} · {activeMolecule.polarity}
+                </div>
+              </div>
+
+              {/* Dedicated Empty Mount Container for Three.js WebGLRenderer */}
+              <div
+                ref={mountRef}
+                className="w-full h-full min-h-[380px] sm:min-h-[430px] cursor-grab active:cursor-grabbing touch-none"
+              />
 
             {/* Graceful Fallback if WebGL Context is Lost */}
             {webglLost && (
@@ -1817,6 +1989,7 @@ export function VseprMolecularGeometryVisualizer() {
             </div>
             <WedgeDash2dDiagram vsepr={vsepr} molecule={activeMolecule} />
           </div>
+        </div>
         </div>
       </div>
     </div>

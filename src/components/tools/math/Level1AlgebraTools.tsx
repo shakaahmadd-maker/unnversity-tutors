@@ -17,6 +17,7 @@ import {
   lcmInt,
 } from '../../../utils/mathEngine';
 import { MathWorkspaceBar, fmtNum, toExactFraction } from './MathWorkspaceHeader';
+import { MathFormula, MathMatrixDisplay, MathText } from './MathTypeset';
 
 // ============================================================================
 // TOOL 1: SCIENTIFIC & COMPLEX EXPRESSION EVALUATOR
@@ -169,13 +170,13 @@ export const ScientificExpressionEvaluator: React.FC = () => {
         modeLabel={mode === 'pemdas' ? `Angle: ${angleUnit.toUpperCase()}` : 'Complex z = a + bi'}
       />
 
-      <div className="p-6 space-y-6">
+      <div className="p-4 sm:p-6 space-y-5 sm:space-y-6">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="inline-flex p-1 bg-[#F9FAFB] border border-gray-200 rounded-xl">
+          <div className="inline-flex flex-wrap p-1 bg-[#F9FAFB] border border-gray-200 rounded-xl gap-1">
             <button
               type="button"
               onClick={() => setMode('pemdas')}
-              className={`px-4 py-2 text-xs font-semibold rounded-lg transition-colors whitespace-nowrap ${
+              className={`px-3.5 sm:px-4 py-2 min-h-[40px] text-xs font-semibold rounded-lg transition-colors whitespace-nowrap cursor-pointer ${
                 mode === 'pemdas'
                   ? 'bg-[#F97316] text-white'
                   : 'text-gray-600 hover:text-gray-900'
@@ -186,13 +187,13 @@ export const ScientificExpressionEvaluator: React.FC = () => {
             <button
               type="button"
               onClick={() => setMode('complex')}
-              className={`px-4 py-2 text-xs font-semibold rounded-lg transition-colors whitespace-nowrap ${
+              className={`px-3.5 sm:px-4 py-2 min-h-[40px] text-xs font-semibold rounded-lg transition-colors whitespace-nowrap cursor-pointer ${
                 mode === 'complex'
                   ? 'bg-[#F97316] text-white'
                   : 'text-gray-600 hover:text-gray-900'
               }`}
             >
-              Complex Rectangular (a + bi)
+              Complex Rectangular (<MathFormula latex="a + bi" />)
             </button>
           </div>
 
@@ -201,7 +202,7 @@ export const ScientificExpressionEvaluator: React.FC = () => {
               <button
                 type="button"
                 onClick={() => setAngleUnit('rad')}
-                className={`px-3.5 py-1.5 text-xs font-semibold rounded-lg whitespace-nowrap ${
+                className={`px-3.5 py-1.5 min-h-[38px] text-xs font-semibold rounded-lg whitespace-nowrap cursor-pointer ${
                   angleUnit === 'rad' ? 'bg-gray-900 text-white' : 'text-gray-600'
                 }`}
               >
@@ -300,7 +301,7 @@ export const ScientificExpressionEvaluator: React.FC = () => {
                       key={fn}
                       type="button"
                       onClick={() => insertToken(fn)}
-                      className="px-2.5 py-2 text-xs font-mono font-medium bg-[#F9FAFB] hover:bg-[#FFF7ED] hover:text-[#EA580C] border border-gray-200 rounded-lg transition-colors whitespace-nowrap"
+                      className="px-2 py-2.5 min-h-[42px] text-xs font-mono font-medium bg-[#F9FAFB] hover:bg-[#FFF7ED] hover:text-[#EA580C] border border-gray-200 rounded-lg transition-colors whitespace-nowrap cursor-pointer"
                     >
                       {fn}
                     </button>
@@ -310,26 +311,35 @@ export const ScientificExpressionEvaluator: React.FC = () => {
             </div>
 
             <div className="lg:col-span-5 space-y-4">
-              <div className="p-5 rounded-2xl bg-[#FFF7ED] border border-orange-200">
-                <p className="text-xs font-semibold text-[#EA580C] mb-1">Evaluated Output</p>
+              <div className="p-4 sm:p-5 rounded-2xl bg-[#FFF7ED] border border-orange-200 space-y-3">
+                <p className="text-xs font-semibold text-[#EA580C]">Evaluated Typeset Output</p>
+                <div className="px-3 py-2 rounded-xl bg-white/90 border border-orange-200/70 text-sm text-[#0F172A]">
+                  <MathFormula expr={expr} displayMode />
+                </div>
                 {evalResult.ok ? (
                   <>
                     <div className="text-3xl font-bold font-mono tabular-nums text-[#111827] break-all">
-                      {fmtNum(evalResult.value, 8)}
+                      = {fmtNum(evalResult.value, 8)}
                     </div>
-                    <div className="mt-3 pt-3 border-t border-orange-200/70 grid grid-cols-2 gap-3 text-xs">
+                    <div className="pt-3 border-t border-orange-200/70 grid grid-cols-2 gap-3 text-xs">
                       <div>
-                        <span className="text-gray-500 block">Exact Rational</span>
-                        <span className="font-mono font-semibold text-gray-900 tabular-nums">
-                          {evalResult.frac
-                            ? evalResult.frac.den === 1
-                              ? `${evalResult.frac.num}`
-                              : `${evalResult.frac.num} / ${evalResult.frac.den}`
-                            : 'Irrational / Transcendental'}
+                        <span className="text-gray-500 block mb-0.5">Exact Rational</span>
+                        <span className="font-semibold text-gray-900 text-sm">
+                          {evalResult.frac ? (
+                            evalResult.frac.den === 1 ? (
+                              <MathFormula latex={String(evalResult.frac.num)} />
+                            ) : (
+                              <MathFormula
+                                latex={`\\frac{${evalResult.frac.num}}{${evalResult.frac.den}}`}
+                              />
+                            )
+                          ) : (
+                            'Irrational / Transcendental'
+                          )}
                         </span>
                       </div>
                       <div>
-                        <span className="text-gray-500 block">Scientific Notation</span>
+                        <span className="text-gray-500 block mb-0.5">Scientific Notation</span>
                         <span className="font-mono font-semibold text-gray-900 tabular-nums">
                           {evalResult.sci}
                         </span>
@@ -436,20 +446,38 @@ export const ScientificExpressionEvaluator: React.FC = () => {
             </div>
 
             <div className="lg:col-span-6 space-y-4">
-              <div className="p-5 rounded-2xl bg-[#FFF7ED] border border-orange-200">
-                <p className="text-xs font-semibold text-[#EA580C] mb-1">Rectangular Result (a + bi)</p>
-                <div className="text-3xl font-bold font-mono tabular-nums text-[#111827]">
-                  {formatComplex(complexCalc.out, 5)}
+              <div className="p-4 sm:p-5 rounded-2xl bg-[#FFF7ED] border border-orange-200">
+                <p className="text-xs font-semibold text-[#EA580C] mb-1">
+                  Rectangular Result (<MathFormula latex="a + bi" />)
+                </p>
+                <div className="text-2xl sm:text-3xl font-bold text-[#111827]">
+                  <MathFormula
+                    latex={`z = ${fmtNum(complexCalc.out.re, 5)} ${complexCalc.out.im >= 0 ? '+' : '-'} ${fmtNum(
+                      Math.abs(complexCalc.out.im),
+                      5
+                    )}i`}
+                  />
                 </div>
-                <div className="mt-3 pt-3 border-t border-orange-200/70 grid grid-cols-2 gap-3 text-xs font-mono tabular-nums">
+                <div className="mt-3 pt-3 border-t border-orange-200/70 grid grid-cols-2 gap-3 text-xs">
                   <div>
-                    <span className="text-gray-500 font-sans block">Modulus |z|</span>
-                    <span className="font-semibold text-gray-900">{fmtNum(complexCalc.polar.r, 5)}</span>
+                    <span className="text-gray-500 block">
+                      Modulus <MathFormula latex="|z|" />
+                    </span>
+                    <span className="font-semibold text-gray-900 text-sm">
+                      <MathFormula latex={`r = ${fmtNum(complexCalc.polar.r, 5)}`} />
+                    </span>
                   </div>
                   <div>
-                    <span className="text-gray-500 font-sans block">Argument arg(z)</span>
-                    <span className="font-semibold text-gray-900">
-                      {fmtNum(complexCalc.polar.thetaDeg, 2)}° ({fmtNum(complexCalc.polar.thetaRad, 4)} rad)
+                    <span className="text-gray-500 block">
+                      Argument <MathFormula latex="\arg(z)" />
+                    </span>
+                    <span className="font-semibold text-gray-900 text-sm">
+                      <MathFormula
+                        latex={`\\theta = ${fmtNum(complexCalc.polar.thetaDeg, 2)}^\\circ\\;(${fmtNum(
+                          complexCalc.polar.thetaRad,
+                          4
+                        )}\\text{ rad})`}
+                      />
                     </span>
                   </div>
                 </div>
@@ -458,9 +486,9 @@ export const ScientificExpressionEvaluator: React.FC = () => {
               <div className="p-4 rounded-xl bg-[#F9FAFB] border border-gray-200 space-y-2">
                 <p className="text-xs font-semibold text-gray-700">Step-by-Step Algebraic Derivation</p>
                 {complexCalc.steps.map((s, idx) => (
-                  <div key={idx} className="text-xs font-mono text-gray-700 bg-white px-3 py-2 rounded-lg border border-gray-200">
+                  <div key={idx} className="text-xs sm:text-sm text-gray-800 bg-white px-3 py-2 rounded-lg border border-gray-200">
                     <span className="text-[#F97316] font-bold mr-2">{idx + 1}.</span>
-                    {s}
+                    <MathText text={s} />
                   </div>
                 ))}
               </div>
@@ -616,15 +644,15 @@ export const QuadraticPolynomialSolver: React.FC = () => {
         modeLabel={`Degree ${degree} Polynomial`}
       />
 
-      <div className="p-6 grid grid-cols-1 lg:grid-cols-12 gap-6">
+      <div className="p-4 sm:p-6 grid grid-cols-1 lg:grid-cols-12 gap-5 sm:gap-6">
         <div className="lg:col-span-5 space-y-4">
-          <div className="inline-flex p-1 bg-[#F9FAFB] border border-gray-200 rounded-xl">
+          <div className="inline-flex flex-wrap p-1 bg-[#F9FAFB] border border-gray-200 rounded-xl gap-1">
             {([2, 3, 4] as const).map((d) => (
               <button
                 key={d}
                 type="button"
                 onClick={() => setDegree(d)}
-                className={`px-3.5 py-1.5 text-xs font-semibold rounded-lg whitespace-nowrap ${
+                className={`px-3.5 py-2 min-h-[38px] text-xs font-semibold rounded-lg whitespace-nowrap cursor-pointer ${
                   degree === d ? 'bg-[#F97316] text-white' : 'text-gray-600 hover:text-gray-900'
                 }`}
               >
@@ -688,36 +716,63 @@ export const QuadraticPolynomialSolver: React.FC = () => {
             </div>
           </div>
 
-          <div className="p-4 rounded-xl bg-[#FFF7ED] border border-orange-200 space-y-2.5">
+          <div className="p-4 rounded-xl bg-[#FFF7ED] border border-orange-200 space-y-3">
+            <div className="px-3 py-2 rounded-lg bg-white/90 border border-orange-200/70 text-sm text-[#0F172A]">
+              <MathFormula
+                latex={
+                  analysis.coeffs
+                    .map((c, idx) => {
+                      const pow = analysis.coeffs.length - 1 - idx;
+                      if (Math.abs(c) < 1e-12 && analysis.coeffs.length > 1) return '';
+                      const sign = idx === 0 ? (c < 0 ? '-' : '') : c >= 0 ? ' + ' : ' - ';
+                      const mag = fmtNum(Math.abs(c), 3);
+                      const coefStr = pow > 0 && mag === '1' ? '' : mag;
+                      const varStr = pow === 0 ? '' : pow === 1 ? 'x' : `x^{${pow}}`;
+                      return `${sign}${coefStr}${varStr}`;
+                    })
+                    .filter(Boolean)
+                    .join('') + ' = 0'
+                }
+                displayMode
+              />
+            </div>
+
             <p className="text-xs font-semibold text-[#EA580C]">All Real & Complex Roots</p>
             <div className="space-y-1.5">
-              {analysis.roots.map((r, i) => (
-                <div
-                  key={i}
-                  className="flex items-center justify-between px-3 py-2 bg-white rounded-lg border border-orange-200/80 font-mono text-sm tabular-nums"
-                >
-                  <span className="text-gray-500">x_{i + 1}</span>
-                  <span className="font-bold text-[#111827]">{formatComplex(r, 5)}</span>
-                  <span className="text-xs font-sans text-gray-500">
-                    {Math.abs(r.im) < 1e-7 ? 'Real' : 'Complex'}
-                  </span>
-                </div>
-              ))}
+              {analysis.roots.map((r, i) => {
+                const rootLatex =
+                  Math.abs(r.im) < 1e-7
+                    ? `x_{${i + 1}} = ${fmtNum(r.re, 5)}`
+                    : `x_{${i + 1}} = ${fmtNum(r.re, 4)} ${r.im >= 0 ? '+' : '-'} ${fmtNum(Math.abs(r.im), 4)}i`;
+                return (
+                  <div
+                    key={i}
+                    className="flex items-center justify-between px-3 py-2 bg-white rounded-lg border border-orange-200/80 text-sm"
+                  >
+                    <MathFormula latex={rootLatex} className="font-semibold text-[#111827]" />
+                    <span className="text-xs font-sans text-gray-500 shrink-0 ml-2">
+                      {Math.abs(r.im) < 1e-7 ? 'Real' : 'Complex'}
+                    </span>
+                  </div>
+                );
+              })}
             </div>
-            <div className="pt-2 border-t border-orange-200/70 text-xs font-mono text-gray-800 break-all">
-              <span className="font-sans text-gray-500 block mb-0.5">Linear Factorization:</span>
-              P(x) = {analysis.factored}
+            <div className="pt-2 border-t border-orange-200/70 text-xs text-gray-800">
+              <span className="font-sans text-gray-500 block mb-1">Linear Factorization:</span>
+              <MathFormula expr={`P(x) = ${analysis.factored}`} displayMode />
             </div>
           </div>
 
           {analysis.discriminant !== null && analysis.vertex && (
-            <div className="grid grid-cols-2 gap-3 text-xs">
-              <div className="p-3 rounded-xl bg-[#F9FAFB] border border-gray-200">
-                <span className="text-gray-500 block">Discriminant Δ = b² − 4ac</span>
-                <span className="font-mono font-bold text-base text-gray-900 tabular-nums">
-                  {fmtNum(analysis.discriminant, 4)}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+              <div className="p-3.5 rounded-xl bg-[#F9FAFB] border border-gray-200">
+                <span className="text-gray-500 block mb-1">
+                  Discriminant <MathFormula latex="\Delta = b^2 - 4ac" />
                 </span>
-                <span className="text-gray-500 block mt-0.5">
+                <div className="text-base font-bold text-gray-900">
+                  <MathFormula latex={`\\Delta = ${fmtNum(analysis.discriminant, 4)}`} />
+                </div>
+                <span className="text-gray-500 block mt-1">
                   {analysis.discriminant > 0
                     ? '2 Distinct Real Roots'
                     : analysis.discriminant === 0
@@ -725,13 +780,15 @@ export const QuadraticPolynomialSolver: React.FC = () => {
                     : 'Complex Conjugate Pair'}
                 </span>
               </div>
-              <div className="p-3 rounded-xl bg-[#F9FAFB] border border-gray-200">
-                <span className="text-gray-500 block">Vertex & Symmetry Axis</span>
-                <span className="font-mono font-bold text-base text-gray-900 tabular-nums">
-                  ({fmtNum(analysis.vertex.h, 3)}, {fmtNum(analysis.vertex.k, 3)})
-                </span>
-                <span className="text-gray-500 block mt-0.5 font-mono">
-                  Axis: x = {fmtNum(analysis.vertex.h, 3)}
+              <div className="p-3.5 rounded-xl bg-[#F9FAFB] border border-gray-200">
+                <span className="text-gray-500 block mb-1">Vertex & Symmetry Axis</span>
+                <div className="text-sm font-bold text-gray-900">
+                  <MathFormula
+                    latex={`(${fmtNum(analysis.vertex.h, 3)},\\; ${fmtNum(analysis.vertex.k, 3)})`}
+                  />
+                </div>
+                <span className="text-gray-600 block mt-1">
+                  <MathFormula latex={`x = ${fmtNum(analysis.vertex.h, 3)}`} />
                 </span>
               </div>
             </div>
@@ -826,10 +883,10 @@ export const QuadraticPolynomialSolver: React.FC = () => {
 export const LinearEquationsSystemSolver: React.FC = () => {
   const [size, setSize] = useState<2 | 3 | 4>(3);
   const [aug, setAug] = useState<number[][]>([
-    [2, 1, -1, 8],
-    [-3, -1, 2, -11],
-    [-2, 1, 2, -3],
-    [0, 0, 0, 0],
+    [2, 1, -1, 0, 8],
+    [-3, -1, 2, 0, -11],
+    [-2, 1, 2, 0, -3],
+    [0, 0, 0, 1, 1],
   ]);
 
   const varNames = ['x', 'y', 'z', 'w'];
@@ -987,27 +1044,17 @@ export const LinearEquationsSystemSolver: React.FC = () => {
         modeLabel={`${size}×${size} Augmented [A | b]`}
       />
 
-      <div className="p-6 grid grid-cols-1 lg:grid-cols-12 gap-6">
+      <div className="p-4 sm:p-6 grid grid-cols-1 lg:grid-cols-12 gap-5 sm:gap-6">
         <div className="lg:col-span-6 space-y-4">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-wrap items-center justify-between gap-2">
             <span className="text-xs font-semibold text-gray-700">System Dimension (N × N)</span>
             <div className="inline-flex p-1 bg-[#F9FAFB] border border-gray-200 rounded-xl">
               {([2, 3, 4] as const).map((n) => (
                 <button
                   key={n}
                   type="button"
-                  onClick={() => {
-                    if (n === 3 && aug[0]?.length === 4) {
-                      applyPreset(3, [
-                        [2, 1, -1, 0, 8],
-                        [-3, -1, 2, 0, -11],
-                        [-2, 1, 2, 0, -3],
-                      ]);
-                    } else {
-                      setSize(n);
-                    }
-                  }}
-                  className={`px-3 py-1.5 text-xs font-semibold rounded-lg whitespace-nowrap ${
+                  onClick={() => setSize(n)}
+                  className={`px-3 py-1.5 min-h-[38px] text-xs font-semibold rounded-lg whitespace-nowrap cursor-pointer ${
                     size === n ? 'bg-[#F97316] text-white' : 'text-gray-600'
                   }`}
                 >
@@ -1069,10 +1116,10 @@ export const LinearEquationsSystemSolver: React.FC = () => {
                 solvedClean.rrefAug.steps.map((s, idx) => (
                   <div
                     key={idx}
-                    className="text-xs font-mono text-gray-700 bg-white px-3 py-1.5 rounded-lg border border-gray-200"
+                    className="text-xs text-gray-800 bg-white px-3 py-1.5 rounded-lg border border-gray-200"
                   >
                     <span className="text-[#F97316] font-bold mr-1.5">{idx + 1}.</span>
-                    {s}
+                    <MathText text={s} />
                   </div>
                 ))
               )}
@@ -1081,72 +1128,65 @@ export const LinearEquationsSystemSolver: React.FC = () => {
         </div>
 
         <div className="lg:col-span-6 space-y-4">
-          <div className="p-5 rounded-2xl bg-[#FFF7ED] border border-orange-200">
-            <div className="flex items-center justify-between mb-2">
+          <div className="p-4 sm:p-5 rounded-2xl bg-[#FFF7ED] border border-orange-200">
+            <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
               <span className="text-xs font-semibold text-[#EA580C]">System Classification</span>
-              <span className="text-xs font-mono text-gray-700 tabular-nums">
-                det(A) = {fmtNum(solvedClean.detA, 4)} · rank(A) = {solvedClean.rankA}
+              <span className="text-xs text-gray-800">
+                <MathFormula
+                  latex={`\\det(A) = ${fmtNum(solvedClean.detA, 4)},\\; \\text{rank}(A) = ${solvedClean.rankA}`}
+                />
               </span>
             </div>
 
             {solvedClean.classification === 'unique' ? (
               <>
                 <p className="text-sm font-semibold text-gray-900 mb-3">
-                  Unique Solution Exists (det(A) ≠ 0)
+                  Unique Solution Exists (<MathFormula latex="\det(A) \ne 0" />)
                 </p>
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
                   {solvedClean.solution.map((val, i) => (
                     <div key={i} className="p-3 rounded-xl bg-white border border-orange-200">
-                      <span className="text-xs font-mono text-gray-500 block">{varNames[i]}</span>
-                      <span className="text-lg font-bold font-mono tabular-nums text-[#111827]">
-                        {fmtNum(val, 4)}
-                      </span>
+                      <MathFormula
+                        latex={`${varNames[i]} = ${fmtNum(val, 4)}`}
+                        className="text-sm sm:text-base font-bold text-[#111827]"
+                      />
                     </div>
                   ))}
                 </div>
-                <div className="mt-3 pt-3 border-t border-orange-200/70 text-xs font-mono text-gray-700">
-                  Cramer Determinants:{' '}
-                  {solvedClean.cramerDets
-                    .map((d, i) => `D_${varNames[i]} = ${fmtNum(d, 3)}`)
-                    .join(' · ')}
+                <div className="mt-3 pt-3 border-t border-orange-200/70 text-xs text-gray-700">
+                  <span className="block font-semibold text-gray-500 mb-1">Cramer Determinants:</span>
+                  <MathFormula
+                    latex={solvedClean.cramerDets
+                      .map((d, i) => `D_{${varNames[i]}} = ${fmtNum(d, 3)}`)
+                      .join(',\\quad ')}
+                  />
                 </div>
               </>
             ) : solvedClean.classification === 'inconsistent' ? (
               <div className="text-sm text-red-800 font-medium">
-                Inconsistent System (No Solution) — rank(A) = {solvedClean.rankA} &lt; rank([A|b]) ={' '}
-                {solvedClean.rrefAug.rank}. A contradictory row [0 … 0 | c ≠ 0] appears in RREF.
+                Inconsistent System (No Solution) —{' '}
+                <MathFormula
+                  latex={`\\text{rank}(A) = ${solvedClean.rankA} < \\text{rank}([A\\mid b]) = ${solvedClean.rrefAug.rank}`}
+                />
+                . A contradictory row appears in RREF.
               </div>
             ) : (
               <div className="text-sm text-amber-900 font-medium">
-                Infinitely Many Solutions — rank(A) = rank([A|b]) = {solvedClean.rankA} &lt; {size}, leaving{' '}
-                {size - solvedClean.rankA} free parameter(s).
+                Infinitely Many Solutions —{' '}
+                <MathFormula
+                  latex={`\\text{rank}(A) = \\text{rank}([A\\mid b]) = ${solvedClean.rankA} < ${size}`}
+                />
+                , leaving {size - solvedClean.rankA} free parameter(s).
               </div>
             )}
           </div>
 
           <div className="p-4 rounded-xl bg-[#F9FAFB] border border-gray-200">
-            <p className="text-xs font-semibold text-gray-700 mb-2">Reduced Row Echelon Form RREF([A | b])</p>
-            <div className="overflow-x-auto">
-              <table className="w-full text-xs font-mono tabular-nums bg-white rounded-lg border border-gray-200">
-                <tbody>
-                  {solvedClean.rrefAug.rref.map((row, rIdx) => (
-                    <tr key={rIdx} className="border-b last:border-b-0 border-gray-100">
-                      {row.map((val, cIdx) => (
-                        <td
-                          key={cIdx}
-                          className={`px-3 py-2 text-right ${
-                            cIdx === size
-                              ? 'border-l-2 border-gray-300 font-bold text-[#EA580C] bg-[#FFF7ED]/50'
-                              : 'text-gray-800'
-                          }`}
-                        >
-                          {fmtNum(val, 4)}
-                        </td>
-                      ))}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+            <p className="text-xs font-semibold text-gray-700 mb-2">
+              Reduced Row Echelon Form <MathFormula latex="\text{RREF}([A \mid b])" />
+            </p>
+            <div className="p-3 bg-white rounded-xl border border-gray-200 overflow-x-auto">
+              <MathMatrixDisplay matrix={solvedClean.rrefAug.rref} precision={4} />
             </div>
           </div>
         </div>
@@ -1310,7 +1350,7 @@ export const FractionRatioPercentageSolver: React.FC = () => {
         solutionText={solutionText}
       />
 
-      <div className="p-6 grid grid-cols-1 lg:grid-cols-12 gap-6">
+      <div className="p-4 sm:p-6 grid grid-cols-1 lg:grid-cols-12 gap-5 sm:gap-6">
         <div className="lg:col-span-7 space-y-5">
           <div className="p-4 rounded-xl bg-[#F9FAFB] border border-gray-200">
             <p className="text-xs font-semibold text-gray-700 mb-3">Exact Rational Arithmetic</p>
@@ -1339,7 +1379,7 @@ export const FractionRatioPercentageSolver: React.FC = () => {
                     key={sym}
                     type="button"
                     onClick={() => setOp(sym)}
-                    className={`w-10 h-10 font-mono font-bold text-sm rounded-lg border ${
+                    className={`w-11 h-11 font-mono font-bold text-base rounded-lg border cursor-pointer ${
                       op === sym
                         ? 'bg-[#F97316] text-white border-[#F97316]'
                         : 'bg-white text-gray-700 border-gray-200'
@@ -1373,10 +1413,10 @@ export const FractionRatioPercentageSolver: React.FC = () => {
               {calc.steps.map((s, i) => (
                 <div
                   key={i}
-                  className="text-xs font-mono text-gray-700 bg-white px-3 py-1.5 rounded-lg border border-gray-200"
+                  className="text-xs sm:text-sm text-gray-800 bg-white px-3 py-2 rounded-lg border border-gray-200"
                 >
                   <span className="text-[#F97316] font-bold mr-1.5">{i + 1}.</span>
-                  {s}
+                  <MathText text={s} />
                 </div>
               ))}
             </div>
@@ -1425,27 +1465,36 @@ export const FractionRatioPercentageSolver: React.FC = () => {
         </div>
 
         <div className="lg:col-span-5 space-y-4">
-          <div className="p-5 rounded-2xl bg-[#FFF7ED] border border-orange-200">
-            <p className="text-xs font-semibold text-[#EA580C] mb-1">Lowest-Terms Result</p>
-            <div className="text-3xl font-bold font-mono tabular-nums text-[#111827]">
-              {calc.simpDen === 0
-                ? 'Undefined (÷ 0)'
-                : calc.simpDen === 1
-                ? `${calc.simpNum}`
-                : `${calc.simpNum} / ${calc.simpDen}`}
+          <div className="p-4 sm:p-5 rounded-2xl bg-[#FFF7ED] border border-orange-200">
+            <p className="text-xs font-semibold text-[#EA580C] mb-1">Lowest-Terms Typeset Result</p>
+            <div className="text-xl sm:text-2xl font-bold text-[#111827]">
+              <MathFormula
+                latex={`\\frac{${calc.a}}{${calc.b}} ${
+                  op === '*' ? '\\times' : op === '/' ? '\\div' : op
+                } \\frac{${calc.c}}{${calc.d}} = ${
+                  calc.simpDen === 0
+                    ? '\\text{Undefined}'
+                    : calc.simpDen === 1
+                    ? `${calc.simpNum}`
+                    : `\\frac{${calc.simpNum}}{${calc.simpDen}}`
+                }`}
+                displayMode
+              />
             </div>
-            <div className="mt-3 pt-3 border-t border-orange-200/70 grid grid-cols-2 gap-3 text-xs font-mono tabular-nums">
+            <div className="mt-3 pt-3 border-t border-orange-200/70 grid grid-cols-2 gap-3 text-xs tabular-nums">
               <div>
-                <span className="font-sans text-gray-500 block">Mixed Number</span>
-                <span className="font-semibold text-gray-900">
-                  {calc.simpDen > 1 && Math.abs(calc.simpNum) > calc.simpDen
-                    ? `${calc.whole}  ${calc.rem}/${calc.simpDen}`
-                    : 'Proper Fraction'}
+                <span className="font-sans text-gray-500 block mb-0.5">Mixed Number</span>
+                <span className="font-semibold text-gray-900 text-sm">
+                  {calc.simpDen > 1 && Math.abs(calc.simpNum) > calc.simpDen ? (
+                    <MathFormula latex={`${calc.whole}\\frac{${calc.rem}}{${calc.simpDen}}`} />
+                  ) : (
+                    'Proper Fraction'
+                  )}
                 </span>
               </div>
               <div>
-                <span className="font-sans text-gray-500 block">Decimal & Percent</span>
-                <span className="font-semibold text-gray-900">
+                <span className="font-sans text-gray-500 block mb-0.5">Decimal & Percent</span>
+                <span className="font-mono font-semibold text-gray-900">
                   {fmtNum(calc.decimal, 5)} ({fmtNum(calc.decimal * 100, 2)}%)
                 </span>
               </div>
@@ -1454,21 +1503,21 @@ export const FractionRatioPercentageSolver: React.FC = () => {
 
           <div className="p-4 rounded-xl bg-[#F9FAFB] border border-gray-200 space-y-2 text-xs">
             <p className="font-semibold text-gray-700">Denominator GCD, LCM & Prime Factors</p>
-            <div className="flex justify-between font-mono py-1 border-b border-gray-200">
-              <span className="text-gray-500">GCD(|{calc.b}|, |{calc.d}|)</span>
-              <span className="font-semibold text-gray-900 tabular-nums">{calc.gDen}</span>
+            <div className="flex justify-between items-center py-1 border-b border-gray-200">
+              <MathFormula latex={`\\gcd(|${calc.b}|, |${calc.d}|)`} className="text-gray-600" />
+              <span className="font-mono font-semibold text-gray-900 tabular-nums">{calc.gDen}</span>
             </div>
-            <div className="flex justify-between font-mono py-1 border-b border-gray-200">
-              <span className="text-gray-500">LCM(|{calc.b}|, |{calc.d}|)</span>
-              <span className="font-semibold text-[#EA580C] tabular-nums">{calc.lcmDen}</span>
+            <div className="flex justify-between items-center py-1 border-b border-gray-200">
+              <MathFormula latex={`\\text{lcm}(|${calc.b}|, |${calc.d}|)`} className="text-gray-600" />
+              <span className="font-mono font-semibold text-[#EA580C] tabular-nums">{calc.lcmDen}</span>
             </div>
-            <div className="flex justify-between font-mono py-1 border-b border-gray-200">
+            <div className="flex justify-between items-center py-1 border-b border-gray-200">
               <span className="text-gray-500">Prime factors of {Math.abs(calc.b)}</span>
-              <span className="font-semibold text-gray-900">{calc.primeB}</span>
+              <MathFormula expr={calc.primeB} className="font-semibold text-gray-900" />
             </div>
-            <div className="flex justify-between font-mono py-1">
+            <div className="flex justify-between items-center py-1">
               <span className="text-gray-500">Prime factors of {Math.abs(calc.d)}</span>
-              <span className="font-semibold text-gray-900">{calc.primeD}</span>
+              <MathFormula expr={calc.primeD} className="font-semibold text-gray-900" />
             </div>
           </div>
         </div>
@@ -1589,11 +1638,11 @@ export const LogarithmExponentSimplifier: React.FC = () => {
         solutionText={solutionText}
       />
 
-      <div className="p-6 grid grid-cols-1 lg:grid-cols-12 gap-6">
+      <div className="p-4 sm:p-6 grid grid-cols-1 lg:grid-cols-12 gap-5 sm:gap-6">
         <div className="lg:col-span-6 space-y-4">
           <div className="p-4 rounded-xl bg-[#F9FAFB] border border-gray-200 space-y-3">
             <p className="text-xs font-semibold text-gray-700">
-              Exponential Equation Solver: a^(b·x + c) = d
+              Exponential Equation Solver: <MathFormula latex="a^{bx + c} = d" />
             </p>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
               <div>
@@ -1638,13 +1687,17 @@ export const LogarithmExponentSimplifier: React.FC = () => {
               </div>
             </div>
             {computed.expValid ? (
-              <div className="p-3.5 rounded-xl bg-[#FFF7ED] border border-orange-200 space-y-1">
-                <div className="text-xs font-mono text-gray-600">
-                  {computed.b}x + ({computed.c}) = ln({computed.d}) / ln({computed.a}) ={' '}
-                  {fmtNum(computed.logAd, 5)}
+              <div className="p-3.5 rounded-xl bg-[#FFF7ED] border border-orange-200 space-y-2">
+                <div className="text-xs sm:text-sm text-gray-800">
+                  <MathFormula
+                    latex={`${computed.b}x ${computed.c >= 0 ? '+' : '-'} ${Math.abs(computed.c)} = \\frac{\\ln(${computed.d})}{\\ln(${computed.a})} = ${fmtNum(
+                      computed.logAd,
+                      5
+                    )}`}
+                  />
                 </div>
-                <div className="text-xl font-bold font-mono tabular-nums text-[#111827]">
-                  x = {fmtNum(computed.xSol, 6)}
+                <div className="text-xl font-bold text-[#111827]">
+                  <MathFormula latex={`x = ${fmtNum(computed.xSol, 6)}`} />
                 </div>
               </div>
             ) : (
@@ -1655,7 +1708,9 @@ export const LogarithmExponentSimplifier: React.FC = () => {
           </div>
 
           <div className="p-4 rounded-xl bg-[#F9FAFB] border border-gray-200 space-y-3">
-            <p className="text-xs font-semibold text-gray-700">Change-of-Base Logarithm Calculator: log_b(x)</p>
+            <p className="text-xs font-semibold text-gray-700">
+              Change-of-Base Logarithm Calculator: <MathFormula latex="\log_b(x)" />
+            </p>
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="block text-xs text-gray-500 mb-1">Log Base (b)</label>
@@ -1678,22 +1733,24 @@ export const LogarithmExponentSimplifier: React.FC = () => {
                 />
               </div>
             </div>
-            <div className="p-3 bg-white rounded-lg border border-gray-200 font-mono text-xs space-y-1 tabular-nums">
-              <div>
-                ln({computed.lx}) / ln({computed.lb}) = {fmtNum(Math.log(computed.lx), 4)} /{' '}
-                {fmtNum(Math.log(computed.lb), 4)}
-              </div>
-              <div className="text-base font-bold text-[#EA580C]">
-                log_{computed.lb}({computed.lx}) = {fmtNum(computed.logVal, 6)}
+            <div className="p-3 bg-white rounded-lg border border-gray-200 space-y-2">
+              <div className="text-xs sm:text-sm text-gray-800">
+                <MathFormula
+                  latex={`\\log_{${computed.lb}}(${computed.lx}) = \\frac{\\ln(${computed.lx})}{\\ln(${computed.lb})} = \\frac{${fmtNum(
+                    Math.log(computed.lx),
+                    4
+                  )}}{${fmtNum(Math.log(computed.lb), 4)}} = ${fmtNum(computed.logVal, 6)}`}
+                  displayMode
+                />
               </div>
             </div>
           </div>
         </div>
 
         <div className="lg:col-span-6 space-y-4">
-          <div className="p-5 rounded-2xl bg-[#FFF7ED] border border-orange-200 space-y-3">
+          <div className="p-4 sm:p-5 rounded-2xl bg-[#FFF7ED] border border-orange-200 space-y-3">
             <p className="text-xs font-semibold text-[#EA580C]">
-              Exact Radical / Surd Simplifier: ᵏ√N = a · ᵏ√b
+              Exact Radical / Surd Simplifier: <MathFormula latex="\sqrt[k]{N} = a\sqrt[k]{b}" />
             </p>
             <div className="grid grid-cols-2 gap-3">
               <div>
@@ -1719,40 +1776,49 @@ export const LogarithmExponentSimplifier: React.FC = () => {
               </div>
             </div>
 
-            <div className="p-4 bg-white rounded-xl border border-orange-200/80">
-              <span className="text-xs text-gray-500 block mb-1">Simplified Exact Surd</span>
-              <div className="text-2xl font-bold font-mono tabular-nums text-[#111827]">
-                {computed.k === 2 ? '√' : `${computed.k}√`}
-                {computed.N} ={' '}
-                {computed.N === 0
-                  ? '0'
-                  : computed.inside === 1
-                  ? `${computed.outside}`
-                  : `${computed.outside === 1 ? '' : computed.outside}${
-                      computed.k === 2 ? '√' : ` · ${computed.k}√`
-                    }${computed.inside}`}
+            <div className="p-4 bg-white rounded-xl border border-orange-200/80 space-y-1.5">
+              <span className="text-xs text-gray-500 block">Simplified Exact Surd</span>
+              <div className="text-xl sm:text-2xl font-bold text-[#111827]">
+                <MathFormula
+                  latex={(() => {
+                    const lhs = computed.k === 2 ? `\\sqrt{${computed.N}}` : `\\sqrt[${computed.k}]{${computed.N}}`;
+                    if (computed.N === 0) return `${lhs} = 0`;
+                    if (computed.inside === 1) return `${lhs} = ${computed.outside}`;
+                    const outPart = computed.outside === 1 ? '' : `${computed.outside}`;
+                    const inPart =
+                      computed.k === 2
+                        ? `\\sqrt{${computed.inside}}`
+                        : `\\sqrt[${computed.k}]{${computed.inside}}`;
+                    return `${lhs} = ${outPart}${inPart}`;
+                  })()}
+                  displayMode
+                />
               </div>
-              <div className="text-xs font-mono text-gray-600 mt-2 tabular-nums">
-                Factorization: {computed.N} = {computed.outside}^{computed.k} × {computed.inside} · Decimal ≈{' '}
-                {fmtNum(Math.pow(computed.N, 1 / computed.k), 6)}
+              <div className="text-xs text-gray-600 pt-1">
+                <MathFormula
+                  latex={`${computed.N} = ${computed.outside}^{${computed.k}} \\times ${computed.inside} \\approx ${fmtNum(
+                    Math.pow(computed.N, 1 / computed.k),
+                    6
+                  )}`}
+                />
               </div>
             </div>
           </div>
 
           <div className="p-4 rounded-xl bg-[#F9FAFB] border border-gray-200 space-y-2 text-xs">
             <p className="font-semibold text-gray-700">Core Logarithm & Exponent Laws Quick Check</p>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 font-mono text-gray-700">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-gray-800">
               <div className="p-2.5 bg-white rounded-lg border border-gray-200">
-                log_b(MN) = log_b(M) + log_b(N)
+                <MathFormula latex="\log_b(MN) = \log_b(M) + \log_b(N)" />
               </div>
               <div className="p-2.5 bg-white rounded-lg border border-gray-200">
-                log_b(M/N) = log_b(M) − log_b(N)
+                <MathFormula latex="\log_b\!\left(\frac{M}{N}\right) = \log_b(M) - \log_b(N)" />
               </div>
               <div className="p-2.5 bg-white rounded-lg border border-gray-200">
-                log_b(M^p) = p · log_b(M)
+                <MathFormula latex="\log_b(M^p) = p \cdot \log_b(M)" />
               </div>
               <div className="p-2.5 bg-white rounded-lg border border-gray-200">
-                x^(m/n) = ⁿ√(x^m) = (ⁿ√x)^m
+                <MathFormula latex="x^{m/n} = \sqrt[n]{x^m} = (\sqrt[n]{x})^m" />
               </div>
             </div>
           </div>

@@ -75,6 +75,44 @@
   animation: bounceSlow 2.5s ease-in-out infinite;
 }
 
+.font-math-serif {
+  font-family: 'STIX Two Math', 'Cambria Math', 'Times New Roman', serif;
+}
+
+.math-grid-bg {
+  background-image: radial-gradient(#cbd5e1 1px, transparent 1px);
+  background-size: 16px 16px;
+}
+
+@keyframes slideUpSheet {
+  from {
+    transform: translateY(100%);
+    opacity: 0.6;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.animate-slide-up {
+  animation: slideUpSheet 0.24s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* KaTeX mathematical typesetting mobile responsiveness */
+.katex-display {
+  max-width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+  margin: 0.25rem 0 !important;
+  padding: 0.15rem 0;
+  -webkit-overflow-scrolling: touch;
+}
+
+.katex {
+  font-size: 1.05em;
+}
+
 /* Custom Scrollbar behavior */
 ::-webkit-scrollbar {
   width: 6px;

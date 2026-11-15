@@ -8,6 +8,7 @@ import {
   simplifyAst,
 } from '../../../utils/mathEngine';
 import { MathWorkspaceBar, fmtNum } from './MathWorkspaceHeader';
+import { MathFormula, asciiMathToLatex } from './MathTypeset';
 
 // ============================================================================
 // TOOL 24: ODE SLOPE FIELD, EULER & RUNGE-KUTTA (RK4) PLOTTER
@@ -124,17 +125,24 @@ export const OdeSlopeFieldRk4Plotter: React.FC = () => {
         modeLabel="Euler vs 4th-Order RK4"
       />
 
-      <div className="p-6 grid grid-cols-1 lg:grid-cols-12 gap-6">
+      <div className="p-4 sm:p-6 grid grid-cols-1 lg:grid-cols-12 gap-5 sm:gap-6">
         <div className="lg:col-span-5 space-y-4">
           <div>
             <label className="block text-xs font-semibold text-gray-700 mb-1">
-              Differential Equation dy/dx = f(x, y)
+              Differential Equation <MathFormula latex="\frac{dy}{dx} = f(x, y)" />
             </label>
             <input
               type="text"
               value={rhsExpr}
               onChange={(e) => setRhsExpr(e.target.value)}
               className="w-full px-3.5 py-2.5 font-mono text-sm bg-[#F9FAFB] border border-gray-300 rounded-xl"
+            />
+          </div>
+
+          <div className="px-3 py-2 rounded-xl bg-[#FFF7ED] border border-orange-200 text-xs sm:text-sm text-[#0F172A]">
+            <MathFormula
+              latex={`\\frac{dy}{dx} = ${asciiMathToLatex(rhsExpr)},\\quad y(${x0Val || 0}) = ${y0Val || 0}`}
+              displayMode
             />
           </div>
 
@@ -263,25 +271,37 @@ const LAPLACE_PAIRS = [
     id: 'damped_sin',
     label: 'Damped Sine: e^(−at)·sin(ωt)',
     timeStr: (a: number, w: number) => `e^(−${a}t) · sin(${w}t)`,
+    timeLatex: (a: number, w: number) => `e^{-${a}t}\\sin(${w}t)`,
     sStr: (a: number, w: number) => `${fmtNum(w, 3)} / ((s + ${a})² + ${fmtNum(w * w, 3)})`,
+    sLatex: (a: number, w: number) => `\\frac{${fmtNum(w, 3)}}{(s + ${a})^2 + ${fmtNum(w * w, 3)}}`,
     roc: (a: number) => `Re(s) > −${a}`,
+    rocLatex: (a: number) => `\\operatorname{Re}(s) > -${a}`,
     poles: (a: number, w: number) => `s = −${a} ± ${w}i`,
+    polesLatex: (a: number, w: number) => `s = -${a} \\pm ${w}i`,
   },
   {
     id: 'damped_cos',
     label: 'Damped Cosine: e^(−at)·cos(ωt)',
     timeStr: (a: number, w: number) => `e^(−${a}t) · cos(${w}t)`,
+    timeLatex: (a: number, w: number) => `e^{-${a}t}\\cos(${w}t)`,
     sStr: (a: number, w: number) => `(s + ${a}) / ((s + ${a})² + ${fmtNum(w * w, 3)})`,
+    sLatex: (a: number, w: number) => `\\frac{s + ${a}}{(s + ${a})^2 + ${fmtNum(w * w, 3)}}`,
     roc: (a: number) => `Re(s) > −${a}`,
+    rocLatex: (a: number) => `\\operatorname{Re}(s) > -${a}`,
     poles: (a: number, w: number) => `s = −${a} ± ${w}i`,
+    polesLatex: (a: number, w: number) => `s = -${a} \\pm ${w}i`,
   },
   {
     id: 'poly_exp',
     label: 'tⁿ Exponential: t^n · e^(−at)',
     timeStr: (a: number, n: number) => `t^${Math.round(n)} · e^(−${a}t)`,
+    timeLatex: (a: number, n: number) => `t^{${Math.round(n)}}e^{-${a}t}`,
     sStr: (a: number, n: number) => `${Math.round(n)}! / (s + ${a})^${Math.round(n) + 1}`,
+    sLatex: (a: number, n: number) => `\\frac{${Math.round(n)}!}{(s + ${a})^{${Math.round(n) + 1}}}`,
     roc: (a: number) => `Re(s) > −${a}`,
+    rocLatex: (a: number) => `\\operatorname{Re}(s) > -${a}`,
     poles: (a: number, n: number) => `s = −${a} (Order ${Math.round(n) + 1})`,
+    polesLatex: (a: number, n: number) => `s = -${a}\\;(\\text{Order } ${Math.round(n) + 1})`,
   },
 ];
 
@@ -383,12 +403,12 @@ export const LaplaceFourierTransformStudio: React.FC = () => {
         solutionText={solutionText}
       />
 
-      <div className="p-6 space-y-5">
-        <div className="inline-flex p-1 bg-[#F9FAFB] border border-gray-200 rounded-xl">
+      <div className="p-4 sm:p-6 space-y-5">
+        <div className="inline-flex flex-wrap p-1 bg-[#F9FAFB] border border-gray-200 rounded-xl gap-1">
           <button
             type="button"
             onClick={() => setTab('fourier')}
-            className={`px-4 py-1.5 text-xs font-semibold rounded-lg ${
+            className={`px-3.5 sm:px-4 py-2 min-h-[40px] text-xs font-semibold rounded-lg cursor-pointer ${
               tab === 'fourier' ? 'bg-[#F97316] text-white' : 'text-gray-600'
             }`}
           >
@@ -397,7 +417,7 @@ export const LaplaceFourierTransformStudio: React.FC = () => {
           <button
             type="button"
             onClick={() => setTab('laplace')}
-            className={`px-4 py-1.5 text-xs font-semibold rounded-lg ${
+            className={`px-3.5 sm:px-4 py-2 min-h-[40px] text-xs font-semibold rounded-lg cursor-pointer ${
               tab === 'laplace' ? 'bg-[#F97316] text-white' : 'text-gray-600'
             }`}
           >
@@ -408,13 +428,13 @@ export const LaplaceFourierTransformStudio: React.FC = () => {
         {tab === 'fourier' ? (
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
             <div className="lg:col-span-5 space-y-4">
-              <div className="flex gap-1.5">
+              <div className="flex flex-wrap gap-1.5">
                 {(['square', 'sawtooth', 'triangle'] as const).map((w) => (
                   <button
                     key={w}
                     type="button"
                     onClick={() => setWave(w)}
-                    className={`px-3.5 py-1.5 text-xs font-semibold rounded-lg capitalize border ${
+                    className={`px-3.5 py-2 min-h-[38px] text-xs font-semibold rounded-lg capitalize border cursor-pointer ${
                       wave === w
                         ? 'bg-gray-900 text-white border-gray-900'
                         : 'bg-[#F9FAFB] text-gray-700 border-gray-200'
@@ -439,11 +459,23 @@ export const LaplaceFourierTransformStudio: React.FC = () => {
                 />
               </div>
 
-              <div className="p-4 rounded-2xl bg-[#FFF7ED] border border-orange-200 space-y-2 text-xs font-mono tabular-nums">
+              <div className="p-4 rounded-2xl bg-[#FFF7ED] border border-orange-200 space-y-2.5 text-xs tabular-nums">
                 <span className="font-sans font-semibold text-[#EA580C] block">
-                  Harmonic Spectral Coefficients b_n
+                  Harmonic Series Formula & Spectral Coefficients <MathFormula latex="b_n" />
                 </span>
-                <div className="grid grid-cols-3 gap-2">
+                <div className="px-3 py-2 rounded-xl bg-white/90 border border-orange-200/70 text-[#0F172A]">
+                  <MathFormula
+                    latex={
+                      wave === 'square'
+                        ? `S_{${harmonics}}(t) = \\frac{4}{\\pi}\\sum_{k=1,3,5}^{${harmonics}} \\frac{\\sin(kt)}{k}`
+                        : wave === 'sawtooth'
+                        ? `S_{${harmonics}}(t) = \\frac{2}{\\pi}\\sum_{k=1}^{${harmonics}} \\frac{(-1)^{k+1}\\sin(kt)}{k}`
+                        : `S_{${harmonics}}(t) = \\frac{8}{\\pi^2}\\sum_{k=1,3,5}^{${harmonics}} \\frac{(-1)^{(k-1)/2}\\sin(kt)}{k^2}`
+                    }
+                    displayMode
+                  />
+                </div>
+                <div className="grid grid-cols-3 gap-2 font-mono">
                   {fourier.coeffs.map((c) => (
                     <div key={c.n} className="p-2 bg-white rounded-lg border border-orange-200/70">
                       <span className="text-gray-400 block">n={c.n}</span>
@@ -521,23 +553,43 @@ export const LaplaceFourierTransformStudio: React.FC = () => {
             </div>
 
             <div className="lg:col-span-6">
-              <div className="p-5 rounded-2xl bg-[#FFF7ED] border border-orange-200 space-y-3 font-mono text-xs">
+              <div className="p-4 sm:p-5 rounded-2xl bg-[#FFF7ED] border border-orange-200 space-y-3 text-xs">
                 <div>
-                  <span className="font-sans font-semibold text-gray-500 block">Time-Domain Signal f(t), t ≥ 0</span>
-                  <span className="text-base font-bold text-gray-900">{activeLap.timeStr(aNum, wNum)}</span>
+                  <span className="font-sans font-semibold text-gray-500 block mb-1">
+                    Time-Domain Signal <MathFormula latex="f(t),\; t \ge 0" />
+                  </span>
+                  <div className="text-base font-bold text-gray-900">
+                    <MathFormula latex={`f(t) = ${activeLap.timeLatex(aNum, wNum)}`} />
+                  </div>
                 </div>
                 <div className="pt-2 border-t border-orange-200/70">
-                  <span className="font-sans font-semibold text-[#EA580C] block">s-Domain Transform F(s) = L&#123;f(t)&#125;</span>
-                  <span className="text-lg font-bold text-gray-900">{activeLap.sStr(aNum, wNum)}</span>
+                  <span className="font-sans font-semibold text-[#EA580C] block mb-1">
+                    <MathFormula latex="s" />-Domain Transform <MathFormula latex="F(s) = \mathcal{L}\{f(t)\}" />
+                  </span>
+                  <div className="px-3 py-2 rounded-xl bg-white/90 border border-orange-200/70 text-base sm:text-lg font-bold text-gray-900">
+                    <MathFormula
+                      latex={`\\mathcal{L}\\!\\left\\{${activeLap.timeLatex(aNum, wNum)}\\right\\} = ${activeLap.sLatex(
+                        aNum,
+                        wNum
+                      )}`}
+                      displayMode
+                    />
+                  </div>
                 </div>
                 <div className="grid grid-cols-2 gap-2 pt-2 border-t border-orange-200/70">
                   <div>
-                    <span className="font-sans text-gray-500 block">Region of Convergence</span>
-                    <span className="font-semibold text-gray-900">{activeLap.roc(aNum)}</span>
+                    <span className="font-sans text-gray-500 block mb-0.5">Region of Convergence</span>
+                    <span className="font-semibold text-gray-900 text-sm">
+                      <MathFormula latex={activeLap.rocLatex(aNum)} />
+                    </span>
                   </div>
                   <div>
-                    <span className="font-sans text-gray-500 block">s-Plane Poles</span>
-                    <span className="font-semibold text-gray-900">{activeLap.poles(aNum, wNum)}</span>
+                    <span className="font-sans text-gray-500 block mb-0.5">
+                      <MathFormula latex="s" />-Plane Poles
+                    </span>
+                    <span className="font-semibold text-gray-900 text-sm">
+                      <MathFormula latex={activeLap.polesLatex(aNum, wNum)} />
+                    </span>
                   </div>
                 </div>
               </div>
@@ -663,15 +715,15 @@ export const NumericalRootFindingLab: React.FC = () => {
         modeLabel={algo.toUpperCase()}
       />
 
-      <div className="p-6 grid grid-cols-1 lg:grid-cols-12 gap-6">
+      <div className="p-4 sm:p-6 grid grid-cols-1 lg:grid-cols-12 gap-5 sm:gap-6">
         <div className="lg:col-span-5 space-y-4">
-          <div className="inline-flex p-1 bg-[#F9FAFB] border border-gray-200 rounded-xl">
+          <div className="inline-flex flex-wrap p-1 bg-[#F9FAFB] border border-gray-200 rounded-xl gap-1">
             {(['newton', 'bisection', 'secant'] as const).map((m) => (
               <button
                 key={m}
                 type="button"
                 onClick={() => setAlgo(m)}
-                className={`px-3.5 py-1.5 text-xs font-semibold rounded-lg capitalize ${
+                className={`px-3.5 py-2 min-h-[38px] text-xs font-semibold rounded-lg capitalize cursor-pointer ${
                   algo === m ? 'bg-[#F97316] text-white' : 'text-gray-600'
                 }`}
               >
@@ -681,7 +733,9 @@ export const NumericalRootFindingLab: React.FC = () => {
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-gray-700 mb-1">Nonlinear Equation f(x) = 0</label>
+            <label className="block text-xs font-semibold text-gray-700 mb-1">
+              Nonlinear Equation <MathFormula latex="f(x) = 0" />
+            </label>
             <input
               type="text"
               value={fnExpr}
@@ -718,10 +772,29 @@ export const NumericalRootFindingLab: React.FC = () => {
           </div>
 
           {rootLab.ok && (
-            <div className="p-5 rounded-2xl bg-[#FFF7ED] border border-orange-200 space-y-1.5 font-mono text-xs tabular-nums">
-              <span className="font-sans font-semibold text-[#EA580C] block">Converged Root x*</span>
-              <div className="text-2xl font-bold text-gray-900">{fmtNum(rootLab.finalRoot, 8)}</div>
-              <div className="text-gray-600 pt-1">Symbolic f&apos;(x) = {rootLab.dfStr}</div>
+            <div className="p-4 sm:p-5 rounded-2xl bg-[#FFF7ED] border border-orange-200 space-y-2.5 text-xs tabular-nums">
+              <span className="font-sans font-semibold text-[#EA580C] block">
+                Converged Root <MathFormula latex="x^*" />
+              </span>
+              <div className="text-2xl font-bold text-gray-900">
+                <MathFormula latex={`x^* \\approx ${fmtNum(rootLab.finalRoot, 8)}`} />
+              </div>
+              <div className="px-3 py-2 rounded-xl bg-white/90 border border-orange-200/70 text-gray-800">
+                <MathFormula
+                  latex={
+                    algo === 'newton'
+                      ? `x_{k+1} = x_k - \\frac{${asciiMathToLatex(fnExpr)}}{${asciiMathToLatex(rootLab.dfStr)}}`
+                      : algo === 'secant'
+                      ? `x_{k+1} = x_k - f(x_k)\\frac{x_k - x_{k-1}}{f(x_k) - f(x_{k-1})}`
+                      : `c_k = \\frac{a_k + b_k}{2},\\quad f(x) = ${asciiMathToLatex(fnExpr)}`
+                  }
+                  displayMode
+                />
+              </div>
+              <div className="text-gray-700 pt-0.5">
+                Symbolic Derivative:{' '}
+                <MathFormula latex={`f'(x) = ${asciiMathToLatex(rootLab.dfStr)}`} />
+              </div>
             </div>
           )}
         </div>
@@ -897,11 +970,12 @@ export const NumberTheoryModularRsaCalculator: React.FC = () => {
         modeLabel="Extended Euclid & RSA"
       />
 
-      <div className="p-6 grid grid-cols-1 lg:grid-cols-12 gap-6">
+      <div className="p-4 sm:p-6 grid grid-cols-1 lg:grid-cols-12 gap-5 sm:gap-6">
         <div className="lg:col-span-6 space-y-4">
           <div className="p-4 rounded-xl bg-[#F9FAFB] border border-gray-200 space-y-3">
             <p className="text-xs font-semibold text-gray-700">
-              Extended Euclidean Bézout, Inverse a⁻¹ mod m & Fast Power a^b mod m
+              Extended Euclidean Bézout, Inverse <MathFormula latex="a^{-1} \bmod m" /> & Fast Power{' '}
+              <MathFormula latex="a^b \bmod m" />
             </p>
             <div className="grid grid-cols-3 gap-2.5">
               <div>
@@ -933,26 +1007,38 @@ export const NumberTheoryModularRsaCalculator: React.FC = () => {
               </div>
             </div>
 
-            <div className="p-3.5 rounded-xl bg-white border border-gray-200 font-mono text-xs space-y-1.5 tabular-nums">
+            <div className="p-3.5 rounded-xl bg-white border border-gray-200 text-xs sm:text-sm space-y-2 tabular-nums">
               <div>
-                Bézout: {nt.a}·({nt.eg.x}) + {nt.m}·({nt.eg.y}) = <strong>{nt.eg.gcd}</strong>
+                <span className="text-xs text-gray-500 block">Bézout Identity:</span>
+                <MathFormula
+                  latex={`${nt.a}(${nt.eg.x}) + ${nt.m}(${nt.eg.y}) = \\gcd(${nt.a}, ${nt.m}) = ${nt.eg.gcd}`}
+                />
               </div>
-              <div>
-                Modular Inverse {nt.a}⁻¹ mod {nt.m} ={' '}
-                <strong className="text-[#EA580C]">
-                  {nt.inv !== null ? nt.inv : 'None (gcd ≠ 1)'}
-                </strong>
+              <div className="pt-1 border-t border-gray-100">
+                <span className="text-xs text-gray-500 block">Modular Multiplicative Inverse:</span>
+                {nt.inv !== null ? (
+                  <MathFormula
+                    latex={`${nt.a}^{-1} \\equiv ${nt.inv} \\pmod{${nt.m}}`}
+                    className="font-bold text-[#EA580C]"
+                  />
+                ) : (
+                  <span className="text-red-700 font-medium">
+                    Does not exist (<MathFormula latex="\gcd \ne 1" />)
+                  </span>
+                )}
               </div>
-              <div>
-                Square-and-Multiply: {nt.a}^{nt.bExp} mod {nt.m} = <strong>{nt.powMod}</strong> · φ({nt.m}) ={' '}
-                <strong>{nt.phiM}</strong>
+              <div className="pt-1 border-t border-gray-100">
+                <span className="text-xs text-gray-500 block">Square-and-Multiply & Euler Totient:</span>
+                <MathFormula
+                  latex={`${nt.a}^{${nt.bExp}} \\equiv ${nt.powMod} \\pmod{${nt.m}},\\quad \\varphi(${nt.m}) = ${nt.phiM}`}
+                />
               </div>
             </div>
           </div>
         </div>
 
         <div className="lg:col-span-6 space-y-4">
-          <div className="p-5 rounded-2xl bg-[#FFF7ED] border border-orange-200 space-y-3">
+          <div className="p-4 sm:p-5 rounded-2xl bg-[#FFF7ED] border border-orange-200 space-y-3">
             <p className="text-xs font-semibold text-[#EA580C]">
               Interactive Public-Key RSA Cryptosystem Simulator
             </p>
@@ -996,29 +1082,40 @@ export const NumberTheoryModularRsaCalculator: React.FC = () => {
             </div>
 
             {nt.coprimeE && nt.d !== null ? (
-              <div className="p-3.5 bg-white rounded-xl border border-orange-200/80 font-mono text-xs space-y-1.5 tabular-nums">
-                <div className="flex justify-between">
-                  <span className="text-gray-500">Modulus n = p·q & Totient φ(n)</span>
-                  <span className="font-bold text-gray-900">
-                    n = {nt.n} · φ(n) = {nt.phiN}
-                  </span>
+              <div className="p-3.5 bg-white rounded-xl border border-orange-200/80 text-xs sm:text-sm space-y-2 tabular-nums">
+                <div className="flex flex-wrap justify-between items-center gap-2">
+                  <span className="text-xs text-gray-500">Modulus & Totient</span>
+                  <MathFormula
+                    latex={`n = p \\cdot q = ${nt.n},\\quad \\varphi(n) = ${nt.phiN}`}
+                    className="font-bold text-gray-900"
+                  />
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-500">Private Key d ≡ e⁻¹ (mod φ(n))</span>
-                  <span className="font-bold text-[#EA580C]">d = {nt.d}</span>
+                <div className="flex flex-wrap justify-between items-center gap-2">
+                  <span className="text-xs text-gray-500">Private Decryption Key</span>
+                  <MathFormula
+                    latex={`d \\equiv ${nt.e}^{-1} \\equiv ${nt.d} \\pmod{${nt.phiN}}`}
+                    className="font-bold text-[#EA580C]"
+                  />
                 </div>
-                <div className="pt-1.5 border-t border-gray-100 flex justify-between">
-                  <span>Encrypt c = {nt.msg}^{nt.e} mod {nt.n}</span>
-                  <span className="font-bold text-sky-700">c = {nt.cipher}</span>
+                <div className="pt-1.5 border-t border-gray-100 flex flex-wrap justify-between items-center gap-2">
+                  <span className="text-xs text-gray-500">Encrypt</span>
+                  <MathFormula
+                    latex={`c \\equiv ${nt.msg}^{${nt.e}} \\equiv ${nt.cipher} \\pmod{${nt.n}}`}
+                    className="font-bold text-sky-700"
+                  />
                 </div>
-                <div className="flex justify-between">
-                  <span>Decrypt m&apos; = {nt.cipher}^{nt.d} mod {nt.n}</span>
-                  <span className="font-bold text-emerald-700">m&apos; = {nt.decrypted} ✓</span>
+                <div className="flex flex-wrap justify-between items-center gap-2">
+                  <span className="text-xs text-gray-500">Decrypt Verified ✓</span>
+                  <MathFormula
+                    latex={`m' \\equiv ${nt.cipher}^{${nt.d}} \\equiv ${nt.decrypted} \\pmod{${nt.n}}`}
+                    className="font-bold text-emerald-700"
+                  />
                 </div>
               </div>
             ) : (
               <p className="text-xs text-red-700 font-medium">
-                Public exponent e = {nt.e} must be coprime to φ(n) = {nt.phiN} (gcd(e, φ(n)) = 1). Try e = 7 or 17.
+                Public exponent e = {nt.e} must be coprime to <MathFormula latex={`\\varphi(n) = ${nt.phiN}`} /> (
+                <MathFormula latex="\gcd(e, \varphi(n)) = 1" />). Try e = 7 or 17.
               </p>
             )}
           </div>

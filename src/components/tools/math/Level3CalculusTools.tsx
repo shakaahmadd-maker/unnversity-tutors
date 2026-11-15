@@ -9,6 +9,7 @@ import {
   simplifyAst,
 } from '../../../utils/mathEngine';
 import { MathWorkspaceBar, fmtNum } from './MathWorkspaceHeader';
+import { MathFormula, MathText, asciiMathToLatex } from './MathTypeset';
 
 // ============================================================================
 // TOOL 10: SYMBOLIC DERIVATIVE & TANGENT LINE CALCULATOR
@@ -126,11 +127,13 @@ export const SymbolicDerivativeCalculator: React.FC = () => {
         modeLabel="Symbolic AST Engine"
       />
 
-      <div className="p-6 grid grid-cols-1 lg:grid-cols-12 gap-6">
+      <div className="p-4 sm:p-6 grid grid-cols-1 lg:grid-cols-12 gap-5 sm:gap-6">
         <div className="lg:col-span-6 space-y-4">
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div className="sm:col-span-2">
-              <label className="block text-xs font-semibold text-gray-700 mb-1">Function f(x)</label>
+              <label className="block text-xs font-semibold text-gray-700 mb-1">
+                Function <MathFormula latex="f(x)" />
+              </label>
               <input
                 type="text"
                 value={fnExpr}
@@ -139,7 +142,9 @@ export const SymbolicDerivativeCalculator: React.FC = () => {
               />
             </div>
             <div>
-              <label className="block text-xs font-semibold text-gray-700 mb-1">Point x = a</label>
+              <label className="block text-xs font-semibold text-gray-700 mb-1">
+                Point <MathFormula latex="x = a" />
+              </label>
               <input
                 type="number"
                 step="0.25"
@@ -152,47 +157,74 @@ export const SymbolicDerivativeCalculator: React.FC = () => {
 
           {calc.ok ? (
             <>
-              <div className="p-4 rounded-2xl bg-[#FFF7ED] border border-orange-200 space-y-2.5 text-xs font-mono">
+              <div className="p-4 rounded-2xl bg-[#FFF7ED] border border-orange-200 space-y-3 text-xs">
                 <div>
-                  <span className="font-sans font-semibold text-[#EA580C] block">First Derivative f&apos;(x)</span>
-                  <div className="text-sm font-bold text-gray-900 break-all">{calc.d1Str}</div>
+                  <span className="font-sans font-semibold text-[#EA580C] block mb-1">
+                    First Derivative <MathFormula latex="f'(x) = \frac{d}{dx}[f(x)]" />
+                  </span>
+                  <div className="text-sm font-bold text-gray-900">
+                    <MathFormula latex={`f'(x) = ${asciiMathToLatex(calc.d1Str)}`} />
+                  </div>
                 </div>
                 <div className="pt-2 border-t border-orange-200/70">
-                  <span className="font-sans font-semibold text-gray-600 block">Second Derivative f&apos;&apos;(x)</span>
-                  <div className="text-gray-900 break-all">{calc.d2Str}</div>
+                  <span className="font-sans font-semibold text-gray-600 block mb-1">
+                    Second Derivative <MathFormula latex="f''(x)" />
+                  </span>
+                  <div className="text-sm text-gray-900">
+                    <MathFormula latex={`f''(x) = ${asciiMathToLatex(calc.d2Str)}`} />
+                  </div>
                 </div>
                 <div className="pt-2 border-t border-orange-200/70">
-                  <span className="font-sans font-semibold text-gray-600 block">Third Derivative f&apos;&apos;&apos;(x)</span>
-                  <div className="text-gray-900 break-all">{calc.d3Str}</div>
+                  <span className="font-sans font-semibold text-gray-600 block mb-1">
+                    Third Derivative <MathFormula latex="f'''(x)" />
+                  </span>
+                  <div className="text-sm text-gray-900">
+                    <MathFormula latex={`f'''(x) = ${asciiMathToLatex(calc.d3Str)}`} />
+                  </div>
                 </div>
               </div>
 
-              <div className="p-4 rounded-xl bg-[#F9FAFB] border border-gray-200 grid grid-cols-2 gap-3 text-xs font-mono tabular-nums">
+              <div className="p-4 rounded-xl bg-[#F9FAFB] border border-gray-200 grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs tabular-nums">
                 <div>
-                  <span className="font-sans text-gray-500 block">Tangent Line at x = {calc.a}</span>
-                  <span className="font-bold text-gray-900">
-                    y = {fmtNum(calc.f1a, 3)}x {calc.tangentIntercept >= 0 ? '+' : '−'}{' '}
-                    {fmtNum(Math.abs(calc.tangentIntercept), 3)}
+                  <span className="font-sans text-gray-500 block mb-0.5">
+                    Tangent Line at <MathFormula latex={`x = ${calc.a}`} />
+                  </span>
+                  <span className="font-bold text-gray-900 text-sm">
+                    <MathFormula
+                      latex={`y = ${fmtNum(calc.f1a, 3)}x ${calc.tangentIntercept >= 0 ? '+' : '-'} ${fmtNum(
+                        Math.abs(calc.tangentIntercept),
+                        3
+                      )}`}
+                    />
                   </span>
                 </div>
                 <div>
-                  <span className="font-sans text-gray-500 block">Normal Line at x = {calc.a}</span>
-                  <span className="font-bold text-gray-900">
-                    {Number.isFinite(calc.normalSlope)
-                      ? `y = ${fmtNum(calc.normalSlope, 3)}x ${calc.normalIntercept >= 0 ? '+' : '−'} ${fmtNum(
-                          Math.abs(calc.normalIntercept),
-                          3
-                        )}`
-                      : `x = ${calc.a} (Vertical)`}
+                  <span className="font-sans text-gray-500 block mb-0.5">
+                    Normal Line at <MathFormula latex={`x = ${calc.a}`} />
+                  </span>
+                  <span className="font-bold text-gray-900 text-sm">
+                    {Number.isFinite(calc.normalSlope) ? (
+                      <MathFormula
+                        latex={`y = ${fmtNum(calc.normalSlope, 3)}x ${
+                          calc.normalIntercept >= 0 ? '+' : '-'
+                        } ${fmtNum(Math.abs(calc.normalIntercept), 3)}`}
+                      />
+                    ) : (
+                      <MathFormula latex={`x = ${calc.a}\\;(\\text{Vertical})`} />
+                    )}
                   </span>
                 </div>
                 <div>
-                  <span className="font-sans text-gray-500 block">Slope f&apos;({calc.a})</span>
-                  <span className="font-bold text-[#EA580C]">{fmtNum(calc.f1a, 5)}</span>
+                  <span className="font-sans text-gray-500 block mb-0.5">
+                    Slope <MathFormula latex={`f'(${calc.a})`} />
+                  </span>
+                  <span className="font-mono font-bold text-[#EA580C] text-sm">{fmtNum(calc.f1a, 5)}</span>
                 </div>
                 <div>
-                  <span className="font-sans text-gray-500 block">Concavity f&apos;&apos;({calc.a})</span>
-                  <span className="font-bold text-gray-900">
+                  <span className="font-sans text-gray-500 block mb-0.5">
+                    Concavity <MathFormula latex={`f''(${calc.a})`} />
+                  </span>
+                  <span className="font-mono font-bold text-gray-900">
                     {fmtNum(calc.f2a, 4)} ({calc.f2a > 0 ? 'Concave Up' : calc.f2a < 0 ? 'Concave Down' : 'Inflection'})
                   </span>
                 </div>
@@ -404,7 +436,7 @@ export const DefiniteIntegralRiemannPlotter: React.FC = () => {
         modeLabel={`Partitions n = ${subN}`}
       />
 
-      <div className="p-6 grid grid-cols-1 lg:grid-cols-12 gap-6">
+      <div className="p-4 sm:p-6 grid grid-cols-1 lg:grid-cols-12 gap-5 sm:gap-6">
         <div className="lg:col-span-5 space-y-4">
           <div>
             <label className="block text-xs font-semibold text-gray-700 mb-1">Integrand f(x)</label>
@@ -442,7 +474,7 @@ export const DefiniteIntegralRiemannPlotter: React.FC = () => {
           <div>
             <div className="flex justify-between text-xs mb-1">
               <span className="font-semibold text-gray-700">Subintervals n: {subN}</span>
-              {quad.ok && <span className="font-mono text-gray-500">Δx = {fmtNum(quad.dx, 4)}</span>}
+              {quad.ok && <MathFormula latex={`\\Delta x = ${fmtNum(quad.dx, 4)}`} className="text-gray-600" />}
             </div>
             <input
               type="range"
@@ -460,7 +492,7 @@ export const DefiniteIntegralRiemannPlotter: React.FC = () => {
                 key={m}
                 type="button"
                 onClick={() => setMethod(m)}
-                className={`px-3 py-1.5 text-xs font-semibold rounded-lg capitalize border ${
+                className={`px-3 py-2 min-h-[38px] text-xs font-semibold rounded-lg capitalize border cursor-pointer ${
                   method === m
                     ? 'bg-[#F97316] text-white border-[#F97316]'
                     : 'bg-[#F9FAFB] text-gray-600 border-gray-200'
@@ -472,19 +504,23 @@ export const DefiniteIntegralRiemannPlotter: React.FC = () => {
           </div>
 
           {quad.ok && (
-            <div className="p-4 rounded-2xl bg-[#FFF7ED] border border-orange-200 space-y-2 text-xs font-mono tabular-nums">
-              <div className="flex justify-between items-baseline">
-                <span className="font-sans font-semibold text-[#EA580C]">Reference Integral</span>
-                <span className="text-lg font-bold text-gray-900">{fmtNum(quad.exactRef, 6)}</span>
+            <div className="p-4 rounded-2xl bg-[#FFF7ED] border border-orange-200 space-y-2.5 text-xs tabular-nums">
+              <div className="px-3 py-2 rounded-xl bg-white/90 border border-orange-200/70 text-sm text-[#0F172A]">
+                <MathFormula
+                  latex={`\\int_{${fmtNum(quad.a, 3)}}^{${fmtNum(quad.b, 3)}} \\left(${asciiMathToLatex(
+                    fnExpr
+                  )}\\right)\\,dx \\approx ${fmtNum(quad.exactRef, 6)}`}
+                  displayMode
+                />
               </div>
-              <div className="grid grid-cols-2 gap-2 pt-2 border-t border-orange-200/70">
-                <div>Left L_n: <strong className="text-gray-900">{fmtNum(quad.left, 5)}</strong></div>
-                <div>Right R_n: <strong className="text-gray-900">{fmtNum(quad.right, 5)}</strong></div>
-                <div>Midpoint M_n: <strong className="text-gray-900">{fmtNum(quad.mid, 5)}</strong></div>
-                <div>Trapezoid T_n: <strong className="text-gray-900">{fmtNum(quad.trap, 5)}</strong></div>
+              <div className="grid grid-cols-2 gap-2 pt-1 font-mono">
+                <div><MathFormula latex={`L_{${quad.n}}`} />: <strong className="text-gray-900">{fmtNum(quad.left, 5)}</strong></div>
+                <div><MathFormula latex={`R_{${quad.n}}`} />: <strong className="text-gray-900">{fmtNum(quad.right, 5)}</strong></div>
+                <div><MathFormula latex={`M_{${quad.n}}`} />: <strong className="text-gray-900">{fmtNum(quad.mid, 5)}</strong></div>
+                <div><MathFormula latex={`T_{${quad.n}}`} />: <strong className="text-gray-900">{fmtNum(quad.trap, 5)}</strong></div>
               </div>
-              <div className="pt-1 text-gray-800">
-                Simpson&apos;s 1/3 Rule: <strong>{fmtNum(quad.simpson, 6)}</strong>
+              <div className="pt-1 font-mono text-gray-800 border-t border-orange-200/70">
+                Simpson&apos;s <MathFormula latex="\frac{1}{3}" /> Rule: <strong>{fmtNum(quad.simpson, 6)}</strong>
               </div>
             </div>
           )}
@@ -679,7 +715,7 @@ export const LimitsLhopitalExplorer: React.FC = () => {
         modeLabel="Quotient & L'Hôpital Mode"
       />
 
-      <div className="p-6 grid grid-cols-1 lg:grid-cols-12 gap-6">
+      <div className="p-4 sm:p-6 grid grid-cols-1 lg:grid-cols-12 gap-5 sm:gap-6">
         <div className="lg:col-span-5 space-y-4">
           <div className="p-4 rounded-xl bg-[#F9FAFB] border border-gray-200 space-y-3">
             <div>
@@ -703,7 +739,9 @@ export const LimitsLhopitalExplorer: React.FC = () => {
               />
             </div>
             <div>
-              <label className="block text-xs font-semibold text-gray-700 mb-1">Approach Point x → a</label>
+              <label className="block text-xs font-semibold text-gray-700 mb-1">
+                Approach Point <MathFormula latex="x \to a" />
+              </label>
               <input
                 type="number"
                 step="any"
@@ -715,21 +753,36 @@ export const LimitsLhopitalExplorer: React.FC = () => {
           </div>
 
           {lim.ok && (
-            <div className="p-5 rounded-2xl bg-[#FFF7ED] border border-orange-200 space-y-2 text-xs font-mono tabular-nums">
-              <span className="font-sans font-semibold text-[#EA580C] block">Two-Sided Limit Conclusion</span>
-              <div className="text-2xl font-bold text-[#111827]">
-                {lim.twoSidedExists
-                  ? fmtNum(lim.lhopitalOrder > 0 ? lim.lhopitalVal : (lim.leftLim + lim.rightLim) / 2, 6)
-                  : 'DNE (Left ≠ Right / Diverges)'}
+            <div className="p-4 sm:p-5 rounded-2xl bg-[#FFF7ED] border border-orange-200 space-y-2.5 text-xs tabular-nums">
+              <span className="font-sans font-semibold text-[#EA580C] block">Two-Sided Limit Evaluation</span>
+              <div className="px-3 py-2 rounded-xl bg-white/90 border border-orange-200/70 text-sm sm:text-base font-bold text-[#111827]">
+                <MathFormula
+                  latex={`\\lim_{x \\to ${lim.a}} \\frac{${asciiMathToLatex(numExpr)}}{${asciiMathToLatex(
+                    denExpr
+                  )}} = ${
+                    lim.twoSidedExists
+                      ? fmtNum(lim.lhopitalOrder > 0 ? lim.lhopitalVal : (lim.leftLim + lim.rightLim) / 2, 6)
+                      : '\\text{DNE}'
+                  }`}
+                  displayMode
+                />
               </div>
-              <div className="pt-2 border-t border-orange-200/70 text-gray-700 space-y-1">
+              <div className="pt-2 border-t border-orange-200/70 text-gray-700 space-y-1.5">
                 <div>
-                  Direct Plug-in: f({lim.a})/g({lim.a}) = {fmtNum(lim.fa, 4)} / {fmtNum(lim.ga, 4)}{' '}
+                  Direct Plug-in:{' '}
+                  <MathFormula
+                    latex={`\\frac{f(${lim.a})}{g(${lim.a})} = \\frac{${fmtNum(lim.fa, 4)}}{${fmtNum(lim.ga, 4)}}`}
+                  />{' '}
                   {lim.isZeroOverZero && <strong className="text-[#EA580C]">(0/0 Indeterminate)</strong>}
                 </div>
                 {lim.lhopitalOrder > 0 && (
                   <div>
-                    L&apos;Hôpital ({lim.lhopitalOrder}x): f&apos;(x)/g&apos;(x) = ({lim.dfStr}) / ({lim.dgStr})
+                    L&apos;Hôpital ({lim.lhopitalOrder}×):{' '}
+                    <MathFormula
+                      latex={`\\frac{f'(x)}{g'(x)} = \\frac{${asciiMathToLatex(lim.dfStr)}}{${asciiMathToLatex(
+                        lim.dgStr
+                      )}}`}
+                    />
                   </div>
                 )}
               </div>
@@ -907,7 +960,7 @@ export const TaylorMaclaurinSeriesVisualizer: React.FC = () => {
         modeLabel={`Order n = ${orderN}`}
       />
 
-      <div className="p-6 grid grid-cols-1 lg:grid-cols-12 gap-6">
+      <div className="p-4 sm:p-6 grid grid-cols-1 lg:grid-cols-12 gap-5 sm:gap-6">
         <div className="lg:col-span-5 space-y-4">
           <div className="grid grid-cols-3 gap-2.5">
             <div className="col-span-3">
@@ -954,23 +1007,30 @@ export const TaylorMaclaurinSeriesVisualizer: React.FC = () => {
 
           {taylor.ok && (
             <>
-              <div className="p-4 rounded-2xl bg-[#FFF7ED] border border-orange-200 space-y-2 text-xs font-mono">
+              <div className="p-4 rounded-2xl bg-[#FFF7ED] border border-orange-200 space-y-2.5 text-xs">
                 <span className="font-sans font-semibold text-[#EA580C] block">
-                  {Math.abs(taylor.a) < 1e-9 ? 'Maclaurin' : 'Taylor'} Polynomial P_{taylor.n}(x)
+                  {Math.abs(taylor.a) < 1e-9 ? 'Maclaurin' : 'Taylor'} Polynomial{' '}
+                  <MathFormula latex={`P_{${taylor.n}}(x)`} />
                 </span>
-                <div className="text-sm font-bold text-gray-900 break-all">{taylor.polyStr}</div>
-                <div className="pt-2 border-t border-orange-200/70 grid grid-cols-2 gap-2 tabular-nums">
+                <div className="px-3 py-2 rounded-xl bg-white/90 border border-orange-200/70 text-sm font-bold text-gray-900">
+                  <MathFormula
+                    latex={`P_{${taylor.n}}(x) = ${asciiMathToLatex(taylor.polyStr)}`}
+                    displayMode
+                  />
+                </div>
+                <div className="pt-2 border-t border-orange-200/70 grid grid-cols-2 gap-2 font-mono tabular-nums">
                   <div>
-                    <span className="font-sans text-gray-500 block">Exact f({taylor.x0})</span>
+                    <span className="font-sans text-gray-500 block">Exact <MathFormula latex={`f(${taylor.x0})`} /></span>
                     <span className="font-bold text-gray-900">{fmtNum(taylor.exactAtX0, 6)}</span>
                   </div>
                   <div>
-                    <span className="font-sans text-gray-500 block">Approx P_{taylor.n}({taylor.x0})</span>
+                    <span className="font-sans text-gray-500 block">Approx <MathFormula latex={`P_{${taylor.n}}(${taylor.x0})`} /></span>
                     <span className="font-bold text-[#EA580C]">{fmtNum(taylor.approxAtX0, 6)}</span>
                   </div>
                 </div>
                 <div className="text-gray-700 tabular-nums">
-                  Absolute Remainder |R_{taylor.n}| = <strong>{taylor.absErr.toExponential(3)}</strong>
+                  Remainder <MathFormula latex={`|R_{${taylor.n}}(${taylor.x0})|`} /> ={' '}
+                  <strong className="font-mono">{taylor.absErr.toExponential(3)}</strong>
                 </div>
               </div>
             </>
@@ -1150,11 +1210,11 @@ export const SequenceSeriesConvergenceTester: React.FC = () => {
         modeLabel={`Terms N = ${maxTerms}`}
       />
 
-      <div className="p-6 grid grid-cols-1 lg:grid-cols-12 gap-6">
+      <div className="p-4 sm:p-6 grid grid-cols-1 lg:grid-cols-12 gap-5 sm:gap-6">
         <div className="lg:col-span-5 space-y-4">
           <div>
             <label className="block text-xs font-semibold text-gray-700 mb-1">
-              General Term Formula a_n (in terms of n ≥ 1)
+              General Term Formula <MathFormula latex="a_n" /> (for <MathFormula latex="n \ge 1" />)
             </label>
             <input
               type="text"
@@ -1179,17 +1239,26 @@ export const SequenceSeriesConvergenceTester: React.FC = () => {
           </div>
 
           {series.ok && (
-            <div className="p-5 rounded-2xl bg-[#FFF7ED] border border-orange-200 space-y-2 text-xs">
+            <div className="p-4 sm:p-5 rounded-2xl bg-[#FFF7ED] border border-orange-200 space-y-2.5 text-xs">
+              <div className="px-3 py-2 rounded-xl bg-white/90 border border-orange-200/70 text-sm text-[#0F172A]">
+                <MathFormula latex={`\\sum_{n=1}^{\\infty} \\left(${asciiMathToLatex(termExpr)}\\right)`} displayMode />
+              </div>
               <span className="font-semibold text-[#EA580C] block">Convergence Diagnostic</span>
               <div className="text-base font-bold text-gray-900">{series.verdict}</div>
-              <p className="text-gray-700">{series.justification}</p>
+              <p className="text-gray-700">
+                <MathText text={series.justification} />
+              </p>
               <div className="pt-2 border-t border-orange-200/70 grid grid-cols-2 gap-2 font-mono tabular-nums">
                 <div>
-                  <span className="font-sans text-gray-500 block">Partial Sum S_{maxTerms}</span>
+                  <span className="font-sans text-gray-500 block">
+                    Partial Sum <MathFormula latex={`S_{${maxTerms}}`} />
+                  </span>
                   <span className="font-bold text-gray-900 text-sm">{fmtNum(series.sum, 6)}</span>
                 </div>
                 <div>
-                  <span className="font-sans text-gray-500 block">Ratio L = |a_(n+1)/a_n|</span>
+                  <span className="font-sans text-gray-500 block">
+                    Ratio <MathFormula latex="L = \left|\frac{a_{n+1}}{a_n}\right|" />
+                  </span>
                   <span className="font-bold text-gray-900 text-sm">{fmtNum(series.ratioL, 4)}</span>
                 </div>
               </div>

@@ -1,0 +1,1079 @@
+```html
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>University Tutors — 27 Interactive Math Tools</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;600&family=STIX+Two+Math&display=swap" rel="stylesheet" />
+  <style>
+    body {
+      font-family: 'Inter', sans-serif;
+      background-color: #f8fafc;
+      color: #0f172a;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .font-mono-code {
+      font-family: 'JetBrains Mono', monospace;
+    }
+    .font-math-serif {
+      font-family: 'STIX Two Math', 'Cambria Math', 'Times New Roman', serif;
+    }
+    /* Hide scrollbar for horizontal category pills while maintaining swipeability */
+    .no-scrollbar::-webkit-scrollbar {
+      display: none;
+    }
+    .no-scrollbar {
+      -ms-overflow-style: none;
+      scrollbar-width: none;
+    }
+    /* Subtle mathematical dot grid background for header */
+    .math-grid-bg {
+      background-image: radial-gradient(#cbd5e1 1px, transparent 1px);
+      background-size: 16px 16px;
+    }
+    @keyframes slideUp {
+      from { transform: translateY(100%); opacity: 0.6; }
+      to { transform: translateY(0); opacity: 1; }
+    }
+    .animate-slide-up {
+      animation: slideUp 0.24s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col items-center bg-slate-100">
+
+  <!-- Mobile App Container (Responsive up to max-w-md on desktop for realistic preview, full-width on mobile) -->
+  <div class="w-full max-w-md min-h-screen bg-slate-50 shadow-xl flex flex-col relative overflow-x-hidden">
+
+    <!-- Hero & Search Section -->
+    <section class="bg-white math-grid-bg border-b border-slate-200/80 px-4 pt-5 pb-4">
+      <div class="mb-3 flex items-start justify-between gap-2">
+        <div>
+          <div class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-orange-50 border border-orange-200/80 text-orange-700 text-[11px] font-semibold mb-1.5">
+            <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+              <path d="M4 19h16M4 15l4-6 4 4 4-8 4 6" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+            Step-by-Step Symbolic Engine
+          </div>
+          <h1 class="text-xl font-extrabold text-slate-900 tracking-tight">
+            Interactive Math Solvers
+          </h1>
+          <p class="text-xs text-slate-500 mt-0.5">
+            Tap any tool to test an equation or view full steps.
+          </p>
+        </div>
+
+        <!-- Saved / Bookmarked Filter Toggle -->
+        <button
+          id="savedFilterBtn"
+          onclick="toggleSavedOnly()"
+          aria-label="Filter saved tools"
+          class="shrink-0 mt-1 inline-flex items-center gap-1.5 px-3 py-2 rounded-2xl border border-slate-200 bg-white text-xs font-bold text-slate-700 hover:bg-slate-50 active:scale-95 transition shadow-2xs"
+        >
+          <svg id="savedFilterIcon" class="w-4 h-4 text-amber-500" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M11.48 3.499a.562.562 0 011.04 0l2.125 5.111a.563.563 0 00.475.345l5.518.442c.499.04.701.663.321.988l-4.204 3.602a.563.563 0 00-.182.557l1.285 5.385a.562.562 0 01-.84.61l-4.725-2.885a.563.563 0 00-.586 0L6.982 20.54a.562.562 0 01-.84-.61l1.285-5.386a.562.562 0 00-.182-.557l-4.204-3.602a.563.563 0 01.321-.988l5.518-.442a.563.563 0 00.475-.345L11.48 3.5z" />
+          </svg>
+          <span id="savedCountBadge">Saved (0)</span>
+        </button>
+      </div>
+
+      <!-- Enhanced Search Input -->
+      <div class="relative group">
+        <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400 group-focus-within:text-orange-500 transition-colors">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+            <circle cx="11" cy="11" r="8" />
+            <path stroke-linecap="round" d="m21 21-4.3-4.3" />
+          </svg>
+        </div>
+        <input
+          id="searchInput"
+          type="text"
+          placeholder="Type topic or formula (e.g., Quadratic, Matrix, p-value...)"
+          class="w-full bg-slate-50/90 focus:bg-white text-sm text-slate-900 placeholder-slate-400 pl-10 pr-9 py-3 rounded-2xl border border-slate-200/90 focus:border-orange-500 focus:ring-4 focus:ring-orange-500/10 outline-none transition-all shadow-sm"
+        />
+        <button id="clearSearchBtn" onclick="clearSearch()" aria-label="Clear search" class="hidden absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+      </div>
+
+      <!-- One-Tap Quick Search Suggestions (No Typing Required) -->
+      <div class="mt-2.5 flex items-center gap-1.5 overflow-x-auto no-scrollbar">
+        <span class="text-[11px] font-semibold text-slate-400 shrink-0">Popular:</span>
+        <button onclick="quickSearch('Quadratic')" class="shrink-0 text-[11px] font-medium px-2.5 py-1 rounded-full bg-slate-100 hover:bg-orange-50 hover:text-orange-700 text-slate-600 transition">Quadratic</button>
+        <button onclick="quickSearch('Derivative')" class="shrink-0 text-[11px] font-medium px-2.5 py-1 rounded-full bg-slate-100 hover:bg-orange-50 hover:text-orange-700 text-slate-600 transition">Derivative</button>
+        <button onclick="quickSearch('RREF')" class="shrink-0 text-[11px] font-medium px-2.5 py-1 rounded-full bg-slate-100 hover:bg-orange-50 hover:text-orange-700 text-slate-600 transition">Matrix RREF</button>
+        <button onclick="quickSearch('Integral')" class="shrink-0 text-[11px] font-medium px-2.5 py-1 rounded-full bg-slate-100 hover:bg-orange-50 hover:text-orange-700 text-slate-600 transition">Integral</button>
+        <button onclick="quickSearch('p-Value')" class="shrink-0 text-[11px] font-medium px-2.5 py-1 rounded-full bg-slate-100 hover:bg-orange-50 hover:text-orange-700 text-slate-600 transition">p-Value</button>
+      </div>
+
+      <!-- Compact Horizontal Swipeable Category Chips with Custom Graphics -->
+      <div class="mt-3.5 -mx-4 px-4">
+        <div class="flex items-center justify-between mb-1.5 px-0.5">
+          <span class="text-[11px] font-bold uppercase tracking-wider text-slate-400">Filter by Course Level</span>
+          <span id="activeCountLabel" class="text-[11px] font-semibold text-orange-600">Showing key solvers</span>
+        </div>
+        <div id="categoryStrip" class="flex gap-2.5 overflow-x-auto no-scrollbar py-1">
+          <!-- Populated dynamically via JS with bespoke category SVG graphics -->
+        </div>
+      </div>
+    </section>
+
+    <!-- Tools Card Feed -->
+    <main class="flex-1 px-4 py-4 space-y-4 pb-8" id="toolsContainer">
+      <!-- Populated dynamically via JS -->
+    </main>
+
+    <!-- Empty State -->
+    <div id="emptyState" class="hidden flex-1 flex flex-col items-center justify-center text-center px-6 py-12">
+      <div class="w-16 h-16 rounded-2xl bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-400 mb-3">
+        <svg class="w-8 h-8" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24">
+          <circle cx="11" cy="11" r="8" />
+          <path stroke-linecap="round" d="m21 21-4.35-4.35M8 11h6" />
+        </svg>
+      </div>
+      <h3 class="text-base font-bold text-slate-800">No matching math solver</h3>
+      <p class="text-xs text-slate-500 mt-1 max-w-[240px]">Try searching for "Matrix", "Derivative", "Complex", or reset your level filter.</p>
+      <button onclick="resetFilters()" class="mt-4 px-4 py-2 rounded-xl bg-orange-600 text-white text-xs font-semibold shadow-sm hover:bg-orange-700 transition">
+        Show All 27 Tools
+      </button>
+    </div>
+
+    <!-- Interactive Solver Preview Bottom Sheet Modal -->
+    <div id="solverModal" onclick="if(event.target===this) closeModal()" class="hidden fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-xs flex items-end justify-center">
+      <div class="bg-white w-full max-w-md rounded-t-3xl p-5 shadow-2xl border-t border-slate-200 animate-slide-up">
+        <div class="w-10 h-1.5 bg-slate-200 rounded-full mx-auto mb-4"></div>
+        <div class="flex items-start justify-between gap-3">
+          <div class="flex items-center gap-3.5">
+            <div id="modalIconBox" class="w-16 h-16 rounded-2xl flex items-center justify-center shrink-0"></div>
+            <div>
+              <span id="modalLevel" class="text-[11px] font-bold uppercase tracking-wider text-orange-600"></span>
+              <h3 id="modalTitle" class="text-base font-extrabold text-slate-900 leading-snug"></h3>
+              <p id="modalUseCase" class="text-xs text-slate-500 mt-0.5"></p>
+            </div>
+          </div>
+          <button onclick="closeModal()" aria-label="Close preview" class="p-2 rounded-xl bg-slate-100 text-slate-500 hover:text-slate-800">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+
+        <div class="mt-4 bg-slate-50 rounded-2xl p-3.5 border border-slate-200/80">
+          <div class="flex items-center justify-between text-[11px] text-slate-500 font-semibold mb-1.5">
+            <span>TRY AN EQUATION RIGHT NOW</span>
+            <button onclick="resetSampleInput()" class="text-orange-600 hover:underline font-bold">Reset Example</button>
+          </div>
+          <div class="flex gap-2">
+            <input id="quickInput" type="text" class="flex-1 bg-white border border-slate-200 rounded-xl px-3 py-2.5 text-xs font-mono-code text-slate-800 focus:outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-500/15" />
+            <button onclick="runQuickSolve()" class="px-4 py-2.5 rounded-xl bg-slate-900 text-white text-xs font-bold hover:bg-slate-800 active:scale-95 transition">
+              Solve
+            </button>
+          </div>
+
+          <!-- Mobile-Friendly Math Symbol Keypad Helper -->
+          <div class="mt-2 flex items-center gap-1.5 overflow-x-auto no-scrollbar pb-0.5">
+            <span class="text-[10px] font-semibold text-slate-400 shrink-0">Insert:</span>
+            <button type="button" onclick="insertSymbol('^2')" class="px-2.5 py-1 rounded-lg bg-white border border-slate-200 text-xs font-mono-code font-semibold text-slate-700 active:bg-orange-50">x²</button>
+            <button type="button" onclick="insertSymbol('sqrt(')" class="px-2.5 py-1 rounded-lg bg-white border border-slate-200 text-xs font-mono-code font-semibold text-slate-700 active:bg-orange-50">√</button>
+            <button type="button" onclick="insertSymbol('pi')" class="px-2.5 py-1 rounded-lg bg-white border border-slate-200 text-xs font-mono-code font-semibold text-slate-700 active:bg-orange-50">π</button>
+            <button type="button" onclick="insertSymbol('sin(')" class="px-2.5 py-1 rounded-lg bg-white border border-slate-200 text-xs font-mono-code font-semibold text-slate-700 active:bg-orange-50">sin</button>
+            <button type="button" onclick="insertSymbol('cos(')" class="px-2.5 py-1 rounded-lg bg-white border border-slate-200 text-xs font-mono-code font-semibold text-slate-700 active:bg-orange-50">cos</button>
+            <button type="button" onclick="insertSymbol('i')" class="px-2.5 py-1 rounded-lg bg-white border border-slate-200 text-xs font-mono-code font-semibold text-slate-700 active:bg-orange-50">i</button>
+          </div>
+
+          <div id="quickOutput" class="mt-2.5 text-xs font-mono-code text-emerald-800 bg-emerald-50 border border-emerald-200/80 rounded-xl px-3 py-2.5 leading-relaxed">
+            Result: Ready for input...
+          </div>
+        </div>
+
+        <div class="mt-4 flex gap-2.5">
+          <button onclick="closeModal()" class="flex-1 py-3 rounded-xl border border-slate-200 text-xs font-bold text-slate-600 hover:bg-slate-50 active:scale-98 transition">
+            Close
+          </button>
+          <button onclick="closeModal(); showToast('Launching full step-by-step workspace...')" class="flex-[1.4] py-3 rounded-xl bg-orange-600 text-white text-xs font-bold shadow-md shadow-orange-600/20 hover:bg-orange-700 active:scale-98 transition">
+            Open Full Step-by-Step Solver →
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Non-intrusive Toast Notification -->
+    <div id="toast" class="fixed bottom-20 left-1/2 -translate-x-1/2 z-50 pointer-events-none opacity-0 transition-opacity duration-200">
+      <div id="toastText" class="bg-slate-900 text-white text-xs font-medium px-4 py-2.5 rounded-full shadow-lg whitespace-nowrap"></div>
+    </div>
+
+  </div>
+
+  <script>
+    // Categories with larger, detailed multi-color mathematical SVG icon badges
+    const categories = [
+      {
+        id: 'all',
+        label: 'All 27',
+        fullLabel: 'All 27 Tools',
+        icon: `<svg class="w-6 h-6" viewBox="0 0 28 28" fill="none">
+          <rect x="3" y="3" width="9" height="9" rx="2.5" fill="currentColor" fill-opacity="0.2" stroke="currentColor" stroke-width="2"/>
+          <rect x="16" y="3" width="9" height="9" rx="2.5" fill="currentColor" fill-opacity="0.85"/>
+          <rect x="3" y="16" width="9" height="9" rx="2.5" fill="currentColor" fill-opacity="0.85"/>
+          <rect x="16" y="16" width="9" height="9" rx="2.5" fill="currentColor" fill-opacity="0.2" stroke="currentColor" stroke-width="2"/>
+        </svg>`
+      },
+      {
+        id: 'Level 1',
+        label: 'L1: Algebra',
+        fullLabel: 'Level 1: Algebra',
+        icon: `<svg class="w-6 h-6" viewBox="0 0 28 28" fill="none">
+          <rect x="2" y="2" width="24" height="24" rx="6" fill="currentColor" fill-opacity="0.12"/>
+          <path d="M5 16h3.5l3 7 4.5-17h7" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="M17.5 12.5l4.5 4.5m0-4.5l-4.5 4.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+        </svg>`
+      },
+      {
+        id: 'Level 2',
+        label: 'L2: Trig & Geo',
+        fullLabel: 'Level 2: Trig & Geometry',
+        icon: `<svg class="w-6 h-6" viewBox="0 0 28 28" fill="none">
+          <circle cx="9.5" cy="14" r="6" fill="currentColor" fill-opacity="0.15" stroke="currentColor" stroke-width="2"/>
+          <path d="M9.5 14L14 10.5V14H9.5Z" fill="currentColor"/>
+          <path d="M16 14c1.8-6 3.5-6 5.2 0s3.5 6 5.3 0" stroke="currentColor" stroke-width="2.1" stroke-linecap="round"/>
+        </svg>`
+      },
+      {
+        id: 'Level 3',
+        label: 'L3: Calculus',
+        fullLabel: 'Level 3: Calculus',
+        icon: `<svg class="w-6 h-6" viewBox="0 0 28 28" fill="none">
+          <path d="M14 21V11C17.5 7 21.5 7 25 10.5V21H14Z" fill="currentColor" fill-opacity="0.22"/>
+          <path d="M10.5 4.5c-2.2 0-2.2 3.5-2.2 9.5s0 9.5-2.3 9.5" stroke="currentColor" stroke-width="2.3" stroke-linecap="round"/>
+          <path d="M14 11c3.5-4 7.5-4 11-.5" stroke="currentColor" stroke-width="2.1" stroke-linecap="round"/>
+          <path d="M13 21h12" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+        </svg>`
+      },
+      {
+        id: 'Level 4',
+        label: 'L4: Linear Alg',
+        fullLabel: 'Level 4: Linear Algebra',
+        icon: `<svg class="w-6 h-6" viewBox="0 0 28 28" fill="none">
+          <path d="M7.5 5H4.5v18h3M20.5 5h3v18h-3" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+          <rect x="9.5" y="8.5" width="3.5" height="3.5" rx="1" fill="currentColor"/>
+          <rect x="15" y="12.2" width="3.5" height="3.5" rx="1" fill="currentColor" fill-opacity="0.45"/>
+          <rect x="9.5" y="16" width="3.5" height="3.5" rx="1" fill="currentColor" fill-opacity="0.45"/>
+          <rect x="15" y="16" width="3.5" height="3.5" rx="1" fill="currentColor"/>
+        </svg>`
+      },
+      {
+        id: 'Level 5',
+        label: 'L5: Statistics',
+        fullLabel: 'Level 5: Statistics',
+        icon: `<svg class="w-6 h-6" viewBox="0 0 28 28" fill="none">
+          <path d="M3.5 21C8.5 21 9.5 7 14 7C18.5 7 19.5 21 24.5 21H3.5Z" fill="currentColor" fill-opacity="0.18"/>
+          <path d="M3.5 21C8.5 21 9.5 7 14 7C18.5 7 19.5 21 24.5 21" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>
+          <path d="M14 7v14" stroke="currentColor" stroke-width="1.8" stroke-dasharray="2.5 2"/>
+        </svg>`
+      },
+      {
+        id: 'Level 6',
+        label: 'L6: ODEs & Discrete',
+        fullLabel: 'Level 6: Advanced ODEs & Discrete',
+        icon: `<svg class="w-6 h-6" viewBox="0 0 28 28" fill="none">
+          <path d="M8.5 7.5l10 2M7.2 9.5l3.5 10.5M19.5 11.5l-5.5 8.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+          <circle cx="6.5" cy="7" r="3" fill="currentColor" fill-opacity="0.25" stroke="currentColor" stroke-width="2"/>
+          <circle cx="21" cy="9.5" r="3" fill="currentColor" fill-opacity="0.25" stroke="currentColor" stroke-width="2"/>
+          <circle cx="12" cy="21.5" r="3" fill="currentColor"/>
+        </svg>`
+      }
+    ];
+
+    // Tools dataset with large (64x64px) realistic 3D-shaded instrument illustrations + student-friendly tags
+    const mathTools = [
+      {
+        id: 1,
+        level: 'Level 1',
+        levelName: 'Level 1: Algebra',
+        badge: 'PEMDAS · z = a + bi',
+        formulaGraphic: `
+          <div class="inline-flex items-center gap-2">
+            <svg class="w-5 h-5 text-orange-600 shrink-0" viewBox="0 0 24 24" fill="none">
+              <circle cx="12" cy="12" r="9.5" stroke="currentColor" stroke-width="1.6" stroke-dasharray="2 2"/>
+              <path d="M4 12h16M12 4v16" stroke="currentColor" stroke-width="1.4" stroke-opacity="0.5"/>
+              <path d="M12 12L17.5 6.5" stroke="#EA580C" stroke-width="2" stroke-linecap="round"/>
+              <circle cx="17.5" cy="6.5" r="2" fill="#EA580C"/>
+            </svg>
+            <span class="font-math-serif text-[14px] text-slate-800 tracking-wide flex items-center gap-1.5">
+              <span class="inline-flex items-center font-semibold text-orange-700">
+                (<span class="italic">x</span><sup class="text-[9px]">2</sup>+<span class="italic">y</span>)
+              </span>
+              <span class="text-slate-300">|</span>
+              <span class="italic font-semibold">z</span> = <span class="italic">a</span> + <span class="italic">bi</span>
+            </span>
+          </div>`,
+        useCase: 'Best for complex numbers, trig & nested fractions',
+        popular: true,
+        title: 'Scientific & Complex Expression Evaluator',
+        description: 'Evaluate nested PEMDAS expressions with trigonometric, logarithmic, hyperbolic, factorial, and full a + bi complex arithmetic.',
+        path: '/tools/math/scientific-evaluator',
+        theme: 'orange',
+        sampleInput: '(3 + 4i) * (2 - i) + sin(pi/2)',
+        sampleOutput: '11 + 5i',
+        // Realistic 64x64 3D Scientific Calculator + Argand Complex Vector Illustration
+        graphic: `
+          <svg class="w-16 h-16 drop-shadow-sm" viewBox="0 0 64 64" fill="none">
+            <defs>
+              <linearGradient id="calcBody1" x1="6" y1="4" x2="58" y2="60" gradientUnits="userSpaceOnUse">
+                <stop offset="0%" stop-color="#FFF7ED"/>
+                <stop offset="100%" stop-color="#FFEDD5"/>
+              </linearGradient>
+              <linearGradient id="calcScreen1" x1="12" y1="10" x2="52" y2="30" gradientUnits="userSpaceOnUse">
+                <stop offset="0%" stop-color="#1E293B"/>
+                <stop offset="100%" stop-color="#0F172A"/>
+              </linearGradient>
+              <linearGradient id="orangeBtn1" x1="0" y1="0" x2="1" y2="1">
+                <stop offset="0%" stop-color="#FB923C"/>
+                <stop offset="100%" stop-color="#EA580C"/>
+              </linearGradient>
+            </defs>
+            <!-- Outer Bevel Card -->
+            <rect x="4" y="4" width="56" height="56" rx="16" fill="url(#calcBody1)" stroke="#FDBA74" stroke-width="1.5"/>
+            <!-- LCD Scientific Display -->
+            <rect x="11" y="10" width="42" height="20" rx="6" fill="url(#calcScreen1)"/>
+            <!-- Argand Axis inside Display -->
+            <path d="M16 25H34M21 13V27" stroke="#475569" stroke-width="1" stroke-linecap="round"/>
+            <path d="M21 25L31 15" stroke="#38BDF8" stroke-width="2" stroke-linecap="round"/>
+            <circle cx="31" cy="15" r="2" fill="#38BDF8"/>
+            <text x="35" y="23" fill="#FDBA74" font-size="8.5" font-weight="700" font-family="monospace">a+bi</text>
+            <!-- Tactile Keypad Buttons -->
+            <rect x="11" y="34" width="12" height="8" rx="2.5" fill="#FFFFFF" stroke="#FED7AA" stroke-width="1"/>
+            <text x="14" y="40" fill="#475569" font-size="6.5" font-weight="700" font-family="sans-serif">sin</text>
+            <rect x="26" y="34" width="12" height="8" rx="2.5" fill="#FFFFFF" stroke="#FED7AA" stroke-width="1"/>
+            <text x="29.5" y="40" fill="#475569" font-size="6.5" font-weight="700" font-family="sans-serif">ln</text>
+            <rect x="41" y="34" width="12" height="8" rx="2.5" fill="#FFFFFF" stroke="#FED7AA" stroke-width="1"/>
+            <text x="44.5" y="40" fill="#EA580C" font-size="7.5" font-weight="800" font-family="monospace">π</text>
+            <rect x="11" y="45" width="12" height="8" rx="2.5" fill="#FFFFFF" stroke="#FED7AA" stroke-width="1"/>
+            <text x="14.5" y="51" fill="#475569" font-size="7" font-weight="700" font-family="monospace">x²</text>
+            <rect x="26" y="45" width="12" height="8" rx="2.5" fill="#FFFFFF" stroke="#FED7AA" stroke-width="1"/>
+            <text x="29.5" y="51" fill="#475569" font-size="7" font-weight="700" font-family="monospace">√x</text>
+            <rect x="41" y="45" width="12" height="8" rx="2.5" fill="url(#orangeBtn1)"/>
+            <text x="45" y="51.5" fill="#FFFFFF" font-size="9" font-weight="800" font-family="monospace">=</text>
+          </svg>`
+      },
+      {
+        id: 2,
+        level: 'Level 1',
+        levelName: 'Level 1: Algebra',
+        badge: 'ax² + bx + c = 0',
+        formulaGraphic: `
+          <div class="inline-flex items-center gap-2">
+            <svg class="w-5 h-5 text-amber-600 shrink-0" viewBox="0 0 24 24" fill="none">
+              <path d="M3 16h18" stroke="currentColor" stroke-width="1.4" stroke-opacity="0.45"/>
+              <path d="M5 6c3 15 11 15 14 0" stroke="#D97706" stroke-width="2" stroke-linecap="round"/>
+              <circle cx="7.4" cy="16" r="1.8" fill="#EA580C"/>
+              <circle cx="16.6" cy="16" r="1.8" fill="#EA580C"/>
+            </svg>
+            <span class="font-math-serif text-[14px] text-slate-800 flex items-center gap-1.5">
+              <span><span class="italic font-semibold">ax</span><sup class="text-[9px] font-bold">2</sup> + <span class="italic font-semibold">bx</span> + <span class="italic font-semibold">c</span> = 0</span>
+              <span class="text-slate-300">|</span>
+              <span class="inline-flex items-center text-[12px] text-amber-800 font-semibold">
+                <svg class="w-3.5 h-3.5 mr-0.5" viewBox="0 0 16 16" fill="none"><path d="M2 9l3 5 4-11h6" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                Δ
+              </span>
+            </span>
+          </div>`,
+        useCase: 'Best for factoring quadratics & finding vertex/roots',
+        popular: true,
+        title: 'Polynomial Root Finder & Discriminant Analyzer',
+        description: 'Find exact real and complex roots of quadratic, cubic, and quartic polynomials with vertex form and step-by-step factoring.',
+        path: '/tools/math/polynomial-roots',
+        theme: 'amber',
+        sampleInput: '2x^2 - 5x + 2 = 0',
+        sampleOutput: 'x₁ = 2, x₂ = 0.5 (Discriminant Δ = 9)',
+        // Realistic 64x64 Coordinate Graph Paper with Glowing Parabola & Root Intercept Pins
+        graphic: `
+          <svg class="w-16 h-16 drop-shadow-sm" viewBox="0 0 64 64" fill="none">
+            <defs>
+              <linearGradient id="amberBg2" x1="4" y1="4" x2="60" y2="60" gradientUnits="userSpaceOnUse">
+                <stop offset="0%" stop-color="#FFFBEB"/>
+                <stop offset="100%" stop-color="#FEF3C7"/>
+              </linearGradient>
+              <linearGradient id="parabolaStroke2" x1="14" y1="12" x2="50" y2="50" gradientUnits="userSpaceOnUse">
+                <stop offset="0%" stop-color="#D97706"/>
+                <stop offset="50%" stop-color="#F59E0B"/>
+                <stop offset="100%" stop-color="#B45309"/>
+              </linearGradient>
+            </defs>
+            <rect x="4" y="4" width="56" height="56" rx="16" fill="url(#amberBg2)" stroke="#FCD34D" stroke-width="1.5"/>
+            <!-- Fine Graph Grid -->
+            <path d="M16 10V54M24 10V54M32 10V54M40 10V54M48 10V54M10 18H54M10 26H54M10 34H54M10 42H54M10 50H54" stroke="#FDE68A" stroke-width="1"/>
+            <!-- Main X and Y Axes -->
+            <path d="M10 34H54M32 10V54" stroke="#92400E" stroke-width="1.5" stroke-opacity="0.45" stroke-linecap="round"/>
+            <!-- Shaded Area Under Vertex -->
+            <path d="M20 34C23 51 41 51 44 34H20Z" fill="#F59E0B" fill-opacity="0.22"/>
+            <!-- Smooth Parabola Curve -->
+            <path d="M15 13C20 56 44 56 49 13" stroke="url(#parabolaStroke2)" stroke-width="3" stroke-linecap="round"/>
+            <!-- Vertex Point -->
+            <circle cx="32" cy="45.2" r="2.8" fill="#FFFFFF" stroke="#B45309" stroke-width="2"/>
+            <!-- Root Intercept Nodes (x1, x2) -->
+            <circle cx="20.2" cy="34" r="3.5" fill="#EA580C" stroke="#FFFFFF" stroke-width="1.5"/>
+            <circle cx="43.8" cy="34" r="3.5" fill="#EA580C" stroke="#FFFFFF" stroke-width="1.5"/>
+            <text x="13" y="29" fill="#92400E" font-size="7.5" font-weight="800" font-family="monospace">x₁</text>
+            <text x="45" y="29" fill="#92400E" font-size="7.5" font-weight="800" font-family="monospace">x₂</text>
+          </svg>`
+      },
+      {
+        id: 5,
+        level: 'Level 2',
+        levelName: 'Level 2: Trig & Geometry',
+        badge: 'sin θ · cos θ · rad/deg',
+        formulaGraphic: `
+          <div class="inline-flex items-center gap-2">
+            <svg class="w-5 h-5 text-sky-600 shrink-0" viewBox="0 0 24 24" fill="none">
+              <circle cx="12" cy="12" r="8.5" stroke="currentColor" stroke-width="1.7"/>
+              <path d="M12 12L18.5 7.5V12H12Z" fill="#0284C7" fill-opacity="0.25" stroke="#0284C7" stroke-width="1.5"/>
+            </svg>
+            <span class="font-math-serif text-[14px] text-slate-800 flex items-center gap-1.5">
+              <span>sin<sup class="text-[9px]">2</sup><span class="italic font-semibold">θ</span> + cos<sup class="text-[9px]">2</sup><span class="italic font-semibold">θ</span> = 1</span>
+            </span>
+          </div>`,
+        useCase: 'Best for unit circle values & proving trig identities',
+        popular: false,
+        title: 'Interactive Unit Circle & Trig Identity Prover',
+        description: 'Visualize reference angles, exact surd values, law of sines/cosines, and verify trigonometric identities step-by-step.',
+        path: '/tools/math/unit-circle-trig',
+        theme: 'sky',
+        sampleInput: 'sin(2x) / (2*cos(x))',
+        sampleOutput: 'sin(x) [Verified Identity]',
+        // Realistic 64x64 Precision Protractor & Unit Circle Geometry Instrument
+        graphic: `
+          <svg class="w-16 h-16 drop-shadow-sm" viewBox="0 0 64 64" fill="none">
+            <defs>
+              <linearGradient id="skyBg5" x1="4" y1="4" x2="60" y2="60" gradientUnits="userSpaceOnUse">
+                <stop offset="0%" stop-color="#F0F9FF"/>
+                <stop offset="100%" stop-color="#E0F2FE"/>
+              </linearGradient>
+            </defs>
+            <rect x="4" y="4" width="56" height="56" rx="16" fill="url(#skyBg5)" stroke="#7DD3FC" stroke-width="1.5"/>
+            <!-- Coordinate Crosshairs -->
+            <path d="M10 32H54M32 10V54" stroke="#0284C7" stroke-width="1.2" stroke-opacity="0.35" stroke-dasharray="2.5 2.5"/>
+            <!-- Outer Unit Circle Ring -->
+            <circle cx="32" cy="32" r="19" fill="#FFFFFF" fill-opacity="0.7" stroke="#0284C7" stroke-width="2.2"/>
+            <!-- Angle Sector Wedge -->
+            <path d="M32 32L46.5 20A19 19 0 0 1 51 32H32Z" fill="#0EA5E9" fill-opacity="0.22"/>
+            <!-- Right Triangle Altitude (sin) & Base (cos) -->
+            <path d="M32 32L46.5 20V32H32Z" stroke="#0369A1" stroke-width="2" stroke-linejoin="round"/>
+            <!-- Sine Vertical Highlight -->
+            <path d="M46.5 20V32" stroke="#F97316" stroke-width="2.6" stroke-linecap="round"/>
+            <!-- Right-Angle Square Marker -->
+            <path d="M43.5 32V29H46.5" stroke="#0369A1" stroke-width="1.3"/>
+            <!-- Point on Unit Circle -->
+            <circle cx="46.5" cy="20" r="3.5" fill="#0284C7" stroke="#FFFFFF" stroke-width="1.5"/>
+            <text x="14" y="21" fill="#0369A1" font-size="8" font-weight="800" font-family="monospace">sin θ</text>
+          </svg>`
+      },
+      {
+        id: 9,
+        level: 'Level 3',
+        levelName: 'Level 3: Calculus',
+        badge: 'd/dx · Chain & Product Rule',
+        formulaGraphic: `
+          <div class="inline-flex items-center gap-2">
+            <svg class="w-5 h-5 text-indigo-600 shrink-0" viewBox="0 0 24 24" fill="none">
+              <path d="M4 19c4-2 6-11 16-14" stroke="#4F46E5" stroke-width="2" stroke-linecap="round"/>
+              <path d="M5 14L18 6" stroke="#F97316" stroke-width="1.8" stroke-linecap="round"/>
+              <circle cx="11.5" cy="10" r="2" fill="#F97316"/>
+            </svg>
+            <span class="font-math-serif text-[14px] text-slate-800 inline-flex items-center gap-1.5">
+              <span class="inline-flex flex-col items-center leading-none text-[11px] font-semibold text-indigo-800">
+                <span class="border-b border-indigo-800 px-1 pb-[1px] italic">d</span>
+                <span class="pt-[1px] italic">dx</span>
+              </span>
+              <span>[<span class="italic font-semibold">f</span>(<span class="italic">g</span>(<span class="italic">x</span>))]</span>
+            </span>
+          </div>`,
+        useCase: 'Best for step-by-step differentiation & tangent slopes',
+        popular: true,
+        title: 'Symbolic Derivative & Tangent Line Calculator',
+        description: 'Compute higher-order symbolic derivatives using product, quotient, and chain rules with full intermediate derivation steps.',
+        path: '/tools/math/symbolic-derivative',
+        theme: 'indigo',
+        sampleInput: 'd/dx [ x^3 * sin(2x) ]',
+        sampleOutput: '3x²·sin(2x) + 2x³·cos(2x)',
+        // Realistic 64x64 Differential Slope & Tangent Line Visualization
+        graphic: `
+          <svg class="w-16 h-16 drop-shadow-sm" viewBox="0 0 64 64" fill="none">
+            <defs>
+              <linearGradient id="indigoBg9" x1="4" y1="4" x2="60" y2="60" gradientUnits="userSpaceOnUse">
+                <stop offset="0%" stop-color="#EEF2FF"/>
+                <stop offset="100%" stop-color="#E0E7FF"/>
+              </linearGradient>
+            </defs>
+            <rect x="4" y="4" width="56" height="56" rx="16" fill="url(#indigoBg9)" stroke="#A5B4FC" stroke-width="1.5"/>
+            <!-- Axes -->
+            <path d="M12 12V50H52" stroke="#4F46E5" stroke-width="1.6" stroke-opacity="0.4" stroke-linecap="round"/>
+            <!-- Rise/Run Slope Triangle (dy / dx) -->
+            <path d="M24 34H42V21" stroke="#6366F1" stroke-width="1.6" stroke-dasharray="3 2.5"/>
+            <text x="30" y="42" fill="#4338CA" font-size="7.5" font-weight="700" font-family="monospace">dx</text>
+            <text x="44" y="30" fill="#4338CA" font-size="7.5" font-weight="700" font-family="monospace">dy</text>
+            <!-- Cubic Function Curve f(x) -->
+            <path d="M14 48C20 45 25 32 33 27.5C41 23 46 15 50 12" stroke="#4338CA" stroke-width="3" stroke-linecap="round"/>
+            <!-- Glowing Orange Tangent Line -->
+            <path d="M15 40.5L50 15.5" stroke="#F97316" stroke-width="2.4" stroke-linecap="round"/>
+            <!-- Point of Tangency -->
+            <circle cx="33" cy="27.5" r="4" fill="#F97316" stroke="#FFFFFF" stroke-width="1.8"/>
+            <text x="15" y="20" fill="#3730A3" font-size="8.5" font-weight="800" font-family="monospace">f'(x)</text>
+          </svg>`
+      },
+      {
+        id: 11,
+        level: 'Level 3',
+        levelName: 'Level 3: Calculus',
+        badge: '∫ f(x) dx · Riemann & Exact',
+        formulaGraphic: `
+          <div class="inline-flex items-center gap-2">
+            <svg class="w-5 h-5 text-violet-600 shrink-0" viewBox="0 0 24 24" fill="none">
+              <path d="M6 19V11c3-4 9-4 12 0v8H6z" fill="#8B5CF6" fill-opacity="0.28"/>
+              <path d="M4 13c4-6 12-6 16 0" stroke="#6D28D9" stroke-width="2" stroke-linecap="round"/>
+              <path d="M4 19h16" stroke="#6D28D9" stroke-width="1.5"/>
+            </svg>
+            <span class="font-math-serif text-[14px] text-slate-800 inline-flex items-center gap-1">
+              <span class="inline-flex items-center text-violet-800 font-bold">
+                <span class="text-[19px] leading-none">∫</span>
+                <span class="inline-flex flex-col text-[8.5px] leading-tight -ml-0.5 mr-0.5 italic">
+                  <span>b</span>
+                  <span>a</span>
+                </span>
+              </span>
+              <span><span class="italic font-semibold">f</span>(<span class="italic">x</span>) <span class="italic">dx</span></span>
+              <span class="text-slate-300 mx-0.5">|</span>
+              <span class="text-[12px] text-violet-700 font-semibold">Σ <span class="italic">f</span>(<span class="italic">x</span><sub class="text-[8px]">i</sub>)Δ<span class="italic">x</span></span>
+            </span>
+          </div>`,
+        useCase: 'Best for area under curves, u-sub & integration by parts',
+        popular: false,
+        title: 'Definite & Indefinite Integral Solver',
+        description: 'Solve antiderivatives via u-substitution, integration by parts, and partial fractions with shaded area visualization.',
+        path: '/tools/math/integral-solver',
+        theme: 'violet',
+        sampleInput: '∫_0^pi sin(x) dx',
+        sampleOutput: '[-cos(x)]₀^π = 2',
+        // Realistic 64x64 Riemann Sum Rectangles & Smooth Integral Area Card
+        graphic: `
+          <svg class="w-16 h-16 drop-shadow-sm" viewBox="0 0 64 64" fill="none">
+            <defs>
+              <linearGradient id="violetBg11" x1="4" y1="4" x2="60" y2="60" gradientUnits="userSpaceOnUse">
+                <stop offset="0%" stop-color="#F5F3FF"/>
+                <stop offset="100%" stop-color="#EDE9FE"/>
+              </linearGradient>
+              <linearGradient id="areaFill11" x1="32" y1="18" x2="32" y2="48" gradientUnits="userSpaceOnUse">
+                <stop offset="0%" stop-color="#8B5CF6" stop-opacity="0.45"/>
+                <stop offset="100%" stop-color="#7C3AED" stop-opacity="0.12"/>
+              </linearGradient>
+            </defs>
+            <rect x="4" y="4" width="56" height="56" rx="16" fill="url(#violetBg11)" stroke="#C4B5FD" stroke-width="1.5"/>
+            <!-- Shaded Definite Integral Area -->
+            <path d="M18 48V28C25 17 37 17 46 26V48H18Z" fill="url(#areaFill11)"/>
+            <!-- Riemann Approximation Bars -->
+            <rect x="18" y="28" width="7" height="20" fill="#8B5CF6" fill-opacity="0.18" stroke="#7C3AED" stroke-width="1.2"/>
+            <rect x="25" y="21" width="7" height="27" fill="#8B5CF6" fill-opacity="0.24" stroke="#7C3AED" stroke-width="1.2"/>
+            <rect x="32" y="20" width="7" height="28" fill="#8B5CF6" fill-opacity="0.24" stroke="#7C3AED" stroke-width="1.2"/>
+            <rect x="39" y="25" width="7" height="23" fill="#8B5CF6" fill-opacity="0.18" stroke="#7C3AED" stroke-width="1.2"/>
+            <!-- Base Axis -->
+            <path d="M11 48H53" stroke="#5B21B6" stroke-width="1.8" stroke-linecap="round"/>
+            <!-- Smooth Function Curve -->
+            <path d="M12 35C19 18 37 15 52 31" stroke="#5B21B6" stroke-width="2.8" stroke-linecap="round"/>
+            <!-- Integral Symbol Badge -->
+            <text x="12" y="21" fill="#6D28D9" font-size="13" font-weight="800" font-family="serif">∫</text>
+            <text x="17" y="55" fill="#5B21B6" font-size="7" font-weight="700" font-family="monospace">a</text>
+            <text x="44" y="55" fill="#5B21B6" font-size="7" font-weight="700" font-family="monospace">b</text>
+          </svg>`
+      },
+      {
+        id: 15,
+        level: 'Level 4',
+        levelName: 'Level 4: Linear Algebra',
+        badge: 'RREF · Gauss-Jordan',
+        formulaGraphic: `
+          <div class="inline-flex items-center gap-2">
+            <svg class="w-5 h-5 text-emerald-600 shrink-0" viewBox="0 0 24 24" fill="none">
+              <path d="M6 4H4v16h2M18 4h2v16h-2" stroke="#059669" stroke-width="1.8" stroke-linecap="round"/>
+              <rect x="7" y="7" width="3" height="3" rx="0.8" fill="#059669"/>
+              <rect x="10.5" y="10.5" width="3" height="3" rx="0.8" fill="#059669"/>
+              <rect x="14" y="14" width="3" height="3" rx="0.8" fill="#059669"/>
+            </svg>
+            <span class="font-math-serif text-[13.5px] text-slate-800 inline-flex items-center gap-1.5">
+              <span>[<span class="italic font-semibold">A</span> | <span class="italic font-semibold">b</span>]</span>
+              <span class="text-emerald-700 font-bold">→</span>
+              <span>[<span class="italic font-semibold">I</span><sub class="text-[9px]">n</sub> | <span class="italic font-semibold">x</span>]</span>
+            </span>
+          </div>`,
+        useCase: 'Best for solving systems of equations & row reduction',
+        popular: true,
+        title: 'Matrix RREF & Linear System Solver',
+        description: 'Transform augmented matrices into Reduced Row Echelon Form with annotated elementary row operations and pivot tracking.',
+        path: '/tools/math/matrix-rref',
+        theme: 'emerald',
+        sampleInput: '[[2, 1, 5], [4, -1, 1]]',
+        sampleOutput: 'RREF: [[1, 0, 1], [0, 1, 3]]',
+        // Realistic 64x64 3x3 Augmented Matrix with Highlighted Diagonal Pivot Cells
+        graphic: `
+          <svg class="w-16 h-16 drop-shadow-sm" viewBox="0 0 64 64" fill="none">
+            <defs>
+              <linearGradient id="emeraldBg15" x1="4" y1="4" x2="60" y2="60" gradientUnits="userSpaceOnUse">
+                <stop offset="0%" stop-color="#ECFDF5"/>
+                <stop offset="100%" stop-color="#D1FAE5"/>
+              </linearGradient>
+            </defs>
+            <rect x="4" y="4" width="56" height="56" rx="16" fill="url(#emeraldBg15)" stroke="#6EE7B7" stroke-width="1.5"/>
+            <!-- Matrix Steel Brackets -->
+            <path d="M16 13H11V51H16M48 13H53V51H48" stroke="#065F46" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/>
+            <!-- Augmented Divider Line -->
+            <path d="M40 15V49" stroke="#059669" stroke-width="1.4" stroke-dasharray="2.5 2.5"/>
+            <!-- Row 1: [1] 0 | 2 -->
+            <rect x="16" y="16" width="9" height="9" rx="2.5" fill="#059669"/>
+            <text x="18.5" y="23" fill="#FFFFFF" font-size="7.5" font-weight="800" font-family="monospace">1</text>
+            <text x="29.5" y="23" fill="#065F46" font-size="7.5" font-weight="700" font-family="monospace">0</text>
+            <text x="43" y="23" fill="#047857" font-size="7.5" font-weight="800" font-family="monospace">2</text>
+            <!-- Row 2: 0 [1] | 5 -->
+            <text x="18.5" y="34.5" fill="#065F46" font-size="7.5" font-weight="700" font-family="monospace">0</text>
+            <rect x="27" y="27.5" width="9" height="9" rx="2.5" fill="#059669"/>
+            <text x="29.5" y="34.5" fill="#FFFFFF" font-size="7.5" font-weight="800" font-family="monospace">1</text>
+            <text x="43" y="34.5" fill="#047857" font-size="7.5" font-weight="800" font-family="monospace">5</text>
+            <!-- Row 3: 0 0 | 1 -->
+            <text x="18.5" y="46" fill="#065F46" font-size="7.5" font-weight="700" font-family="monospace">0</text>
+            <text x="29.5" y="46" fill="#065F46" font-size="7.5" font-weight="700" font-family="monospace">0</text>
+            <rect x="41" y="39" width="8" height="9" rx="2.5" fill="#10B981" fill-opacity="0.25" stroke="#059669" stroke-width="1.2"/>
+            <text x="43" y="46" fill="#065F46" font-size="7.5" font-weight="800" font-family="monospace">1</text>
+          </svg>`
+      },
+      {
+        id: 17,
+        level: 'Level 4',
+        levelName: 'Level 4: Linear Algebra',
+        badge: 'det(A - λI) = 0',
+        formulaGraphic: `
+          <div class="inline-flex items-center gap-2">
+            <svg class="w-5 h-5 text-teal-600 shrink-0" viewBox="0 0 24 24" fill="none">
+              <path d="M5 19L19 5" stroke="#0D9488" stroke-width="2" stroke-linecap="round"/>
+              <path d="M14 5h5v5" stroke="#0D9488" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+              <path d="M5 19l7-7" stroke="#F97316" stroke-width="2.4" stroke-linecap="round"/>
+            </svg>
+            <span class="font-math-serif text-[14px] text-slate-800 inline-flex items-center gap-1">
+              <span>det(<span class="italic font-semibold">A</span> − <span class="italic font-semibold text-teal-700">λ</span><span class="italic font-semibold">I</span>) = 0</span>
+            </span>
+          </div>`,
+        useCase: 'Best for characteristic polynomials & matrix diagonalization',
+        popular: false,
+        title: 'Eigenvalues, Eigenvectors & Diagonalization',
+        description: 'Derive the characteristic polynomial, compute real/complex eigenvalues, nullspace basis vectors, and P·D·P⁻¹ decomposition.',
+        path: '/tools/math/eigen-solver',
+        theme: 'teal',
+        sampleInput: '[[4, 1], [2, 3]]',
+        sampleOutput: 'λ₁ = 5, v₁ = [1, 1]ᵀ | λ₂ = 2, v₂ = [1, -2]ᵀ',
+        // Realistic 64x64 2D Vector Basis Grid with Scaled Eigenvector Av = λv
+        graphic: `
+          <svg class="w-16 h-16 drop-shadow-sm" viewBox="0 0 64 64" fill="none">
+            <defs>
+              <linearGradient id="tealBg17" x1="4" y1="4" x2="60" y2="60" gradientUnits="userSpaceOnUse">
+                <stop offset="0%" stop-color="#F0FDFA"/>
+                <stop offset="100%" stop-color="#CCFBF1"/>
+              </linearGradient>
+            </defs>
+            <rect x="4" y="4" width="56" height="56" rx="16" fill="url(#tealBg17)" stroke="#5EEAD4" stroke-width="1.5"/>
+            <!-- Sheared Transformation Grid Lines -->
+            <path d="M12 46L34 12M24 50L46 16M10 38L48 26M14 50L52 38" stroke="#99F6E4" stroke-width="1.3"/>
+            <!-- Extended Eigenvector Span Line (Av = λv) -->
+            <path d="M16 48L48 16" stroke="#0D9488" stroke-width="3" stroke-linecap="round"/>
+            <path d="M40 16H48V24" stroke="#0D9488" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/>
+            <!-- Original Base Eigenvector v -->
+            <path d="M16 48L31 33" stroke="#F97316" stroke-width="3.5" stroke-linecap="round"/>
+            <path d="M25 33H31V39" stroke="#F97316" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+            <!-- Origin Node -->
+            <circle cx="16" cy="48" r="3.5" fill="#115E59" stroke="#FFFFFF" stroke-width="1.5"/>
+            <text x="14" y="22" fill="#115E59" font-size="8.5" font-weight="800" font-family="monospace">Av=λv</text>
+          </svg>`
+      },
+      {
+        id: 21,
+        level: 'Level 5',
+        levelName: 'Level 5: Statistics',
+        badge: 'Z-Score · p-Value · CI',
+        formulaGraphic: `
+          <div class="inline-flex items-center gap-2">
+            <svg class="w-5 h-5 text-rose-600 shrink-0" viewBox="0 0 24 24" fill="none">
+              <path d="M3 18c4 0 5-12 9-12s5 12 9 12" stroke="#E11D48" stroke-width="2" stroke-linecap="round"/>
+              <path d="M15.5 11.5c1.5 4 3 6.5 5.5 6.5h-5.5v-6.5z" fill="#E11D48" fill-opacity="0.45"/>
+            </svg>
+            <span class="font-math-serif text-[13.5px] text-slate-800 inline-flex items-center gap-1.5">
+              <span class="italic font-semibold">z</span> =
+              <span class="inline-flex flex-col items-center leading-none text-[10.5px] font-semibold">
+                <span class="border-b border-slate-700 px-1 pb-[1px]"><span class="overline">x</span> − μ</span>
+                <span class="pt-[1px]">σ/√n</span>
+              </span>
+              <span class="text-slate-300">|</span>
+              <span class="text-rose-700 font-semibold italic">p &lt; α</span>
+            </span>
+          </div>`,
+        useCase: 'Best for Z/t-tests, confidence intervals & tail probabilities',
+        popular: false,
+        title: 'Hypothesis Testing & Normal Distribution Lab',
+        description: 'Calculate two-tailed p-values, critical Z/t thresholds, confidence intervals, and shaded tail probabilities.',
+        path: '/tools/math/hypothesis-testing',
+        theme: 'rose',
+        sampleInput: 'μ₀ = 100, x̄ = 104.5, σ = 12, n = 36',
+        sampleOutput: 'Z = 2.25, p = 0.0244 (Reject H₀ at α=0.05)',
+        // Realistic 64x64 Gaussian Bell Curve with Mean μ Line & Critical α Rejection Tail
+        graphic: `
+          <svg class="w-16 h-16 drop-shadow-sm" viewBox="0 0 64 64" fill="none">
+            <defs>
+              <linearGradient id="roseBg21" x1="4" y1="4" x2="60" y2="60" gradientUnits="userSpaceOnUse">
+                <stop offset="0%" stop-color="#FFF1F2"/>
+                <stop offset="100%" stop-color="#FFE4E6"/>
+              </linearGradient>
+              <linearGradient id="bellFill21" x1="32" y1="16" x2="32" y2="46" gradientUnits="userSpaceOnUse">
+                <stop offset="0%" stop-color="#F43F5E" stop-opacity="0.22"/>
+                <stop offset="100%" stop-color="#F43F5E" stop-opacity="0.03"/>
+              </linearGradient>
+            </defs>
+            <rect x="4" y="4" width="56" height="56" rx="16" fill="url(#roseBg21)" stroke="#FDA4AF" stroke-width="1.5"/>
+            <!-- Main Bell Fill -->
+            <path d="M10 46C18 46 21 17 32 17C43 17 46 46 54 46H10Z" fill="url(#bellFill21)"/>
+            <!-- Critical Rejection Tail Shaded Solid -->
+            <path d="M41 29C44 38 47 46 54 46H41V29Z" fill="#E11D48" fill-opacity="0.55"/>
+            <!-- Baseline -->
+            <path d="M9 46H55" stroke="#881337" stroke-width="1.8" stroke-linecap="round"/>
+            <!-- Gaussian Curve -->
+            <path d="M10 46C18 46 21 17 32 17C43 17 46 46 54 46" stroke="#BE123C" stroke-width="2.8" stroke-linecap="round"/>
+            <!-- Mean Line μ -->
+            <path d="M32 17V46" stroke="#9F1239" stroke-width="1.4" stroke-dasharray="2.5 2"/>
+            <!-- Critical Z Threshold Line -->
+            <path d="M41 26V48" stroke="#E11D48" stroke-width="2"/>
+            <text x="29.5" y="54" fill="#881337" font-size="8" font-weight="800" font-family="serif">μ</text>
+            <text x="43" y="24" fill="#BE123C" font-size="7.5" font-weight="800" font-family="monospace">p&lt;α</text>
+          </svg>`
+      },
+      {
+        id: 25,
+        level: 'Level 6',
+        levelName: 'Level 6: Advanced ODEs & Discrete',
+        badge: 'dy/dx = f(x,y) · Laplace',
+        formulaGraphic: `
+          <div class="inline-flex items-center gap-2">
+            <svg class="w-5 h-5 text-cyan-600 shrink-0" viewBox="0 0 24 24" fill="none">
+              <path d="M4 17c5-1 8-9 16-11" stroke="#0891B2" stroke-width="2" stroke-linecap="round"/>
+              <path d="M6 9l3-2M12 15l3-2M15 8l3-2" stroke="#0891B2" stroke-width="1.4" stroke-opacity="0.5" stroke-linecap="round"/>
+            </svg>
+            <span class="font-math-serif text-[13.5px] text-slate-800 inline-flex items-center gap-1.5">
+              <span class="inline-flex flex-col items-center leading-none text-[10.5px] font-semibold text-cyan-800">
+                <span class="border-b border-cyan-800 px-1 pb-[1px] italic">dy</span>
+                <span class="pt-[1px] italic">dx</span>
+              </span>
+              <span>= <span class="italic font-semibold">f</span>(<span class="italic">x</span>, <span class="italic">y</span>)</span>
+              <span class="text-slate-300">|</span>
+              <span class="text-cyan-800 font-semibold">ℒ{<span class="italic">y</span>}</span>
+            </span>
+          </div>`,
+        useCase: 'Best for 1st/2nd order differential equations & slope fields',
+        popular: false,
+        title: 'First & Second-Order ODE & Slope Field Solver',
+        description: 'Solve separable, linear integrating factor, and constant-coefficient homogeneous/non-homogeneous differential equations.',
+        path: '/tools/math/ode-solver',
+        theme: 'cyan',
+        sampleInput: "y'' + 4y' + 4y = 0",
+        sampleOutput: 'y(t) = (C₁ + C₂·t)·e^(-2t)',
+        // Realistic 64x64 Direction Slope Field Matrix with Integral Trajectory Curve
+        graphic: `
+          <svg class="w-16 h-16 drop-shadow-sm" viewBox="0 0 64 64" fill="none">
+            <defs>
+              <linearGradient id="cyanBg25" x1="4" y1="4" x2="60" y2="60" gradientUnits="userSpaceOnUse">
+                <stop offset="0%" stop-color="#ECFEFF"/>
+                <stop offset="100%" stop-color="#CFFAFE"/>
+              </linearGradient>
+            </defs>
+            <rect x="4" y="4" width="56" height="56" rx="16" fill="url(#cyanBg25)" stroke="#67E8F9" stroke-width="1.5"/>
+            <!-- Direction Slope Field Tick Marks -->
+            <g stroke="#0891B2" stroke-width="1.7" stroke-linecap="round" stroke-opacity="0.55">
+              <path d="M13 18L19 15M25 18L31 15M37 18L43 15M47 18L52 16"/>
+              <path d="M13 30L19 26M25 29L31 24M37 27L43 23M47 26L52 23"/>
+              <path d="M13 42L19 39M25 41L31 36M37 38L43 34M47 37L52 34"/>
+              <path d="M13 51L19 49M25 50L31 47M37 49L43 46M47 48L52 46"/>
+            </g>
+            <!-- Particular Solution Trajectory Curve y(t) -->
+            <path d="M12 45C22 44 31 25 52 21" stroke="#0E7490" stroke-width="3.2" stroke-linecap="round"/>
+            <!-- Initial Condition Point (t0, y0) -->
+            <circle cx="24" cy="38" r="3.8" fill="#F97316" stroke="#FFFFFF" stroke-width="1.6"/>
+            <text x="13" y="13.5" fill="#155E75" font-size="7.5" font-weight="800" font-family="monospace">dy/dt</text>
+          </svg>`
+      }
+    ];
+
+    let activeCategory = 'all';
+    let searchQuery = '';
+    let showSavedOnly = false;
+    let savedToolIds = new Set([1, 9]); // Pre-bookmark 2 essentials so users see how it works
+    let currentModalTool = null;
+
+    function updateSavedBadge() {
+      const btn = document.getElementById('savedFilterBtn');
+      const icon = document.getElementById('savedFilterIcon');
+      const badge = document.getElementById('savedCountBadge');
+      badge.textContent = `Saved (${savedToolIds.size})`;
+      if (showSavedOnly) {
+        btn.classList.add('bg-amber-50', 'border-amber-300', 'text-amber-800');
+        icon.setAttribute('fill', 'currentColor');
+      } else {
+        btn.classList.remove('bg-amber-50', 'border-amber-300', 'text-amber-800');
+        icon.setAttribute('fill', 'none');
+      }
+    }
+
+    function toggleSavedOnly() {
+      showSavedOnly = !showSavedOnly;
+      updateSavedBadge();
+      renderTools();
+    }
+
+    function toggleBookmark(event, toolId) {
+      event.stopPropagation();
+      if (savedToolIds.has(toolId)) {
+        savedToolIds.delete(toolId);
+        showToast('Removed from Saved Tools');
+      } else {
+        savedToolIds.add(toolId);
+        showToast('Saved to your quick-access list ★');
+      }
+      updateSavedBadge();
+      renderTools();
+    }
+
+    // Render Category Pills with Larger Custom Graphics
+    function renderCategories() {
+      const strip = document.getElementById('categoryStrip');
+      strip.innerHTML = categories.map(cat => {
+        const isActive = activeCategory === cat.id;
+        return `
+          <button
+            onclick="selectCategory('${cat.id}')"
+            class="shrink-0 inline-flex items-center gap-2.5 px-3.5 py-2.5 rounded-2xl text-xs font-bold transition-all active:scale-95 border ${
+              isActive
+                ? 'bg-orange-600 text-white border-orange-600 shadow-md shadow-orange-600/25'
+                : 'bg-white text-slate-700 border-slate-200/90 hover:border-slate-300 hover:bg-slate-50 shadow-2xs'
+            }"
+          >
+            <span class="${isActive ? 'text-white' : 'text-orange-600'} shrink-0">${cat.icon}</span>
+            <span>${cat.label}</span>
+          </button>
+        `;
+      }).join('');
+    }
+
+    // Render Filtered Tool Cards with Prominent 64x64 Realistic Graphics & Clear Student Affordances
+    function renderTools() {
+      const container = document.getElementById('toolsContainer');
+      const emptyState = document.getElementById('emptyState');
+      const activeCountLabel = document.getElementById('activeCountLabel');
+
+      const filtered = mathTools.filter(tool => {
+        const matchesCat = activeCategory === 'all' || tool.level === activeCategory;
+        const matchesSaved = !showSavedOnly || savedToolIds.has(tool.id);
+        const q = searchQuery.toLowerCase().trim();
+        const matchesSearch = !q ||
+          tool.title.toLowerCase().includes(q) ||
+          tool.description.toLowerCase().includes(q) ||
+          tool.badge.toLowerCase().includes(q) ||
+          tool.useCase.toLowerCase().includes(q) ||
+          tool.levelName.toLowerCase().includes(q);
+        return matchesCat && matchesSaved && matchesSearch;
+      });
+
+      activeCountLabel.textContent = showSavedOnly
+        ? `${filtered.length} saved tool${filtered.length === 1 ? '' : 's'}`
+        : filtered.length === mathTools.length
+          ? 'Showing key solvers (27 total)'
+          : `${filtered.length} matching solver${filtered.length === 1 ? '' : 's'}`;
+
+      if (filtered.length === 0) {
+        container.classList.add('hidden');
+        emptyState.classList.remove('hidden');
+        return;
+      }
+
+      container.classList.remove('hidden');
+      emptyState.classList.add('hidden');
+
+      container.innerHTML = filtered.map(tool => {
+        const isSaved = savedToolIds.has(tool.id);
+        return `
+        <article
+          onclick="openSolverModal(${tool.id})"
+          class="group bg-white rounded-3xl p-4 border border-slate-200/90 shadow-xs hover:shadow-md hover:border-orange-300 active:scale-[0.99] transition-all cursor-pointer"
+        >
+          <!-- Top Row: Large 64x64 Realistic Graphic + Level Meta, Bookmark & Title -->
+          <div class="flex items-start gap-3.5">
+            <!-- Prominent 64x64 Mathematical Instrument Graphic -->
+            <div class="shrink-0 transition-transform duration-200 group-hover:scale-105">
+              ${tool.graphic}
+            </div>
+
+            <div class="flex-1 min-w-0">
+              <div class="flex items-center justify-between gap-2">
+                <div class="flex items-center gap-1.5 min-w-0">
+                  <span class="text-[11px] font-bold text-slate-500 truncate">${tool.levelName}</span>
+                  ${tool.popular ? `<span class="shrink-0 text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200/80 px-1.5 py-0.2 rounded-md">Popular</span>` : ''}
+                </div>
+
+                <!-- Bookmark Toggle Button -->
+                <button
+                  type="button"
+                  onclick="toggleBookmark(event, ${tool.id})"
+                  aria-label="${isSaved ? 'Remove bookmark' : 'Bookmark tool'}"
+                  class="shrink-0 p-1.5 -mr-1 -mt-1 rounded-xl hover:bg-amber-50 text-slate-400 hover:text-amber-500 transition"
+                >
+                  <svg class="w-4 h-4 ${isSaved ? 'text-amber-500 fill-amber-400' : ''}" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M11.48 3.499a.562.562 0 011.04 0l2.125 5.111a.563.563 0 00.475.345l5.518.442c.499.04.701.663.321.988l-4.204 3.602a.563.563 0 00-.182.557l1.285 5.385a.562.562 0 01-.84.61l-4.725-2.885a.563.563 0 00-.586 0L6.982 20.54a.562.562 0 01-.84-.61l1.285-5.386a.562.562 0 00-.182-.557l-4.204-3.602a.563.563 0 01.321-.988l5.518-.442a.563.563 0 00.475-.345L11.48 3.5z" />
+                  </svg>
+                </button>
+              </div>
+
+              <h2 class="mt-1 text-[15px] font-extrabold text-slate-900 group-hover:text-orange-600 transition-colors leading-snug">
+                ${tool.title}
+              </h2>
+
+              <!-- Plain-English Use Case Helper -->
+              <p class="text-[11px] font-medium text-slate-500 mt-1">
+                ${tool.useCase}
+              </p>
+            </div>
+          </div>
+
+          <!-- Description -->
+          <p class="text-xs text-slate-600 leading-relaxed mt-3 line-clamp-2">
+            ${tool.description}
+          </p>
+
+          <!-- Card Footer: Typeset Mathematical Graphic Badge + Clear Action Button -->
+          <div class="mt-3.5 pt-3 border-t border-slate-100 flex items-center justify-between gap-2">
+            <div class="bg-slate-50/90 border border-slate-200/80 px-2.5 py-1.5 rounded-xl overflow-hidden">
+              ${tool.formulaGraphic}
+            </div>
+            <span class="shrink-0 inline-flex items-center gap-1 bg-orange-600/10 group-hover:bg-orange-600 text-orange-700 group-hover:text-white px-3 py-1.5 rounded-xl text-xs font-bold transition-colors">
+              Try & Open
+              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2.4" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M13 7l5 5m0 0l-5 5m5-5H6" />
+              </svg>
+            </span>
+          </div>
+        </article>
+      `}).join('');
+    }
+
+    function selectCategory(catId) {
+      activeCategory = catId;
+      renderCategories();
+      renderTools();
+    }
+
+    function quickSearch(term) {
+      searchQuery = term;
+      searchInput.value = term;
+      clearSearchBtn.classList.remove('hidden');
+      renderTools();
+    }
+
+    // Search Handling
+    const searchInput = document.getElementById('searchInput');
+    const clearSearchBtn = document.getElementById('clearSearchBtn');
+
+    searchInput.addEventListener('input', (e) => {
+      searchQuery = e.target.value;
+      clearSearchBtn.classList.toggle('hidden', searchQuery.length === 0);
+      renderTools();
+    });
+
+    function clearSearch() {
+      searchQuery = '';
+      searchInput.value = '';
+      clearSearchBtn.classList.add('hidden');
+      renderTools();
+    }
+
+    function resetFilters() {
+      activeCategory = 'all';
+      showSavedOnly = false;
+      updateSavedBadge();
+      clearSearch();
+      renderCategories();
+    }
+
+    // Interactive Quick-Preview Bottom Sheet Modal
+    function openSolverModal(toolId) {
+      const tool = mathTools.find(t => t.id === toolId);
+      if (!tool) return;
+      currentModalTool = tool;
+
+      document.getElementById('modalIconBox').innerHTML = tool.graphic;
+      document.getElementById('modalLevel').textContent = `${tool.levelName} · Tool #${tool.id}`;
+      document.getElementById('modalTitle').textContent = tool.title;
+      document.getElementById('modalUseCase').textContent = tool.useCase;
+      document.getElementById('quickInput').value = tool.sampleInput;
+      document.getElementById('quickOutput').textContent = `Answer: ${tool.sampleOutput}`;
+
+      document.getElementById('solverModal').classList.remove('hidden');
+    }
+
+    function resetSampleInput() {
+      if (!currentModalTool) return;
+      document.getElementById('quickInput').value = currentModalTool.sampleInput;
+      document.getElementById('quickOutput').textContent = `Answer: ${currentModalTool.sampleOutput}`;
+    }
+
+    function insertSymbol(sym) {
+      const input = document.getElementById('quickInput');
+      const start = input.selectionStart || input.value.length;
+      const end = input.selectionEnd || input.value.length;
+      input.value = input.value.slice(0, start) + sym + input.value.slice(end);
+      input.focus();
+      input.setSelectionRange(start + sym.length, start + sym.length);
+    }
+
+    function closeModal() {
+      document.getElementById('solverModal').classList.add('hidden');
+    }
+
+    function runQuickSolve() {
+      const inputVal = document.getElementById('quickInput').value.trim();
+      const outputEl = document.getElementById('quickOutput');
+      if (!inputVal) {
+        outputEl.textContent = 'Please enter a valid mathematical expression.';
+        return;
+      }
+      if (currentModalTool && inputVal === currentModalTool.sampleInput) {
+        outputEl.textContent = `Answer: ${currentModalTool.sampleOutput}`;
+      } else {
+        outputEl.textContent = `Ready to solve "${inputVal}" — tap Open Full Step-by-Step Solver below for complete working.`;
+      }
+    }
+
+    // Toast Helper
+    let toastTimer;
+    function showToast(msg) {
+      const toast = document.getElementById('toast');
+      document.getElementById('toastText').textContent = msg;
+      toast.classList.remove('opacity-0');
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => {
+        toast.classList.add('opacity-0');
+      }, 2400);
+    }
+
+    // Initialize UI
+    updateSavedBadge();
+    renderCategories();
+    renderTools();
+  </script>
+</body>
+</html>
+```

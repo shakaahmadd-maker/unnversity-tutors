@@ -15,6 +15,7 @@ import {
   studentTPdf,
 } from '../../../utils/mathEngine';
 import { MathWorkspaceBar, fmtNum } from './MathWorkspaceHeader';
+import { MathFormula, MathText } from './MathTypeset';
 
 // ============================================================================
 // TOOL 19: DESCRIPTIVE STATISTICS, QUARTILES & BOX-PLOT GENERATOR
@@ -147,7 +148,7 @@ export const DescriptiveStatisticsBoxplot: React.FC = () => {
         modeLabel={stats.ok ? `Sample n = ${stats.n}` : ''}
       />
 
-      <div className="p-6 grid grid-cols-1 lg:grid-cols-12 gap-6">
+      <div className="p-4 sm:p-6 grid grid-cols-1 lg:grid-cols-12 gap-5 sm:gap-6">
         <div className="lg:col-span-5 space-y-4">
           <div>
             <label className="block text-xs font-semibold text-gray-700 mb-1">
@@ -162,27 +163,37 @@ export const DescriptiveStatisticsBoxplot: React.FC = () => {
           </div>
 
           {stats.ok ? (
-            <div className="p-5 rounded-2xl bg-[#FFF7ED] border border-orange-200 grid grid-cols-2 gap-3 text-xs font-mono tabular-nums">
+            <div className="p-4 sm:p-5 rounded-2xl bg-[#FFF7ED] border border-orange-200 grid grid-cols-2 gap-3 text-xs font-mono tabular-nums">
               <div>
-                <span className="font-sans text-[#EA580C] font-semibold block">Sample Mean (x̄)</span>
+                <span className="font-sans text-[#EA580C] font-semibold block">
+                  Sample Mean (<MathFormula latex="\bar{x}" />)
+                </span>
                 <span className="text-lg font-bold text-gray-900">{fmtNum(stats.mean, 4)}</span>
               </div>
               <div>
-                <span className="font-sans text-[#EA580C] font-semibold block">Median (Q₂)</span>
+                <span className="font-sans text-[#EA580C] font-semibold block">
+                  Median (<MathFormula latex="Q_2" />)
+                </span>
                 <span className="text-lg font-bold text-gray-900">{fmtNum(stats.median, 4)}</span>
               </div>
               <div>
-                <span className="font-sans text-gray-500 block">Sample SD (s) / Var (s²)</span>
+                <span className="font-sans text-gray-500 block">
+                  Sample SD (<MathFormula latex="s" />) / Var (<MathFormula latex="s^2" />)
+                </span>
                 <span className="font-bold text-gray-900">
                   {fmtNum(stats.sampleSd, 4)} / {fmtNum(stats.sampleVar, 3)}
                 </span>
               </div>
               <div>
-                <span className="font-sans text-gray-500 block">Population SD (σ)</span>
+                <span className="font-sans text-gray-500 block">
+                  Population SD (<MathFormula latex="\sigma" />)
+                </span>
                 <span className="font-bold text-gray-900">{fmtNum(stats.popSd, 4)}</span>
               </div>
               <div>
-                <span className="font-sans text-gray-500 block">Quartiles Q₁ / Q₃ (IQR)</span>
+                <span className="font-sans text-gray-500 block">
+                  Quartiles <MathFormula latex="Q_1 / Q_3" /> (IQR)
+                </span>
                 <span className="font-bold text-gray-900">
                   {fmtNum(stats.q1, 2)} / {fmtNum(stats.q3, 2)} ({fmtNum(stats.iqr, 2)})
                 </span>
@@ -487,7 +498,7 @@ export const ProbabilityDistributionExplorer: React.FC = () => {
         modeLabel={dist.toUpperCase()}
       />
 
-      <div className="p-6 grid grid-cols-1 lg:grid-cols-12 gap-6">
+      <div className="p-4 sm:p-6 grid grid-cols-1 lg:grid-cols-12 gap-5 sm:gap-6">
         <div className="lg:col-span-5 space-y-4">
           <div className="flex flex-wrap gap-1.5">
             {(
@@ -523,7 +534,7 @@ export const ProbabilityDistributionExplorer: React.FC = () => {
                     setXVal('12.59');
                   }
                 }}
-                className={`px-3 py-1.5 text-xs font-semibold rounded-lg border ${
+                className={`px-3 py-2 min-h-[38px] text-xs font-semibold rounded-lg border cursor-pointer ${
                   dist === d.id
                     ? 'bg-[#F97316] text-white border-[#F97316]'
                     : 'bg-[#F9FAFB] text-gray-700 border-gray-200'
@@ -579,18 +590,24 @@ export const ProbabilityDistributionExplorer: React.FC = () => {
             </div>
           </div>
 
-          <div className="p-5 rounded-2xl bg-[#FFF7ED] border border-orange-200 space-y-2 text-xs font-mono tabular-nums">
+          <div className="p-4 sm:p-5 rounded-2xl bg-[#FFF7ED] border border-orange-200 space-y-2.5 text-xs tabular-nums">
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <span className="font-sans font-semibold text-[#EA580C] block">Left Tail P(X ≤ {prob.x})</span>
-                <span className="text-xl font-bold text-gray-900">{fmtNum(prob.cdf, 5)}</span>
+                <span className="font-sans font-semibold text-[#EA580C] block mb-0.5">
+                  Left Tail <MathFormula latex={`P(X \\le ${prob.x})`} />
+                </span>
+                <span className="text-xl font-bold font-mono text-gray-900">{fmtNum(prob.cdf, 5)}</span>
               </div>
               <div>
-                <span className="font-sans font-semibold text-gray-600 block">Right Tail P(X ≥ {prob.x})</span>
-                <span className="text-xl font-bold text-gray-900">{fmtNum(prob.upper, 5)}</span>
+                <span className="font-sans font-semibold text-gray-600 block mb-0.5">
+                  Right Tail <MathFormula latex={`P(X \\ge ${prob.x})`} />
+                </span>
+                <span className="text-xl font-bold font-mono text-gray-900">{fmtNum(prob.upper, 5)}</span>
               </div>
             </div>
-            <div className="pt-2 border-t border-orange-200/70 text-gray-700">{prob.extra}</div>
+            <div className="pt-2 border-t border-orange-200/70 text-gray-800">
+              <MathText text={prob.extra} />
+            </div>
           </div>
         </div>
 
@@ -819,10 +836,10 @@ export const HypothesisTestingSuite: React.FC = () => {
         modeLabel={`α = ${alpha}`}
       />
 
-      <div className="p-6 grid grid-cols-1 lg:grid-cols-12 gap-6">
+      <div className="p-4 sm:p-6 grid grid-cols-1 lg:grid-cols-12 gap-5 sm:gap-6">
         <div className="lg:col-span-6 space-y-4">
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <div className="flex flex-wrap gap-1">
+            <div className="flex flex-wrap gap-1.5">
               {(
                 [
                   { id: 't1', lbl: '1-Sample t' },
@@ -836,7 +853,7 @@ export const HypothesisTestingSuite: React.FC = () => {
                   key={t.id}
                   type="button"
                   onClick={() => setTestKind(t.id)}
-                  className={`px-3 py-1.5 text-xs font-semibold rounded-lg border ${
+                  className={`px-3 py-2 min-h-[38px] text-xs font-semibold rounded-lg border cursor-pointer ${
                     testKind === t.id
                       ? 'bg-[#F97316] text-white border-[#F97316]'
                       : 'bg-[#F9FAFB] text-gray-700 border-gray-200'
@@ -981,9 +998,11 @@ export const HypothesisTestingSuite: React.FC = () => {
         </div>
 
         <div className="lg:col-span-6 space-y-4">
-          <div className="p-5 rounded-2xl bg-[#FFF7ED] border border-orange-200 space-y-3 font-mono text-xs tabular-nums">
-            <div className="flex items-center justify-between">
-              <span className="font-sans font-semibold text-[#EA580C]">Statistical Decision (α = {res.alpha})</span>
+          <div className="p-4 sm:p-5 rounded-2xl bg-[#FFF7ED] border border-orange-200 space-y-3 text-xs tabular-nums">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <span className="font-sans font-semibold text-[#EA580C]">
+                Statistical Decision (<MathFormula latex={`\\alpha = ${res.alpha}`} />)
+              </span>
               <span
                 className={`px-2.5 py-1 rounded-md font-sans font-bold ${
                   res.reject ? 'bg-orange-600 text-white' : 'bg-gray-900 text-white'
@@ -993,13 +1012,15 @@ export const HypothesisTestingSuite: React.FC = () => {
               </span>
             </div>
 
-            <div className="grid grid-cols-3 gap-3 pt-2">
+            <div className="grid grid-cols-3 gap-3 pt-2 font-mono">
               <div className="p-3 bg-white rounded-xl border border-orange-200/80">
                 <span className="font-sans text-gray-500 block">Statistic ({res.statName})</span>
                 <span className="text-lg font-bold text-gray-900">{fmtNum(res.stat, 4)}</span>
               </div>
               <div className="p-3 bg-white rounded-xl border border-orange-200/80">
-                <span className="font-sans text-gray-500 block">Exact p-Value</span>
+                <span className="font-sans text-gray-500 block">
+                  Exact <MathFormula latex="p" />-Value
+                </span>
                 <span className="text-lg font-bold text-[#EA580C]">{fmtNum(res.pVal, 5)}</span>
               </div>
               <div className="p-3 bg-white rounded-xl border border-orange-200/80">
@@ -1010,7 +1031,7 @@ export const HypothesisTestingSuite: React.FC = () => {
 
             <div className="pt-2 border-t border-orange-200/70 text-gray-800">
               <span className="font-sans text-gray-500">Confidence / Summary: </span>
-              <strong>{res.ciStr}</strong>
+              <MathText text={res.ciStr} className="font-semibold" />
             </div>
           </div>
         </div>
@@ -1048,6 +1069,7 @@ export const RegressionCurveFittingAnalyzer: React.FC = () => {
 
     let evalHat = (x: number) => x;
     let eqStr = '';
+    let eqLatex = '';
 
     if (model === 'linear') {
       const meanX = pts.reduce((s, p) => s + p.x, 0) / n;
@@ -1057,6 +1079,7 @@ export const RegressionCurveFittingAnalyzer: React.FC = () => {
       const b0 = meanY - b1 * meanX;
       evalHat = (x) => b0 + b1 * x;
       eqStr = `ŷ = ${fmtNum(b0, 4)} ${b1 >= 0 ? '+' : '−'} ${fmtNum(Math.abs(b1), 4)}x`;
+      eqLatex = `\\hat{y} = ${fmtNum(b0, 4)} ${b1 >= 0 ? '+' : '-'} ${fmtNum(Math.abs(b1), 4)}x`;
     } else if (model === 'quadratic') {
       // Normal equations for b0 + b1*x + b2*x^2
       const s = (k: number) => pts.reduce((acc, p) => acc + p.x ** k, 0);
@@ -1070,6 +1093,9 @@ export const RegressionCurveFittingAnalyzer: React.FC = () => {
       const [b0, b1, b2] = [rref[0][3], rref[1][3], rref[2][3]];
       evalHat = (x) => b0 + b1 * x + b2 * x * x;
       eqStr = `ŷ = ${fmtNum(b2, 4)}x² + (${fmtNum(b1, 4)})x + (${fmtNum(b0, 4)})`;
+      eqLatex = `\\hat{y} = ${fmtNum(b2, 4)}x^2 ${b1 >= 0 ? '+' : '-'} ${fmtNum(Math.abs(b1), 4)}x ${
+        b0 >= 0 ? '+' : '-'
+      } ${fmtNum(Math.abs(b0), 4)}`;
     } else {
       // Exponential y = a * exp(b*x) -> ln(y) = ln(a) + b*x
       const posPts = pts.filter((p) => p.y > 0);
@@ -1081,6 +1107,7 @@ export const RegressionCurveFittingAnalyzer: React.FC = () => {
       const a = Math.exp(mly - b * mx);
       evalHat = (x) => a * Math.exp(b * x);
       eqStr = `ŷ = ${fmtNum(a, 4)} · e^(${fmtNum(b, 4)}x)`;
+      eqLatex = `\\hat{y} = ${fmtNum(a, 4)}\\,e^{${fmtNum(b, 4)}x}`;
     }
 
     const ssTot = pts.reduce((s, p) => s + (p.y - meanY) ** 2, 0);
@@ -1091,7 +1118,7 @@ export const RegressionCurveFittingAnalyzer: React.FC = () => {
     const x0 = Number(predX) || 0;
     const yPred = evalHat(x0);
 
-    return { ok: true as const, pts, eqStr, r2, rmse, residuals, evalHat, x0, yPred };
+    return { ok: true as const, pts, eqStr, eqLatex, r2, rmse, residuals, evalHat, x0, yPred };
   }, [pairsRaw, model, predX]);
 
   const W = 480;
@@ -1141,7 +1168,7 @@ export const RegressionCurveFittingAnalyzer: React.FC = () => {
         modeLabel={reg.ok ? `R² = ${fmtNum(reg.r2, 4)}` : ''}
       />
 
-      <div className="p-6 grid grid-cols-1 lg:grid-cols-12 gap-6">
+      <div className="p-4 sm:p-6 grid grid-cols-1 lg:grid-cols-12 gap-5 sm:gap-6">
         <div className="lg:col-span-5 space-y-4">
           <div className="inline-flex p-1 bg-[#F9FAFB] border border-gray-200 rounded-xl">
             {(['linear', 'quadratic', 'exponential'] as const).map((m) => (
@@ -1149,7 +1176,7 @@ export const RegressionCurveFittingAnalyzer: React.FC = () => {
                 key={m}
                 type="button"
                 onClick={() => setModel(m)}
-                className={`px-3.5 py-1.5 text-xs font-semibold rounded-lg capitalize ${
+                className={`px-3.5 py-2 min-h-[38px] text-xs font-semibold rounded-lg capitalize cursor-pointer ${
                   model === m ? 'bg-[#F97316] text-white' : 'text-gray-600'
                 }`}
               >
@@ -1171,7 +1198,9 @@ export const RegressionCurveFittingAnalyzer: React.FC = () => {
           </div>
 
           <div>
-            <label className="block text-xs text-gray-500 mb-1">Predict ŷ at x₀ =</label>
+            <label className="block text-xs text-gray-500 mb-1">
+              Predict <MathFormula latex="\hat{y}" /> at <MathFormula latex="x_0 =" />
+            </label>
             <input
               type="number"
               step="any"
@@ -1182,12 +1211,14 @@ export const RegressionCurveFittingAnalyzer: React.FC = () => {
           </div>
 
           {reg.ok && (
-            <div className="p-4 rounded-2xl bg-[#FFF7ED] border border-orange-200 space-y-2 text-xs font-mono tabular-nums">
-              <span className="font-sans font-semibold text-[#EA580C] block">Best-Fit Model</span>
-              <div className="text-sm font-bold text-gray-900">{reg.eqStr}</div>
-              <div className="grid grid-cols-3 gap-2 pt-2 border-t border-orange-200/70">
+            <div className="p-4 rounded-2xl bg-[#FFF7ED] border border-orange-200 space-y-2 text-xs tabular-nums">
+              <span className="font-sans font-semibold text-[#EA580C] block">Best-Fit Least-Squares Equation</span>
+              <div className="px-3 py-2 rounded-xl bg-white/90 border border-orange-200/70 text-sm font-bold text-gray-900">
+                <MathFormula latex={reg.eqLatex} displayMode />
+              </div>
+              <div className="grid grid-cols-3 gap-2 pt-2 border-t border-orange-200/70 font-mono">
                 <div>
-                  <span className="font-sans text-gray-500 block">R²</span>
+                  <span className="font-sans text-gray-500 block"><MathFormula latex="R^2" /></span>
                   <span className="font-bold text-gray-900">{fmtNum(reg.r2, 5)}</span>
                 </div>
                 <div>
@@ -1195,7 +1226,9 @@ export const RegressionCurveFittingAnalyzer: React.FC = () => {
                   <span className="font-bold text-gray-900">{fmtNum(reg.rmse, 4)}</span>
                 </div>
                 <div>
-                  <span className="font-sans text-gray-500 block">ŷ({reg.x0})</span>
+                  <span className="font-sans text-gray-500 block">
+                    <MathFormula latex={`\\hat{y}(${reg.x0})`} />
+                  </span>
                   <span className="font-bold text-[#EA580C]">{fmtNum(reg.yPred, 4)}</span>
                 </div>
               </div>
@@ -1305,7 +1338,7 @@ export const CombinatoricsPermutationsCalculator: React.FC = () => {
         modeLabel={`n = ${comb.n}, r = ${comb.r}`}
       />
 
-      <div className="p-6 grid grid-cols-1 lg:grid-cols-12 gap-6">
+      <div className="p-4 sm:p-6 grid grid-cols-1 lg:grid-cols-12 gap-5 sm:gap-6">
         <div className="lg:col-span-5 space-y-4">
           <div className="p-4 rounded-xl bg-[#F9FAFB] border border-gray-200 grid grid-cols-2 gap-3">
             <div>
@@ -1332,26 +1365,38 @@ export const CombinatoricsPermutationsCalculator: React.FC = () => {
             </div>
           </div>
 
-          <div className="p-5 rounded-2xl bg-[#FFF7ED] border border-orange-200 grid grid-cols-2 gap-3 text-xs font-mono tabular-nums">
+          <div className="p-4 sm:p-5 rounded-2xl bg-[#FFF7ED] border border-orange-200 grid grid-cols-2 gap-3 text-xs tabular-nums">
             <div>
-              <span className="font-sans font-semibold text-[#EA580C] block">Combinations C(n, r)</span>
-              <span className="text-2xl font-bold text-gray-900">{comb.ncr.toLocaleString()}</span>
+              <span className="font-sans font-semibold text-[#EA580C] block mb-0.5">
+                Combinations <MathFormula latex={`\\binom{${comb.n}}{${comb.r}}`} />
+              </span>
+              <span className="font-mono text-2xl font-bold text-gray-900">{comb.ncr.toLocaleString()}</span>
             </div>
             <div>
-              <span className="font-sans font-semibold text-[#EA580C] block">Permutations P(n, r)</span>
-              <span className="text-2xl font-bold text-gray-900">{comb.npr.toLocaleString()}</span>
+              <span className="font-sans font-semibold text-[#EA580C] block mb-0.5">
+                Permutations <MathFormula latex={`_{${comb.n}}P_{${comb.r}}`} />
+              </span>
+              <span className="font-mono text-2xl font-bold text-gray-900">{comb.npr.toLocaleString()}</span>
             </div>
             <div className="pt-2 border-t border-orange-200/70">
-              <span className="font-sans text-gray-500 block">With Repetition (n^r)</span>
-              <span className="font-bold text-gray-900">{comb.permRep.toLocaleString()}</span>
+              <span className="font-sans text-gray-500 block mb-0.5">
+                With Repetition (<MathFormula latex="n^r" />)
+              </span>
+              <span className="font-mono font-bold text-gray-900">{comb.permRep.toLocaleString()}</span>
             </div>
             <div className="pt-2 border-t border-orange-200/70">
-              <span className="font-sans text-gray-500 block">Stars & Bars C(n+r−1, r)</span>
-              <span className="font-bold text-gray-900">{comb.starsBars.toLocaleString()}</span>
+              <span className="font-sans text-gray-500 block mb-0.5">
+                Stars & Bars <MathFormula latex="\binom{n+r-1}{r}" />
+              </span>
+              <span className="font-mono font-bold text-gray-900">{comb.starsBars.toLocaleString()}</span>
             </div>
             <div className="col-span-2 pt-2 border-t border-orange-200/70">
-              <span className="font-sans text-gray-500 block">Binomial Expansion (a + b)^{Math.min(comb.n, 9)}</span>
-              <span className="text-gray-900 break-all">{comb.binomialTerms}</span>
+              <span className="font-sans text-gray-500 block mb-1">
+                Binomial Expansion <MathFormula latex={`(a + b)^{${Math.min(comb.n, 9)}}`} />
+              </span>
+              <div className="px-3 py-2 rounded-xl bg-white/90 border border-orange-200/70 text-gray-900">
+                <MathFormula expr={comb.binomialTerms} displayMode />
+              </div>
             </div>
           </div>
         </div>
