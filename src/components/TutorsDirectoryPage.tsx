@@ -523,7 +523,7 @@ export default function TutorsDirectoryPage({
                 onNavigate('home');
               }
             }}
-            className="inline-flex items-center gap-2 text-xs font-bold text-slate-700 bg-slate-50 hover:bg-orange-50 hover:text-orange-600 px-4 py-3 rounded-2xl border border-slate-200/80 transition-all cursor-pointer self-start md:self-auto shrink-0 shadow-xs"
+            className="inline-flex items-center gap-2 text-xs font-bold text-slate-700 bg-slate-50 hover:bg-orange-50 hover:text-orange-600 px-4 py-3 min-h-[44px] rounded-2xl border border-slate-200/80 transition-all cursor-pointer self-start md:self-auto shrink-0 shadow-xs"
           >
             <ArrowLeft className="w-4 h-4 text-[#FF7A00]" />
             <span>Return to Home</span>
@@ -537,7 +537,7 @@ export default function TutorsDirectoryPage({
           </span>
           <button
             onClick={() => setShowMobileFilters(!showMobileFilters)}
-            className="flex items-center gap-1.5 bg-[#FF7A00] text-white text-xs font-bold px-3.5 py-2 rounded-xl shadow-xs"
+            className="flex items-center gap-1.5 bg-[#FF7A00] text-white text-xs font-bold px-3.5 py-2 min-h-[44px] rounded-xl shadow-xs"
           >
             <Filter className="w-3.5 h-3.5" />
             <span>{showMobileFilters ? 'Hide Filters' : 'Filter & Search'}</span>
@@ -559,7 +559,7 @@ export default function TutorsDirectoryPage({
                 {(selectedCountry !== 'all' || selectedSubject !== 'All Subjects' || maxPrice < MAX_PRICE_LIMIT || searchTerm) && (
                   <button
                     onClick={clearAllFilters}
-                    className="text-xs font-bold text-[#FF7A00] hover:underline cursor-pointer"
+                    className="touch-target-expand min-h-[44px] px-2 text-xs font-bold text-[#FF7A00] hover:underline cursor-pointer"
                   >
                     Reset All
                   </button>
@@ -581,12 +581,13 @@ export default function TutorsDirectoryPage({
                       setSearchTerm(e.target.value);
                       setCurrentPage(1);
                     }}
-                    className="w-full pl-9 pr-8 py-2.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:border-[#FF7A00] focus:bg-white outline-none font-medium transition-all"
+                    className="w-full pl-9 pr-11 py-2.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:border-[#FF7A00] focus:bg-white outline-none font-medium transition-all"
                   />
                   {searchTerm && (
                     <button 
                       onClick={() => setSearchTerm('')}
-                      className="absolute right-2.5 top-2.5 text-slate-400 hover:text-slate-600 p-0.5"
+                      aria-label="Clear tutor search"
+                      className="absolute right-0 top-1/2 -translate-y-1/2 w-11 h-11 min-w-[44px] min-h-[44px] inline-flex items-center justify-center text-slate-400 hover:text-slate-600 cursor-pointer"
                     >
                       <X className="w-3.5 h-3.5" />
                     </button>
@@ -610,7 +611,7 @@ export default function TutorsDirectoryPage({
                           setSelectedCountry(c.value);
                           setCurrentPage(1);
                         }}
-                        className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-medium transition-all text-left cursor-pointer ${
+                        className={`w-full flex items-center justify-between px-3 py-2 min-h-[44px] rounded-xl text-xs font-medium transition-all text-left cursor-pointer ${
                           isSelected 
                             ? 'bg-orange-50 text-[#FF7A00] font-bold border border-orange-200 shadow-xs' 
                             : 'hover:bg-slate-50 text-slate-700'
@@ -718,7 +719,7 @@ export default function TutorsDirectoryPage({
                       setPageSize(0);
                       setCurrentPage(1);
                     }}
-                    className="compact-inline-link text-[11px] font-bold text-[#FF7A00] bg-orange-50 hover:bg-orange-100 border border-orange-200 px-2.5 py-1 rounded-lg cursor-pointer transition-colors"
+                    className="compact-inline-link touch-target-expand text-[11px] font-bold text-[#FF7A00] bg-orange-50 hover:bg-orange-100 border border-orange-200 px-2.5 py-1 rounded-lg cursor-pointer transition-colors"
                   >
                     Show All {sortedTutors.length} Tutors
                   </button>
@@ -835,7 +836,7 @@ export default function TutorsDirectoryPage({
                               onSelectTutorProfile(tutor);
                             }
                           }}
-                          className="relative shrink-0 cursor-pointer block"
+                          className="relative w-20 h-20 shrink-0 cursor-pointer block"
                         >
                           <ResponsiveAvatar
                             src={tutor.avatarUrl || (tutor as any).profileImageUrl}
@@ -970,14 +971,14 @@ export default function TutorsDirectoryPage({
                               onSelectTutorProfile(tutor);
                             }
                           }}
-                          className="flex-1 py-2.5 px-3 rounded-xl border border-slate-200 hover:border-slate-300 bg-white text-slate-700 hover:text-slate-950 text-xs font-bold transition-all text-center flex items-center justify-center gap-1 shadow-2xs cursor-pointer active:scale-[0.98]"
+                          className="flex-1 min-h-[44px] py-2.5 px-3 rounded-xl border border-slate-200 hover:border-slate-300 bg-white text-slate-700 hover:text-slate-950 text-xs font-bold transition-all text-center flex items-center justify-center gap-1 shadow-2xs cursor-pointer active:scale-[0.98]"
                         >
                           <span>Full Profile</span>
                           <span className="text-[11px]">↗</span>
                         </a>
                         <button
                           onClick={() => onOpenChat(tutor.id)}
-                          className="flex-[1.4] py-2.5 px-4 rounded-xl bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 active:scale-[0.98] text-white text-xs font-bold shadow-md shadow-orange-500/25 transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                          className="flex-[1.4] min-h-[44px] py-2.5 px-4 rounded-xl bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 active:scale-[0.98] text-white text-xs font-bold shadow-md shadow-orange-500/25 transition-all flex items-center justify-center gap-1.5 cursor-pointer"
                         >
                           <span>Request Session</span>
                           <ChevronRight className="w-4 h-4 stroke-[2.5]" />
@@ -998,7 +999,7 @@ export default function TutorsDirectoryPage({
                               onSelectTutorProfile(tutor);
                             }
                           }}
-                          className="relative shrink-0 cursor-pointer block"
+                          className="relative w-20 h-20 sm:w-24 sm:h-24 shrink-0 cursor-pointer block"
                         >
                           <ResponsiveAvatar
                             src={tutor.avatarUrl || (tutor as any).profileImageUrl}
@@ -1110,7 +1111,7 @@ export default function TutorsDirectoryPage({
                                     <button
                                       key={sIdx}
                                       onClick={() => setSelectedSubject(sub)}
-                                      className={`text-[11px] px-2.5 py-1 rounded-lg border font-medium transition-all cursor-pointer ${
+                                      className={`compact-inline-link touch-target-expand text-[11px] px-2.5 py-1 rounded-lg border font-medium transition-all cursor-pointer ${
                                         isHighlighted
                                           ? 'bg-[#FF7A00] text-white border-[#FF7A00] font-bold shadow-xs'
                                           : 'bg-white hover:bg-orange-50 text-slate-700 border-slate-200 hover:border-orange-300'
@@ -1150,14 +1151,14 @@ export default function TutorsDirectoryPage({
                                   onSelectTutorProfile(tutor);
                                 }
                               }}
-                              className="text-xs font-bold text-slate-600 hover:text-[#FF7A00] transition-colors cursor-pointer"
+                              className="touch-target-expand inline-flex items-center text-xs font-bold text-slate-600 hover:text-[#FF7A00] transition-colors cursor-pointer"
                             >
                               View Full Profile &amp; Research Portfolio →
                             </a>
 
                             <button
                               onClick={() => onOpenChat(tutor.id)}
-                              className="bg-[#FF7A00] hover:bg-[#e06c00] active:scale-95 text-white text-xs font-bold px-5 py-2.5 rounded-xl transition-all shadow-md shadow-orange-500/20 cursor-pointer flex items-center gap-1.5"
+                              className="bg-[#FF7A00] hover:bg-[#e06c00] active:scale-95 text-white text-xs font-bold px-5 py-2.5 min-h-[44px] rounded-xl transition-all shadow-md shadow-orange-500/20 cursor-pointer flex items-center gap-1.5"
                             >
                               <span>Request Session</span>
                               <ChevronRight className="w-3.5 h-3.5 stroke-[2.5]" />
@@ -1184,7 +1185,7 @@ export default function TutorsDirectoryPage({
                   </p>
                   <button
                     onClick={clearAllFilters}
-                    className="bg-[#FF7A00] hover:bg-[#e06c00] text-white font-bold text-xs px-5 py-2.5 rounded-xl cursor-pointer shadow-xs transition-all"
+                    className="bg-[#FF7A00] hover:bg-[#e06c00] text-white font-bold text-xs px-5 py-2.5 min-h-[44px] rounded-xl cursor-pointer shadow-xs transition-all"
                   >
                     Reset All Filters
                   </button>
@@ -1202,7 +1203,7 @@ export default function TutorsDirectoryPage({
                     setCurrentPage(prev => Math.max(prev - 1, 1));
                     window.scrollTo({ top: 120, behavior: 'smooth' });
                   }}
-                  className={`flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-bold border transition-all ${
+                  className={`flex items-center gap-1 px-3 py-1.5 min-h-[44px] rounded-xl text-xs font-bold border transition-all ${
                     safeCurrentPage === 1
                       ? 'text-slate-300 border-slate-150 cursor-not-allowed'
                       : 'text-slate-700 border-slate-200 hover:bg-slate-50 cursor-pointer'
@@ -1222,7 +1223,7 @@ export default function TutorsDirectoryPage({
                     setCurrentPage(prev => Math.min(prev + 1, totalPages));
                     window.scrollTo({ top: 120, behavior: 'smooth' });
                   }}
-                  className={`flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-bold border transition-all ${
+                  className={`flex items-center gap-1 px-3 py-1.5 min-h-[44px] rounded-xl text-xs font-bold border transition-all ${
                     safeCurrentPage === totalPages
                       ? 'text-slate-300 border-slate-150 cursor-not-allowed'
                       : 'text-slate-700 border-slate-200 hover:bg-slate-50 cursor-pointer'

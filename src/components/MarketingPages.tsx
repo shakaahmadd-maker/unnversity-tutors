@@ -76,50 +76,98 @@ function MarketingPages({
   useEffect(() => {
     if (activeView !== 'home' || shouldLoadPillars) return;
     const node = pillarsSentinelRef.current;
-    if (!node || typeof IntersectionObserver === 'undefined') {
-      const t = window.setTimeout(() => setShouldLoadPillars(true), 250);
-      return () => window.clearTimeout(t);
-    }
-    const fallbackTimer = window.setTimeout(() => setShouldLoadPillars(true), 250);
-    const observer = new IntersectionObserver(
-      (entries) => {
-        if (entries.some((entry) => entry.isIntersecting)) {
-          setShouldLoadPillars(true);
-          window.clearTimeout(fallbackTimer);
-          observer.disconnect();
+    let timerId: number | null = null;
+    let idleId: number | null = null;
+    const w = window as Window & {
+      requestIdleCallback?: (cb: () => void, opts?: { timeout: number }) => number;
+      cancelIdleCallback?: (id: number) => void;
+    };
+
+    const mount = () => setShouldLoadPillars(true);
+    const scheduleIdle = () => {
+      timerId = window.setTimeout(() => {
+        if (typeof w.requestIdleCallback === 'function') {
+          idleId = w.requestIdleCallback(mount, { timeout: 2000 });
+        } else {
+          mount();
         }
-      },
-      { rootMargin: '750px 0px' }
-    );
-    observer.observe(node);
+      }, 1200);
+    };
+
+    if (document.readyState === 'complete') {
+      scheduleIdle();
+    } else {
+      window.addEventListener('load', scheduleIdle, { once: true });
+    }
+
+    let observer: IntersectionObserver | null = null;
+    if (node && typeof IntersectionObserver !== 'undefined') {
+      observer = new IntersectionObserver(
+        (entries) => {
+          if (entries.some((entry) => entry.isIntersecting)) {
+            mount();
+            observer?.disconnect();
+          }
+        },
+        { rootMargin: '850px 0px' }
+      );
+      observer.observe(node);
+    }
+
     return () => {
-      window.clearTimeout(fallbackTimer);
-      observer.disconnect();
+      window.removeEventListener('load', scheduleIdle);
+      if (timerId !== null) window.clearTimeout(timerId);
+      if (idleId !== null && typeof w.cancelIdleCallback === 'function') w.cancelIdleCallback(idleId);
+      observer?.disconnect();
     };
   }, [activeView, shouldLoadPillars]);
 
   useEffect(() => {
     if (activeView !== 'home' || shouldLoadBelowFold) return;
     const node = belowFoldSentinelRef.current;
-    if (!node || typeof IntersectionObserver === 'undefined') {
-      const t = window.setTimeout(() => setShouldLoadBelowFold(true), 400);
-      return () => window.clearTimeout(t);
-    }
-    const fallbackTimer = window.setTimeout(() => setShouldLoadBelowFold(true), 400);
-    const observer = new IntersectionObserver(
-      (entries) => {
-        if (entries.some((entry) => entry.isIntersecting)) {
-          setShouldLoadBelowFold(true);
-          window.clearTimeout(fallbackTimer);
-          observer.disconnect();
+    let timerId: number | null = null;
+    let idleId: number | null = null;
+    const w = window as Window & {
+      requestIdleCallback?: (cb: () => void, opts?: { timeout: number }) => number;
+      cancelIdleCallback?: (id: number) => void;
+    };
+
+    const mount = () => setShouldLoadBelowFold(true);
+    const scheduleIdle = () => {
+      timerId = window.setTimeout(() => {
+        if (typeof w.requestIdleCallback === 'function') {
+          idleId = w.requestIdleCallback(mount, { timeout: 2000 });
+        } else {
+          mount();
         }
-      },
-      { rootMargin: '600px 0px' }
-    );
-    observer.observe(node);
+      }, 1800);
+    };
+
+    if (document.readyState === 'complete') {
+      scheduleIdle();
+    } else {
+      window.addEventListener('load', scheduleIdle, { once: true });
+    }
+
+    let observer: IntersectionObserver | null = null;
+    if (node && typeof IntersectionObserver !== 'undefined') {
+      observer = new IntersectionObserver(
+        (entries) => {
+          if (entries.some((entry) => entry.isIntersecting)) {
+            mount();
+            observer?.disconnect();
+          }
+        },
+        { rootMargin: '750px 0px' }
+      );
+      observer.observe(node);
+    }
+
     return () => {
-      window.clearTimeout(fallbackTimer);
-      observer.disconnect();
+      window.removeEventListener('load', scheduleIdle);
+      if (timerId !== null) window.clearTimeout(timerId);
+      if (idleId !== null && typeof w.cancelIdleCallback === 'function') w.cancelIdleCallback(idleId);
+      observer?.disconnect();
     };
   }, [activeView, shouldLoadBelowFold]);
 
@@ -141,7 +189,7 @@ function MarketingPages({
     <div id="marketing-pages-view" className="bg-white font-sans text-gray-800">
       {/* ==================== 1. HOME PAGE ==================== */}
       {activeView === 'home' && (
-        <div id="home-section" className="animate-fade-in">
+        <div id="home-section">
           {/* Hero Section */}
           <section className="relative overflow-hidden bg-white py-8 sm:py-14 md:py-20 border-b border-gray-100">
             <div className="container mx-auto px-4 sm:px-6 md:px-8 max-w-7xl flex flex-col lg:flex-row items-center gap-8 lg:gap-12 relative z-10">
@@ -191,18 +239,19 @@ function MarketingPages({
                 </div>
 
                 <div className="pt-4 sm:pt-6 border-t border-gray-100 flex items-center gap-3 sm:gap-4 text-xs font-semibold text-gray-600">
-                  <div className="flex -space-x-1.5 shrink-0">
+                  <div className="flex -space-x-1.5 shrink-0 h-7">
                     {tutors.slice(0, 4).map((t, idx) => (
-                      <ResponsiveAvatar
-                        key={idx}
-                        src={t.avatarUrl}
-                        sizePx={28}
-                        width={28}
-                        height={28}
-                        loading="lazy"
-                        className="w-7 h-7 rounded-full border-2 border-white object-cover"
-                        alt={t.name || 'Tutor Avatar'}
-                      />
+                      <div key={idx} className="w-7 h-7 rounded-full border-2 border-white overflow-hidden bg-slate-100 shrink-0">
+                        <ResponsiveAvatar
+                          src={t.avatarUrl}
+                          sizePx={28}
+                          width={28}
+                          height={28}
+                          loading="lazy"
+                          className="w-full h-full object-cover"
+                          alt={t.name || 'Tutor Avatar'}
+                        />
+                      </div>
                     ))}
                   </div>
                   <div>
@@ -384,7 +433,7 @@ function MarketingPages({
                   fallback={
                     <section
                       id="how-it-works-section"
-                      className="min-h-[560px] bg-white border-b border-gray-100"
+                      className="min-h-[840px] md:min-h-[720px] bg-white border-b border-gray-100"
                       aria-hidden="true"
                     />
                   }
@@ -396,7 +445,7 @@ function MarketingPages({
                   fallback={
                     <section
                       id="four-pillars-section"
-                      className="min-h-[540px] bg-white border-b border-gray-100"
+                      className="min-h-[720px] md:min-h-[600px] bg-white border-b border-gray-100"
                       aria-hidden="true"
                     />
                   }
@@ -408,12 +457,12 @@ function MarketingPages({
               <>
                 <section
                   id="how-it-works-section"
-                  className="min-h-[560px] bg-white border-b border-gray-100"
+                  className="min-h-[840px] md:min-h-[720px] bg-white border-b border-gray-100"
                   aria-hidden="true"
                 />
                 <section
                   id="four-pillars-section"
-                  className="min-h-[540px] bg-white border-b border-gray-100"
+                  className="min-h-[720px] md:min-h-[600px] bg-white border-b border-gray-100"
                   aria-hidden="true"
                 />
               </>
@@ -426,7 +475,7 @@ function MarketingPages({
             id="premium-services-showcase"
           >
             <React.Suspense
-              fallback={<div className="min-h-[760px]" aria-hidden="true" />}
+              fallback={<div className="min-h-[1850px] md:min-h-[2100px]" aria-hidden="true" />}
             >
               {!isMdUp ? (
                 <HomePillarsMobileShowcase
@@ -470,7 +519,7 @@ function MarketingPages({
             {shouldLoadBelowFold ? (
               <React.Suspense
                 fallback={
-                  <div className="min-h-[1200px] bg-amber-50/20 border-b border-gray-100" aria-hidden="true" />
+                  <div className="min-h-[3400px] lg:min-h-[2950px] bg-amber-50/20 border-b border-gray-100" aria-hidden="true" />
                 }
               >
                 <HomeBelowFoldSections
@@ -480,7 +529,7 @@ function MarketingPages({
                 />
               </React.Suspense>
             ) : (
-              <div className="min-h-[1200px] bg-amber-50/20 border-b border-gray-100" aria-hidden="true" />
+              <div className="min-h-[3400px] lg:min-h-[2950px] bg-amber-50/20 border-b border-gray-100" aria-hidden="true" />
             )}
           </div>
 
@@ -507,7 +556,7 @@ function MarketingPages({
                       onNavigate('tutors');
                     }
                   }}
-                  className="text-xs font-bold text-orange-700 hover:underline shrink-0"
+                  className="touch-target-expand text-xs font-bold text-orange-700 hover:underline shrink-0 inline-flex items-center"
                 >
                   View All 500+ Tutors →
                 </a>
@@ -517,48 +566,48 @@ function MarketingPages({
                 <div className="bg-white rounded-2xl border border-slate-200 p-4 space-y-2.5">
                   <h3 className="font-bold text-slate-900 text-xs uppercase tracking-wider">Featured Subject Tutors</h3>
                   <ul className="space-y-1.5 text-slate-700">
-                    <li><a href="/tutor/james-cook" className="hover:text-orange-700 hover:underline font-medium">James Cook — Computer Science &amp; Systems (Sydney)</a></li>
-                    <li><a href="/tutor/dr-clara-stirling" className="hover:text-orange-700 hover:underline font-medium">Dr. Clara Stirling — Quantitative Economics &amp; Stats</a></li>
-                    <li><a href="/tutor/liam-kennedy-m-sc" className="hover:text-orange-700 hover:underline font-medium">Liam Kennedy, M.Sc — Applied Calculus &amp; Chemistry</a></li>
-                    <li><a href="/tutor/dr-marcus-vance" className="hover:text-orange-700 hover:underline font-medium">Dr. Marcus Vance — Python &amp; Machine Learning</a></li>
-                    <li><a href="/tutors" className="text-orange-700 font-bold hover:underline">Browse Full Tutor Directory →</a></li>
+                    <li><a href="/tutor/james-cook" className="touch-target-expand inline-block hover:text-orange-700 hover:underline font-medium">James Cook — Computer Science &amp; Systems (Sydney)</a></li>
+                    <li><a href="/tutor/dr-clara-stirling" className="touch-target-expand inline-block hover:text-orange-700 hover:underline font-medium">Dr. Clara Stirling — Quantitative Economics &amp; Stats</a></li>
+                    <li><a href="/tutor/liam-kennedy-m-sc" className="touch-target-expand inline-block hover:text-orange-700 hover:underline font-medium">Liam Kennedy, M.Sc — Applied Calculus &amp; Chemistry</a></li>
+                    <li><a href="/tutor/dr-marcus-vance" className="touch-target-expand inline-block hover:text-orange-700 hover:underline font-medium">Dr. Marcus Vance — Python &amp; Machine Learning</a></li>
+                    <li><a href="/tutors" className="touch-target-expand inline-block text-orange-700 font-bold hover:underline">Browse Full Tutor Directory →</a></li>
                   </ul>
                 </div>
 
                 <div className="bg-white rounded-2xl border border-slate-200 p-4 space-y-2.5">
                   <h3 className="font-bold text-slate-900 text-xs uppercase tracking-wider">Blog &amp; Academic Guides</h3>
                   <ul className="space-y-1.5 text-slate-700">
-                    <li><a href="/blog" className="hover:text-orange-700 hover:underline font-bold text-orange-700">Academic Knowledge Hub (/blog)</a></li>
-                    <li><a href="/blog/the-ultimate-harvard-apa-7th-edition-formatting-checklist-for-2026" className="hover:text-orange-700 hover:underline font-medium">Harvard &amp; APA 7th Formatting Checklist</a></li>
-                    <li><a href="/blog/mastering-the-undergraduate-dissertation-5-critical-roadmap-milestones" className="hover:text-orange-700 hover:underline font-medium">5-Milestone Dissertation Roadmap</a></li>
-                    <li><a href="/blog/active-recall-vs-passive-reading-why-high-achievers-tutor-one-on-one" className="hover:text-orange-700 hover:underline font-medium">Active Recall vs Passive Reading</a></li>
-                    <li><a href="/blog/understanding-turnitin-similarity-scores-and-academic-integrity-boundaries" className="hover:text-orange-700 hover:underline font-medium">Turnitin Similarity &amp; Integrity Guide</a></li>
+                    <li><a href="/blog" className="touch-target-expand inline-block hover:text-orange-700 hover:underline font-bold text-orange-700">Academic Knowledge Hub (/blog)</a></li>
+                    <li><a href="/blog/the-ultimate-harvard-apa-7th-edition-formatting-checklist-for-2026" className="touch-target-expand inline-block hover:text-orange-700 hover:underline font-medium">Harvard &amp; APA 7th Formatting Checklist</a></li>
+                    <li><a href="/blog/mastering-the-undergraduate-dissertation-5-critical-roadmap-milestones" className="touch-target-expand inline-block hover:text-orange-700 hover:underline font-medium">5-Milestone Dissertation Roadmap</a></li>
+                    <li><a href="/blog/active-recall-vs-passive-reading-why-high-achievers-tutor-one-on-one" className="touch-target-expand inline-block hover:text-orange-700 hover:underline font-medium">Active Recall vs Passive Reading</a></li>
+                    <li><a href="/blog/understanding-turnitin-similarity-scores-and-academic-integrity-boundaries" className="touch-target-expand inline-block hover:text-orange-700 hover:underline font-medium">Turnitin Similarity &amp; Integrity Guide</a></li>
                   </ul>
                 </div>
 
                 <div className="bg-white rounded-2xl border border-slate-200 p-4 space-y-2.5">
                   <h3 className="font-bold text-slate-900 text-xs uppercase tracking-wider">Free Student Tools (70+)</h3>
                   <ul className="space-y-1.5 text-slate-700">
-                    <li><a href="/tools" className="hover:text-orange-700 hover:underline font-bold text-orange-700">All 70+ Free Student Tools</a></li>
-                    <li><a href="/tools/math" className="hover:text-orange-700 hover:underline font-medium">27 Math &amp; Statistics Solvers</a></li>
-                    <li><a href="/tools/biology" className="hover:text-orange-700 hover:underline font-medium">14 Biology &amp; Genetics Calculators</a></li>
-                    <li><a href="/tools/chemistry" className="hover:text-orange-700 hover:underline font-medium">16 Chemistry &amp; Spectroscopy Tools</a></li>
-                    <li><a href="/tools/citation-generator" className="hover:text-orange-700 hover:underline font-medium">APA, MLA &amp; Harvard Citation Generator</a></li>
-                    <li><a href="/tools/university-grade-converter" className="hover:text-orange-700 hover:underline font-medium">GPA &amp; University Grade Converter</a></li>
+                    <li><a href="/tools" className="touch-target-expand inline-block hover:text-orange-700 hover:underline font-bold text-orange-700">All 70+ Free Student Tools</a></li>
+                    <li><a href="/tools/math" className="touch-target-expand inline-block hover:text-orange-700 hover:underline font-medium">27 Math &amp; Statistics Solvers</a></li>
+                    <li><a href="/tools/biology" className="touch-target-expand inline-block hover:text-orange-700 hover:underline font-medium">14 Biology &amp; Genetics Calculators</a></li>
+                    <li><a href="/tools/chemistry" className="touch-target-expand inline-block hover:text-orange-700 hover:underline font-medium">16 Chemistry &amp; Spectroscopy Tools</a></li>
+                    <li><a href="/tools/citation-generator" className="touch-target-expand inline-block hover:text-orange-700 hover:underline font-medium">APA, MLA &amp; Harvard Citation Generator</a></li>
+                    <li><a href="/tools/university-grade-converter" className="touch-target-expand inline-block hover:text-orange-700 hover:underline font-medium">GPA &amp; University Grade Converter</a></li>
                   </ul>
                 </div>
 
                 <div className="bg-white rounded-2xl border border-slate-200 p-4 space-y-2.5">
                   <h3 className="font-bold text-slate-900 text-xs uppercase tracking-wider">Global Country Portals</h3>
                   <ul className="grid grid-cols-2 gap-1.5 text-slate-700">
-                    <li><a href="/online-tutoring-usa" className="hover:text-orange-700 hover:underline font-medium">USA Tutoring</a></li>
-                    <li><a href="/online-tutoring-uk" className="hover:text-orange-700 hover:underline font-medium">UK Tutoring</a></li>
-                    <li><a href="/online-tutoring-canada" className="hover:text-orange-700 hover:underline font-medium">Canada Tutoring</a></li>
-                    <li><a href="/online-tutoring-australia" className="hover:text-orange-700 hover:underline font-medium">Australia Tutoring</a></li>
-                    <li><a href="/online-tutoring-ireland" className="hover:text-orange-700 hover:underline font-medium">Ireland Tutoring</a></li>
-                    <li><a href="/online-tutoring-new-zealand" className="hover:text-orange-700 hover:underline font-medium">NZ Tutoring</a></li>
-                    <li><a href="/online-tutoring-singapore" className="hover:text-orange-700 hover:underline font-medium">Singapore Tutoring</a></li>
-                    <li><a href="/online-tutoring-uae" className="hover:text-orange-700 hover:underline font-medium">UAE Tutoring</a></li>
+                    <li><a href="/online-tutoring-usa" className="touch-target-expand inline-block hover:text-orange-700 hover:underline font-medium">USA Tutoring</a></li>
+                    <li><a href="/online-tutoring-uk" className="touch-target-expand inline-block hover:text-orange-700 hover:underline font-medium">UK Tutoring</a></li>
+                    <li><a href="/online-tutoring-canada" className="touch-target-expand inline-block hover:text-orange-700 hover:underline font-medium">Canada Tutoring</a></li>
+                    <li><a href="/online-tutoring-australia" className="touch-target-expand inline-block hover:text-orange-700 hover:underline font-medium">Australia Tutoring</a></li>
+                    <li><a href="/online-tutoring-ireland" className="touch-target-expand inline-block hover:text-orange-700 hover:underline font-medium">Ireland Tutoring</a></li>
+                    <li><a href="/online-tutoring-new-zealand" className="touch-target-expand inline-block hover:text-orange-700 hover:underline font-medium">NZ Tutoring</a></li>
+                    <li><a href="/online-tutoring-singapore" className="touch-target-expand inline-block hover:text-orange-700 hover:underline font-medium">Singapore Tutoring</a></li>
+                    <li><a href="/online-tutoring-uae" className="touch-target-expand inline-block hover:text-orange-700 hover:underline font-medium">UAE Tutoring</a></li>
                   </ul>
                 </div>
               </div>

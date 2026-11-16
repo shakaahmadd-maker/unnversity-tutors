@@ -614,7 +614,7 @@ export default function SEOKeywordLinksBlock({
                         onNavigateSubject(item.searchSubject);
                       }
                     }}
-                    className="compact-inline-link text-blue-700 hover:text-orange-600 hover:underline cursor-pointer transition-colors font-medium text-left leading-snug"
+                    className="compact-inline-link touch-target-expand text-blue-700 hover:text-orange-600 hover:underline cursor-pointer transition-colors font-medium text-left leading-snug"
                   >
                     {item.label}
                   </button>
@@ -642,7 +642,7 @@ export default function SEOKeywordLinksBlock({
                         onNavigateSubject(domain.shortName);
                       }
                     }}
-                    className="compact-inline-link text-blue-700 hover:text-orange-600 hover:underline cursor-pointer transition-colors font-medium text-left leading-snug"
+                    className="compact-inline-link touch-target-expand text-blue-700 hover:text-orange-600 hover:underline cursor-pointer transition-colors font-medium text-left leading-snug"
                   >
                     {cityOrUniPrefix} {domain.shortName} Tutors
                   </button>
@@ -671,7 +671,7 @@ export default function SEOKeywordLinksBlock({
                         onNavigateLocation(`${trimmedCity}, ${cleanCity}`);
                       }
                     }}
-                    className="compact-inline-link text-blue-700 hover:text-orange-600 hover:underline cursor-pointer transition-colors font-medium text-left leading-snug"
+                    className="compact-inline-link touch-target-expand text-blue-700 hover:text-orange-600 hover:underline cursor-pointer transition-colors font-medium text-left leading-snug"
                   >
                     {trimmedCity} Tutors
                   </button>

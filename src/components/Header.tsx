@@ -30,6 +30,7 @@ function prefetchHeaderMenus() {
 
 interface HeaderProps {
   currentUser: User | null;
+  isSessionInitialized?: boolean;
   activeView: string;
   onNavigate: (view: string) => void;
   onLogout: () => void;
@@ -49,6 +50,7 @@ const NAV_LINKS = [
 
 export default function Header({
   currentUser,
+  isSessionInitialized = true,
   activeView,
   onNavigate,
   onLogout,
@@ -146,7 +148,7 @@ export default function Header({
                 handleLinkClick('whatsapp');
               }
             }}
-            className="flex items-center gap-1.5 bg-emerald-950/80 hover:bg-emerald-900 text-emerald-300 hover:text-white px-2.5 py-0.5 rounded border border-emerald-700/60 transition-colors font-sans font-semibold text-[11px] cursor-pointer whitespace-nowrap shrink-0"
+            className="touch-target-expand flex items-center gap-1.5 bg-emerald-950/80 hover:bg-emerald-900 text-emerald-300 hover:text-white px-2.5 py-0.5 rounded border border-emerald-700/60 transition-colors font-sans font-semibold text-[11px] cursor-pointer whitespace-nowrap shrink-0"
           >
             <MessageCircle className="w-3 h-3 text-emerald-400 shrink-0" />
             <span>WhatsApp (24/7)</span>
@@ -166,9 +168,9 @@ export default function Header({
                 handleLinkClick('home');
               }
             }}
-            className="flex items-center cursor-pointer py-1 pr-2 group select-none text-left shrink-0"
+            className="flex items-center cursor-pointer py-1 pr-2 min-h-[44px] group select-none text-left shrink-0"
           >
-            <picture className="shrink-0">
+            <picture className="shrink-0 block aspect-[220/84] h-9 sm:h-11 lg:h-10 xl:h-12">
               <source type="image/avif" srcSet="/logo-440.avif" />
               <source
                 type="image/webp"
@@ -183,7 +185,7 @@ export default function Header({
                 loading="eager"
                 decoding="sync"
                 fetchPriority="high"
-                className="h-9 sm:h-11 lg:h-10 xl:h-12 w-auto max-w-[165px] sm:max-w-[195px] lg:max-w-[165px] xl:max-w-[210px] object-contain transition-transform group-hover:scale-102"
+                className="h-full w-auto aspect-[220/84] max-w-[165px] sm:max-w-[195px] lg:max-w-[165px] xl:max-w-[210px] object-contain transition-transform group-hover:scale-102"
               />
             </picture>
           </a>
@@ -200,10 +202,10 @@ export default function Header({
                     handleLinkClick('home');
                   }
                 }}
-                className={`text-[13px] xl:text-sm font-semibold tracking-wide transition-colors cursor-pointer whitespace-nowrap shrink-0 ${
+                className={`text-[13px] xl:text-sm font-semibold tracking-wide transition-colors cursor-pointer whitespace-nowrap shrink-0 inline-flex items-center min-h-[44px] ${
                   activeView === 'home'
-                    ? 'text-orange-650 border-b-2 border-orange-650 pb-1'
-                    : 'text-gray-700 hover:text-orange-650 pb-1'
+                    ? 'text-orange-650 border-b-2 border-orange-650'
+                    : 'text-gray-700 hover:text-orange-650'
                 }`}
               >
                 Home
@@ -225,7 +227,7 @@ export default function Header({
                     prefetchHeaderMenus();
                     setIsServicesDropdownOpen(true);
                   }}
-                  className={`text-[13px] xl:text-sm font-semibold tracking-wide transition-colors cursor-pointer flex items-center gap-1 pb-1 whitespace-nowrap shrink-0 ${
+                  className={`text-[13px] xl:text-sm font-semibold tracking-wide transition-colors cursor-pointer flex items-center gap-1 min-h-[44px] whitespace-nowrap shrink-0 ${
                     activeView === 'services' ||
                     Boolean(resolveDedicatedServiceRoute(activeView)) ||
                     activeView === 'specialized-service' ||
@@ -266,7 +268,7 @@ export default function Header({
                     prefetchHeaderMenus();
                     setIsToolsDropdownOpen(true);
                   }}
-                  className={`text-[13px] xl:text-sm font-semibold tracking-wide transition-colors cursor-pointer flex items-center gap-1 pb-1 whitespace-nowrap shrink-0 ${
+                  className={`text-[13px] xl:text-sm font-semibold tracking-wide transition-colors cursor-pointer flex items-center gap-1 min-h-[44px] whitespace-nowrap shrink-0 ${
                     activeView === 'tools' || activeView.startsWith('tools/')
                       ? 'text-orange-650 border-b-2 border-orange-650'
                       : 'text-gray-700 hover:text-orange-650'
@@ -301,10 +303,10 @@ export default function Header({
                         handleLinkClick(link.view);
                       }
                     }}
-                    className={`text-[13px] xl:text-sm font-semibold tracking-wide transition-colors cursor-pointer whitespace-nowrap shrink-0 ${
+                    className={`text-[13px] xl:text-sm font-semibold tracking-wide transition-colors cursor-pointer whitespace-nowrap shrink-0 inline-flex items-center min-h-[44px] ${
                       isActive
-                        ? 'text-orange-650 border-b-2 border-orange-650 pb-1'
-                        : 'text-gray-700 hover:text-orange-650 pb-1'
+                        ? 'text-orange-650 border-b-2 border-orange-650'
+                        : 'text-gray-700 hover:text-orange-650'
                     }`}
                   >
                     {link.name}
@@ -316,14 +318,19 @@ export default function Header({
 
           {/* Right Action buttons */}
           {isLgUp && (
-            <div className="hidden lg:flex items-center gap-2 xl:gap-2.5 shrink-0">
-              {currentUser ? (
+            <div className="hidden lg:flex items-center gap-2 xl:gap-2.5 shrink-0 min-w-[260px] justify-end">
+              {!isSessionInitialized && !currentUser ? (
+                <div
+                  className="w-[260px] xl:w-[295px] h-11 rounded-xl bg-slate-100/70 animate-pulse"
+                  aria-hidden="true"
+                />
+              ) : currentUser ? (
                 <div className="flex items-center gap-2.5 shrink-0">
                   <button
                     type="button"
                     id="dashboard-header-nav"
                     onClick={() => handleLinkClick('dashboard')}
-                    className="bg-gray-100 hover:bg-orange-50 text-gray-800 hover:text-orange-650 flex items-center gap-2 px-3.5 py-2 min-h-[40px] rounded-xl transition-all cursor-pointer border border-transparent hover:border-orange-100 text-xs font-semibold whitespace-nowrap shrink-0"
+                    className="bg-gray-100 hover:bg-orange-50 text-gray-800 hover:text-orange-650 flex items-center gap-2 px-3.5 py-2 min-h-[44px] rounded-xl transition-all cursor-pointer border border-transparent hover:border-orange-100 text-xs font-semibold whitespace-nowrap shrink-0"
                   >
                     <UserIcon className="w-4 h-4 text-orange-650 shrink-0" />
                     <span>My Dashboard ({currentUser.role})</span>
@@ -332,7 +339,7 @@ export default function Header({
                     type="button"
                     id="logout-header-btn"
                     onClick={onLogout}
-                    className="text-gray-600 hover:text-red-600 p-2 min-w-[40px] min-h-[40px] inline-flex items-center justify-center rounded-xl hover:bg-gray-150 transition-colors cursor-pointer shrink-0"
+                    className="text-gray-600 hover:text-red-600 p-2 min-w-[44px] min-h-[44px] inline-flex items-center justify-center rounded-xl hover:bg-gray-150 transition-colors cursor-pointer shrink-0"
                     title="Logout Session"
                     aria-label="Logout Session"
                   >
@@ -345,7 +352,7 @@ export default function Header({
                     type="button"
                     id="nav-join-login"
                     onClick={() => handleLinkClick('auth')}
-                    className="text-xs xl:text-[13px] font-semibold text-gray-700 hover:text-orange-650 transition-colors cursor-pointer px-2.5 py-2 min-h-[40px] whitespace-nowrap shrink-0"
+                    className="text-xs xl:text-[13px] font-semibold text-gray-700 hover:text-orange-650 transition-colors cursor-pointer px-3 py-2 min-h-[44px] whitespace-nowrap shrink-0"
                   >
                     Sign In
                   </button>
@@ -358,7 +365,7 @@ export default function Header({
                         handleLinkClick('tutors');
                       }
                     }}
-                    className="bg-orange-600 hover:bg-orange-700 text-white font-bold text-[11px] xl:text-xs tracking-wider uppercase px-3 xl:px-4 py-2 min-h-[40px] rounded-xl shadow-md shadow-orange-500/20 hover:-translate-y-0.5 transition-all duration-200 cursor-pointer whitespace-nowrap shrink-0 inline-flex items-center"
+                    className="bg-orange-600 hover:bg-orange-700 text-white font-bold text-[11px] xl:text-xs tracking-wider uppercase px-3 xl:px-4 py-2 min-h-[44px] rounded-xl shadow-md shadow-orange-500/20 hover:-translate-y-0.5 transition-all duration-200 cursor-pointer whitespace-nowrap shrink-0 inline-flex items-center"
                   >
                     Find a Tutor
                   </a>
@@ -368,7 +375,7 @@ export default function Header({
                     onClick={() => {
                       if (onOpenBecomeTutor) onOpenBecomeTutor();
                     }}
-                    className="bg-slate-900 hover:bg-slate-800 text-white font-bold text-[11px] xl:text-xs tracking-wider uppercase px-3 xl:px-4 py-2 min-h-[40px] rounded-xl shadow-md hover:-translate-y-0.5 transition-all duration-200 cursor-pointer inline-flex items-center gap-1.5 whitespace-nowrap shrink-0"
+                    className="bg-slate-900 hover:bg-slate-800 text-white font-bold text-[11px] xl:text-xs tracking-wider uppercase px-3 xl:px-4 py-2 min-h-[44px] rounded-xl shadow-md hover:-translate-y-0.5 transition-all duration-200 cursor-pointer inline-flex items-center gap-1.5 whitespace-nowrap shrink-0"
                   >
                     <GraduationCap className="w-3.5 h-3.5 text-orange-400 shrink-0" />
                     <span>Become a Tutor</span>

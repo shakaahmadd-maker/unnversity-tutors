@@ -617,7 +617,7 @@ export default function HomeBelowFoldSections({
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 sm:gap-10">
             {/* Card 1 */}
-            <div className="bg-white rounded-[2.5rem] overflow-hidden shadow-xs hover:shadow-md border border-gray-100 flex flex-col justify-between group hover:-translate-y-1 transition-all duration-300 animate-fade-in">
+            <div className="bg-white rounded-[2.5rem] overflow-hidden shadow-xs hover:shadow-md border border-gray-100 flex flex-col justify-between group hover:-translate-y-1 transition-all duration-300">
               <div>
                 <div className="relative h-60 sm:h-64 overflow-hidden">
                   <ResponsivePicture
@@ -653,7 +653,7 @@ export default function HomeBelowFoldSections({
             </div>
 
             {/* Card 2 */}
-            <div className="bg-white rounded-[2.5rem] overflow-hidden shadow-xs hover:shadow-md border border-gray-100 flex flex-col justify-between group hover:-translate-y-1 transition-all duration-300 animate-fade-in">
+            <div className="bg-white rounded-[2.5rem] overflow-hidden shadow-xs hover:shadow-md border border-gray-100 flex flex-col justify-between group hover:-translate-y-1 transition-all duration-300">
               <div>
                 <div className="relative h-60 sm:h-64 overflow-hidden">
                   <ResponsivePicture
@@ -689,7 +689,7 @@ export default function HomeBelowFoldSections({
             </div>
 
             {/* Card 3 */}
-            <div className="bg-white rounded-[2.5rem] overflow-hidden shadow-xs hover:shadow-md border border-gray-100 flex flex-col justify-between group hover:-translate-y-1 transition-all duration-300 animate-fade-in">
+            <div className="bg-white rounded-[2.5rem] overflow-hidden shadow-xs hover:shadow-md border border-gray-100 flex flex-col justify-between group hover:-translate-y-1 transition-all duration-300">
               <div>
                 <div className="relative h-60 sm:h-64 overflow-hidden">
                   <ResponsivePicture
@@ -725,7 +725,7 @@ export default function HomeBelowFoldSections({
             </div>
 
             {/* Card 4 */}
-            <div className="bg-white rounded-[2.5rem] overflow-hidden shadow-xs hover:shadow-md border border-gray-100 flex flex-col justify-between group hover:-translate-y-1 transition-all duration-300 animate-fade-in">
+            <div className="bg-white rounded-[2.5rem] overflow-hidden shadow-xs hover:shadow-md border border-gray-100 flex flex-col justify-between group hover:-translate-y-1 transition-all duration-300">
               <div>
                 <div className="relative h-60 sm:h-64 overflow-hidden">
                   <ResponsivePicture
@@ -761,7 +761,7 @@ export default function HomeBelowFoldSections({
             </div>
 
             {/* Card 5 */}
-            <div className="bg-white rounded-[2.5rem] overflow-hidden shadow-xs hover:shadow-md border border-gray-100 flex flex-col justify-between group hover:-translate-y-1 transition-all duration-300 animate-fade-in">
+            <div className="bg-white rounded-[2.5rem] overflow-hidden shadow-xs hover:shadow-md border border-gray-100 flex flex-col justify-between group hover:-translate-y-1 transition-all duration-300">
               <div>
                 <div className="relative h-60 sm:h-64 overflow-hidden">
                   <ResponsivePicture
@@ -918,7 +918,7 @@ export default function HomeBelowFoldSections({
             </>
           ) : (
             <>
-              <div className="text-center max-w-3xl mx-auto mb-16 lg:mb-20 animate-fade-in">
+              <div className="text-center max-w-3xl mx-auto mb-16 lg:mb-20">
                 <h2 className="text-4xl sm:text-5xl lg:text-6xl font-black tracking-tight leading-tight uppercase select-none">
                   <span className="italic block sm:inline mr-3 text-amber-600 bg-clip-text">
                     WHY STUDENTS TRUST US{' '}
@@ -1147,15 +1147,17 @@ export default function HomeBelowFoldSections({
                 </div>
 
                 <div className="flex items-center gap-3 mt-6 pt-4 border-t border-gray-100">
-                  <ResponsiveAvatar
-                    src={t.avatar}
-                    alt={t.name || 'Student Avatar'}
-                    sizePx={32}
-                    width={32}
-                    height={32}
-                    loading="lazy"
-                    className="w-8 h-8 rounded-full object-cover border"
-                  />
+                  <div className="w-8 h-8 rounded-full overflow-hidden border bg-slate-100 shrink-0">
+                    <ResponsiveAvatar
+                      src={t.avatar}
+                      alt={t.name || 'Student Avatar'}
+                      sizePx={32}
+                      width={32}
+                      height={32}
+                      loading="lazy"
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
                   <div>
                     <div className="flex items-center gap-1.5">
                       <span className="text-xs font-bold text-gray-950 block">{t.name}</span>

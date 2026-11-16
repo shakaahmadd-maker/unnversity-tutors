@@ -144,7 +144,7 @@ export default function Footer({ onNavigate, onOpenBecomeTutor }: FooterProps) {
             <button
               type="button"
               onClick={() => handleButtonNav('home')}
-              className="inline-flex items-center cursor-pointer group text-left"
+              className="inline-flex items-center min-h-[44px] cursor-pointer group text-left"
               aria-label="University Tutors Home"
             >
               <picture className="shrink-0">
@@ -172,14 +172,14 @@ export default function Footer({ onNavigate, onOpenBecomeTutor }: FooterProps) {
             <div className="space-y-2.5 pt-1 text-xs text-stone-700 font-medium">
               <a
                 href="mailto:support@universitytutors.com"
-                className="flex items-center gap-2.5 hover:text-terracotta-700 transition-colors"
+                className="flex items-center gap-2.5 touch-target-expand hover:text-terracotta-700 transition-colors"
               >
                 <Mail className="w-4 h-4 text-orange-600 shrink-0" />
                 <span>support@universitytutors.com</span>
               </a>
               <a
                 href="tel:+18001238886"
-                className="flex items-center gap-2.5 hover:text-terracotta-700 transition-colors"
+                className="flex items-center gap-2.5 touch-target-expand hover:text-terracotta-700 transition-colors"
               >
                 <Phone className="w-4 h-4 text-orange-600 shrink-0" />
                 <span>+1 (800) 123-TUTOR</span>
@@ -201,7 +201,7 @@ export default function Footer({ onNavigate, onOpenBecomeTutor }: FooterProps) {
                 <a
                   href="/services"
                   onClick={(e) => handleLinkClick(e, 'services')}
-                  className="hover:text-terracotta-700 transition-colors cursor-pointer"
+                  className="touch-target-expand inline-block hover:text-terracotta-700 transition-colors cursor-pointer"
                 >
                   All Tutoring Services Hub
                 </a>
@@ -210,7 +210,7 @@ export default function Footer({ onNavigate, onOpenBecomeTutor }: FooterProps) {
                 <a
                   href="/services/1-on-1-live-tutoring"
                   onClick={(e) => handleLinkClick(e, 'service-1on1')}
-                  className="hover:text-terracotta-700 transition-colors cursor-pointer"
+                  className="touch-target-expand inline-block hover:text-terracotta-700 transition-colors cursor-pointer"
                 >
                   1-on-1 Live Tutoring
                 </a>
@@ -219,7 +219,7 @@ export default function Footer({ onNavigate, onOpenBecomeTutor }: FooterProps) {
                 <a
                   href="/services/assignment-guidance"
                   onClick={(e) => handleLinkClick(e, 'service-assignment')}
-                  className="hover:text-terracotta-700 transition-colors cursor-pointer"
+                  className="touch-target-expand inline-block hover:text-terracotta-700 transition-colors cursor-pointer"
                 >
                   Assignment Guidance
                 </a>
@@ -228,7 +228,7 @@ export default function Footer({ onNavigate, onOpenBecomeTutor }: FooterProps) {
                 <a
                   href="/services/coursework-track"
                   onClick={(e) => handleLinkClick(e, 'service-coursework')}
-                  className="hover:text-terracotta-700 transition-colors cursor-pointer"
+                  className="touch-target-expand inline-block hover:text-terracotta-700 transition-colors cursor-pointer"
                 >
                   Coursework Track
                 </a>
@@ -237,7 +237,7 @@ export default function Footer({ onNavigate, onOpenBecomeTutor }: FooterProps) {
                 <a
                   href="/services/essay-reference-checks"
                   onClick={(e) => handleLinkClick(e, 'service-essay')}
-                  className="hover:text-terracotta-700 transition-colors cursor-pointer"
+                  className="touch-target-expand inline-block hover:text-terracotta-700 transition-colors cursor-pointer"
                 >
                   Essay &amp; Reference Checks
                 </a>
@@ -246,7 +246,7 @@ export default function Footer({ onNavigate, onOpenBecomeTutor }: FooterProps) {
                 <a
                   href="/whatsapp"
                   onClick={(e) => handleLinkClick(e, 'whatsapp')}
-                  className="hover:text-terracotta-700 transition-colors cursor-pointer"
+                  className="touch-target-expand inline-block hover:text-terracotta-700 transition-colors cursor-pointer"
                 >
                   WhatsApp Academic Hotline
                 </a>
@@ -255,7 +255,7 @@ export default function Footer({ onNavigate, onOpenBecomeTutor }: FooterProps) {
                 <button
                   type="button"
                   onClick={() => (onOpenBecomeTutor ? onOpenBecomeTutor() : handleButtonNav('auth'))}
-                  className="hover:text-terracotta-700 transition-colors cursor-pointer text-left"
+                  className="touch-target-expand inline-block hover:text-terracotta-700 transition-colors cursor-pointer text-left"
                 >
                   Become a Tutor (Apply Now)
                 </button>
@@ -264,7 +264,7 @@ export default function Footer({ onNavigate, onOpenBecomeTutor }: FooterProps) {
                 <a
                   href="/about-us"
                   onClick={(e) => handleLinkClick(e, 'about')}
-                  className="hover:text-terracotta-700 transition-colors cursor-pointer"
+                  className="touch-target-expand inline-block hover:text-terracotta-700 transition-colors cursor-pointer"
                 >
                   About Founding Team
                 </a>
@@ -273,7 +273,7 @@ export default function Footer({ onNavigate, onOpenBecomeTutor }: FooterProps) {
                 <a
                   href="/our-blog"
                   onClick={(e) => handleLinkClick(e, 'blog')}
-                  className="hover:text-terracotta-700 transition-colors cursor-pointer"
+                  className="touch-target-expand inline-block hover:text-terracotta-700 transition-colors cursor-pointer"
                 >
                   Knowledge Center (Blog)
                 </a>
@@ -291,7 +291,7 @@ export default function Footer({ onNavigate, onOpenBecomeTutor }: FooterProps) {
                 <a
                   href="/sop"
                   onClick={(e) => handleLinkClick(e, 'sop')}
-                  className="hover:text-terracotta-700 transition-colors cursor-pointer"
+                  className="touch-target-expand inline-block hover:text-terracotta-700 transition-colors cursor-pointer"
                 >
                   Standard Operating Procedures (SOP)
                 </a>
@@ -300,7 +300,7 @@ export default function Footer({ onNavigate, onOpenBecomeTutor }: FooterProps) {
                 <a
                   href="/terms"
                   onClick={(e) => handleLinkClick(e, 'terms')}
-                  className="hover:text-terracotta-700 transition-colors cursor-pointer"
+                  className="touch-target-expand inline-block hover:text-terracotta-700 transition-colors cursor-pointer"
                 >
                   Payments Escrow Guarantee
                 </a>
@@ -309,7 +309,7 @@ export default function Footer({ onNavigate, onOpenBecomeTutor }: FooterProps) {
                 <a
                   href="/privacy"
                   onClick={(e) => handleLinkClick(e, 'privacy')}
-                  className="hover:text-terracotta-700 transition-colors cursor-pointer"
+                  className="touch-target-expand inline-block hover:text-terracotta-700 transition-colors cursor-pointer"
                 >
                   Privacy Policy &amp; GDPR Disclosure
                 </a>
@@ -318,7 +318,7 @@ export default function Footer({ onNavigate, onOpenBecomeTutor }: FooterProps) {
                 <a
                   href="/data-deletion"
                   onClick={(e) => handleLinkClick(e, 'data-deletion')}
-                  className="hover:text-terracotta-700 transition-colors cursor-pointer"
+                  className="touch-target-expand inline-block hover:text-terracotta-700 transition-colors cursor-pointer"
                 >
                   User Data Deletion Instructions
                 </a>
@@ -327,7 +327,7 @@ export default function Footer({ onNavigate, onOpenBecomeTutor }: FooterProps) {
                 <a
                   href="/terms"
                   onClick={(e) => handleLinkClick(e, 'terms')}
-                  className="hover:text-terracotta-700 transition-colors cursor-pointer"
+                  className="touch-target-expand inline-block hover:text-terracotta-700 transition-colors cursor-pointer"
                 >
                   Terms of Service &amp; Escrow Agreement
                 </a>
@@ -336,7 +336,7 @@ export default function Footer({ onNavigate, onOpenBecomeTutor }: FooterProps) {
                 <a
                   href="/google-disclosure"
                   onClick={(e) => handleLinkClick(e, 'google-disclosure')}
-                  className="hover:text-terracotta-700 transition-colors cursor-pointer"
+                  className="touch-target-expand inline-block hover:text-terracotta-700 transition-colors cursor-pointer"
                 >
                   Google OAuth Disclosure
                 </a>
@@ -345,7 +345,7 @@ export default function Footer({ onNavigate, onOpenBecomeTutor }: FooterProps) {
                 <a
                   href="/faqs"
                   onClick={(e) => handleLinkClick(e, 'faqs')}
-                  className="hover:text-terracotta-700 transition-colors cursor-pointer"
+                  className="touch-target-expand inline-block hover:text-terracotta-700 transition-colors cursor-pointer"
                 >
                   Frequently Asked Questions (FAQs)
                 </a>
@@ -354,7 +354,7 @@ export default function Footer({ onNavigate, onOpenBecomeTutor }: FooterProps) {
                 <a
                   href="/contact"
                   onClick={(e) => handleLinkClick(e, 'contact')}
-                  className="hover:text-terracotta-700 transition-colors cursor-pointer"
+                  className="touch-target-expand inline-block hover:text-terracotta-700 transition-colors cursor-pointer"
                 >
                   Contact 24/7 Human Advising
                 </a>
@@ -449,7 +449,7 @@ export default function Footer({ onNavigate, onOpenBecomeTutor }: FooterProps) {
               <a
                 href="/tools/math"
                 onClick={(e) => handleLinkClick(e, 'tools/math')}
-                className="group inline-flex items-center gap-1 text-[11px] sm:text-[13px] font-semibold text-terracotta-700 hover:text-terracotta-800 transition-colors cursor-pointer"
+                className="group touch-target-expand inline-flex items-center gap-1 text-[11px] sm:text-[13px] font-semibold text-terracotta-700 hover:text-terracotta-800 transition-colors cursor-pointer"
               >
                 <span>Math &amp; Stats Hub (27)</span>
                 <span aria-hidden="true" className="transition-transform duration-200 group-hover:translate-x-1">
@@ -463,7 +463,7 @@ export default function Footer({ onNavigate, onOpenBecomeTutor }: FooterProps) {
                 aria-expanded={isMathSolversOpen}
                 aria-controls="math-solvers-drawer"
                 onClick={() => setIsMathSolversOpen((prev) => !prev)}
-                className={`inline-flex items-center gap-1.5 px-2.5 sm:px-3.5 py-1.5 sm:py-2 rounded-lg sm:rounded-xl bg-white hover:bg-cream-200/70 text-stone-800 text-[11px] sm:text-xs font-semibold border border-cream-400 shadow-2xs hover:border-terracotta-600/40 transition-all cursor-pointer ${
+                className={`touch-target-expand inline-flex items-center gap-1.5 px-2.5 sm:px-3.5 py-1.5 sm:py-2 rounded-lg sm:rounded-xl bg-white hover:bg-cream-200/70 text-stone-800 text-[11px] sm:text-xs font-semibold border border-cream-400 shadow-2xs hover:border-terracotta-600/40 transition-all cursor-pointer ${
                   isMathSolversOpen ? 'is-expanded' : ''
                 }`}
               >
@@ -501,7 +501,7 @@ export default function Footer({ onNavigate, onOpenBecomeTutor }: FooterProps) {
                         key={solver.viewKey}
                         href={solver.href}
                         onClick={(e) => handleLinkClick(e, solver.viewKey)}
-                        className="group flex items-center justify-between p-2 sm:p-2.5 rounded-lg sm:rounded-xl bg-white border border-cream-300 hover:border-terracotta-600/50 hover:bg-cream-200/40 transition-all cursor-pointer"
+                        className="group flex items-center justify-between min-h-[44px] p-2 sm:p-2.5 rounded-lg sm:rounded-xl bg-white border border-cream-300 hover:border-terracotta-600/50 hover:bg-cream-200/40 transition-all cursor-pointer"
                       >
                         <div>
                           <p className="text-[11px] sm:text-xs font-semibold text-stone-800 group-hover:text-terracotta-700">
@@ -520,14 +520,14 @@ export default function Footer({ onNavigate, onOpenBecomeTutor }: FooterProps) {
                     <button
                       type="button"
                       onClick={() => setShowAllMathDirectory((prev) => !prev)}
-                      className="text-[11px] font-semibold text-terracotta-700 hover:text-terracotta-800 underline cursor-pointer"
+                      className="touch-target-expand text-[11px] font-semibold text-terracotta-700 hover:text-terracotta-800 underline cursor-pointer"
                     >
                       {showAllMathDirectory ? 'Hide full 27-solver list' : 'Expand full 27-solver directory'}
                     </button>
                     <a
                       href="/tools/math"
                       onClick={(e) => handleLinkClick(e, 'tools/math')}
-                      className="text-[11px] font-semibold text-stone-600 hover:text-terracotta-700 cursor-pointer"
+                      className="touch-target-expand text-[11px] font-semibold text-stone-600 hover:text-terracotta-700 cursor-pointer"
                     >
                       Open Math Hub &rarr;
                     </a>
@@ -597,11 +597,11 @@ export default function Footer({ onNavigate, onOpenBecomeTutor }: FooterProps) {
               </p>
 
               {/* Compact Hub Links Pill Bar (Single-Row Scroll on Mobile, Wrap on Desktop) */}
-              <div className="mt-2.5 sm:mt-4 flex items-center gap-1.5 overflow-x-auto no-scrollbar flex-nowrap sm:flex-wrap pb-0.5 sm:pb-0">
+              <div className="mt-2.5 sm:mt-4 py-2.5 -my-2.5 flex items-center gap-1.5 overflow-x-auto no-scrollbar flex-nowrap sm:flex-wrap">
                 <a
                   href="/tools/math"
                   onClick={(e) => handleLinkClick(e, 'tools/math')}
-                  className="group shrink-0 inline-flex items-center gap-1 px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-md sm:rounded-lg bg-cream-200/80 hover:bg-terracotta-700 text-terracotta-700 hover:text-white text-[11px] sm:text-xs font-semibold border border-cream-400 hover:border-terracotta-700 transition-all cursor-pointer"
+                  className="group touch-target-expand shrink-0 inline-flex items-center gap-1 px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-md sm:rounded-lg bg-cream-200/80 hover:bg-terracotta-700 text-terracotta-700 hover:text-white text-[11px] sm:text-xs font-semibold border border-cream-400 hover:border-terracotta-700 transition-all cursor-pointer"
                 >
                   <span>Math (27)</span>
                   <span aria-hidden="true" className="transition-transform group-hover:translate-x-0.5">
@@ -611,7 +611,7 @@ export default function Footer({ onNavigate, onOpenBecomeTutor }: FooterProps) {
                 <a
                   href="/tools/biology"
                   onClick={(e) => handleLinkClick(e, 'tools/biology')}
-                  className="group shrink-0 inline-flex items-center gap-1 px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-md sm:rounded-lg bg-cream-200/80 hover:bg-terracotta-700 text-terracotta-700 hover:text-white text-[11px] sm:text-xs font-semibold border border-cream-400 hover:border-terracotta-700 transition-all cursor-pointer"
+                  className="group touch-target-expand shrink-0 inline-flex items-center gap-1 px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-md sm:rounded-lg bg-cream-200/80 hover:bg-terracotta-700 text-terracotta-700 hover:text-white text-[11px] sm:text-xs font-semibold border border-cream-400 hover:border-terracotta-700 transition-all cursor-pointer"
                 >
                   <span>Biology (14)</span>
                   <span aria-hidden="true" className="transition-transform group-hover:translate-x-0.5">
@@ -621,7 +621,7 @@ export default function Footer({ onNavigate, onOpenBecomeTutor }: FooterProps) {
                 <a
                   href="/tools/chemistry"
                   onClick={(e) => handleLinkClick(e, 'tools/chemistry')}
-                  className="group shrink-0 inline-flex items-center gap-1 px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-md sm:rounded-lg bg-cream-200/80 hover:bg-terracotta-700 text-terracotta-700 hover:text-white text-[11px] sm:text-xs font-semibold border border-cream-400 hover:border-terracotta-700 transition-all cursor-pointer"
+                  className="group touch-target-expand shrink-0 inline-flex items-center gap-1 px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-md sm:rounded-lg bg-cream-200/80 hover:bg-terracotta-700 text-terracotta-700 hover:text-white text-[11px] sm:text-xs font-semibold border border-cream-400 hover:border-terracotta-700 transition-all cursor-pointer"
                 >
                   <span>Chemistry (16)</span>
                   <span aria-hidden="true" className="transition-transform group-hover:translate-x-0.5">
@@ -631,7 +631,7 @@ export default function Footer({ onNavigate, onOpenBecomeTutor }: FooterProps) {
                 <a
                   href="/tools"
                   onClick={(e) => handleLinkClick(e, 'tools')}
-                  className="group shrink-0 inline-flex items-center gap-1 px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-md sm:rounded-lg bg-white hover:bg-terracotta-700 text-terracotta-700 hover:text-white text-[11px] sm:text-xs font-semibold border border-cream-400 hover:border-terracotta-700 transition-all cursor-pointer"
+                  className="group touch-target-expand shrink-0 inline-flex items-center gap-1 px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-md sm:rounded-lg bg-white hover:bg-terracotta-700 text-terracotta-700 hover:text-white text-[11px] sm:text-xs font-semibold border border-cream-400 hover:border-terracotta-700 transition-all cursor-pointer"
                 >
                   <span>All Tools</span>
                   <span aria-hidden="true" className="transition-transform group-hover:translate-x-0.5">
@@ -651,7 +651,7 @@ export default function Footer({ onNavigate, onOpenBecomeTutor }: FooterProps) {
                 aria-expanded={isStudentToolsOpen}
                 aria-controls="student-tools-drawer"
                 onClick={() => setIsStudentToolsOpen((prev) => !prev)}
-                className={`inline-flex items-center gap-1.5 px-2.5 sm:px-3.5 py-1.5 sm:py-2 rounded-lg sm:rounded-xl bg-white hover:bg-cream-200/70 text-stone-800 text-[11px] sm:text-xs font-semibold border border-cream-400 shadow-2xs hover:border-terracotta-600/40 transition-all cursor-pointer ${
+                className={`touch-target-expand inline-flex items-center gap-1.5 px-2.5 sm:px-3.5 py-1.5 sm:py-2 rounded-lg sm:rounded-xl bg-white hover:bg-cream-200/70 text-stone-800 text-[11px] sm:text-xs font-semibold border border-cream-400 shadow-2xs hover:border-terracotta-600/40 transition-all cursor-pointer ${
                   isStudentToolsOpen ? 'is-expanded' : ''
                 }`}
               >
@@ -689,7 +689,7 @@ export default function Footer({ onNavigate, onOpenBecomeTutor }: FooterProps) {
                         key={tool.viewKey}
                         href={tool.href}
                         onClick={(e) => handleLinkClick(e, tool.viewKey)}
-                        className="group flex items-center justify-between p-2 sm:p-2.5 rounded-lg sm:rounded-xl bg-white border border-cream-300 hover:border-terracotta-600/50 hover:bg-cream-200/40 transition-all cursor-pointer"
+                        className="group flex items-center justify-between min-h-[44px] p-2 sm:p-2.5 rounded-lg sm:rounded-xl bg-white border border-cream-300 hover:border-terracotta-600/50 hover:bg-cream-200/40 transition-all cursor-pointer"
                       >
                         <div>
                           <p className="text-[11px] sm:text-xs font-semibold text-stone-800 group-hover:text-terracotta-700">
@@ -708,14 +708,14 @@ export default function Footer({ onNavigate, onOpenBecomeTutor }: FooterProps) {
                     <button
                       type="button"
                       onClick={() => setShowAllStudentDirectory((prev) => !prev)}
-                      className="text-[11px] font-semibold text-terracotta-700 hover:text-terracotta-800 underline cursor-pointer"
+                      className="touch-target-expand text-[11px] font-semibold text-terracotta-700 hover:text-terracotta-800 underline cursor-pointer"
                     >
                       {showAllStudentDirectory ? 'Hide full tools directory' : 'Expand all student tools'}
                     </button>
                     <a
                       href="/tools"
                       onClick={(e) => handleLinkClick(e, 'tools')}
-                      className="text-[11px] font-semibold text-stone-600 hover:text-terracotta-700 cursor-pointer"
+                      className="touch-target-expand text-[11px] font-semibold text-stone-600 hover:text-terracotta-700 cursor-pointer"
                     >
                       Open Tools Suite &rarr;
                     </a>
@@ -776,7 +776,7 @@ export default function Footer({ onNavigate, onOpenBecomeTutor }: FooterProps) {
           {/* Horizontal Scrollable Pill Strip on Mobile (Single Row), Multi-Row Wrap on Desktop */}
           <div
             id="google-ads-keywords"
-            className="flex items-center gap-1.5 sm:gap-2.5 overflow-x-auto no-scrollbar flex-nowrap sm:flex-wrap pb-0.5 sm:pb-0"
+            className="flex items-center gap-1.5 sm:gap-2.5 overflow-x-auto no-scrollbar flex-nowrap sm:flex-wrap py-2 -my-2"
           >
             {seoTopics.map((topic, idx) => (
               <a
@@ -785,7 +785,7 @@ export default function Footer({ onNavigate, onOpenBecomeTutor }: FooterProps) {
                 href={topic.href}
                 rel="nofollow"
                 onClick={(e) => handleLinkClick(e, topic.view)}
-                className="group shrink-0 inline-flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-3.5 py-1.5 sm:py-2 rounded-lg sm:rounded-xl bg-white hover:bg-cream-50 text-stone-700 hover:text-terracotta-700 text-[11px] sm:text-xs font-medium border border-cream-400 hover:border-terracotta-600/50 shadow-2xs sm:hover:-translate-y-0.5 transition-all duration-200 cursor-pointer"
+                className="group touch-target-expand shrink-0 inline-flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-3.5 py-1.5 sm:py-2 rounded-lg sm:rounded-xl bg-white hover:bg-cream-50 text-stone-700 hover:text-terracotta-700 text-[11px] sm:text-xs font-medium border border-cream-400 hover:border-terracotta-600/50 shadow-2xs sm:hover:-translate-y-0.5 transition-all duration-200 cursor-pointer"
               >
                 <span>{topic.text}</span>
                 <span
@@ -808,7 +808,7 @@ export default function Footer({ onNavigate, onOpenBecomeTutor }: FooterProps) {
               aria-expanded={isDisclosuresOpen}
               aria-controls="footerDisclosurePanel"
               onClick={() => setIsDisclosuresOpen((prev) => !prev)}
-              className={`group inline-flex items-center gap-1.5 px-3 py-1.5 sm:px-3.5 sm:py-1.5 rounded-full bg-white hover:bg-cream-50 text-stone-900 border border-cream-400 hover:border-terracotta-600/60 shadow-2xs transition-all cursor-pointer ${
+              className={`group touch-target-expand inline-flex items-center gap-1.5 px-3 py-1.5 sm:px-3.5 sm:py-1.5 rounded-full bg-white hover:bg-cream-50 text-stone-900 border border-cream-400 hover:border-terracotta-600/60 shadow-2xs transition-all cursor-pointer ${
                 isDisclosuresOpen ? 'is-expanded' : ''
               }`}
             >
@@ -932,7 +932,7 @@ export default function Footer({ onNavigate, onOpenBecomeTutor }: FooterProps) {
                     Enquiries:{' '}
                     <a
                       href="mailto:support@universitytutors.com"
-                      className="font-semibold text-terracotta-700 hover:underline"
+                      className="touch-target-expand inline-block font-semibold text-terracotta-700 hover:underline"
                     >
                       support@universitytutors.com
                     </a>
@@ -942,7 +942,7 @@ export default function Footer({ onNavigate, onOpenBecomeTutor }: FooterProps) {
                         <button
                           type="button"
                           onClick={onOpenBecomeTutor}
-                          className="font-semibold text-terracotta-700 hover:underline cursor-pointer"
+                          className="touch-target-expand inline-block font-semibold text-terracotta-700 hover:underline cursor-pointer"
                         >
                           Become a Tutor
                         </button>
@@ -952,7 +952,7 @@ export default function Footer({ onNavigate, onOpenBecomeTutor }: FooterProps) {
                   <button
                     type="button"
                     onClick={() => handleButtonNav('google-disclosure')}
-                    className="font-semibold text-terracotta-700 hover:text-terracotta-800 hover:underline cursor-pointer"
+                    className="touch-target-expand inline-block font-semibold text-terracotta-700 hover:text-terracotta-800 hover:underline cursor-pointer"
                   >
                     View Google OAuth Disclosure &rarr;
                   </button>
@@ -981,7 +981,7 @@ export default function Footer({ onNavigate, onOpenBecomeTutor }: FooterProps) {
               id="footer-cc-priv"
               href="/privacy"
               onClick={(e) => handleLinkClick(e, 'privacy')}
-              className="hover:text-terracotta-700 transition-colors cursor-pointer"
+              className="touch-target-expand inline-flex items-center hover:text-terracotta-700 transition-colors cursor-pointer"
             >
               Privacy Policy
             </a>
@@ -989,7 +989,7 @@ export default function Footer({ onNavigate, onOpenBecomeTutor }: FooterProps) {
               id="footer-cc-terms"
               href="/terms"
               onClick={(e) => handleLinkClick(e, 'terms')}
-              className="hover:text-terracotta-700 transition-colors cursor-pointer"
+              className="touch-target-expand inline-flex items-center hover:text-terracotta-700 transition-colors cursor-pointer"
             >
               Terms of Service
             </a>
@@ -997,7 +997,7 @@ export default function Footer({ onNavigate, onOpenBecomeTutor }: FooterProps) {
               id="footer-cc-disclosure"
               href="/google-disclosure"
               onClick={(e) => handleLinkClick(e, 'google-disclosure')}
-              className="hover:text-terracotta-700 transition-colors cursor-pointer"
+              className="touch-target-expand inline-flex items-center hover:text-terracotta-700 transition-colors cursor-pointer"
             >
               Google Disclosure
             </a>
@@ -1005,7 +1005,7 @@ export default function Footer({ onNavigate, onOpenBecomeTutor }: FooterProps) {
               id="footer-cc-contact"
               href="/contact"
               onClick={(e) => handleLinkClick(e, 'contact')}
-              className="hover:text-terracotta-700 transition-colors cursor-pointer"
+              className="touch-target-expand inline-flex items-center hover:text-terracotta-700 transition-colors cursor-pointer"
             >
               Contact Us
             </a>
@@ -1013,7 +1013,7 @@ export default function Footer({ onNavigate, onOpenBecomeTutor }: FooterProps) {
               id="footer-cc-sop"
               href="/sop"
               onClick={(e) => handleLinkClick(e, 'sop')}
-              className="hover:text-terracotta-700 transition-colors cursor-pointer"
+              className="touch-target-expand inline-flex items-center hover:text-terracotta-700 transition-colors cursor-pointer"
             >
               System SOP
             </a>
@@ -1021,7 +1021,7 @@ export default function Footer({ onNavigate, onOpenBecomeTutor }: FooterProps) {
               id="footer-cc-admin"
               href="/admin-login"
               onClick={(e) => handleLinkClick(e, 'admin-login')}
-              className="hover:text-terracotta-700 transition-colors cursor-pointer"
+              className="touch-target-expand inline-flex items-center hover:text-terracotta-700 transition-colors cursor-pointer"
             >
               Admin Portal
             </a>

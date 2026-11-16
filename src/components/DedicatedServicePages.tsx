@@ -27,6 +27,7 @@ import hero1on1Img from '../assets/images/hero_1on1_tutoring_1787387369345.jpg';
 import heroAssignmentImg from '../assets/images/hero_assignment_guidance_1787387387028.jpg';
 import heroCourseworkImg from '../assets/images/hero_coursework_tracks_1787387403661.jpg';
 import heroEssayImg from '../assets/images/hero_essay_rhetoric_1787387419893.jpg';
+import '../data/serviceHeroesMedia';
 import { ResponsiveAvatar, ResponsivePicture } from './ResponsiveImage';
 import {
   DEDICATED_SERVICE_ROUTES,

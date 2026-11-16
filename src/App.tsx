@@ -302,29 +302,54 @@ export default function App() {
     };
   }, []);
 
-  // Gate lazy Footer download & DOM mount until user scrolls near the bottom or after brief post-paint timer for crawlers
+  // Gate lazy Footer download & DOM mount until user scrolls near bottom or browser is idle after load
   useEffect(() => {
     if (shouldRenderFooter) return;
     const el = footerSentinelRef.current;
-    if (!el || typeof IntersectionObserver === 'undefined') {
-      const fallbackTimer = window.setTimeout(() => setShouldRenderFooter(true), 400);
-      return () => window.clearTimeout(fallbackTimer);
-    }
-    const fallbackTimer = window.setTimeout(() => setShouldRenderFooter(true), 550);
-    const observer = new IntersectionObserver(
-      (entries) => {
-        if (entries.some((entry) => entry.isIntersecting)) {
-          setShouldRenderFooter(true);
-          window.clearTimeout(fallbackTimer);
-          observer.disconnect();
+    let timerId: number | null = null;
+    let idleId: number | null = null;
+    const w = window as Window & {
+      requestIdleCallback?: (cb: () => void, opts?: { timeout: number }) => number;
+      cancelIdleCallback?: (id: number) => void;
+    };
+
+    const mountFooter = () => setShouldRenderFooter(true);
+
+    const scheduleIdleMount = () => {
+      timerId = window.setTimeout(() => {
+        if (typeof w.requestIdleCallback === 'function') {
+          idleId = w.requestIdleCallback(mountFooter, { timeout: 2500 });
+        } else {
+          mountFooter();
         }
-      },
-      { rootMargin: '500px 0px' }
-    );
-    observer.observe(el);
+      }, 2200);
+    };
+
+    if (document.readyState === 'complete') {
+      scheduleIdleMount();
+    } else {
+      window.addEventListener('load', scheduleIdleMount, { once: true });
+    }
+
+    let observer: IntersectionObserver | null = null;
+    if (el && typeof IntersectionObserver !== 'undefined') {
+      observer = new IntersectionObserver(
+        (entries) => {
+          if (entries.some((entry) => entry.isIntersecting)) {
+            mountFooter();
+            observer?.disconnect();
+          }
+        },
+        { rootMargin: '850px 0px' }
+      );
+      observer.observe(el);
+    }
+
     return () => {
-      window.clearTimeout(fallbackTimer);
-      observer.disconnect();
+      window.removeEventListener('load', scheduleIdleMount);
+      if (timerId !== null) window.clearTimeout(timerId);
+      if (idleId !== null && typeof w.cancelIdleCallback === 'function') w.cancelIdleCallback(idleId);
+      observer?.disconnect();
     };
   }, [activeView, shouldRenderFooter]);
 
@@ -2013,11 +2038,11 @@ export default function App() {
       <div className="absolute top-1/3 -left-24 w-64 h-64 bg-orange-200 rounded-full blur-3xl opacity-40 pointer-events-none z-0"></div>
       <div className="absolute bottom-1/4 right-0 w-80 h-80 bg-orange-100 rounded-full blur-3xl opacity-30 pointer-events-none z-0"></div>
 
-      {/* Session Expiry Notification Banner */}
+      {/* Session Expiry Notification Banner (Fixed overlay so appearing never shifts Header or layout) */}
       {storeState.sessionExpiredMessage && (
         <div
           role="alert"
-          className="bg-amber-50 border-b border-amber-200 px-4 py-2.5 text-xs text-amber-900 flex items-center justify-between gap-3 z-50"
+          className="fixed top-0 left-0 right-0 bg-amber-50 border-b border-amber-200 px-4 py-2 text-xs text-amber-900 flex items-center justify-between gap-3 z-[60] shadow-md"
         >
           <div className="flex items-center gap-2 font-medium">
             <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
@@ -2030,14 +2055,14 @@ export default function App() {
                 store.clearSessionExpiredMessage();
                 handleNavigate('auth');
               }}
-              className="bg-orange-500 hover:bg-orange-600 text-white font-semibold px-3 py-1 rounded-lg cursor-pointer"
+              className="bg-orange-500 hover:bg-orange-600 text-white font-semibold px-3.5 py-2 min-h-[44px] rounded-lg cursor-pointer"
             >
               Sign In
             </button>
             <button
               type="button"
               onClick={() => store.clearSessionExpiredMessage()}
-              className="p-1 text-amber-700 hover:text-amber-950 cursor-pointer"
+              className="p-2 min-w-[44px] min-h-[44px] inline-flex items-center justify-center text-amber-700 hover:text-amber-950 cursor-pointer"
               aria-label="Dismiss notice"
             >
               <X className="w-4 h-4" />
@@ -2050,6 +2075,7 @@ export default function App() {
       {!(activeView === 'dashboard' && storeState.currentUser?.role === UserRole.STUDENT) && (
         <Header
           currentUser={storeState.currentUser}
+          isSessionInitialized={storeState.isSessionInitialized}
           activeView={activeView}
           onNavigate={handleNavigate}
           onLogout={handleLogout}
@@ -2268,7 +2294,7 @@ export default function App() {
                 fallback={
                   <footer
                     id="main-footer"
-                    className="min-h-[600px] bg-[#ffeedd] border-t-2 border-[#ffab85]"
+                    className="min-h-[1250px] lg:min-h-[1100px] bg-[#ffeedd] border-t-2 border-[#ffab85]"
                     aria-hidden="true"
                   />
                 }
@@ -2284,7 +2310,7 @@ export default function App() {
             ) : (
               <footer
                 id="main-footer"
-                className="min-h-[600px] bg-[#ffeedd] border-t-2 border-[#ffab85]"
+                className="min-h-[1250px] lg:min-h-[1100px] bg-[#ffeedd] border-t-2 border-[#ffab85]"
                 aria-hidden="true"
               />
             )}

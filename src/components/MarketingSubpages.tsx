@@ -29,6 +29,7 @@ import hero1on1Img from '../assets/images/hero_1on1_tutoring_1787387369345.jpg';
 import heroAssignmentImg from '../assets/images/hero_assignment_guidance_1787387387028.jpg';
 import heroCourseworkImg from '../assets/images/hero_coursework_tracks_1787387403661.jpg';
 import heroEssayImg from '../assets/images/hero_essay_rhetoric_1787387419893.jpg';
+import '../data/serviceHeroesMedia';
 import { ResponsiveAvatar, ResponsivePicture } from './ResponsiveImage';
 import {
   resolveDedicatedServiceRoute,
@@ -36,7 +37,7 @@ import {
 } from '../data/dedicatedServiceRoutes';
 import { getBlogCanonicalSlug, matchesBlogSlugOrId } from '../utils/blogSlug';
 import { apiFetch } from '../lib/apiClient';
-import { renderBlogStudioMarkdown } from './AdminBlogStudio';
+import { renderBlogStudioMarkdown } from '../utils/blogMarkdown';
 
 const DedicatedServicePages = React.lazy(() => import('./DedicatedServicePages'));
 
@@ -1313,7 +1314,7 @@ export default function MarketingSubpages({
                       <button
                         type="button"
                         onClick={() => setBlogActiveCategory(track.category)}
-                        className="text-[10px] font-bold uppercase tracking-wider text-orange-700 hover:underline cursor-pointer text-left"
+                        className="touch-target-expand compact-inline-link text-[10px] font-bold uppercase tracking-wider text-orange-700 hover:underline cursor-pointer text-left"
                       >
                         {track.category}
                       </button>
@@ -1328,7 +1329,7 @@ export default function MarketingSubpages({
                           onNavigate(track.href.replace(/^\//, ''));
                         }
                       }}
-                      className="text-[11px] font-bold text-orange-700 hover:underline inline-flex items-center gap-1"
+                      className="touch-target-expand text-[11px] font-bold text-orange-700 hover:underline inline-flex items-center gap-1"
                     >
                       <span>Explore {track.cta}</span>
                       <ArrowRight className="w-3 h-3" />
@@ -1426,7 +1427,7 @@ export default function MarketingSubpages({
                                     window.scrollTo({ top: 0, behavior: 'instant' });
                                   }
                                 }}
-                                className="hover:underline"
+                                className="hover:underline inline-block"
                               >
                                 {b.title}
                               </a>
@@ -1453,7 +1454,7 @@ export default function MarketingSubpages({
                                 window.scrollTo({ top: 0, behavior: 'instant' });
                               }
                             }}
-                            className="text-xs font-bold text-orange-700 flex items-center gap-1 group-hover:underline"
+                            className="touch-target-expand text-xs font-bold text-orange-700 flex items-center gap-1 group-hover:underline"
                           >
                             <span>Read Article</span>
                             <ArrowRight className="w-3.5 h-3.5" />
@@ -1566,7 +1567,7 @@ export default function MarketingSubpages({
                       </h2>
                       <button
                         onClick={() => handleCopyCitation(selectedBlog)}
-                        className="text-[11px] font-bold text-orange-700 hover:text-orange-850 min-h-[36px] flex items-center gap-1 cursor-pointer transition-colors"
+                        className="text-[11px] font-bold text-orange-700 hover:text-orange-850 min-h-[44px] px-2 flex items-center gap-1 cursor-pointer transition-colors"
                       >
                         <Share2 className="w-3.5 h-3.5" />
                         <span>{copiedId === selectedBlog.id ? 'Copied Citation!' : 'Copy Reference'}</span>

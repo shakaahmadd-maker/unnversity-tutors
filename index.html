@@ -147,10 +147,10 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     
-    <!-- Non-blocking asynchronous Google Fonts with display=swap -->
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@500;600;700;800&family=JetBrains+Mono:wght@500;600&family=STIX+Two+Math&display=swap" media="print" onload="this.media='all'" />
+    <!-- Non-blocking asynchronous Google Fonts with display=optional to eliminate font-swap CLS -->
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@500;600;700;800&family=JetBrains+Mono:wght@500;600&display=optional" media="print" onload="this.media='all'" />
     <noscript>
-      <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@500;600;700;800&family=JetBrains+Mono:wght@500;600&family=STIX+Two+Math&display=swap" />
+      <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@500;600;700;800&family=JetBrains+Mono:wght@500;600&display=optional" />
     </noscript>
 
     <!-- App icons -->
@@ -173,7 +173,7 @@
       #preboot-shell .preboot-navrow{display:flex;height:4rem;align-items:center;justify-content:space-between;gap:.5rem}
       @media (min-width:1024px){#preboot-shell .preboot-navrow{height:5rem}}
       #preboot-shell .preboot-logo{display:flex;align-items:center;padding:.25rem .5rem .25rem 0;margin:0;text-decoration:none;flex-shrink:0}
-      #preboot-shell .preboot-logo img{height:2.25rem;width:auto;max-width:165px;object-fit:contain;display:block}
+      #preboot-shell .preboot-logo img{height:2.25rem;width:auto;aspect-ratio:220/84;max-width:165px;object-fit:contain;display:block}
       @media (min-width:640px){#preboot-shell .preboot-logo img{height:2.75rem;max-width:195px}}
       @media (min-width:1024px){#preboot-shell .preboot-logo img{height:2.5rem;max-width:165px}}
       @media (min-width:1280px){#preboot-shell .preboot-logo img{height:3rem;max-width:210px}}

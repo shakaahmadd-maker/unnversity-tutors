@@ -328,7 +328,7 @@ export default function FooterLocationsSubjects({
                         onNavigateService(cat.slugBase);
                       }
                     }}
-                    className="text-sm font-bold text-[#204070] hover:text-orange-650 hover:underline text-left min-h-[32px] inline-flex items-center cursor-pointer"
+                    className="touch-target-expand text-sm font-bold text-[#204070] hover:text-orange-650 hover:underline text-left min-h-[32px] inline-flex items-center cursor-pointer"
                   >
                     {cat.title}
                   </a>
@@ -350,7 +350,7 @@ export default function FooterLocationsSubjects({
                           onNavigateService(`${cat.slugBase}-${c.slug}`);
                         }
                       }}
-                      className="text-left text-slate-700 hover:text-orange-650 hover:underline py-1.5 px-1.5 min-h-[28px] w-full rounded hover:bg-orange-50/50 transition-colors flex items-center gap-1.5 font-medium cursor-pointer"
+                      className="touch-target-expand text-left text-slate-700 hover:text-orange-650 hover:underline py-1.5 px-1.5 min-h-[28px] w-full rounded hover:bg-orange-50/50 transition-colors flex items-center gap-1.5 font-medium cursor-pointer"
                     >
                       <span>{c.flag}</span>
                       <span className="truncate">{c.name}</span>
@@ -403,7 +403,7 @@ export default function FooterLocationsSubjects({
                       <button
                         type="button"
                         onClick={() => onNavigateLocation(loc.city)}
-                        className="text-[10.5px] sm:text-xs md:text-[13px] leading-[1.4] sm:leading-[1.55] text-[#155799] hover:text-[#0f4c81] hover:underline text-left min-h-[28px] py-1 w-full flex items-center font-normal cursor-pointer transition-colors"
+                        className="compact-inline-link touch-target-expand text-[10.5px] sm:text-xs md:text-[13px] leading-[1.4] sm:leading-[1.55] text-[#155799] hover:text-[#0f4c81] hover:underline text-left min-h-[28px] py-1 w-full flex items-center font-normal cursor-pointer transition-colors"
                       >
                         {loc.name}
                       </button>
@@ -440,7 +440,7 @@ export default function FooterLocationsSubjects({
                           <button
                             type="button"
                             onClick={() => onNavigateLocation(loc.city)}
-                            className="text-[10.5px] sm:text-xs md:text-[13px] leading-[1.4] sm:leading-[1.55] text-[#155799] hover:text-[#0f4c81] hover:underline text-left min-h-[28px] py-1 w-full flex items-center font-normal cursor-pointer transition-colors"
+                            className="compact-inline-link touch-target-expand text-[10.5px] sm:text-xs md:text-[13px] leading-[1.4] sm:leading-[1.55] text-[#155799] hover:text-[#0f4c81] hover:underline text-left min-h-[28px] py-1 w-full flex items-center font-normal cursor-pointer transition-colors"
                           >
                             {loc.name}
                           </button>
@@ -469,7 +469,7 @@ export default function FooterLocationsSubjects({
                           <button
                             type="button"
                             onClick={() => onNavigateLocation(loc.city)}
-                            className="text-[10.5px] sm:text-xs md:text-[13px] leading-[1.4] sm:leading-[1.55] text-[#155799] hover:text-[#0f4c81] hover:underline text-left min-h-[28px] py-1 w-full flex items-center font-normal cursor-pointer transition-colors"
+                            className="compact-inline-link touch-target-expand text-[10.5px] sm:text-xs md:text-[13px] leading-[1.4] sm:leading-[1.55] text-[#155799] hover:text-[#0f4c81] hover:underline text-left min-h-[28px] py-1 w-full flex items-center font-normal cursor-pointer transition-colors"
                           >
                             {loc.name}
                           </button>
@@ -513,7 +513,7 @@ export default function FooterLocationsSubjects({
                     key={idx}
                     type="button"
                     onClick={() => onNavigateSubject(subj)}
-                    className="text-[11px] sm:text-[13px] text-[#155799] hover:text-[#0f4c81] hover:underline text-left min-h-[28px] py-1 w-full flex items-center font-normal cursor-pointer transition-colors"
+                    className="compact-inline-link touch-target-expand text-[11px] sm:text-[13px] text-[#155799] hover:text-[#0f4c81] hover:underline text-left min-h-[28px] py-1 w-full flex items-center font-normal cursor-pointer transition-colors"
                   >
                     {subj}
                   </button>
@@ -526,7 +526,7 @@ export default function FooterLocationsSubjects({
                     key={idx}
                     type="button"
                     onClick={() => onNavigateSubject(subj)}
-                    className="text-[11px] sm:text-[13px] text-[#155799] hover:text-[#0f4c81] hover:underline text-left min-h-[28px] py-1 w-full flex items-center font-normal cursor-pointer transition-colors"
+                    className="compact-inline-link touch-target-expand text-[11px] sm:text-[13px] text-[#155799] hover:text-[#0f4c81] hover:underline text-left min-h-[28px] py-1 w-full flex items-center font-normal cursor-pointer transition-colors"
                   >
                     {subj}
                   </button>
@@ -539,7 +539,7 @@ export default function FooterLocationsSubjects({
                     key={idx}
                     type="button"
                     onClick={() => onNavigateSubject(subj)}
-                    className="text-[11px] sm:text-[13px] text-[#155799] hover:text-[#0f4c81] hover:underline text-left min-h-[28px] py-1 w-full flex items-center font-normal cursor-pointer transition-colors"
+                    className="compact-inline-link touch-target-expand text-[11px] sm:text-[13px] text-[#155799] hover:text-[#0f4c81] hover:underline text-left min-h-[28px] py-1 w-full flex items-center font-normal cursor-pointer transition-colors"
                   >
                     {subj}
                   </button>

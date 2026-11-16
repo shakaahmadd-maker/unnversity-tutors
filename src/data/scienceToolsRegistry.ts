@@ -4,6 +4,7 @@ import tutorStemImg from '../assets/images/tutor_stem_statistics_1794552322797.j
 import tutorWritingImg from '../assets/images/tutor_academic_writing_1794552322265.jpg';
 import tutorAdmissionsImg from '../assets/images/tutor_admissions_career_1794552324260.jpg';
 import tutorLanguagesImg from '../assets/images/tutor_languages_german_1794552324409.jpg';
+import './tutorToolsMedia';
 
 export type ScienceCategory = 'Biology' | 'Chemistry';
 

@@ -203,7 +203,7 @@ export const PaginationBar: React.FC<PaginationBarProps> = ({
           type="button"
           disabled={activePage <= 1}
           onClick={() => onPageChange(Math.max(1, activePage - 1))}
-          className="inline-flex items-center gap-1 px-3 py-2 min-h-[40px] rounded-xl border border-gray-200 bg-white hover:bg-gray-50 disabled:opacity-45 disabled:cursor-not-allowed font-semibold cursor-pointer"
+          className="inline-flex items-center gap-1 px-3 py-2 min-h-[44px] rounded-xl border border-gray-200 bg-white hover:bg-gray-50 disabled:opacity-45 disabled:cursor-not-allowed font-semibold cursor-pointer"
         >
           <ChevronLeft className="w-3.5 h-3.5" />
           <span>Previous</span>
@@ -215,7 +215,7 @@ export const PaginationBar: React.FC<PaginationBarProps> = ({
           type="button"
           disabled={activePage >= totalPages}
           onClick={() => onPageChange(Math.min(totalPages, activePage + 1))}
-          className="inline-flex items-center gap-1 px-3 py-2 min-h-[40px] rounded-xl border border-gray-200 bg-white hover:bg-gray-50 disabled:opacity-45 disabled:cursor-not-allowed font-semibold cursor-pointer"
+          className="inline-flex items-center gap-1 px-3 py-2 min-h-[44px] rounded-xl border border-gray-200 bg-white hover:bg-gray-50 disabled:opacity-45 disabled:cursor-not-allowed font-semibold cursor-pointer"
         >
           <span>Next</span>
           <ChevronRight className="w-3.5 h-3.5" />

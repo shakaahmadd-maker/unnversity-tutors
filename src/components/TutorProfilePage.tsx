@@ -192,7 +192,7 @@ export default function TutorProfilePage({
                 onNavigate('tutors-directory');
               }
             }}
-            className="w-10 h-10 rounded-full flex items-center justify-center text-slate-700 hover:bg-slate-100 active:scale-95 transition cursor-pointer"
+            className="w-11 h-11 min-w-[44px] min-h-[44px] rounded-full flex items-center justify-center text-slate-700 hover:bg-slate-100 active:scale-95 transition cursor-pointer"
             aria-label="Go Back"
           >
             <ArrowLeft className="w-5 h-5" />
@@ -204,14 +204,14 @@ export default function TutorProfilePage({
           <div className="flex items-center gap-1">
             <button 
               onClick={toggleFavorite} 
-              className="w-10 h-10 rounded-full flex items-center justify-center text-slate-600 hover:bg-slate-100 active:scale-95 transition cursor-pointer" 
+              className="w-11 h-11 min-w-[44px] min-h-[44px] rounded-full flex items-center justify-center text-slate-600 hover:bg-slate-100 active:scale-95 transition cursor-pointer" 
               aria-label="Bookmark Profile"
             >
               <Heart className={`w-5 h-5 transition-colors ${isFavorited ? 'fill-rose-500 text-rose-500 scale-110' : 'text-slate-600'}`} />
             </button>
             <button 
               onClick={handleShare} 
-              className="w-10 h-10 rounded-full flex items-center justify-center text-slate-600 hover:bg-slate-100 active:scale-95 transition cursor-pointer" 
+              className="w-11 h-11 min-w-[44px] min-h-[44px] rounded-full flex items-center justify-center text-slate-600 hover:bg-slate-100 active:scale-95 transition cursor-pointer" 
               aria-label="Share Profile"
             >
               <Share2 className="w-5 h-5" />
@@ -398,7 +398,7 @@ export default function TutorProfilePage({
               onClick={() => {
                 if (onOpenChat) onOpenChat(tutor.id);
               }} 
-              className="text-xs font-semibold text-slate-500 hover:text-slate-800 transition inline-flex items-center gap-1.5 py-1 px-3 rounded-full hover:bg-slate-200/60 cursor-pointer"
+              className="text-xs font-semibold text-slate-500 hover:text-slate-800 transition inline-flex items-center gap-1.5 min-h-[44px] py-1 px-3 rounded-full hover:bg-slate-200/60 cursor-pointer"
             >
               <MessageCircle className="w-3.5 h-3.5 text-blue-600" />
               <span>Have questions? Chat with {tutor.name.split(' ')[0] || 'Tutor'} first</span>
@@ -445,7 +445,7 @@ export default function TutorProfilePage({
                       key={idx}
                       type="button"
                       onClick={() => handleKeywordClick(kw)}
-                      className="compact-inline-link text-[10px] bg-white hover:bg-orange-500 hover:text-white text-slate-700 border border-slate-200 font-medium px-2 py-0.5 rounded-md transition-all shadow-2xs cursor-pointer flex items-center gap-0.5"
+                      className="compact-inline-link touch-target-expand text-[10px] bg-white hover:bg-orange-500 hover:text-white text-slate-700 border border-slate-200 font-medium px-2 py-0.5 rounded-md transition-all shadow-2xs cursor-pointer flex items-center gap-0.5"
                     >
                       <span>{kw}</span>
                       <span className="text-[9px] text-slate-400">↗</span>
@@ -471,7 +471,7 @@ export default function TutorProfilePage({
                       key={idx}
                       type="button"
                       onClick={() => handleKeywordClick(kw)}
-                      className="compact-inline-link text-[10px] bg-emerald-50/60 hover:bg-emerald-600 hover:text-white text-emerald-900 border border-emerald-200/80 font-medium px-2 py-0.5 rounded-md transition-all shadow-2xs cursor-pointer flex items-center gap-0.5"
+                      className="compact-inline-link touch-target-expand text-[10px] bg-emerald-50/60 hover:bg-emerald-600 hover:text-white text-emerald-900 border border-emerald-200/80 font-medium px-2 py-0.5 rounded-md transition-all shadow-2xs cursor-pointer flex items-center gap-0.5"
                     >
                       <span>{kw}</span>
                       <span className="text-[9px] text-emerald-600">↗</span>
@@ -497,7 +497,7 @@ export default function TutorProfilePage({
                       key={idx}
                       type="button"
                       onClick={() => handleKeywordClick(kw)}
-                      className="compact-inline-link text-[10px] bg-indigo-50/60 hover:bg-indigo-600 hover:text-white text-indigo-900 border border-indigo-200/80 font-medium px-2 py-0.5 rounded-md transition-all shadow-2xs cursor-pointer flex items-center gap-0.5"
+                      className="compact-inline-link touch-target-expand text-[10px] bg-indigo-50/60 hover:bg-indigo-600 hover:text-white text-indigo-900 border border-indigo-200/80 font-medium px-2 py-0.5 rounded-md transition-all shadow-2xs cursor-pointer flex items-center gap-0.5"
                     >
                       <span>{kw}</span>
                       <span className="text-[9px] text-indigo-500">↗</span>
@@ -523,7 +523,7 @@ export default function TutorProfilePage({
                       key={idx}
                       type="button"
                       onClick={() => handleKeywordClick(kw)}
-                      className="compact-inline-link text-[10px] bg-amber-50/70 hover:bg-amber-600 hover:text-white text-amber-950 border border-amber-200/80 font-medium px-2 py-0.5 rounded-md transition-all shadow-2xs cursor-pointer flex items-center gap-0.5"
+                      className="compact-inline-link touch-target-expand text-[10px] bg-amber-50/70 hover:bg-amber-600 hover:text-white text-amber-950 border border-amber-200/80 font-medium px-2 py-0.5 rounded-md transition-all shadow-2xs cursor-pointer flex items-center gap-0.5"
                     >
                       <span>{kw}</span>
                       <span className="text-[9px] text-amber-600">↗</span>
@@ -538,7 +538,7 @@ export default function TutorProfilePage({
                 <button
                   type="button"
                   onClick={() => setShowAllKeywords(!showAllKeywords)}
-                  className="compact-inline-link text-[10.5px] font-bold text-blue-700 hover:text-blue-900 bg-blue-50/80 px-3 py-1 rounded-xl border border-blue-200 cursor-pointer transition-all"
+                  className="compact-inline-link touch-target-expand text-[10.5px] font-bold text-blue-700 hover:text-blue-900 bg-blue-50/80 px-3 py-1 rounded-xl border border-blue-200 cursor-pointer transition-all"
                 >
                   {showAllKeywords ? '▲ Show Fewer Keywords' : `▼ View All ${highSearchKws.length} Search Keywords`}
                 </button>
@@ -615,7 +615,7 @@ export default function TutorProfilePage({
                 onNavigate('tutors-directory');
               }
             }}
-            className="inline-flex items-center gap-2 text-xs font-bold text-blue-700 hover:text-blue-900 bg-white px-3.5 py-2 rounded-xl border border-slate-200 shadow-xs transition-all cursor-pointer"
+            className="inline-flex items-center gap-2 text-xs font-bold text-blue-700 hover:text-blue-900 bg-white px-3.5 py-2 min-h-[44px] rounded-xl border border-slate-200 shadow-xs transition-all cursor-pointer"
           >
             <ArrowLeft className="w-4 h-4" />
             <span>Back to All Tutors</span>
@@ -630,7 +630,7 @@ export default function TutorProfilePage({
                   onNavigate('home');
                 }
               }}
-              className="hover:text-blue-700 hover:underline"
+              className="touch-target-expand inline-block hover:text-blue-700 hover:underline"
             >
               Home
             </a>{' '}
@@ -643,7 +643,7 @@ export default function TutorProfilePage({
                   onNavigate('tutors-directory');
                 }
               }}
-              className="text-blue-600 font-semibold hover:underline"
+              className="touch-target-expand inline-block text-blue-600 font-semibold hover:underline"
             >
               {locationDisplay} Tutors
             </a>{' '}
@@ -660,14 +660,16 @@ export default function TutorProfilePage({
               
               {/* Header Info */}
               <div className="flex flex-col sm:flex-row items-start gap-5">
-                <ResponsiveAvatar
-                  src={avatarSrc}
-                  alt={tutor.name}
-                  sizePx={112}
-                  loading="eager"
-                  fallbackSrc={getFallbackAvatar(tutor.name)}
-                  className="w-24 h-24 md:w-28 md:h-28 rounded-2xl object-cover border-2 border-slate-300 shadow-md shrink-0"
-                />
+                <div className="w-24 h-24 md:w-28 md:h-28 shrink-0">
+                  <ResponsiveAvatar
+                    src={avatarSrc}
+                    alt={tutor.name}
+                    sizePx={112}
+                    loading="eager"
+                    fallbackSrc={getFallbackAvatar(tutor.name)}
+                    className="w-full h-full rounded-2xl object-cover border-2 border-slate-300 shadow-md"
+                  />
+                </div>
 
                 <div className="space-y-2">
                   <div className="flex items-center gap-2 flex-wrap">
@@ -742,7 +744,7 @@ export default function TutorProfilePage({
                 {subjects.length > 10 && (
                   <button
                     onClick={() => setShowAllSubjects(!showAllSubjects)}
-                    className="text-xs font-bold text-blue-700 hover:text-blue-900 mt-2 block cursor-pointer underline"
+                    className="touch-target-expand text-xs font-bold text-blue-700 hover:text-blue-900 mt-2 block cursor-pointer underline"
                   >
                     {showAllSubjects ? 'Show Less' : 'Show More...'}
                   </button>
@@ -795,7 +797,7 @@ export default function TutorProfilePage({
                   onClick={() => {
                     if (onOpenChat) onOpenChat(tutor.id);
                   }}
-                  className="w-full bg-orange-500 hover:bg-orange-600 active:bg-orange-700 text-white font-bold text-sm py-3 px-4 rounded-xl shadow-md transition-all cursor-pointer flex items-center justify-center gap-2 group"
+                  className="w-full bg-orange-500 hover:bg-orange-600 active:bg-orange-700 text-white font-bold text-sm py-3 px-4 min-h-[44px] rounded-xl shadow-md transition-all cursor-pointer flex items-center justify-center gap-2 group"
                 >
                   <Send className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" />
                   <span>Let's Begin (Request Session)</span>
@@ -803,7 +805,7 @@ export default function TutorProfilePage({
 
                 <button
                   onClick={() => onNavigate('get-a-quote')}
-                  className="w-full bg-slate-900 hover:bg-black text-white font-bold text-xs py-2.5 px-4 rounded-xl transition-all cursor-pointer flex items-center justify-center gap-1.5"
+                  className="w-full bg-slate-900 hover:bg-black text-white font-bold text-xs py-2.5 px-4 min-h-[44px] rounded-xl transition-all cursor-pointer flex items-center justify-center gap-1.5"
                 >
                   <MessageSquare className="w-3.5 h-3.5 text-orange-400" />
                   <span>Get Custom Price Quote</span>
@@ -868,7 +870,7 @@ export default function TutorProfilePage({
                     type="button"
                     onClick={() => handleKeywordClick(kw)}
                     title={`Search all tutors for ${kw}`}
-                    className="compact-inline-link text-xs bg-white hover:bg-orange-500 hover:text-white hover:border-orange-500 text-slate-700 border border-slate-200 font-medium px-2.5 py-1 rounded-lg transition-all shadow-2xs cursor-pointer flex items-center gap-1 group"
+                    className="compact-inline-link touch-target-expand text-xs bg-white hover:bg-orange-500 hover:text-white hover:border-orange-500 text-slate-700 border border-slate-200 font-medium px-2.5 py-1 rounded-lg transition-all shadow-2xs cursor-pointer flex items-center gap-1 group"
                   >
                     <span>{kw}</span>
                     <span className="text-[10px] text-slate-400 group-hover:text-white">↗</span>
@@ -895,7 +897,7 @@ export default function TutorProfilePage({
                     type="button"
                     onClick={() => handleKeywordClick(kw)}
                     title={`Search all tutors for ${kw}`}
-                    className="compact-inline-link text-xs bg-emerald-50/60 hover:bg-emerald-600 hover:text-white hover:border-emerald-600 text-emerald-900 border border-emerald-200/80 font-medium px-2.5 py-1 rounded-lg transition-all shadow-2xs cursor-pointer flex items-center gap-1 group"
+                    className="compact-inline-link touch-target-expand text-xs bg-emerald-50/60 hover:bg-emerald-600 hover:text-white hover:border-emerald-600 text-emerald-900 border border-emerald-200/80 font-medium px-2.5 py-1 rounded-lg transition-all shadow-2xs cursor-pointer flex items-center gap-1 group"
                   >
                     <span>{kw}</span>
                     <span className="text-[10px] text-emerald-600 group-hover:text-white">↗</span>
@@ -922,7 +924,7 @@ export default function TutorProfilePage({
                     type="button"
                     onClick={() => handleKeywordClick(kw)}
                     title={`Search tutors with career prep in ${kw}`}
-                    className="compact-inline-link text-xs bg-indigo-50/60 hover:bg-indigo-600 hover:text-white hover:border-indigo-600 text-indigo-900 border border-indigo-200/80 font-medium px-2.5 py-1 rounded-lg transition-all shadow-2xs cursor-pointer flex items-center gap-1 group"
+                    className="compact-inline-link touch-target-expand text-xs bg-indigo-50/60 hover:bg-indigo-600 hover:text-white hover:border-indigo-600 text-indigo-900 border border-indigo-200/80 font-medium px-2.5 py-1 rounded-lg transition-all shadow-2xs cursor-pointer flex items-center gap-1 group"
                   >
                     <span>{kw}</span>
                     <span className="text-[10px] text-indigo-500 group-hover:text-white">↗</span>
@@ -949,7 +951,7 @@ export default function TutorProfilePage({
                     type="button"
                     onClick={() => handleKeywordClick(kw)}
                     title={`Search tutors for ${kw}`}
-                    className="compact-inline-link text-xs bg-amber-50/70 hover:bg-amber-600 hover:text-white hover:border-amber-600 text-amber-950 border border-amber-200/80 font-medium px-2.5 py-1 rounded-lg transition-all shadow-2xs cursor-pointer flex items-center gap-1 group"
+                    className="compact-inline-link touch-target-expand text-xs bg-amber-50/70 hover:bg-amber-600 hover:text-white hover:border-amber-600 text-amber-950 border border-amber-200/80 font-medium px-2.5 py-1 rounded-lg transition-all shadow-2xs cursor-pointer flex items-center gap-1 group"
                   >
                     <span>{kw}</span>
                     <span className="text-[10px] text-amber-600 group-hover:text-white">↗</span>
@@ -965,7 +967,7 @@ export default function TutorProfilePage({
               <button
                 type="button"
                 onClick={() => setShowAllKeywords(!showAllKeywords)}
-                className="compact-inline-link text-xs font-bold text-blue-700 hover:text-blue-900 bg-blue-50/80 px-4 py-1.5 rounded-xl border border-blue-200 cursor-pointer transition-all"
+                className="compact-inline-link touch-target-expand text-xs font-bold text-blue-700 hover:text-blue-900 bg-blue-50/80 px-4 py-1.5 rounded-xl border border-blue-200 cursor-pointer transition-all"
               >
                 {showAllKeywords ? '▲ Show Fewer Keywords' : `▼ View All ${highSearchKws.length} Search Keywords for this Domain`}
               </button>

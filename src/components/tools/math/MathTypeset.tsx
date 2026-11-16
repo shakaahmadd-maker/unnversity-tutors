@@ -1,5 +1,6 @@
 import React, { useMemo } from 'react';
 import katex from 'katex';
+import 'katex/dist/katex.min.css';
 
 /**
  * Converts common ASCII / Unicode math expressions into clean KaTeX LaTeX so

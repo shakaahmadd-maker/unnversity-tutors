@@ -61,14 +61,14 @@ function HomePillarsDesktopShowcase({ onNavigate, onOpenBooking }: HomePillarsDe
                     onNavigate('service-1on1');
                   }
                 }}
-                className="inline-flex items-center gap-2 text-xs font-bold text-white bg-slate-900 hover:bg-orange-650 py-2.5 px-4 rounded-xl transition cursor-pointer"
+                className="inline-flex items-center gap-2 text-xs font-bold text-white bg-slate-900 hover:bg-orange-650 py-2.5 px-4 min-h-[44px] rounded-xl transition cursor-pointer"
               >
                 <span>Explore 1-on-1 Tutoring Page</span>
                 <ArrowRight className="w-4 h-4" />
               </a>
               <button
                 onClick={() => onOpenBooking('1. Personalized 1-1 Tutoring Services')}
-                className="inline-flex items-center gap-2 text-xs font-bold text-orange-700 hover:text-orange-850 bg-orange-50 hover:bg-orange-100 py-2.5 px-4 rounded-xl transition cursor-pointer"
+                className="inline-flex items-center gap-2 text-xs font-bold text-orange-700 hover:text-orange-850 bg-orange-50 hover:bg-orange-100 py-2.5 px-4 min-h-[44px] rounded-xl transition cursor-pointer"
               >
                 <span>Book 1-1 Tutoring Session</span>
                 <ArrowRight className="w-4 h-4" />
@@ -99,14 +99,14 @@ function HomePillarsDesktopShowcase({ onNavigate, onOpenBooking }: HomePillarsDe
                     onNavigate('service-assignment');
                   }
                 }}
-                className="inline-flex items-center gap-2 text-xs font-bold text-white bg-slate-900 hover:bg-orange-650 py-2.5 px-4 rounded-xl transition cursor-pointer"
+                className="inline-flex items-center gap-2 text-xs font-bold text-white bg-slate-900 hover:bg-orange-650 py-2.5 px-4 min-h-[44px] rounded-xl transition cursor-pointer"
               >
                 <span>Explore Assignment Guidance Page</span>
                 <ArrowRight className="w-4 h-4" />
               </a>
               <button
                 onClick={() => onOpenBooking('2. Professional Assignment Tutoring & Guidance')}
-                className="inline-flex items-center gap-2 text-xs font-bold text-orange-700 hover:text-orange-850 bg-orange-50 hover:bg-orange-100 py-2.5 px-4 rounded-xl transition cursor-pointer"
+                className="inline-flex items-center gap-2 text-xs font-bold text-orange-700 hover:text-orange-850 bg-orange-50 hover:bg-orange-100 py-2.5 px-4 min-h-[44px] rounded-xl transition cursor-pointer"
               >
                 <span>Book Assignment Guidance</span>
                 <ArrowRight className="w-4 h-4" />
@@ -165,14 +165,14 @@ function HomePillarsDesktopShowcase({ onNavigate, onOpenBooking }: HomePillarsDe
                     onNavigate('service-coursework');
                   }
                 }}
-                className="inline-flex items-center gap-2 text-xs font-bold text-white bg-slate-900 hover:bg-orange-650 py-2.5 px-4 rounded-xl transition cursor-pointer"
+                className="inline-flex items-center gap-2 text-xs font-bold text-white bg-slate-900 hover:bg-orange-650 py-2.5 px-4 min-h-[44px] rounded-xl transition cursor-pointer"
               >
                 <span>Explore Coursework Track Page</span>
                 <ArrowRight className="w-4 h-4" />
               </a>
               <button
                 onClick={() => onOpenBooking('3. Comprehensive Coursework Tutoring')}
-                className="inline-flex items-center gap-2 text-xs font-bold text-orange-700 hover:text-orange-850 bg-orange-50 hover:bg-orange-100 py-2.5 px-4 rounded-xl transition cursor-pointer"
+                className="inline-flex items-center gap-2 text-xs font-bold text-orange-700 hover:text-orange-850 bg-orange-50 hover:bg-orange-100 py-2.5 px-4 min-h-[44px] rounded-xl transition cursor-pointer"
               >
                 <span>Book Coursework Guidance</span>
                 <ArrowRight className="w-4 h-4" />
@@ -203,14 +203,14 @@ function HomePillarsDesktopShowcase({ onNavigate, onOpenBooking }: HomePillarsDe
                     onNavigate('service-essay');
                   }
                 }}
-                className="inline-flex items-center gap-2 text-xs font-bold text-white bg-slate-900 hover:bg-orange-650 py-2.5 px-4 rounded-xl transition cursor-pointer"
+                className="inline-flex items-center gap-2 text-xs font-bold text-white bg-slate-900 hover:bg-orange-650 py-2.5 px-4 min-h-[44px] rounded-xl transition cursor-pointer"
               >
                 <span>Explore Essay &amp; Citations Page</span>
                 <ArrowRight className="w-4 h-4" />
               </a>
               <button
                 onClick={() => onOpenBooking('4. Expert Academic Writing Consultation')}
-                className="inline-flex items-center gap-2 text-xs font-bold text-orange-700 hover:text-orange-850 bg-orange-50 hover:bg-orange-100 py-2.5 px-4 rounded-xl transition cursor-pointer"
+                className="inline-flex items-center gap-2 text-xs font-bold text-orange-700 hover:text-orange-850 bg-orange-50 hover:bg-orange-100 py-2.5 px-4 min-h-[44px] rounded-xl transition cursor-pointer"
               >
                 <span>Book Writing Consultation</span>
                 <ArrowRight className="w-4 h-4" />
