@@ -224,6 +224,7 @@ export class AppStore {
   private fetchDataAbortController: AbortController | null = null;
   private inFlightFetchData: Promise<void> | null = null;
   private pendingRoomCreates = new Map<string, Promise<void>>();
+  private pendingOrderCreates = new Map<string, Promise<void>>();
   private trendingTutorsLoaded = false;
   public fullDirectoryLoaded = false;
   private inFlightDirectoryLoad: Promise<void> | null = null;
@@ -739,6 +740,42 @@ export class AppStore {
     this.chats = [...pendingOptimistic, ...mappedRooms];
   }
 
+  public normalizeOrderRecord(o: any): Assignment {
+    let parsedUrls: string[] = [];
+    let parsedNames: string[] = [];
+    try {
+      parsedUrls = typeof o.fileUrls === 'string' ? JSON.parse(o.fileUrls || '[]') : Array.isArray(o.fileUrls) ? o.fileUrls : [];
+    } catch {
+      parsedUrls = [];
+    }
+    try {
+      parsedNames = typeof o.fileNames === 'string' ? JSON.parse(o.fileNames || '[]') : Array.isArray(o.fileNames) ? o.fileNames : [];
+    } catch {
+      parsedNames = [];
+    }
+    return {
+      ...o,
+      tutorId: o.tutorId || '',
+      wordCount: o.wordCount || 250,
+      fileUrls: parsedUrls,
+      fileNames: parsedNames,
+      createdAt: o.createdAt || new Date().toISOString(),
+    };
+  }
+
+  public applyOrdersData(rawOrders: any[]) {
+    const normalized = rawOrders.map((o) => this.normalizeOrderRecord(o));
+    const serverIds = new Set(normalized.map((o) => o.id));
+    const pendingOptimistic = this.assignments.filter(
+      (a) => !serverIds.has(a.id) && this.pendingOrderCreates.has(a.id)
+    );
+    const merged = [...pendingOptimistic, ...normalized];
+    merged.sort(
+      (a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime()
+    );
+    this.assignments = merged;
+  }
+
   public async fetchData(force = false) {
     if (this.inFlightFetchData) {
       if (!force) {
@@ -855,12 +892,7 @@ export class AppStore {
         const privateTasks: Promise<void>[] = [
           safePrivateFetch('/api/orders?page=1&limit=50', (oData) => {
             if (Array.isArray(oData.orders)) {
-              this.assignments = oData.orders.map((o: any) => ({
-                ...o,
-                wordCount: o.wordCount || 250,
-                fileUrls: typeof o.fileUrls === 'string' ? JSON.parse(o.fileUrls || '[]') : (o.fileUrls || []),
-                fileNames: typeof o.fileNames === 'string' ? JSON.parse(o.fileNames || '[]') : (o.fileNames || []),
-              }));
+              this.applyOrdersData(oData.orders);
             }
           }),
           safePrivateFetch('/api/chat-rooms?page=1&limit=50', (rData) => {
@@ -977,6 +1009,22 @@ export class AppStore {
   // ==========================================
   // SYNCHRONOUS CHAT STATE HELPERS
   // ==========================================
+
+  public registerPendingOrderCreate(orderId: string, createPromise: Promise<void>) {
+    this.pendingOrderCreates.set(orderId, createPromise);
+    createPromise.finally(() => {
+      if (this.pendingOrderCreates.get(orderId) === createPromise) {
+        this.pendingOrderCreates.delete(orderId);
+      }
+    });
+  }
+
+  public async waitForPendingOrderCreate(orderId: string): Promise<void> {
+    const pending = this.pendingOrderCreates.get(orderId);
+    if (pending) {
+      await pending.catch(() => {});
+    }
+  }
 
   public async waitForPendingRoomCreate(chatId: string): Promise<void> {
     const pending = this.pendingRoomCreates.get(chatId);

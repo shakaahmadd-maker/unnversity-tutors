@@ -1184,6 +1184,15 @@ export default function AdminDashboard({
               >
                 {tab.icon}
                 <span>{tab.label}</span>
+                {tab.id === 'assignments' && assignments.length > 0 && (
+                  <span
+                    className={`ml-auto px-2 py-0.5 rounded-full text-[10px] font-bold tabular-nums ${
+                      activeTab === tab.id ? 'bg-white/25 text-white' : 'bg-orange-100 text-orange-700'
+                    }`}
+                  >
+                    {assignments.length}
+                  </span>
+                )}
               </button>
             ))}
 
@@ -2229,14 +2238,17 @@ export default function AdminDashboard({
               return AssignmentStatus.PENDING;
             };
 
-            // Merge store assignments with initial submissions
-            const liveSubmissions = assignments.length > 0 
-              ? assignments.map(a => {
+            // Merge store assignments (sorted newest-first) with initial submissions
+            const sortedAssignments = [...assignments].sort(
+              (a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime()
+            );
+            const liveSubmissions = sortedAssignments.length > 0 
+              ? sortedAssignments.map(a => {
                   const student = users.find(u => 
-                    u.id.toLowerCase() === a.studentId.toLowerCase() || 
-                    u.email.toLowerCase().trim() === a.studentId.toLowerCase().trim()
+                    u.id.toLowerCase() === String(a.studentId || '').toLowerCase() || 
+                    u.email.toLowerCase().trim() === String(a.studentId || '').toLowerCase().trim()
                   );
-                  const tutor = users.find(u => u.id === a.tutorId);
+                  const tutor = a.tutorId ? users.find(u => u.id === a.tutorId) : undefined;
                   const sName = student?.name || (a.studentId.includes('@') ? a.studentId.split('@')[0] : a.studentId);
                   const sEmail = student?.email || (a.studentId.includes('@') ? a.studentId : `${a.studentId.replace(/\s+/g, '.').toLowerCase()}@universitytutors.com`);
                   
@@ -2326,6 +2338,7 @@ export default function AdminDashboard({
                 toStoreStatus={toStoreStatus}
                 isPageExpanded={isPageExpanded}
                 onTogglePageExpand={() => setIsPageExpanded(prev => !prev)}
+                onRefreshOrders={() => onLoadTab?.('assignments', true)}
                 onSeedMockStudentData={async () => {
                   try {
                     await store.addAssignment(

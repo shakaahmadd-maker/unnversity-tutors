@@ -87,6 +87,7 @@ interface AssignmentLedgerViewProps {
   onSeedMockStudentData?: () => Promise<void | boolean>;
   isPageExpanded?: boolean;
   onTogglePageExpand?: () => void;
+  onRefreshOrders?: () => Promise<void> | void;
 }
 
 interface ParsedBrief {
@@ -198,7 +199,8 @@ export default function AssignmentLedgerView({
   toStoreStatus,
   onSeedMockStudentData,
   isPageExpanded = false,
-  onTogglePageExpand
+  onTogglePageExpand,
+  onRefreshOrders
 }: AssignmentLedgerViewProps) {
   const [submissions, setSubmissions] = useState<SubmissionItem[]>(initialData);
   const [activeTab, setSubTab] = useState('All Requests');
@@ -244,10 +246,18 @@ export default function AssignmentLedgerView({
     return () => clearTimeout(timer);
   }, [searchQuery]);
 
-  // Sync state if initialData changes
+  // Sync state if initialData changes (and auto-expand newly arrived top entry)
   useEffect(() => {
     if (initialData && initialData.length > 0) {
-      setSubmissions(initialData);
+      setSubmissions(prev => {
+        const prevFirstId = prev[0]?.id;
+        const nextFirstId = initialData[0]?.id;
+        if (nextFirstId && prevFirstId && nextFirstId !== prevFirstId && !prev.some(item => item.id === nextFirstId)) {
+          setExpandedRowIds(exp => ({ ...exp, [nextFirstId]: true }));
+          setCurrentPage(1);
+        }
+        return initialData;
+      });
       setPrices(prev => {
         const next = { ...prev };
         for (const item of initialData) {
@@ -664,6 +674,21 @@ export default function AssignmentLedgerView({
                     <span>Expand Page Full Width</span>
                   </>
                 )}
+              </button>
+            )}
+
+            {onRefreshOrders && (
+              <button
+                type="button"
+                onClick={async () => {
+                  await onRefreshOrders();
+                  showNotification('Synced latest incoming student requests');
+                }}
+                className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 transition-colors cursor-pointer"
+                title="Fetch latest student requests from server"
+              >
+                <ArrowUpDown className="w-3.5 h-3.5 text-orange-600" />
+                <span>Refresh</span>
               </button>
             )}
 

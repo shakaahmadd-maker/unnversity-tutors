@@ -5918,6 +5918,70 @@ export async function createApp(options: CreateAppOptions = {}) {
   // ORDERS (Assignments & Tutoring Requests)
   // ==========================================
 
+  // Ensure a referenced student or tutor ID exists in the PostgreSQL `users` table before inserting FKs
+  const ensureUserExistsInDb = async (userId: string | null | undefined, fallbackUser?: any): Promise<boolean> => {
+    if (!userId || typeof userId !== 'string') return false;
+    const cleanId = userId.trim();
+    if (!cleanId) return false;
+    if (!isDbConnected() || !db) return true;
+    try {
+      const existing = await withDbTimeout(
+        db.select({ id: users.id }).from(users).where(eq(users.id, cleanId)).limit(1),
+        6000,
+        'Check referenced user in DB'
+      );
+      if (existing.length > 0) return true;
+
+      const memUser = memoryStore.findUserById(cleanId);
+      const seedUser = SEED_TUTORS.find((t) => t.id === cleanId);
+      const curatedUser = CURATED_SPECIALIZED_TUTORS.find((t) => t.id === cleanId);
+      const trendingUser = TRENDING_TUTORS_500.find((t) => t.id === cleanId);
+      const source: any = memUser || seedUser || curatedUser || trendingUser || fallbackUser;
+      if (!source) return false;
+
+      const safeRole = String(source.role || (cleanId.startsWith('tutor') ? 'tutor' : cleanId.startsWith('admin') ? 'admin' : 'student')).toLowerCase();
+      const rawSubjects = source.subjects || source.subjectExpertise;
+      const serializedSubjects = Array.isArray(rawSubjects)
+        ? JSON.stringify(rawSubjects)
+        : typeof rawSubjects === 'string'
+        ? rawSubjects
+        : null;
+
+      await withDbTimeout(
+        db.insert(users).values({
+          id: cleanId,
+          role: safeRole,
+          name: String(source.name || (safeRole === 'tutor' ? 'Academic Tutor' : 'Student')),
+          email: String(source.email || `${cleanId}@university-tutors.com`).toLowerCase().trim(),
+          passwordHash: null,
+          avatarUrl: String(source.avatarUrl || source.profileImageUrl || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&auto=format&fit=crop&q=80'),
+          createdAt: String(source.createdAt || new Date().toISOString()),
+          verified: source.verified !== undefined ? Boolean(source.verified) : true,
+          suspended: Boolean(source.suspended),
+          bio: source.bio || source.experience || null,
+          hourlyRate: typeof source.hourlyRate === 'number' ? source.hourlyRate : null,
+          rating: typeof source.rating === 'number' ? source.rating : null,
+          reviewCount: typeof source.reviewCount === 'number' ? source.reviewCount : (typeof source.reviewsCount === 'number' ? source.reviewsCount : null),
+          subjects: serializedSubjects,
+          country: source.country || null,
+          location: source.location || source.cityLocation || null,
+          education: source.education || null,
+          experience: source.experience || source.experienceSummary || null,
+          subjectExpertise: serializedSubjects,
+          availability: source.availability || null,
+          isApproved: source.isApproved !== undefined ? Boolean(source.isApproved) : true,
+          status: source.status || 'approved',
+        }).onConflictDoNothing(),
+        8000,
+        'Upsert referenced user in DB'
+      );
+      return true;
+    } catch (err: any) {
+      console.warn(`[API] Notice ensuring user ${cleanId} exists in DB:`, err?.message || err);
+      return false;
+    }
+  };
+
   // GET /api/orders - Role-scoped and paginated
   app.get('/api/orders', requireAuth, async (req, res) => {
     try {
@@ -5932,23 +5996,26 @@ export async function createApp(options: CreateAppOptions = {}) {
       const requestedStudentId = isAdmin ? (req.query.studentId as string | undefined) : (caller.role === 'student' ? caller.id : undefined);
       const requestedTutorId = isAdmin ? (req.query.tutorId as string | undefined) : (caller.role === 'tutor' ? caller.id : undefined);
 
-      let rows: any[] = [];
+      let dbRows: any[] = [];
       if (isDbConnected() && db) {
         try {
           if (requestedStudentId) {
-            rows = await withDbTimeout(
-              db.select().from(orders).where(eq(orders.studentId, String(requestedStudentId))).orderBy(desc(orders.createdAt)),
+            const studentEmail = !isAdmin && caller.email ? String(caller.email).toLowerCase().trim() : null;
+            dbRows = await withDbTimeout(
+              studentEmail
+                ? db.select().from(orders).where(or(eq(orders.studentId, String(requestedStudentId)), eq(orders.studentId, studentEmail))).orderBy(desc(orders.createdAt))
+                : db.select().from(orders).where(eq(orders.studentId, String(requestedStudentId))).orderBy(desc(orders.createdAt)),
               10000,
               'Query student orders'
             );
           } else if (requestedTutorId) {
-            rows = await withDbTimeout(
+            dbRows = await withDbTimeout(
               db.select().from(orders).where(eq(orders.tutorId, String(requestedTutorId))).orderBy(desc(orders.createdAt)),
               10000,
               'Query tutor orders'
             );
           } else if (isAdmin) {
-            rows = await withDbTimeout(
+            dbRows = await withDbTimeout(
               db.select().from(orders).orderBy(desc(orders.createdAt)),
               10000,
               'Query admin orders'
@@ -5959,9 +6026,36 @@ export async function createApp(options: CreateAppOptions = {}) {
         }
       }
 
-      if (rows.length === 0) {
-        rows = memoryStore.getOrders(requestedStudentId, requestedTutorId);
+      // Always merge memoryStore orders with DB rows so orders whose DB write fell back to memory are never hidden
+      let memRows = memoryStore.getOrders(requestedStudentId, requestedTutorId);
+      if (!isAdmin && caller.role === 'student' && caller.email) {
+        const byEmail = memoryStore.getOrders(String(caller.email).toLowerCase().trim(), undefined);
+        if (byEmail.length > 0) {
+          const seen = new Set(memRows.map((o) => o.id));
+          for (const o of byEmail) {
+            if (!seen.has(o.id)) memRows.push(o);
+          }
+        }
       }
+
+      const mergedMap = new Map<string, any>();
+      for (const r of memRows) {
+        mergedMap.set(r.id, r);
+      }
+      for (const r of dbRows) {
+        const existing = mergedMap.get(r.id);
+        if (!existing) {
+          mergedMap.set(r.id, r);
+        } else {
+          const existingUpd = new Date(existing.updatedAt || existing.createdAt || 0).getTime();
+          const dbUpd = new Date(r.updatedAt || r.createdAt || 0).getTime();
+          mergedMap.set(r.id, dbUpd >= existingUpd ? r : existing);
+        }
+      }
+
+      let rows = Array.from(mergedMap.values()).sort(
+        (a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime()
+      );
 
       if (statusFilter && statusFilter !== 'all') {
         rows = rows.filter((o) => String(o.status || '').toLowerCase() === statusFilter.toLowerCase());
@@ -6002,6 +6096,8 @@ export async function createApp(options: CreateAppOptions = {}) {
       const data = req.body || {};
       const orderId = data.id || 'ord_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6);
       const effectiveStudentId = isAdmin && data.studentId ? String(data.studentId) : caller.id;
+      const normalizedTutorId =
+        typeof data.tutorId === 'string' && data.tutorId.trim().length > 0 ? data.tutorId.trim() : null;
 
       if (!data.title || !data.subject) {
         return res.status(400).json({ error: 'Order title and subject are required.', code: 'VALIDATION_ERROR', status: 400 });
@@ -6010,7 +6106,7 @@ export async function createApp(options: CreateAppOptions = {}) {
       const newOrder = {
         id: orderId,
         studentId: effectiveStudentId,
-        tutorId: data.tutorId || null,
+        tutorId: normalizedTutorId,
         title: String(data.title),
         subject: String(data.subject),
         academicLevel: data.academicLevel || null,
@@ -6024,7 +6120,7 @@ export async function createApp(options: CreateAppOptions = {}) {
         fileNames: data.fileNames ? (Array.isArray(data.fileNames) ? JSON.stringify(data.fileNames) : data.fileNames) : null,
         budget: data.budget ? Number(data.budget) : null,
         quoteAmount: data.quoteAmount ? Number(data.quoteAmount) : null,
-        status: data.status || 'Pending Tutor Assignment',
+        status: data.status || (normalizedTutorId ? 'In Progress' : 'Pending Tutor Assignment'),
         escrowStatus: data.escrowStatus || 'pending',
         progressPercent: data.progressPercent ? Number(data.progressPercent) : 0,
         tutorWorkFileUrl: data.tutorWorkFileUrl || null,
@@ -6038,7 +6134,18 @@ export async function createApp(options: CreateAppOptions = {}) {
 
       if (isDbConnected() && db) {
         try {
-          await withDbTimeout(db.insert(orders).values(newOrder), 10000, 'Insert order');
+          const studentExists = await ensureUserExistsInDb(effectiveStudentId, caller);
+          const tutorExists = normalizedTutorId ? await ensureUserExistsInDb(normalizedTutorId) : false;
+          if (studentExists) {
+            await withDbTimeout(
+              db.insert(orders).values({
+                ...newOrder,
+                tutorId: tutorExists ? normalizedTutorId : null,
+              }).onConflictDoNothing(),
+              10000,
+              'Insert order'
+            );
+          }
         } catch (dbErr: any) {
           console.warn('[API] Notice inserting order into DB:', dbErr.message);
         }
@@ -6080,10 +6187,19 @@ export async function createApp(options: CreateAppOptions = {}) {
       if (updates.quoteAmount !== undefined && updates.quoteAmount !== null) updates.quoteAmount = Number(updates.quoteAmount);
       if (updates.progressPercent !== undefined) updates.progressPercent = Number(updates.progressPercent);
 
+      if (updates.tutorId !== undefined) {
+        updates.tutorId = typeof updates.tutorId === 'string' && updates.tutorId.trim().length > 0 ? updates.tutorId.trim() : null;
+      }
       memoryStore.updateOrder(id, updates);
 
       if (isDbConnected() && db) {
         try {
+          if (updates.tutorId) {
+            const tutorExists = await ensureUserExistsInDb(updates.tutorId);
+            if (!tutorExists) {
+              updates.tutorId = null;
+            }
+          }
           const allowedCols = [
             'studentId', 'tutorId', 'title', 'subject', 'academicLevel', 'deadline',
             'pages', 'wordCount', 'referenceStyle', 'sourcesCount', 'instructions',
@@ -6274,9 +6390,18 @@ export async function createApp(options: CreateAppOptions = {}) {
       // Save to database if connected
       if (isDbConnected() && db) {
         try {
-          await db.insert(chatRooms).values(newRoom);
+          await ensureUserExistsInDb(currentUser.id, currentUser);
+          let safeOrderId = newRoom.orderId;
+          if (safeOrderId) {
+            const ordExists = await db.select({ id: orders.id }).from(orders).where(eq(orders.id, safeOrderId)).limit(1);
+            if (ordExists.length === 0) safeOrderId = null;
+          }
+          await db.insert(chatRooms).values({ ...newRoom, orderId: safeOrderId }).onConflictDoNothing();
           for (const m of membersList) {
-            await db.insert(chatRoomMembers).values(m);
+            const memberExists = await ensureUserExistsInDb(m.userId);
+            if (memberExists) {
+              await db.insert(chatRoomMembers).values(m).onConflictDoNothing();
+            }
           }
         } catch (dbErr: any) {
           console.warn('[API] Notice inserting chat room into DB:', dbErr.message);

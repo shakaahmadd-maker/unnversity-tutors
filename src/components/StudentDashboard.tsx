@@ -558,13 +558,18 @@ export default function StudentDashboard({
   const unreadNotifCount = userNotifications.filter(n => !n.read).length;
 
 
-  // Filter lists for current student (matching across user ID, email, and display name for funnel submissions)
-  const studentAssignments = assignments.filter(a => {
-    if (a.studentId === currentUser.id) return true;
-    if (currentUser.email && a.studentId.toLowerCase() === currentUser.email.toLowerCase()) return true;
-    if (currentUser.name && a.studentId.toLowerCase() === currentUser.name.toLowerCase()) return true;
-    return false;
-  });
+  // Filter lists for current student (matching across user ID, email, and display name) sorted newest-first
+  const studentAssignments = assignments
+    .filter(a => {
+      const aStudent = String(a.studentId || '').toLowerCase().trim();
+      if (!aStudent) return false;
+      if (aStudent === String(currentUser.id || '').toLowerCase().trim()) return true;
+      if (currentUser.email && aStudent === currentUser.email.toLowerCase().trim()) return true;
+      if (currentUser.name && aStudent === currentUser.name.toLowerCase().trim()) return true;
+      return false;
+    })
+    .slice()
+    .sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
 
   const studentPayments = payments.filter(p => {
     const a = assignments.find(assign => assign.id === p.assignmentId);
@@ -1109,11 +1114,13 @@ export default function StudentDashboard({
       setQuickReqTitle('');
       setQuickReqNotes('');
       setQuickReqDeliverables([]);
+      setSearchQuery('');
+      setAssignmentsPage(1);
       setActiveTab('chat');
-      triggerToast('Request submitted & chat thread opened!');
-    } catch (err) {
+      triggerToast('Request submitted & added to your dashboard!');
+    } catch (err: any) {
       console.error('Quick request submission failed:', err);
-      triggerToast('Unable to submit request. Please try again.');
+      triggerToast(err?.message || 'Unable to submit request. Please try again.');
     } finally {
       setIsSubmittingQuickReq(false);
     }
@@ -2085,7 +2092,12 @@ export default function StudentDashboard({
               chats={studentChats}
               existingAssignments={studentAssignments}
               initialPathway={preselectedWizardPathway}
-              onSubmitAssignment={onSubmitAssignment}
+              onSubmitAssignment={async (data) => {
+                await Promise.resolve(onSubmitAssignment(data));
+                setSearchQuery('');
+                setAssignmentsPage(1);
+                triggerToast('New request created & added to your dashboard!');
+              }}
               onOpenChat={onOpenChat}
               onOpenWhatsApp={onOpenWhatsApp}
               onOpenMenu={() => setIsMobileSidebarOpen(true)}

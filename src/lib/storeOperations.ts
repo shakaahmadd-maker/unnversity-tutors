@@ -77,12 +77,7 @@ export async function loadDashboardTabData(
         tasks.push(
           safeGet(`/api/orders?page=${page}&limit=${limit}${searchQ}`, (oData) => {
             if (Array.isArray(oData.orders)) {
-              store.assignments = oData.orders.map((o: any) => ({
-                ...o,
-                wordCount: o.wordCount || 250,
-                fileUrls: typeof o.fileUrls === 'string' ? JSON.parse(o.fileUrls || '[]') : (o.fileUrls || []),
-                fileNames: typeof o.fileNames === 'string' ? JSON.parse(o.fileNames || '[]') : (o.fileNames || []),
-              }));
+              store.applyOrdersData(oData.orders);
             }
           })
         );
@@ -142,12 +137,7 @@ export async function loadDashboardTabData(
         tasks.push(
           safeGet(`/api/orders?page=${page}&limit=${limit}`, (oData) => {
             if (Array.isArray(oData.orders)) {
-              store.assignments = oData.orders.map((o: any) => ({
-                ...o,
-                wordCount: o.wordCount || 250,
-                fileUrls: typeof o.fileUrls === 'string' ? JSON.parse(o.fileUrls || '[]') : (o.fileUrls || []),
-                fileNames: typeof o.fileNames === 'string' ? JSON.parse(o.fileNames || '[]') : (o.fileNames || []),
-              }));
+              store.applyOrdersData(oData.orders);
             }
           }),
           safeGet(`/api/payments?page=${page}&limit=${limit}`, (pData) => {
@@ -172,17 +162,25 @@ export async function loadDashboardTabData(
             }
           })
         );
+      } else if (tab === 'assignments') {
+        tasks.push(
+          safeGet(
+            store.fullDirectoryLoaded ? '/api/users?role=student&page=1&limit=500' : '/api/users?page=1&limit=2500',
+            (uData) => {
+              if (Array.isArray(uData.users)) {
+                store.mergeServerUsers(uData.users);
+                if (!store.fullDirectoryLoaded) store.fullDirectoryLoaded = true;
+              }
+            }
+          )
+        );
       }
       if (['assignments', 'student_profiles', 'disputes', 'reports'].includes(tab)) {
+        const ordersLimit = Math.max(limit, 100);
         tasks.push(
-          safeGet(`/api/orders?page=${page}&limit=${limit}`, (oData) => {
+          safeGet(`/api/orders?page=${page}&limit=${ordersLimit}`, (oData) => {
             if (Array.isArray(oData.orders)) {
-              store.assignments = oData.orders.map((o: any) => ({
-                ...o,
-                wordCount: o.wordCount || 250,
-                fileUrls: typeof o.fileUrls === 'string' ? JSON.parse(o.fileUrls || '[]') : (o.fileUrls || []),
-                fileNames: typeof o.fileNames === 'string' ? JSON.parse(o.fileNames || '[]') : (o.fileNames || []),
-              }));
+              store.applyOrdersData(oData.orders);
             }
           })
         );
@@ -787,10 +785,12 @@ export async function addAssignment(
   tutorId?: string
 ): Promise<Assignment> {
   const assignId = `assign_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
+  const effectiveStudentId = store.currentUser?.id || studentId;
+  const cleanTutorId = typeof tutorId === 'string' && tutorId.trim().length > 0 ? tutorId.trim() : '';
   const newAssignment: Assignment = {
     id: assignId,
-    studentId,
-    tutorId: tutorId || '',
+    studentId: effectiveStudentId,
+    tutorId: cleanTutorId,
     title,
     subject,
     deadline,
@@ -800,7 +800,7 @@ export async function addAssignment(
     instructions,
     fileUrls,
     fileNames,
-    status: tutorId ? AssignmentStatus.IN_PROGRESS : AssignmentStatus.PENDING,
+    status: cleanTutorId ? AssignmentStatus.IN_PROGRESS : AssignmentStatus.PENDING,
     progressPercent: 0,
     createdAt: new Date().toISOString(),
   };
@@ -808,27 +808,55 @@ export async function addAssignment(
   store.assignments.unshift(newAssignment);
   store.notify();
 
-  apiFetch('/api/orders', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      id: assignId,
-      studentId,
-      tutorId: tutorId || null,
-      title,
-      subject,
-      deadline,
-      wordCount,
-      referenceStyle,
-      sourcesCount,
-      instructions,
-      fileUrls,
-      fileNames,
-      status: newAssignment.status,
-    }),
-  }).catch(() => {});
+  let serverOrder: Assignment = newAssignment;
+  const persistPromise = (async () => {
+    const res = await apiFetch('/api/orders', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        id: assignId,
+        studentId: effectiveStudentId,
+        tutorId: cleanTutorId || null,
+        title,
+        subject,
+        deadline,
+        wordCount,
+        referenceStyle,
+        sourcesCount,
+        instructions,
+        fileUrls,
+        fileNames,
+        status: newAssignment.status,
+      }),
+    });
 
-  return newAssignment;
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      throw new Error(data?.error || data?.message || `Failed to save request (HTTP ${res.status})`);
+    }
+
+    if (data?.order) {
+      serverOrder = store.normalizeOrderRecord(data.order);
+      const idx = store.assignments.findIndex((a) => a.id === assignId || a.id === serverOrder.id);
+      if (idx !== -1) {
+        store.assignments[idx] = serverOrder;
+      } else {
+        store.assignments.unshift(serverOrder);
+      }
+      store.notify();
+    }
+  })();
+
+  store.registerPendingOrderCreate(assignId, persistPromise.catch(() => {}));
+
+  try {
+    await persistPromise;
+    return serverOrder;
+  } catch (err) {
+    store.assignments = store.assignments.filter((a) => a.id !== assignId);
+    store.notify();
+    throw err;
+  }
 }
 
 export async function createAssignmentWithDirectInvoice(
@@ -878,6 +906,7 @@ export async function updateAssignmentStatus(store: AppStore, assignmentId: stri
   if (assign) {
     assign.status = status;
     store.notify();
+    await store.waitForPendingOrderCreate(assignmentId);
     apiFetch(`/api/orders/${assignmentId}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
@@ -892,6 +921,7 @@ export async function assignTutorToAssignment(store: AppStore, assignmentId: str
     assign.tutorId = tutorId;
     assign.status = AssignmentStatus.IN_PROGRESS;
     store.notify();
+    await store.waitForPendingOrderCreate(assignmentId);
     apiFetch(`/api/orders/${assignmentId}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
@@ -905,6 +935,7 @@ export async function updateAssignmentProgress(store: AppStore, assignmentId: st
   if (assign) {
     assign.progressPercent = progressPercent;
     store.notify();
+    await store.waitForPendingOrderCreate(assignmentId);
     apiFetch(`/api/orders/${assignmentId}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
@@ -918,6 +949,7 @@ export async function setAssignmentCustomPrice(store: AppStore, assignmentId: st
   if (assign) {
     assign.quoteAmount = price;
     store.notify();
+    await store.waitForPendingOrderCreate(assignmentId);
     apiFetch(`/api/orders/${assignmentId}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
