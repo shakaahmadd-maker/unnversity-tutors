@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { ChevronDown } from 'lucide-react';
+import { isModifiedAnchorClick } from '../data/dedicatedServiceRoutes';
 
 interface FooterLocationsSubjectsProps {
   onNavigateLocation: (locationName: string) => void;
@@ -280,16 +281,22 @@ export default function FooterLocationsSubjects({
           </h3>
           <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-3">
             {countriesList.map((c) => (
-              <button
+              <a
                 key={c.slug}
                 id={`footer-country-portal-${c.slug}`}
-                onClick={() => onNavigateCountry && onNavigateCountry(c.slug)}
-                className="bg-white border border-slate-200 hover:border-orange-500 hover:bg-orange-50/50 p-2.5 min-h-[44px] rounded-xl text-center transition-all shadow-2xs group cursor-pointer"
+                href={`/online-tutoring-${c.slug}`}
+                onClick={(e) => {
+                  if (!isModifiedAnchorClick(e) && onNavigateCountry) {
+                    e.preventDefault();
+                    onNavigateCountry(c.slug);
+                  }
+                }}
+                className="bg-white border border-slate-200 hover:border-orange-500 hover:bg-orange-50/50 p-2.5 min-h-[44px] rounded-xl text-center transition-all shadow-2xs group cursor-pointer block"
               >
                 <div className="text-lg mb-1 group-hover:scale-115 transition-transform">{c.flag}</div>
                 <div className="text-[11px] font-bold text-slate-800 group-hover:text-orange-650 line-clamp-1 leading-tight">{c.name.replace(' Online Tutoring', '')}</div>
                 <div className="text-[9px] text-slate-600 font-medium">Online Tutoring</div>
-              </button>
+              </a>
             ))}
           </div>
         </div>
@@ -313,12 +320,18 @@ export default function FooterLocationsSubjects({
                 className="bg-white p-5 rounded-2xl border border-slate-200 space-y-3 shadow-2xs"
               >
                 <div className="flex items-center justify-between border-b border-slate-100 pb-2">
-                  <button
-                    onClick={() => onNavigateService && onNavigateService(cat.slugBase)}
+                  <a
+                    href={`/${cat.slugBase}`}
+                    onClick={(e) => {
+                      if (!isModifiedAnchorClick(e) && onNavigateService) {
+                        e.preventDefault();
+                        onNavigateService(cat.slugBase);
+                      }
+                    }}
                     className="text-sm font-bold text-[#204070] hover:text-orange-650 hover:underline text-left min-h-[32px] inline-flex items-center cursor-pointer"
                   >
                     {cat.title}
-                  </button>
+                  </a>
                   <span className="text-[10px] text-orange-700 font-bold bg-orange-50 px-2 py-0.5 rounded-md">
                     Global / All
                   </span>
@@ -328,14 +341,20 @@ export default function FooterLocationsSubjects({
                 </p>
                 <div className="grid grid-cols-2 gap-1.5 pt-1 text-xs">
                   {cat.countries.map((c) => (
-                    <button
+                    <a
                       key={c.slug}
-                      onClick={() => onNavigateService && onNavigateService(`${cat.slugBase}-${c.slug}`)}
+                      href={`/${cat.slugBase}-${c.slug}`}
+                      onClick={(e) => {
+                        if (!isModifiedAnchorClick(e) && onNavigateService) {
+                          e.preventDefault();
+                          onNavigateService(`${cat.slugBase}-${c.slug}`);
+                        }
+                      }}
                       className="text-left text-slate-700 hover:text-orange-650 hover:underline py-1.5 px-1.5 min-h-[28px] w-full rounded hover:bg-orange-50/50 transition-colors flex items-center gap-1.5 font-medium cursor-pointer"
                     >
                       <span>{c.flag}</span>
                       <span className="truncate">{c.name}</span>
-                    </button>
+                    </a>
                   ))}
                 </div>
               </div>

@@ -184,15 +184,21 @@ export default function TutorProfilePage({
         
         {/* Top Mobile App Header / Navigation Bar */}
         <header className="sticky top-0 z-30 bg-white/90 backdrop-blur-md border-b border-slate-100 px-4 py-3 flex items-center justify-between transition-all">
-          <button 
-            onClick={() => onNavigate('tutors-directory')} 
-            className="w-10 h-10 rounded-full flex items-center justify-center text-slate-700 hover:bg-slate-100 active:scale-95 transition cursor-pointer" 
+          <a
+            href="/tutors"
+            onClick={(e) => {
+              if (!e.metaKey && !e.ctrlKey && !e.shiftKey && !e.altKey && e.button === 0) {
+                e.preventDefault();
+                onNavigate('tutors-directory');
+              }
+            }}
+            className="w-10 h-10 rounded-full flex items-center justify-center text-slate-700 hover:bg-slate-100 active:scale-95 transition cursor-pointer"
             aria-label="Go Back"
           >
             <ArrowLeft className="w-5 h-5" />
-          </button>
+          </a>
           <div className="text-center min-w-0 px-2">
-            <h1 className="text-xs font-semibold text-slate-400 tracking-wider uppercase">Tutor Profile</h1>
+            <span className="text-xs font-semibold text-slate-400 tracking-wider uppercase block">Tutor Profile</span>
             <p className="text-sm font-bold text-slate-800 truncate">{tutor.name}</p>
           </div>
           <div className="flex items-center gap-1">
@@ -601,17 +607,48 @@ export default function TutorProfilePage({
         
         {/* Breadcrumbs & Back Button */}
         <div className="flex items-center justify-between">
-          <button
-            onClick={() => onNavigate('tutors-directory')}
+          <a
+            href="/tutors"
+            onClick={(e) => {
+              if (!e.metaKey && !e.ctrlKey && !e.shiftKey && !e.altKey && e.button === 0) {
+                e.preventDefault();
+                onNavigate('tutors-directory');
+              }
+            }}
             className="inline-flex items-center gap-2 text-xs font-bold text-blue-700 hover:text-blue-900 bg-white px-3.5 py-2 rounded-xl border border-slate-200 shadow-xs transition-all cursor-pointer"
           >
             <ArrowLeft className="w-4 h-4" />
             <span>Back to All Tutors</span>
-          </button>
+          </a>
 
-          <div className="text-xs text-slate-500 font-medium">
-            <span>Home</span> / <span className="text-blue-600 font-semibold">{locationDisplay} Tutors</span> / <span className="font-bold text-slate-800">{tutor.name}</span>
-          </div>
+          <nav aria-label="Breadcrumb" className="text-xs text-slate-500 font-medium">
+            <a
+              href="/"
+              onClick={(e) => {
+                if (!e.metaKey && !e.ctrlKey && !e.shiftKey && !e.altKey && e.button === 0) {
+                  e.preventDefault();
+                  onNavigate('home');
+                }
+              }}
+              className="hover:text-blue-700 hover:underline"
+            >
+              Home
+            </a>{' '}
+            /{' '}
+            <a
+              href="/tutors"
+              onClick={(e) => {
+                if (!e.metaKey && !e.ctrlKey && !e.shiftKey && !e.altKey && e.button === 0) {
+                  e.preventDefault();
+                  onNavigate('tutors-directory');
+                }
+              }}
+              className="text-blue-600 font-semibold hover:underline"
+            >
+              {locationDisplay} Tutors
+            </a>{' '}
+            / <span className="font-bold text-slate-800">{tutor.name}</span>
+          </nav>
         </div>
 
         {/* Main Profile Card (Matching Screenshot 2) */}

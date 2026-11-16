@@ -3,6 +3,7 @@ import { Sparkles, CheckCircle2 } from 'lucide-react';
 import { User, Blog, FAQ } from '../types';
 import hero1on1Img from '../assets/images/hero_1on1_tutoring_1787387369345.jpg';
 import { ResponsiveAvatar, ResponsivePicture } from './ResponsiveImage';
+import { isModifiedAnchorClick } from '../data/dedicatedServiceRoutes';
 
 const HowItWorksSection = React.lazy(() => import('./HowItWorksSection'));
 const HomeFourPillarsCards = React.lazy(() => import('./HomeFourPillarsCards'));
@@ -76,40 +77,50 @@ function MarketingPages({
     if (activeView !== 'home' || shouldLoadPillars) return;
     const node = pillarsSentinelRef.current;
     if (!node || typeof IntersectionObserver === 'undefined') {
-      const t = window.setTimeout(() => setShouldLoadPillars(true), 1800);
+      const t = window.setTimeout(() => setShouldLoadPillars(true), 250);
       return () => window.clearTimeout(t);
     }
+    const fallbackTimer = window.setTimeout(() => setShouldLoadPillars(true), 250);
     const observer = new IntersectionObserver(
       (entries) => {
         if (entries.some((entry) => entry.isIntersecting)) {
           setShouldLoadPillars(true);
+          window.clearTimeout(fallbackTimer);
           observer.disconnect();
         }
       },
       { rootMargin: '750px 0px' }
     );
     observer.observe(node);
-    return () => observer.disconnect();
+    return () => {
+      window.clearTimeout(fallbackTimer);
+      observer.disconnect();
+    };
   }, [activeView, shouldLoadPillars]);
 
   useEffect(() => {
     if (activeView !== 'home' || shouldLoadBelowFold) return;
     const node = belowFoldSentinelRef.current;
     if (!node || typeof IntersectionObserver === 'undefined') {
-      const t = window.setTimeout(() => setShouldLoadBelowFold(true), 2500);
+      const t = window.setTimeout(() => setShouldLoadBelowFold(true), 400);
       return () => window.clearTimeout(t);
     }
+    const fallbackTimer = window.setTimeout(() => setShouldLoadBelowFold(true), 400);
     const observer = new IntersectionObserver(
       (entries) => {
         if (entries.some((entry) => entry.isIntersecting)) {
           setShouldLoadBelowFold(true);
+          window.clearTimeout(fallbackTimer);
           observer.disconnect();
         }
       },
       { rootMargin: '600px 0px' }
     );
     observer.observe(node);
-    return () => observer.disconnect();
+    return () => {
+      window.clearTimeout(fallbackTimer);
+      observer.disconnect();
+    };
   }, [activeView, shouldLoadBelowFold]);
 
   const handleOpenBooking = useCallback((service: string) => {
@@ -151,20 +162,32 @@ function MarketingPages({
                 </p>
 
                 <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 sm:gap-4 pt-1 sm:pt-2">
-                  <button
+                  <a
                     id="hero-find-tutor-btn"
-                    onClick={() => onNavigate('tutors')}
-                    className="bg-orange-650 hover:bg-orange-700 text-white font-bold text-xs tracking-wider uppercase px-7 py-3.5 sm:px-8 sm:py-4 min-h-[44px] rounded-xl shadow-lg shadow-orange-650/15 cursor-pointer hover:-translate-y-0.5 transition-all duration-200 text-center"
+                    href="/tutors"
+                    onClick={(e) => {
+                      if (!isModifiedAnchorClick(e)) {
+                        e.preventDefault();
+                        onNavigate('tutors');
+                      }
+                    }}
+                    className="bg-orange-650 hover:bg-orange-700 text-white font-bold text-xs tracking-wider uppercase px-7 py-3.5 sm:px-8 sm:py-4 min-h-[44px] rounded-xl shadow-lg shadow-orange-650/15 cursor-pointer hover:-translate-y-0.5 transition-all duration-200 text-center inline-flex items-center justify-center"
                   >
                     Find a Tutor
-                  </button>
-                  <button
+                  </a>
+                  <a
                     id="hero-get-quote-btn"
-                    onClick={() => onNavigate('contact')}
-                    className="bg-white hover:bg-gray-100 text-gray-800 border-2 border-gray-250 font-bold text-xs tracking-wider uppercase px-7 py-3.5 sm:px-8 sm:py-4 min-h-[44px] rounded-xl cursor-pointer hover:-translate-y-0.5 transition-all duration-200 text-center"
+                    href="/contact"
+                    onClick={(e) => {
+                      if (!isModifiedAnchorClick(e)) {
+                        e.preventDefault();
+                        onNavigate('contact');
+                      }
+                    }}
+                    className="bg-white hover:bg-gray-100 text-gray-800 border-2 border-gray-250 font-bold text-xs tracking-wider uppercase px-7 py-3.5 sm:px-8 sm:py-4 min-h-[44px] rounded-xl cursor-pointer hover:-translate-y-0.5 transition-all duration-200 text-center inline-flex items-center justify-center"
                   >
                     Get a Free Quote
-                  </button>
+                  </a>
                 </div>
 
                 <div className="pt-4 sm:pt-6 border-t border-gray-100 flex items-center gap-3 sm:gap-4 text-xs font-semibold text-gray-600">
@@ -460,6 +483,87 @@ function MarketingPages({
               <div className="min-h-[1200px] bg-amber-50/20 border-b border-gray-100" aria-hidden="true" />
             )}
           </div>
+
+          {/* Direct Academic Portals & Top Resources Internal Link Directory */}
+          <section
+            aria-label="Direct Academic Portals and Top Resources"
+            className="bg-slate-50 border-t border-gray-200 py-10 px-4 sm:px-6 md:px-8"
+          >
+            <div className="container mx-auto max-w-7xl space-y-6">
+              <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-2 border-b border-slate-200 pb-4">
+                <div>
+                  <span className="text-[10px] font-bold uppercase tracking-widest text-orange-700 block">
+                    Direct Academic Portals &amp; Top Resources
+                  </span>
+                  <h2 className="text-lg sm:text-xl font-bold text-slate-900 tracking-tight">
+                    Explore Verified Tutors, Study Guides &amp; Free University Calculators
+                  </h2>
+                </div>
+                <a
+                  href="/tutors"
+                  onClick={(e) => {
+                    if (!isModifiedAnchorClick(e)) {
+                      e.preventDefault();
+                      onNavigate('tutors');
+                    }
+                  }}
+                  className="text-xs font-bold text-orange-700 hover:underline shrink-0"
+                >
+                  View All 500+ Tutors →
+                </a>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 text-xs">
+                <div className="bg-white rounded-2xl border border-slate-200 p-4 space-y-2.5">
+                  <h3 className="font-bold text-slate-900 text-xs uppercase tracking-wider">Featured Subject Tutors</h3>
+                  <ul className="space-y-1.5 text-slate-700">
+                    <li><a href="/tutor/james-cook" className="hover:text-orange-700 hover:underline font-medium">James Cook — Computer Science &amp; Systems (Sydney)</a></li>
+                    <li><a href="/tutor/dr-clara-stirling" className="hover:text-orange-700 hover:underline font-medium">Dr. Clara Stirling — Quantitative Economics &amp; Stats</a></li>
+                    <li><a href="/tutor/liam-kennedy-m-sc" className="hover:text-orange-700 hover:underline font-medium">Liam Kennedy, M.Sc — Applied Calculus &amp; Chemistry</a></li>
+                    <li><a href="/tutor/dr-marcus-vance" className="hover:text-orange-700 hover:underline font-medium">Dr. Marcus Vance — Python &amp; Machine Learning</a></li>
+                    <li><a href="/tutors" className="text-orange-700 font-bold hover:underline">Browse Full Tutor Directory →</a></li>
+                  </ul>
+                </div>
+
+                <div className="bg-white rounded-2xl border border-slate-200 p-4 space-y-2.5">
+                  <h3 className="font-bold text-slate-900 text-xs uppercase tracking-wider">Blog &amp; Academic Guides</h3>
+                  <ul className="space-y-1.5 text-slate-700">
+                    <li><a href="/blog" className="hover:text-orange-700 hover:underline font-bold text-orange-700">Academic Knowledge Hub (/blog)</a></li>
+                    <li><a href="/blog/the-ultimate-harvard-apa-7th-edition-formatting-checklist-for-2026" className="hover:text-orange-700 hover:underline font-medium">Harvard &amp; APA 7th Formatting Checklist</a></li>
+                    <li><a href="/blog/mastering-the-undergraduate-dissertation-5-critical-roadmap-milestones" className="hover:text-orange-700 hover:underline font-medium">5-Milestone Dissertation Roadmap</a></li>
+                    <li><a href="/blog/active-recall-vs-passive-reading-why-high-achievers-tutor-one-on-one" className="hover:text-orange-700 hover:underline font-medium">Active Recall vs Passive Reading</a></li>
+                    <li><a href="/blog/understanding-turnitin-similarity-scores-and-academic-integrity-boundaries" className="hover:text-orange-700 hover:underline font-medium">Turnitin Similarity &amp; Integrity Guide</a></li>
+                  </ul>
+                </div>
+
+                <div className="bg-white rounded-2xl border border-slate-200 p-4 space-y-2.5">
+                  <h3 className="font-bold text-slate-900 text-xs uppercase tracking-wider">Free Student Tools (70+)</h3>
+                  <ul className="space-y-1.5 text-slate-700">
+                    <li><a href="/tools" className="hover:text-orange-700 hover:underline font-bold text-orange-700">All 70+ Free Student Tools</a></li>
+                    <li><a href="/tools/math" className="hover:text-orange-700 hover:underline font-medium">27 Math &amp; Statistics Solvers</a></li>
+                    <li><a href="/tools/biology" className="hover:text-orange-700 hover:underline font-medium">14 Biology &amp; Genetics Calculators</a></li>
+                    <li><a href="/tools/chemistry" className="hover:text-orange-700 hover:underline font-medium">16 Chemistry &amp; Spectroscopy Tools</a></li>
+                    <li><a href="/tools/citation-generator" className="hover:text-orange-700 hover:underline font-medium">APA, MLA &amp; Harvard Citation Generator</a></li>
+                    <li><a href="/tools/university-grade-converter" className="hover:text-orange-700 hover:underline font-medium">GPA &amp; University Grade Converter</a></li>
+                  </ul>
+                </div>
+
+                <div className="bg-white rounded-2xl border border-slate-200 p-4 space-y-2.5">
+                  <h3 className="font-bold text-slate-900 text-xs uppercase tracking-wider">Global Country Portals</h3>
+                  <ul className="grid grid-cols-2 gap-1.5 text-slate-700">
+                    <li><a href="/online-tutoring-usa" className="hover:text-orange-700 hover:underline font-medium">USA Tutoring</a></li>
+                    <li><a href="/online-tutoring-uk" className="hover:text-orange-700 hover:underline font-medium">UK Tutoring</a></li>
+                    <li><a href="/online-tutoring-canada" className="hover:text-orange-700 hover:underline font-medium">Canada Tutoring</a></li>
+                    <li><a href="/online-tutoring-australia" className="hover:text-orange-700 hover:underline font-medium">Australia Tutoring</a></li>
+                    <li><a href="/online-tutoring-ireland" className="hover:text-orange-700 hover:underline font-medium">Ireland Tutoring</a></li>
+                    <li><a href="/online-tutoring-new-zealand" className="hover:text-orange-700 hover:underline font-medium">NZ Tutoring</a></li>
+                    <li><a href="/online-tutoring-singapore" className="hover:text-orange-700 hover:underline font-medium">Singapore Tutoring</a></li>
+                    <li><a href="/online-tutoring-uae" className="hover:text-orange-700 hover:underline font-medium">UAE Tutoring</a></li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+          </section>
         </div>
       )}
 

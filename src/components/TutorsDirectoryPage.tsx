@@ -28,6 +28,8 @@ import { apiFetch, getFriendlyErrorMessage } from '../lib/apiClient';
 import { TabLoadingSkeleton, ErrorStatePanel } from './ui/StatePanels';
 import { getRelevantKeywordsForTutor } from '../data/subjectKeywordsData';
 import { ResponsiveAvatar } from './ResponsiveImage';
+import { assignUniqueTutorSlugs, getTutorCanonicalSlug } from '../utils/tutorSlug';
+import { isModifiedAnchorClick } from '../data/dedicatedServiceRoutes';
 
 interface TutorsDirectoryPageProps {
   locationFilter?: string;
@@ -301,6 +303,8 @@ export default function TutorsDirectoryPage({
     return Array.from(uniqueMap.values());
   }, [masterTutors, allStoreTutors]);
 
+  const tutorSlugMap = useMemo(() => assignUniqueTutorSlugs(unifiedTutors), [unifiedTutors]);
+
   const COUNTRY_OPTIONS = useMemo(() => {
     const matchesOption = (t: User, optValue: string, optCode?: string) => {
       if (optValue === 'all') return true;
@@ -511,13 +515,19 @@ export default function TutorsDirectoryPage({
             </p>
           </div>
 
-          <button
-            onClick={() => onNavigate('home')}
+          <a
+            href="/"
+            onClick={(e) => {
+              if (!isModifiedAnchorClick(e)) {
+                e.preventDefault();
+                onNavigate('home');
+              }
+            }}
             className="inline-flex items-center gap-2 text-xs font-bold text-slate-700 bg-slate-50 hover:bg-orange-50 hover:text-orange-600 px-4 py-3 rounded-2xl border border-slate-200/80 transition-all cursor-pointer self-start md:self-auto shrink-0 shadow-xs"
           >
             <ArrowLeft className="w-4 h-4 text-[#FF7A00]" />
             <span>Return to Home</span>
-          </button>
+          </a>
         </div>
 
         {/* Mobile Filter Toggle */}
@@ -805,6 +815,8 @@ export default function TutorsDirectoryPage({
 
                 const availabilityText = tutor.availability || 'Flexible schedule (EST, GMT, AEST)';
                 const canMeetText = tutor.canMeet || '1-on-1 Worldwide Interactive';
+                const tutorCanonicalSlug = getTutorCanonicalSlug(tutor, tutorSlugMap);
+                const tutorProfileHref = `/tutor/${encodeURIComponent(tutorCanonicalSlug)}`;
 
                 return (
                   <div key={tutor.id} className="tutor-directory-card">
@@ -815,9 +827,15 @@ export default function TutorsDirectoryPage({
                       {/* Top Row: Avatar + Info + Rate */}
                       <div className="flex items-start gap-3.5">
                         {/* Avatar with Verified Floating Badge */}
-                        <div
-                          onClick={() => onSelectTutorProfile(tutor)}
-                          className="relative shrink-0 cursor-pointer"
+                        <a
+                          href={tutorProfileHref}
+                          onClick={(e) => {
+                            if (!isModifiedAnchorClick(e)) {
+                              e.preventDefault();
+                              onSelectTutorProfile(tutor);
+                            }
+                          }}
+                          className="relative shrink-0 cursor-pointer block"
                         >
                           <ResponsiveAvatar
                             src={tutor.avatarUrl || (tutor as any).profileImageUrl}
@@ -830,7 +848,7 @@ export default function TutorsDirectoryPage({
                             <Check className="w-2.5 h-2.5 stroke-[3]" />
                             <span>Verified</span>
                           </span>
-                        </div>
+                        </a>
 
                         {/* Middle Info Column with Header (Name + Rate) */}
                         <div className="flex-1 min-w-0 pt-0.5">
@@ -838,11 +856,19 @@ export default function TutorsDirectoryPage({
                           <div className="flex items-start justify-between gap-1.5">
                             <div className="min-w-0 flex-1">
                               <div className="flex items-center gap-1.5 flex-wrap">
-                                <h3
-                                  onClick={() => onSelectTutorProfile(tutor)}
-                                  className="text-base sm:text-lg font-bold text-slate-950 leading-snug cursor-pointer hover:text-[#ea580c] transition-colors"
-                                >
-                                  {tutor.name}
+                                <h3 className="text-base sm:text-lg font-bold text-slate-950 leading-snug">
+                                  <a
+                                    href={tutorProfileHref}
+                                    onClick={(e) => {
+                                      if (!isModifiedAnchorClick(e)) {
+                                        e.preventDefault();
+                                        onSelectTutorProfile(tutor);
+                                      }
+                                    }}
+                                    className="cursor-pointer hover:text-[#ea580c] transition-colors"
+                                  >
+                                    {tutor.name}
+                                  </a>
                                 </h3>
                                 <span className="inline-block w-2.5 h-2.5 rounded-full bg-emerald-500 ring-2 ring-white shrink-0" title="Online now" />
                               </div>
@@ -936,13 +962,19 @@ export default function TutorsDirectoryPage({
 
                       {/* Action Buttons Footer */}
                       <div className="mt-4 pt-3 border-t border-slate-100 flex items-center gap-2.5">
-                        <button
-                          onClick={() => onSelectTutorProfile(tutor)}
+                        <a
+                          href={tutorProfileHref}
+                          onClick={(e) => {
+                            if (!isModifiedAnchorClick(e)) {
+                              e.preventDefault();
+                              onSelectTutorProfile(tutor);
+                            }
+                          }}
                           className="flex-1 py-2.5 px-3 rounded-xl border border-slate-200 hover:border-slate-300 bg-white text-slate-700 hover:text-slate-950 text-xs font-bold transition-all text-center flex items-center justify-center gap-1 shadow-2xs cursor-pointer active:scale-[0.98]"
                         >
                           <span>Full Profile</span>
                           <span className="text-[11px]">↗</span>
-                        </button>
+                        </a>
                         <button
                           onClick={() => onOpenChat(tutor.id)}
                           className="flex-[1.4] py-2.5 px-4 rounded-xl bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 active:scale-[0.98] text-white text-xs font-bold shadow-md shadow-orange-500/25 transition-all flex items-center justify-center gap-1.5 cursor-pointer"
@@ -958,9 +990,15 @@ export default function TutorsDirectoryPage({
                       <div className="flex flex-col sm:flex-row items-start gap-5">
                         
                         {/* Avatar with Verified Status */}
-                        <div
-                          onClick={() => onSelectTutorProfile(tutor)}
-                          className="relative shrink-0 cursor-pointer"
+                        <a
+                          href={tutorProfileHref}
+                          onClick={(e) => {
+                            if (!isModifiedAnchorClick(e)) {
+                              e.preventDefault();
+                              onSelectTutorProfile(tutor);
+                            }
+                          }}
+                          className="relative shrink-0 cursor-pointer block"
                         >
                           <ResponsiveAvatar
                             src={tutor.avatarUrl || (tutor as any).profileImageUrl}
@@ -973,18 +1011,26 @@ export default function TutorsDirectoryPage({
                             <ShieldCheck className="w-3 h-3" />
                             <span>Verified</span>
                           </span>
-                        </div>
+                        </a>
 
                         {/* Tutor Details */}
                         <div className="flex-1 space-y-3">
                           <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-2">
                             <div>
                               <div className="flex flex-wrap items-center gap-2">
-                                <h2
-                                  onClick={() => onSelectTutorProfile(tutor)}
-                                  className="text-xl font-bold text-slate-900 hover:text-[#FF7A00] transition-colors cursor-pointer"
-                                >
-                                  {tutor.name}
+                                <h2 className="text-xl font-bold text-slate-900">
+                                  <a
+                                    href={tutorProfileHref}
+                                    onClick={(e) => {
+                                      if (!isModifiedAnchorClick(e)) {
+                                        e.preventDefault();
+                                        onSelectTutorProfile(tutor);
+                                      }
+                                    }}
+                                    className="hover:text-[#FF7A00] transition-colors cursor-pointer"
+                                  >
+                                    {tutor.name}
+                                  </a>
                                 </h2>
                                 <span className="text-base" title={countryName}>
                                   {flagEmoji}
@@ -1096,12 +1142,18 @@ export default function TutorsDirectoryPage({
 
                           {/* Action Buttons */}
                           <div className="pt-3 border-t border-slate-100 flex flex-wrap items-center justify-between gap-3">
-                            <button
-                              onClick={() => onSelectTutorProfile(tutor)}
+                            <a
+                              href={tutorProfileHref}
+                              onClick={(e) => {
+                                if (!isModifiedAnchorClick(e)) {
+                                  e.preventDefault();
+                                  onSelectTutorProfile(tutor);
+                                }
+                              }}
                               className="text-xs font-bold text-slate-600 hover:text-[#FF7A00] transition-colors cursor-pointer"
                             >
                               View Full Profile &amp; Research Portfolio →
-                            </button>
+                            </a>
 
                             <button
                               onClick={() => onOpenChat(tutor.id)}

@@ -26,6 +26,7 @@ import {
   SitemapBlogInput,
   SitemapTutorInput,
 } from './src/server/sitemapGenerator';
+import { renderSeoHtml } from './src/server/ssrSeoRenderer';
 import { getBlogCanonicalSlug, matchesBlogSlugOrId } from './src/utils/blogSlug';
 import {
   getIndexNowKey,
@@ -8727,9 +8728,42 @@ export async function createApp(options: CreateAppOptions = {}) {
       });
       const vite = await createViteServer({
         server: { middlewareMode: true },
-        appType: 'spa',
+        appType: 'custom',
       });
       app.use(vite.middlewares);
+
+      const devIndexHtmlPath = path.resolve(process.cwd(), 'index.html');
+      app.get('*', async (req, res, next) => {
+        if (
+          req.path.startsWith('/api/') ||
+          req.path.startsWith('/uploads/') ||
+          req.path.startsWith('/@') ||
+          req.path.startsWith('/src/') ||
+          req.path.startsWith('/node_modules/') ||
+          req.path.startsWith('/.well-known/') ||
+          path.extname(req.path)
+        ) {
+          return next();
+        }
+        try {
+          const rawTemplate = fs.readFileSync(devIndexHtmlPath, 'utf-8');
+          const transformedTemplate = await vite.transformIndexHtml(req.originalUrl, rawTemplate);
+          const renderedHtml = await renderSeoHtml({
+            reqPath: req.path,
+            templateHtml: transformedTemplate,
+            loadMergedPublicTutorCatalog,
+            loadSitemapDatabaseRecords,
+          });
+          res.status(200);
+          res.setHeader('Content-Type', 'text/html; charset=utf-8');
+          res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+          res.setHeader('Link', '</.well-known/ard.json>; rel="ard"; type="application/json"');
+          return res.send(renderedHtml);
+        } catch (err) {
+          vite.ssrFixStacktrace(err as Error);
+          return next(err);
+        }
+      });
     } else {
       const possibleDistPaths = [
         path.join(process.cwd(), 'dist'),
@@ -8774,8 +8808,9 @@ export async function createApp(options: CreateAppOptions = {}) {
         }));
       }
 
-      // Static files: long immutable caching for versioned logo variants, 7-day SWR for stable filenames, no-cache for HTML
+      // Static files: disable auto-index so `/` always passes through SSR SEO renderer; long cache for hashed/media assets
       app.use(express.static(distPath, {
+        index: false,
         dotfiles: 'allow',
         maxAge: '7d',
         setHeaders: (res, filePath) => {
@@ -8806,10 +8841,47 @@ export async function createApp(options: CreateAppOptions = {}) {
         });
       });
 
-      app.get('*', (_req, res) => {
+      const prodIndexHtmlPath = path.join(distPath, 'index.html');
+      let cachedProdIndexTemplate = '';
+      try {
+        if (fs.existsSync(prodIndexHtmlPath)) {
+          cachedProdIndexTemplate = fs.readFileSync(prodIndexHtmlPath, 'utf-8');
+        }
+      } catch {
+        cachedProdIndexTemplate = '';
+      }
+
+      app.get('*', async (req, res, next) => {
+        if (
+          req.path.startsWith('/api/') ||
+          req.path.startsWith('/uploads/') ||
+          req.path.startsWith('/assets/') ||
+          req.path.startsWith('/.well-known/') ||
+          (req.path !== '/' && path.extname(req.path) && !req.path.endsWith('.html'))
+        ) {
+          return next();
+        }
         res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
         res.setHeader('Link', '</.well-known/ard.json>; rel="ard"; type="application/json"');
-        res.sendFile(path.join(distPath, 'index.html'));
+        try {
+          const templateHtml =
+            cachedProdIndexTemplate ||
+            (fs.existsSync(prodIndexHtmlPath) ? fs.readFileSync(prodIndexHtmlPath, 'utf-8') : '');
+          if (!templateHtml) {
+            return res.sendFile(prodIndexHtmlPath);
+          }
+          const renderedHtml = await renderSeoHtml({
+            reqPath: req.path,
+            templateHtml,
+            loadMergedPublicTutorCatalog,
+            loadSitemapDatabaseRecords,
+          });
+          res.status(200).setHeader('Content-Type', 'text/html; charset=utf-8');
+          return res.send(renderedHtml);
+        } catch (err) {
+          console.error('[SSR-SEO] Production HTML render fallback:', (err as Error)?.message || err);
+          return res.sendFile(prodIndexHtmlPath);
+        }
       });
     }
   }

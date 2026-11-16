@@ -76,6 +76,8 @@ const EXCLUDED_EXACT_PATHS = new Set([
   '/get-quote',
   '/tutor',
   '/sop',
+  '/whatsapp',
+  '/whatsapp-desk',
 ]);
 
 export const ROBOTS_TXT_CONTENT = [
@@ -223,7 +225,6 @@ export function buildAllSitemapEntries(params: {
   addRoute('/about', '0.8', 'weekly');
   addRoute('/faqs', '0.8', 'weekly');
   addRoute('/contact', '0.8', 'weekly');
-  addRoute('/whatsapp', '0.8', 'weekly');
 
   // Public Legal, Privacy & Compliance Pages
   addRoute('/privacy', '0.5', 'monthly');

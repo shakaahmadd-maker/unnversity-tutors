@@ -9,7 +9,7 @@ import {
   MessageCircle,
 } from 'lucide-react';
 import { User, UserRole } from '../types';
-import { resolveDedicatedServiceRoute } from '../data/dedicatedServiceRoutes';
+import { resolveDedicatedServiceRoute, isModifiedAnchorClick } from '../data/dedicatedServiceRoutes';
 
 const ServicesDropdownPanel = lazy(() =>
   import('./HeaderMenus').then((m) => ({ default: m.ServicesDropdownPanel }))
@@ -117,40 +117,55 @@ export default function Header({
                     { code: 'new-zealand', label: 'NZ 🇳🇿' },
                     { code: 'singapore', label: 'SG 🇸🇬' },
                   ].map((c) => (
-                    <button
+                    <a
                       key={c.code}
-                      type="button"
                       id={`header-country-${c.code}`}
-                      onClick={() => handleLinkClick(`online-tutoring-${c.code}`)}
+                      href={`/online-tutoring-${c.code}`}
+                      onClick={(e) => {
+                        if (!isModifiedAnchorClick(e)) {
+                          e.preventDefault();
+                          handleLinkClick(`online-tutoring-${c.code}`);
+                        }
+                      }}
                       className="hover:text-orange-400 hover:underline cursor-pointer text-[10px] font-sans px-1 shrink-0"
                     >
                       {c.label}
-                    </button>
+                    </a>
                   ))}
                 </div>
               </>
             )}
           </div>
 
-          <button
-            type="button"
+          <a
             id="header-whatsapp-fast-track-btn"
-            onClick={() => handleLinkClick('whatsapp')}
+            href="/whatsapp"
+            onClick={(e) => {
+              if (!isModifiedAnchorClick(e)) {
+                e.preventDefault();
+                handleLinkClick('whatsapp');
+              }
+            }}
             className="flex items-center gap-1.5 bg-emerald-950/80 hover:bg-emerald-900 text-emerald-300 hover:text-white px-2.5 py-0.5 rounded border border-emerald-700/60 transition-colors font-sans font-semibold text-[11px] cursor-pointer whitespace-nowrap shrink-0"
           >
             <MessageCircle className="w-3 h-3 text-emerald-400 shrink-0" />
             <span>WhatsApp (24/7)</span>
-          </button>
+          </a>
         </div>
       </div>
 
       <div className="container mx-auto px-4 lg:px-5 xl:px-8 max-w-7xl">
         <div className="flex h-16 lg:h-20 items-center justify-between gap-3 xl:gap-6">
           {/* Logo Brand Identity */}
-          <button
-            type="button"
+          <a
             id="logo-home-nav"
-            onClick={() => handleLinkClick('home')}
+            href="/"
+            onClick={(e) => {
+              if (!isModifiedAnchorClick(e)) {
+                e.preventDefault();
+                handleLinkClick('home');
+              }
+            }}
             className="flex items-center cursor-pointer py-1 pr-2 group select-none text-left shrink-0"
           >
             <picture className="shrink-0">
@@ -171,15 +186,20 @@ export default function Header({
                 className="h-9 sm:h-11 lg:h-10 xl:h-12 w-auto max-w-[165px] sm:max-w-[195px] lg:max-w-[165px] xl:max-w-[210px] object-contain transition-transform group-hover:scale-102"
               />
             </picture>
-          </button>
+          </a>
 
           {/* Desktop Navigation Links */}
           {isLgUp && (
             <nav className="hidden lg:flex items-center gap-3.5 xl:gap-5 shrink-0" onPointerEnter={prefetchHeaderMenus}>
-              <button
-                type="button"
+              <a
                 id="nav-home"
-                onClick={() => handleLinkClick('home')}
+                href="/"
+                onClick={(e) => {
+                  if (!isModifiedAnchorClick(e)) {
+                    e.preventDefault();
+                    handleLinkClick('home');
+                  }
+                }}
                 className={`text-[13px] xl:text-sm font-semibold tracking-wide transition-colors cursor-pointer whitespace-nowrap shrink-0 ${
                   activeView === 'home'
                     ? 'text-orange-650 border-b-2 border-orange-650 pb-1'
@@ -187,7 +207,7 @@ export default function Header({
                 }`}
               >
                 Home
-              </button>
+              </a>
 
               {/* Services Dropdown */}
               <div
@@ -271,11 +291,16 @@ export default function Header({
                   activeView === link.view ||
                   (link.view === 'blog' && (activeView.startsWith('blog-') || activeView.startsWith('blog/')));
                 return (
-                  <button
-                    type="button"
+                  <a
                     key={link.view}
                     id={`nav-${link.view}`}
-                    onClick={() => handleLinkClick(link.view)}
+                    href={`/${link.view}`}
+                    onClick={(e) => {
+                      if (!isModifiedAnchorClick(e)) {
+                        e.preventDefault();
+                        handleLinkClick(link.view);
+                      }
+                    }}
                     className={`text-[13px] xl:text-sm font-semibold tracking-wide transition-colors cursor-pointer whitespace-nowrap shrink-0 ${
                       isActive
                         ? 'text-orange-650 border-b-2 border-orange-650 pb-1'
@@ -283,7 +308,7 @@ export default function Header({
                     }`}
                   >
                     {link.name}
-                  </button>
+                  </a>
                 );
               })}
             </nav>
@@ -324,14 +349,19 @@ export default function Header({
                   >
                     Sign In
                   </button>
-                  <button
-                    type="button"
+                  <a
                     id="nav-join-find"
-                    onClick={() => handleLinkClick('tutors')}
-                    className="bg-orange-600 hover:bg-orange-700 text-white font-bold text-[11px] xl:text-xs tracking-wider uppercase px-3 xl:px-4 py-2 min-h-[40px] rounded-xl shadow-md shadow-orange-500/20 hover:-translate-y-0.5 transition-all duration-200 cursor-pointer whitespace-nowrap shrink-0"
+                    href="/tutors"
+                    onClick={(e) => {
+                      if (!isModifiedAnchorClick(e)) {
+                        e.preventDefault();
+                        handleLinkClick('tutors');
+                      }
+                    }}
+                    className="bg-orange-600 hover:bg-orange-700 text-white font-bold text-[11px] xl:text-xs tracking-wider uppercase px-3 xl:px-4 py-2 min-h-[40px] rounded-xl shadow-md shadow-orange-500/20 hover:-translate-y-0.5 transition-all duration-200 cursor-pointer whitespace-nowrap shrink-0 inline-flex items-center"
                   >
                     Find a Tutor
-                  </button>
+                  </a>
                   <button
                     type="button"
                     id="nav-become-tutor-btn"

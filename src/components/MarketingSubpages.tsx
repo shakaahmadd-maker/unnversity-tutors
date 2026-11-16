@@ -210,7 +210,20 @@ export default function MarketingSubpages({
   const [contactSuccess, setContactSuccess] = useState(false);
 
   // Blog Details & Search State
-  const [selectedBlog, setSelectedBlog] = useState<Blog | null>(null);
+  const [selectedBlog, setSelectedBlog] = useState<Blog | null>(() => {
+    if (!activeView.startsWith('blog/')) return null;
+    const slugPart = activeView.slice('blog/'.length);
+    const localMatch = blogs.find((b) => matchesBlogSlugOrId(b, slugPart));
+    if (localMatch) return localMatch;
+    if (typeof window !== 'undefined') {
+      const ssrData = (window as Window & { __INITIAL_SSR_DATA__?: { routeType?: string; blog?: Blog } })
+        .__INITIAL_SSR_DATA__;
+      if (ssrData?.routeType === 'blog-post' && ssrData.blog && matchesBlogSlugOrId(ssrData.blog, slugPart)) {
+        return ssrData.blog;
+      }
+    }
+    return null;
+  });
   const [blogSearchQuery, setBlogSearchQuery] = useState('');
   const [blogActiveCategory, setBlogActiveCategory] = useState('All');
   const [blogClaps, setBlogClaps] = useState<Record<string, number>>({
@@ -1260,6 +1273,70 @@ export default function MarketingSubpages({
                 ))}
               </div>
 
+              {/* Featured Study Tracks & Academic Categories (Ensures rich, indexable editorial value) */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-10">
+                {[
+                  {
+                    category: 'University Survival',
+                    title: 'Dissertation & Thesis Roadmaps',
+                    desc: 'Chapter-by-chapter milestone frameworks, literature synthesis matrices, and defense prep strategies.',
+                    href: '/services/coursework-track',
+                    cta: 'Coursework Track',
+                  },
+                  {
+                    category: 'APA Guidelines',
+                    title: 'Harvard & APA 7th Reference Manuals',
+                    desc: 'Step-by-step in-text citation formatting, DOI rules, and bibliography checklists for essays.',
+                    href: '/tools/citation-generator',
+                    cta: 'Citation Generator',
+                  },
+                  {
+                    category: 'Mathematics Tricks',
+                    title: 'STEM Active Recall & Exam Coaching',
+                    desc: 'Spaced repetition formulas, calculus derivation drills, and error-log methods for high grades.',
+                    href: '/tools/math',
+                    cta: '27 Math Solvers',
+                  },
+                  {
+                    category: 'Legal Disclaimers',
+                    title: 'Turnitin & Academic Integrity Standards',
+                    desc: 'Clear boundaries on ethical study coaching, paraphrase verification, and similarity reports.',
+                    href: '/tutors',
+                    cta: 'Verified Mentors',
+                  },
+                ].map((track) => (
+                  <div
+                    key={track.title}
+                    className="bg-orange-50/40 border border-orange-100 rounded-2xl p-5 flex flex-col justify-between space-y-3"
+                  >
+                    <div className="space-y-1.5">
+                      <button
+                        type="button"
+                        onClick={() => setBlogActiveCategory(track.category)}
+                        className="text-[10px] font-bold uppercase tracking-wider text-orange-700 hover:underline cursor-pointer text-left"
+                      >
+                        {track.category}
+                      </button>
+                      <h2 className="text-sm font-bold text-gray-950 font-sans leading-snug">{track.title}</h2>
+                      <p className="text-xs text-gray-600 leading-relaxed">{track.desc}</p>
+                    </div>
+                    <a
+                      href={track.href}
+                      onClick={(e) => {
+                        if (!isModifiedAnchorClick(e)) {
+                          e.preventDefault();
+                          onNavigate(track.href.replace(/^\//, ''));
+                        }
+                      }}
+                      className="text-[11px] font-bold text-orange-700 hover:underline inline-flex items-center gap-1"
+                    >
+                      <span>Explore {track.cta}</span>
+                      <ArrowRight className="w-3 h-3" />
+                    </a>
+                  </div>
+                ))}
+              </div>
+
               {/* Filtered Grid */}
               {blogs.filter((b) => {
                 const matchesCat = blogActiveCategory === 'All' || b.category === blogActiveCategory;
@@ -1296,39 +1373,63 @@ export default function MarketingSubpages({
                         b.tags.some((t) => t.toLowerCase().includes(blogSearchQuery.toLowerCase()));
                       return matchesCat && matchesSearch;
                     })
-                    .map((b) => (
-                      <div
+                    .map((b) => {
+                      const blogSlug = getBlogCanonicalSlug(b);
+                      const blogHref = `/blog/${encodeURIComponent(blogSlug)}`;
+                      return (
+                      <article
                         key={b.id}
                         id={`blog-preview-card-${b.id}`}
-                        className="bg-white border border-gray-150 rounded-3xl overflow-hidden shadow-xs hover:border-orange-200 hover:shadow-md transition-all flex flex-col justify-between cursor-pointer group"
-                        onClick={() => {
-                          setSelectedBlog(b);
-                          onNavigate(`blog/${getBlogCanonicalSlug(b)}`);
-                          window.scrollTo({ top: 0, behavior: 'instant' });
-                        }}
+                        className="bg-white border border-gray-150 rounded-3xl overflow-hidden shadow-xs hover:border-orange-200 hover:shadow-md transition-all flex flex-col justify-between group"
                       >
                         <div>
-                          <ResponsivePicture
-                            src={b.imageUrl || b.image}
-                            alt={b.title}
-                            width={600}
-                            height={224}
-                            loading="lazy"
-                            sizes="(max-width: 768px) 94vw, 560px"
-                            widths={[400, 600, 800]}
-                            className="w-full h-56 object-cover"
-                          />
+                          <a
+                            href={blogHref}
+                            onClick={(e) => {
+                              if (!isModifiedAnchorClick(e)) {
+                                e.preventDefault();
+                                setSelectedBlog(b);
+                                onNavigate(`blog/${blogSlug}`);
+                                window.scrollTo({ top: 0, behavior: 'instant' });
+                              }
+                            }}
+                            className="block"
+                          >
+                            <ResponsivePicture
+                              src={b.imageUrl || b.image}
+                              alt={b.title}
+                              width={600}
+                              height={224}
+                              loading="lazy"
+                              sizes="(max-width: 768px) 94vw, 560px"
+                              widths={[400, 600, 800]}
+                              className="w-full h-56 object-cover"
+                            />
+                          </a>
                           <div className="p-6 space-y-3">
                             <div className="flex items-center gap-2.5">
                               <span className="text-[10px] font-semibold tracking-wider text-orange-700 bg-orange-100 px-2.5 py-1 rounded-full uppercase">
                                 {b.category}
                               </span>
-                              <span className="text-[10px] text-gray-600 font-mono">
+                              <time dateTime={b.publishedAt} className="text-[10px] text-gray-600 font-mono">
                                 {new Date(b.publishedAt).toLocaleDateString()}
-                              </span>
+                              </time>
                             </div>
                             <h2 className="text-lg font-bold text-gray-950 font-sans leading-tight group-hover:text-orange-650 transition-colors">
-                              {b.title}
+                              <a
+                                href={blogHref}
+                                onClick={(e) => {
+                                  if (!isModifiedAnchorClick(e)) {
+                                    e.preventDefault();
+                                    setSelectedBlog(b);
+                                    onNavigate(`blog/${blogSlug}`);
+                                    window.scrollTo({ top: 0, behavior: 'instant' });
+                                  }
+                                }}
+                                className="hover:underline"
+                              >
+                                {b.title}
+                              </a>
                             </h2>
                             <p className="text-xs text-gray-600 leading-relaxed line-clamp-3">{b.content}</p>
                           </div>
@@ -1342,13 +1443,25 @@ export default function MarketingSubpages({
                               </span>
                             ))}
                           </div>
-                          <span className="text-xs font-bold text-orange-700 flex items-center gap-1 group-hover:underline">
+                          <a
+                            href={blogHref}
+                            onClick={(e) => {
+                              if (!isModifiedAnchorClick(e)) {
+                                e.preventDefault();
+                                setSelectedBlog(b);
+                                onNavigate(`blog/${blogSlug}`);
+                                window.scrollTo({ top: 0, behavior: 'instant' });
+                              }
+                            }}
+                            className="text-xs font-bold text-orange-700 flex items-center gap-1 group-hover:underline"
+                          >
                             <span>Read Article</span>
                             <ArrowRight className="w-3.5 h-3.5" />
-                          </span>
+                          </a>
                         </div>
-                      </div>
-                    ))}
+                      </article>
+                      );
+                    })}
                 </div>
               )}
             </>
@@ -1357,17 +1470,21 @@ export default function MarketingSubpages({
             <div className="space-y-8 animate-fade-in text-left max-w-7xl mx-auto" id="blog-modal-container">
               {/* Back breadcrumb navigation */}
               <div className="flex items-center justify-between pb-4 border-b border-gray-150">
-                <button
+                <a
                   id="close-blog-popup"
-                  onClick={() => {
-                    setSelectedBlog(null);
-                    onNavigate('blog');
+                  href="/blog"
+                  onClick={(e) => {
+                    if (!isModifiedAnchorClick(e)) {
+                      e.preventDefault();
+                      setSelectedBlog(null);
+                      onNavigate('blog');
+                    }
                   }}
                   className="flex items-center gap-2 text-xs font-bold text-gray-700 hover:text-orange-700 py-2.5 px-4 min-h-[44px] rounded-xl bg-white border border-gray-200 transition-all cursor-pointer shadow-xs"
                 >
                   <ArrowLeft className="w-4 h-4" />
                   <span>Back to Knowledge Hub</span>
-                </button>
+                </a>
 
                 <div className="text-[10px] text-gray-600 font-medium font-mono hidden md:block">
                   Reference: https://university-tutors.com/blog/{getBlogCanonicalSlug(selectedBlog)}
@@ -1376,16 +1493,19 @@ export default function MarketingSubpages({
 
               {/* Core Page Columns */}
               <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 md:gap-12 pt-4">
-                <div className="lg:col-span-8 space-y-6">
+                <article className="lg:col-span-8 space-y-6">
                   <div className="space-y-4">
                     <div className="flex flex-wrap items-center gap-3">
                       <span className="text-[10px] font-bold tracking-widest text-orange-700 bg-orange-100 px-3 py-1.5 rounded-full uppercase">
                         {selectedBlog.category}
                       </span>
-                      <span className="text-xs text-gray-600 font-mono flex items-center gap-1">
+                      <time
+                        dateTime={selectedBlog.publishedAt}
+                        className="text-xs text-gray-600 font-mono flex items-center gap-1"
+                      >
                         <Calendar className="w-3.5 h-3.5" />
                         {new Date(selectedBlog.publishedAt).toDateString()}
-                      </span>
+                      </time>
                       <span className="text-xs text-gray-600 font-medium flex items-center gap-1">
                         <Clock className="w-3.5 h-3.5" />
                         {selectedBlog.readTime || '5 min read'}
@@ -1456,7 +1576,7 @@ export default function MarketingSubpages({
                       If you are citing this advice within your essay plan or academic blog, please use this standardized citation structure:
                     </p>
                     <div className="p-3.5 bg-white border border-orange-100 rounded-xl font-mono text-[10px] text-gray-700 select-all leading-relaxed break-all">
-                      University-Tutors. (2026). <em>{selectedBlog.title}</em>. Academic Guides &amp; Mentorship Articles. Available at: https://universitytutors.com/blog/{selectedBlog.id}
+                      University-Tutors. (2026). <em>{selectedBlog.title}</em>. Academic Guides &amp; Mentorship Articles. Available at: https://university-tutors.com/blog/{getBlogCanonicalSlug(selectedBlog)}
                     </div>
                   </div>
 
@@ -1558,7 +1678,7 @@ export default function MarketingSubpages({
                       </div>
                     </form>
                   </div>
-                </div>
+                </article>
 
                 {/* Right Sidebar Column */}
                 <div className="lg:col-span-4 lg:sticky lg:top-24 self-start space-y-6 text-left">
@@ -1586,33 +1706,44 @@ export default function MarketingSubpages({
                     <p className="text-[11px] text-gray-300 leading-relaxed">
                       Discuss your syllabus, template draft requirements, and rubrics directly with vetted lecturers under secure Stripe escrow coverage. No blind risk!
                     </p>
-                    <button
+                    <a
                       id="blog-modal-services-btn"
-                      onClick={() => {
-                        setSelectedBlog(null);
-                        onNavigate('services');
+                      href="/services"
+                      onClick={(e) => {
+                        if (!isModifiedAnchorClick(e)) {
+                          e.preventDefault();
+                          setSelectedBlog(null);
+                          onNavigate('services');
+                        }
                       }}
-                      className="w-full bg-orange-650 hover:bg-orange-700 text-white font-extrabold text-xs py-3 min-h-[44px] rounded-xl transition-all cursor-pointer block text-center uppercase tracking-wider font-sans shadow-md shadow-orange-650/10"
+                      className="w-full bg-orange-650 hover:bg-orange-700 text-white font-extrabold text-xs py-3 min-h-[44px] rounded-xl transition-all cursor-pointer flex items-center justify-center text-center uppercase tracking-wider font-sans shadow-md shadow-orange-650/10"
                     >
                       Browse Specialists
-                    </button>
+                    </a>
                   </div>
 
                   <div className="bg-white rounded-3xl border border-gray-150 p-6 space-y-4 shadow-xs">
                     <h2 className="text-xs font-bold text-gray-950 uppercase tracking-wider font-sans pb-1 border-b">
-                      Other Suggested Reads
+                      Related Study Guides
                     </h2>
 
                     <div className="space-y-4">
                       {blogs
                         .filter((ob) => ob.id !== selectedBlog.id)
-                        .slice(0, 3)
-                        .map((ob) => (
-                          <div
+                        .slice(0, 4)
+                        .map((ob) => {
+                          const relatedSlug = getBlogCanonicalSlug(ob);
+                          return (
+                          <a
                             key={ob.id}
-                            onClick={() => {
-                              setSelectedBlog(ob);
-                              window.scrollTo({ top: 0, behavior: 'smooth' });
+                            href={`/blog/${encodeURIComponent(relatedSlug)}`}
+                            onClick={(e) => {
+                              if (!isModifiedAnchorClick(e)) {
+                                e.preventDefault();
+                                setSelectedBlog(ob);
+                                onNavigate(`blog/${relatedSlug}`);
+                                window.scrollTo({ top: 0, behavior: 'smooth' });
+                              }
                             }}
                             className="group flex gap-3 items-start cursor-pointer border-b border-gray-100 last:border-0 pb-3 last:pb-0 font-sans"
                           >
@@ -1632,8 +1763,9 @@ export default function MarketingSubpages({
                                 {ob.title}
                               </h3>
                             </div>
-                          </div>
-                        ))}
+                          </a>
+                          );
+                        })}
                     </div>
                   </div>
                 </div>

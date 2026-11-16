@@ -201,12 +201,44 @@ export default function App() {
     if (window.location.hash.toLowerCase().startsWith('#admin')) return window.location.hash.replace(/^#/, '/');
     return '/admin';
   });
-  const [activeCountryTutoringSlug, setActiveCountryTutoringSlug] = useState<string>('usa');
-  const [activeSpecializedServiceSlug, setActiveSpecializedServiceSlug] = useState<string>('assignment-guidance');
+  const [activeCountryTutoringSlug, setActiveCountryTutoringSlug] = useState<string>(() => {
+    if (typeof window === 'undefined') return 'usa';
+    const p = decodeURIComponent(window.location.pathname).toLowerCase().replace(/\/+$/, '');
+    if (p.startsWith('/online-tutoring-')) {
+      return p.replace('/online-tutoring-', '').trim() || 'usa';
+    }
+    return 'usa';
+  });
+  const [activeSpecializedServiceSlug, setActiveSpecializedServiceSlug] = useState<string>(() => {
+    if (typeof window === 'undefined') return 'assignment-guidance';
+    const p = decodeURIComponent(window.location.pathname).toLowerCase().replace(/\/+$/, '');
+    if (isSpecializedServiceSlug(p)) {
+      return p.replace(/^\//, '').trim() || 'assignment-guidance';
+    }
+    return 'assignment-guidance';
+  });
   const [locationFilter, setLocationFilter] = useState<string>('');
   const [subjectFilter, setSubjectFilter] = useState<string>('');
-  const [selectedTutorProfile, setSelectedTutorProfile] = useState<User | null>(null);
-  const [isLoadingTutorProfile, setIsLoadingTutorProfile] = useState<boolean>(() => resolveInitialViewFromWindow() === 'tutor-profile');
+  const [selectedTutorProfile, setSelectedTutorProfile] = useState<User | null>(() => {
+    if (typeof window === 'undefined' || resolveInitialViewFromWindow() !== 'tutor-profile') {
+      return null;
+    }
+    const ssrData = (window as Window & { __INITIAL_SSR_DATA__?: { routeType?: string; tutor?: User } })
+      .__INITIAL_SSR_DATA__;
+    if (ssrData?.routeType === 'tutor-profile' && ssrData.tutor) {
+      return store.upsertTutorPreview(ssrData.tutor);
+    }
+    return null;
+  });
+  const [isLoadingTutorProfile, setIsLoadingTutorProfile] = useState<boolean>(() => {
+    if (resolveInitialViewFromWindow() !== 'tutor-profile') return false;
+    if (typeof window !== 'undefined') {
+      const ssrData = (window as Window & { __INITIAL_SSR_DATA__?: { routeType?: string; tutor?: User } })
+        .__INITIAL_SSR_DATA__;
+      if (ssrData?.routeType === 'tutor-profile' && ssrData.tutor) return false;
+    }
+    return true;
+  });
   const [activeChat, setActiveChat] = useState<Chat | null>(null);
   const [isSopModalOpen, setIsSopModalOpen] = useState<boolean>(false);
   const [isAssignModalOpen, setIsAssignModalOpen] = useState<boolean>(false);
@@ -270,26 +302,30 @@ export default function App() {
     };
   }, []);
 
-  // Gate lazy Footer download & DOM mount until user scrolls near the bottom of the page
+  // Gate lazy Footer download & DOM mount until user scrolls near the bottom or after brief post-paint timer for crawlers
   useEffect(() => {
     if (shouldRenderFooter) return;
     const el = footerSentinelRef.current;
-    if (!el) return;
-    if (typeof IntersectionObserver === 'undefined') {
-      setShouldRenderFooter(true);
-      return;
+    if (!el || typeof IntersectionObserver === 'undefined') {
+      const fallbackTimer = window.setTimeout(() => setShouldRenderFooter(true), 400);
+      return () => window.clearTimeout(fallbackTimer);
     }
+    const fallbackTimer = window.setTimeout(() => setShouldRenderFooter(true), 550);
     const observer = new IntersectionObserver(
       (entries) => {
         if (entries.some((entry) => entry.isIntersecting)) {
           setShouldRenderFooter(true);
+          window.clearTimeout(fallbackTimer);
           observer.disconnect();
         }
       },
       { rootMargin: '500px 0px' }
     );
     observer.observe(el);
-    return () => observer.disconnect();
+    return () => {
+      window.clearTimeout(fallbackTimer);
+      observer.disconnect();
+    };
   }, [activeView, shouldRenderFooter]);
 
   // Incoming text listener: lazy-loads audio synthesizer only when real incoming messages arrive
@@ -348,17 +384,28 @@ export default function App() {
     return () => clearTimeout(timer);
   }, [activeView, selectedTutorProfile, hasUserInteracted]);
 
-  // Automated Technical SEO: Canonicalization, parameter stripping, and dynamic metadata sync
+  // Automated Technical SEO: Canonicalization, parameter stripping, robots, Schema.org JSON-LD, and dynamic metadata sync
   useEffect(() => {
     let cancelled = false;
-    const defaultTitle = 'University Tutors - Expert Academic Mentorship & Tutoring';
+    const defaultTitle = 'University Tutors | 1-on-1 Online Tutoring, Exam Prep & Tools';
     const defaultDesc =
-      'Verified 1-on-1 expert academic tutoring, assignment guidance, coursework support, and study consultations across major universities.';
+      'Verified 1-on-1 university tutoring, coursework guidance, dissertation feedback, and 70+ free STEM & citation tools across the US, UK, Canada, Australia & Ireland.';
 
     const applySeo = async () => {
       let title = defaultTitle;
       let description = defaultDesc;
       let canonicalPath = '/';
+      let ogType: 'website' | 'article' | 'profile' = 'website';
+      let ogImage: string | undefined = 'https://university-tutors.com/logo.webp';
+      let robots = 'index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1';
+      let structuredData: Record<string, any> | null = {
+        '@context': 'https://schema.org',
+        '@type': 'EducationalOrganization',
+        name: 'University Tutors',
+        url: 'https://university-tutors.com',
+        logo: 'https://university-tutors.com/logo.webp',
+        description: defaultDesc,
+      };
 
       if (activeView === 'country-online-tutoring') {
         const { COUNTRY_ONLINE_TUTORING_PAGES } = await import('./data/countryOnlineTutoringData');
@@ -367,6 +414,14 @@ export default function App() {
           title = pageData.seoTitle || pageData.h1;
           description = pageData.paragraphs?.[0] || description;
           canonicalPath = `/online-tutoring-${activeCountryTutoringSlug}`;
+          structuredData = {
+            '@context': 'https://schema.org',
+            '@type': 'Service',
+            name: pageData.h1,
+            description,
+            url: `https://university-tutors.com${canonicalPath}`,
+            provider: { '@type': 'EducationalOrganization', name: 'University Tutors', url: 'https://university-tutors.com' },
+          };
         }
       } else if (activeView === 'specialized-service') {
         const { SPECIALIZED_SERVICE_PAGES_MAP } = await import('./data/specializedTutoringServicesData');
@@ -377,27 +432,91 @@ export default function App() {
           title = sPage.seoTitle || sPage.h1;
           description = sPage.summary || description;
           canonicalPath = `/${activeSpecializedServiceSlug}`;
+          structuredData = {
+            '@context': 'https://schema.org',
+            '@type': 'Service',
+            name: sPage.h1,
+            description,
+            url: `https://university-tutors.com${canonicalPath}`,
+            provider: { '@type': 'EducationalOrganization', name: 'University Tutors', url: 'https://university-tutors.com' },
+          };
         }
       } else if (resolveDedicatedServiceRoute(activeView)) {
         const dService = resolveDedicatedServiceRoute(activeView)!;
         title = dService.seoTitle;
         description = dService.seoDescription;
         canonicalPath = dService.path;
+        structuredData = {
+          '@context': 'https://schema.org',
+          '@type': 'Service',
+          name: dService.label,
+          description,
+          url: `https://university-tutors.com${canonicalPath}`,
+          provider: { '@type': 'EducationalOrganization', name: 'University Tutors', url: 'https://university-tutors.com' },
+        };
       } else if (activeView === 'tutor-profile' && selectedTutorProfile) {
-        const primarySubj =
-          selectedTutorProfile.primarySubject ||
-          (Array.isArray(selectedTutorProfile.subjectExpertise) ? selectedTutorProfile.subjectExpertise[0] : '') ||
-          (Array.isArray(selectedTutorProfile.subjects) ? selectedTutorProfile.subjects[0] : '') ||
-          'Academic';
-        title = `${selectedTutorProfile.name} — ${primarySubj} Tutor | University Tutors`;
+        const expArr = Array.isArray(selectedTutorProfile.subjectExpertise)
+          ? selectedTutorProfile.subjectExpertise
+          : [];
+        const subArr = Array.isArray(selectedTutorProfile.subjects) ? selectedTutorProfile.subjects : [];
+        const allSubj = Array.from(
+          new Set([selectedTutorProfile.primarySubject || '', ...expArr, ...subArr].map((s) => String(s || '').trim()).filter(Boolean))
+        );
+        const primarySubj = allSubj[0] || 'University Subjects';
+        const locationLabel =
+          selectedTutorProfile.location ||
+          (selectedTutorProfile as any).cityLocation ||
+          selectedTutorProfile.city ||
+          selectedTutorProfile.country ||
+          'Online Worldwide';
+        const educationLabel = selectedTutorProfile.education || 'Verified University Degree';
+        const ratingVal = Number(selectedTutorProfile.rating || 4.9);
+        const reviewsTotal = Number((selectedTutorProfile as any).reviewsCount ?? selectedTutorProfile.reviewCount ?? 120);
+        const canonicalSlug = getTutorCanonicalSlug(selectedTutorProfile, store.getTutorSlugMap());
+
+        canonicalPath = `/tutor/${encodeURIComponent(canonicalSlug)}`;
+        const canonicalFullUrl = `https://university-tutors.com${canonicalPath}`;
+        title = `${selectedTutorProfile.name} — ${primarySubj} Tutor (${locationLabel}) | University Tutors`;
         description =
           selectedTutorProfile.bio ||
           selectedTutorProfile.experienceSummary ||
           selectedTutorProfile.experience ||
-          defaultDesc;
-        canonicalPath = `/tutor/${encodeURIComponent(
-          getTutorCanonicalSlug(selectedTutorProfile, store.getTutorSlugMap())
-        )}`;
+          `Book 1-on-1 sessions with ${selectedTutorProfile.name}, verified ${allSubj.slice(0, 3).join(', ')} tutor (${educationLabel}) in ${locationLabel}.`;
+        ogType = 'profile';
+        if (selectedTutorProfile.avatarUrl) {
+          ogImage = selectedTutorProfile.avatarUrl;
+        }
+        structuredData = {
+          '@context': 'https://schema.org',
+          '@type': 'Person',
+          '@id': `${canonicalFullUrl}#person`,
+          name: selectedTutorProfile.name,
+          url: canonicalFullUrl,
+          image: ogImage,
+          jobTitle: `${primarySubj} University Tutor`,
+          description,
+          homeLocation: { '@type': 'Place', name: locationLabel },
+          knowsAbout: allSubj.length > 0 ? allSubj : [primarySubj],
+          hasCredential: {
+            '@type': 'EducationalOccupationalCredential',
+            credentialCategory: 'degree',
+            name: educationLabel,
+          },
+          aggregateRating: {
+            '@type': 'AggregateRating',
+            ratingValue: String(ratingVal),
+            bestRating: '5',
+            reviewCount: String(reviewsTotal),
+          },
+          makesOffer: {
+            '@type': 'Offer',
+            name: `1-on-1 ${primarySubj} Tutoring with ${selectedTutorProfile.name}`,
+            price: String(Number(selectedTutorProfile.hourlyRate || 45)),
+            priceCurrency: 'USD',
+            availability: 'https://schema.org/InStock',
+            url: canonicalFullUrl,
+          },
+        };
       } else if (activeView === 'services') {
         title = 'Academic Tutoring Services - University Tutors';
         canonicalPath = '/services';
@@ -411,30 +530,88 @@ export default function App() {
         title = 'Contact Advising Team - University Tutors';
         canonicalPath = '/contact';
       } else if (activeView === 'blog') {
-        title = 'Academic Integrity Blog & Study Guides - University Tutors';
+        title = 'Academic Study Guides, Citation Manuals & Research Blog | University Tutors';
+        description =
+          'Read university study guides on APA 7th & Harvard referencing, dissertation planning, STEM exam recall, and academic writing by vetted mentors.';
         canonicalPath = '/blog';
+        structuredData = {
+          '@context': 'https://schema.org',
+          '@type': 'Blog',
+          name: 'University Tutors Academic Blog & Study Guides',
+          url: 'https://university-tutors.com/blog',
+          description,
+          blogPost: storeState.blogs.slice(0, 12).map((b) => ({
+            '@type': 'BlogPosting',
+            headline: b.title,
+            url: `https://university-tutors.com/blog/${encodeURIComponent(getBlogCanonicalSlug(b))}`,
+            datePublished: b.publishedAt || '2026-10-01T00:00:00.000Z',
+            author: { '@type': 'Organization', name: b.author || 'University Tutors Editorial Team' },
+          })),
+        };
       } else if (activeView.startsWith('blog/')) {
         const rawBlogSlug = activeView.slice('blog/'.length);
-        const matchedBlog = storeState.blogs.find((b) => matchesBlogSlugOrId(b, rawBlogSlug));
+        const ssrData =
+          typeof window !== 'undefined'
+            ? (window as Window & { __INITIAL_SSR_DATA__?: { routeType?: string; blog?: any } }).__INITIAL_SSR_DATA__
+            : undefined;
+        const matchedBlog =
+          storeState.blogs.find((b) => matchesBlogSlugOrId(b, rawBlogSlug)) ||
+          (ssrData?.routeType === 'blog-post' && ssrData.blog && matchesBlogSlugOrId(ssrData.blog, rawBlogSlug)
+            ? ssrData.blog
+            : undefined);
+        ogType = 'article';
         if (matchedBlog) {
           title = `${matchedBlog.title} | University Tutors`;
           description =
             matchedBlog.excerpt ||
-            matchedBlog.content.replace(/[#*`>_]/g, '').replace(/\s+/g, ' ').trim().slice(0, 155) ||
+            String(matchedBlog.content || '').replace(/[#*`>_]/g, '').replace(/\s+/g, ' ').trim().slice(0, 155) ||
             defaultDesc;
           canonicalPath = `/blog/${encodeURIComponent(getBlogCanonicalSlug(matchedBlog))}`;
+          const blogImg = matchedBlog.imageUrl || matchedBlog.image;
+          if (blogImg) ogImage = blogImg;
+          structuredData = {
+            '@context': 'https://schema.org',
+            '@type': 'Article',
+            headline: matchedBlog.title,
+            description,
+            image: ogImage,
+            datePublished: matchedBlog.publishedAt || '2026-10-01T00:00:00.000Z',
+            dateModified: (matchedBlog as any).updatedAt || matchedBlog.publishedAt || '2026-10-01T00:00:00.000Z',
+            articleSection: matchedBlog.category || 'Academic Guides',
+            author: { '@type': 'Organization', name: matchedBlog.author || 'University Tutors Editorial Team' },
+            publisher: {
+              '@type': 'Organization',
+              name: 'University Tutors',
+              logo: { '@type': 'ImageObject', url: 'https://university-tutors.com/logo.webp' },
+            },
+            mainEntityOfPage: { '@type': 'WebPage', '@id': `https://university-tutors.com${canonicalPath}` },
+          };
         } else {
           title = 'Academic Study Guide & Article | University Tutors';
           canonicalPath = `/blog/${encodeURIComponent(rawBlogSlug)}`;
         }
       } else if (activeView === 'whatsapp') {
         title = '24/7 WhatsApp Academic Concierge - University Tutors';
-        canonicalPath = '/whatsapp';
+        canonicalPath = '/';
+        robots = 'noindex, follow';
+        structuredData = null;
+      } else if (activeView === 'auth' || activeView === 'admin-login' || activeView === 'dashboard') {
+        title =
+          activeView === 'admin-login'
+            ? 'Admin Sign In - University Tutors'
+            : activeView === 'dashboard'
+              ? 'Account Dashboard - University Tutors'
+              : 'Sign In or Create Account - University Tutors';
+        canonicalPath = typeof window !== 'undefined' ? window.location.pathname || '/auth' : '/auth';
+        robots = 'noindex, nofollow';
+        structuredData = null;
       } else if (activeView === 'google-disclosure') {
         title = 'Google OAuth Data Disclosure - University Tutors';
         canonicalPath = '/google-disclosure';
       } else if (activeView === 'tutors-directory' || activeView === 'tutors') {
-        title = 'Find Verified University Mentors & Tutors - University Tutors';
+        title = 'Find Verified University Mentors & Tutors | University Tutors';
+        description =
+          'Browse 500+ vetted PhD and Master’s university tutors across computer science, calculus, organic chemistry, nursing, finance, and academic writing.';
         canonicalPath = '/tutors';
       } else if (activeView === 'get-a-quote') {
         title = 'Get a Binding Milestone Quote - University Tutors';
@@ -450,6 +627,8 @@ export default function App() {
         description =
           'Complete platform user registry of students, credentialed tutors, and administrators with real-time verification status.';
         canonicalPath = '/user-data';
+        robots = 'noindex, nofollow';
+        structuredData = null;
       } else if (activeView === 'data-deletion') {
         title = 'User Data Deletion Instructions - University Tutors';
         description =
@@ -474,6 +653,16 @@ export default function App() {
             description = mRoute.tool.seoDescription;
             canonicalPath = mRoute.tool.path;
           }
+          structuredData = {
+            '@context': 'https://schema.org',
+            '@type': 'WebApplication',
+            name: title,
+            description,
+            url: `https://university-tutors.com${canonicalPath}`,
+            applicationCategory: 'EducationalApplication',
+            operatingSystem: 'Any',
+            offers: { '@type': 'Offer', price: '0', priceCurrency: 'USD' },
+          };
         }
       } else if (matchScienceRouteView(activeView)) {
         const { resolveScienceRoute } = await import('./data/scienceToolsRegistry');
@@ -496,6 +685,16 @@ export default function App() {
             description = sciRoute.tool.seoDescription;
             canonicalPath = sciRoute.tool.path;
           }
+          structuredData = {
+            '@context': 'https://schema.org',
+            '@type': 'WebApplication',
+            name: title,
+            description,
+            url: `https://university-tutors.com${canonicalPath}`,
+            applicationCategory: 'EducationalApplication',
+            operatingSystem: 'Any',
+            offers: { '@type': 'Offer', price: '0', priceCurrency: 'USD' },
+          };
         }
       } else if (matchStudentToolSlug(activeView)) {
         const toolSlug = matchStudentToolSlug(activeView)!;
@@ -505,6 +704,16 @@ export default function App() {
           title = toolDef.seoTitle;
           description = toolDef.seoDescription;
           canonicalPath = toolDef.path;
+          structuredData = {
+            '@context': 'https://schema.org',
+            '@type': 'WebApplication',
+            name: title,
+            description,
+            url: `https://university-tutors.com${canonicalPath}`,
+            applicationCategory: 'EducationalApplication',
+            operatingSystem: 'Any',
+            offers: { '@type': 'Offer', price: '0', priceCurrency: 'USD' },
+          };
         }
       }
 
@@ -513,6 +722,10 @@ export default function App() {
           title,
           description,
           canonicalPath,
+          ogType,
+          ogImage,
+          robots,
+          structuredData,
         });
       }
     };
@@ -1433,6 +1646,20 @@ export default function App() {
         } else if (href === '/google-disclosure' || href === '#google-disclosure') {
           e.preventDefault();
           handleNavigate('google-disclosure');
+        } else if (href === '/privacy' || href === '#privacy') {
+          e.preventDefault();
+          handleNavigate('privacy');
+        } else if (href === '/terms' || href === '#terms') {
+          e.preventDefault();
+          handleNavigate('terms');
+        } else if (
+          href === '/data-deletion' ||
+          href === '/data-deletion-instructions' ||
+          href === '/user-data-deletion' ||
+          href === '#data-deletion'
+        ) {
+          e.preventDefault();
+          handleNavigate('data-deletion');
         } else if (href === '/whatsapp' || href === '#whatsapp' || href.endsWith('/whatsapp')) {
           e.preventDefault();
           handleNavigate('whatsapp');

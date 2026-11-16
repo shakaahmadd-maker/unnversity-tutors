@@ -11,25 +11,27 @@ interface SeoMetadataOptions {
   description?: string;
   canonicalPath?: string;
   ogImage?: string;
+  ogType?: 'website' | 'article' | 'profile';
+  robots?: string;
+  structuredData?: Record<string, any> | null;
 }
 
 /**
- * Strips tracking parameters, query strings, and hashes to return a clean canonical URL
+ * Strips tracking parameters, query strings, hashes, and trailing slashes to return a clean canonical URL
  */
 export function getCleanCanonicalUrl(pathname?: string): string {
-  const path = pathname || (typeof window !== 'undefined' ? window.location.pathname : '/');
-  // Normalize path: ensure leading slash, remove trailing slash (except root)
-  let normalizedPath = path.startsWith('/') ? path : `/${path}`;
+  const raw = pathname || (typeof window !== 'undefined' ? window.location.pathname : '/');
+  const withoutQuery = String(raw).split('?')[0].split('#')[0];
+  let normalizedPath = withoutQuery.startsWith('/') ? withoutQuery : `/${withoutQuery}`;
+  normalizedPath = normalizedPath.replace(/\/{2,}/g, '/');
   if (normalizedPath.length > 1 && normalizedPath.endsWith('/')) {
     normalizedPath = normalizedPath.slice(0, -1);
   }
-  return `${BASE_CANONICAL_DOMAIN}${normalizedPath}`;
+  return `${BASE_CANONICAL_DOMAIN}${normalizedPath || '/'}`;
 }
 
 /**
  * Dynamically updates or inserts the canonical <link> tag in the document <head>.
- * Guarantees parameter-based URLs (e.g. ?utm_source=... or ?ref=...) canonicalize
- * back to the clean primary URL.
  */
 export function updateCanonicalTag(customCanonicalUrl?: string): void {
   if (typeof document === 'undefined') return;
@@ -40,12 +42,12 @@ export function updateCanonicalTag(customCanonicalUrl?: string): void {
   if (!linkTag) {
     linkTag = document.createElement('link');
     linkTag.setAttribute('rel', 'canonical');
+    linkTag.id = 'canonical-url';
     document.head.appendChild(linkTag);
   }
 
   linkTag.setAttribute('href', targetUrl);
 
-  // Synchronize OpenGraph URL with the canonical URL
   let ogUrlTag = document.querySelector<HTMLMetaElement>("meta[property='og:url']");
   if (!ogUrlTag) {
     ogUrlTag = document.createElement('meta');
@@ -56,12 +58,12 @@ export function updateCanonicalTag(customCanonicalUrl?: string): void {
 }
 
 /**
- * Updates full page SEO meta elements across client-side page transitions
+ * Updates full page SEO meta elements, robots directives, and JSON-LD across client-side transitions
  */
 export function updatePageSeo(options: SeoMetadataOptions): void {
   if (typeof document === 'undefined') return;
 
-  const { title, description, canonicalPath, ogImage } = options;
+  const { title, description, canonicalPath, ogImage, ogType, robots, structuredData } = options;
 
   if (title) {
     document.title = title;
@@ -72,13 +74,33 @@ export function updatePageSeo(options: SeoMetadataOptions): void {
   }
 
   if (description) {
-    const metaDesc = document.querySelector<HTMLMetaElement>("meta[name='description']");
-    if (metaDesc) metaDesc.setAttribute('content', description);
+    let metaDesc = document.querySelector<HTMLMetaElement>("meta[name='description']");
+    if (!metaDesc) {
+      metaDesc = document.createElement('meta');
+      metaDesc.setAttribute('name', 'description');
+      document.head.appendChild(metaDesc);
+    }
+    metaDesc.setAttribute('content', description);
+
     const ogDesc = document.querySelector<HTMLMetaElement>("meta[property='og:description']");
     if (ogDesc) ogDesc.setAttribute('content', description);
     const twDesc = document.querySelector<HTMLMetaElement>("meta[name='twitter:description']");
     if (twDesc) twDesc.setAttribute('content', description);
   }
+
+  if (ogType) {
+    const ogTypeTag = document.querySelector<HTMLMetaElement>("meta[property='og:type']");
+    if (ogTypeTag) ogTypeTag.setAttribute('content', ogType);
+  }
+
+  const targetRobots = robots || 'index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1';
+  let robotsTag = document.querySelector<HTMLMetaElement>("meta[name='robots']");
+  if (!robotsTag) {
+    robotsTag = document.createElement('meta');
+    robotsTag.setAttribute('name', 'robots');
+    document.head.appendChild(robotsTag);
+  }
+  robotsTag.setAttribute('content', targetRobots);
 
   const cleanCanonical = getCleanCanonicalUrl(canonicalPath);
   updateCanonicalTag(cleanCanonical);
@@ -88,5 +110,20 @@ export function updatePageSeo(options: SeoMetadataOptions): void {
     if (ogImg) ogImg.setAttribute('content', ogImage);
     const twImg = document.querySelector<HTMLMetaElement>("meta[name='twitter:image']");
     if (twImg) twImg.setAttribute('content', ogImage);
+  }
+
+  if (structuredData !== undefined) {
+    let jsonLdScript = document.querySelector<HTMLScriptElement>('script#dynamic-route-jsonld');
+    if (structuredData === null) {
+      if (jsonLdScript) jsonLdScript.remove();
+    } else {
+      if (!jsonLdScript) {
+        jsonLdScript = document.createElement('script');
+        jsonLdScript.id = 'dynamic-route-jsonld';
+        jsonLdScript.type = 'application/ld+json';
+        document.head.appendChild(jsonLdScript);
+      }
+      jsonLdScript.textContent = JSON.stringify(structuredData);
+    }
   }
 }
