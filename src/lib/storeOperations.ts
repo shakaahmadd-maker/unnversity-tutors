@@ -322,7 +322,10 @@ export async function login(store: AppStore, email: string, password?: string): 
 
     const data = await res.json().catch(() => ({}));
     if (!res.ok) {
-      throw new Error(data.error || 'Authentication rejected');
+      const authErr: any = new Error(data.error || 'Authentication rejected');
+      authErr.status = res.status;
+      authErr.code = data.code;
+      throw authErr;
     }
 
     if (!data?.user?.id) {
@@ -344,7 +347,9 @@ export async function login(store: AppStore, email: string, password?: string): 
     store.notify();
     return true;
   } catch (err: any) {
-    console.error('[AUTH] Login error:', err.message);
+    if (!err?.status || err.status >= 500) {
+      console.error('[AUTH] Login error:', err.message);
+    }
     throw err;
   }
 }
@@ -383,7 +388,10 @@ export async function register(
 
     const data = await res.json().catch(() => ({}));
     if (!res.ok) {
-      throw new Error(data?.error || data?.message || 'Registration failed');
+      const regErr: any = new Error(data?.error || data?.message || 'Registration failed');
+      regErr.status = res.status;
+      regErr.code = data?.code;
+      throw regErr;
     }
     if (!data?.user?.id) {
       throw new Error('Backend session could not be established.');
@@ -404,7 +412,9 @@ export async function register(
     store.notify();
     return true;
   } catch (err: any) {
-    console.error('[AUTH] Register error:', err.message);
+    if (!err?.status || err.status >= 500) {
+      console.error('[AUTH] Register error:', err.message);
+    }
     throw err;
   }
 }

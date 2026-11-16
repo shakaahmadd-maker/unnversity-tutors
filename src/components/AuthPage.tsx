@@ -93,6 +93,7 @@ export default function AuthPage({ onLogin, onRegister, onNavigate }: AuthPagePr
 
   // Status & error messages
   const [errorMsg, setErrorMsg] = useState('');
+  const [errorCode, setErrorCode] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
   const [toastText, setToastText] = useState('');
   const [toastVisible, setToastVisible] = useState(false);
@@ -107,14 +108,35 @@ export default function AuthPage({ onLogin, onRegister, onNavigate }: AuthPagePr
   const [resetTokenInput, setResetTokenInput] = useState('');
   const [newPasswordInput, setNewPasswordInput] = useState('');
 
-  // Read any server OAuth callback error returned via query string (?oauth_error=...)
+  // Read any server OAuth callback error (?oauth_error=...) or email reset link (?reset_token=...&email=...)
   useEffect(() => {
     if (typeof window === 'undefined') return;
     const params = new URLSearchParams(window.location.search);
     const oauthErr = params.get('oauth_error');
+    const resetToken = params.get('reset_token');
+    const resetEmailParam = params.get('email');
+    let changed = false;
+
     if (oauthErr) {
       setErrorMsg(oauthErr);
+      setErrorCode('');
       params.delete('oauth_error');
+      changed = true;
+    }
+    if (resetToken) {
+      setIsForgotPasswordView(false);
+      setIsResetPasswordView(true);
+      setResetTokenInput(resetToken);
+      if (resetEmailParam) {
+        setResetEmail(resetEmailParam);
+        setEmail(resetEmailParam);
+      }
+      params.delete('reset_token');
+      params.delete('email');
+      changed = true;
+    }
+
+    if (changed) {
       const nextQuery = params.toString();
       const nextUrl = `${window.location.pathname}${nextQuery ? `?${nextQuery}` : ''}${window.location.hash}`;
       window.history.replaceState(null, '', nextUrl);
@@ -203,6 +225,7 @@ export default function AuthPage({ onLogin, onRegister, onNavigate }: AuthPagePr
 
   const handleTabSwitch = (mode: 'signin' | 'signup') => {
     setErrorMsg('');
+    setErrorCode('');
     setSuccessMsg('');
     setIsForgotPasswordView(false);
     setIsResetPasswordView(false);
@@ -282,6 +305,7 @@ export default function AuthPage({ onLogin, onRegister, onNavigate }: AuthPagePr
       return;
     }
     setErrorMsg('');
+    setErrorCode('');
     setSuccessMsg('');
 
     if (!email.trim() || !password) {
@@ -300,6 +324,7 @@ export default function AuthPage({ onLogin, onRegister, onNavigate }: AuthPagePr
         setErrorMsg('Authentication failed: Invalid credentials or account not registered.');
       }
     } catch (err: any) {
+      setErrorCode(typeof err?.code === 'string' ? err.code : '');
       setErrorMsg(err.message || 'Authentication error. Please check credentials.');
     } finally {
       authRequestLockRef.current = false;
@@ -516,9 +541,41 @@ export default function AuthPage({ onLogin, onRegister, onNavigate }: AuthPagePr
 
         {/* Alerts: Error & Success */}
         {errorMsg && (
-          <div id="auth-error-msg" className="bg-red-50 border border-red-200 text-red-700 text-xs p-3 rounded-xl mb-5 flex items-start gap-2">
-            <span className="shrink-0 text-amber-600 text-sm font-bold">⚠️</span>
-            <p className="font-semibold">{errorMsg}</p>
+          <div id="auth-error-msg" className="bg-red-50 border border-red-200 text-red-700 text-xs p-3.5 rounded-xl mb-5 space-y-2.5">
+            <div className="flex items-start gap-2">
+              <span className="shrink-0 text-amber-600 text-sm font-bold">⚠️</span>
+              <p className="font-semibold leading-relaxed">{errorMsg}</p>
+            </div>
+            {(errorCode === 'PASSWORD_NOT_SET' ||
+              errorCode === 'SOCIAL_OR_NO_PASSWORD' ||
+              errorMsg.toLowerCase().includes('password reset') ||
+              errorMsg.toLowerCase().includes('social login')) && (
+              <div className="flex flex-wrap gap-2 pl-6">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setErrorMsg('');
+                    setErrorCode('');
+                    setResetEmail(email.trim());
+                    setIsForgotPasswordView(true);
+                  }}
+                  className="inline-flex items-center gap-1.5 bg-white hover:bg-orange-50 text-orange-700 border border-orange-200 font-bold text-[11px] px-2.5 py-1.5 rounded-lg transition-colors cursor-pointer"
+                >
+                  <KeyRound className="w-3.5 h-3.5" />
+                  <span>Set Password via Email Reset</span>
+                </button>
+                {providersLoaded && providers.google?.configured && (
+                  <button
+                    type="button"
+                    onClick={() => handleSocialAuth('google')}
+                    className="inline-flex items-center gap-1.5 bg-white hover:bg-slate-50 text-slate-800 border border-slate-200 font-bold text-[11px] px-2.5 py-1.5 rounded-lg transition-colors cursor-pointer"
+                  >
+                    <GoogleIcon />
+                    <span>Sign in with Google</span>
+                  </button>
+                )}
+              </div>
+            )}
           </div>
         )}
 
@@ -613,10 +670,10 @@ export default function AuthPage({ onLogin, onRegister, onNavigate }: AuthPagePr
                   <input
                     type="text"
                     required
-                    placeholder="RESET-123456"
+                    placeholder="Paste recovery token from email"
                     value={resetTokenInput}
                     onChange={(e) => setResetTokenInput(e.target.value)}
-                    className="block w-full pl-10 pr-4 py-2.5 bg-orange-50/30 border border-orange-200 rounded-xl text-sm font-mono font-bold uppercase tracking-wider text-orange-950 focus:bg-white focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 transition-colors"
+                    className="block w-full pl-10 pr-4 py-2.5 bg-orange-50/30 border border-orange-200 rounded-xl text-sm font-mono font-semibold tracking-wide text-orange-950 focus:bg-white focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 transition-colors"
                   />
                 </div>
               </div>

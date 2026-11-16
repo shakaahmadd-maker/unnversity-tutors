@@ -22,11 +22,8 @@ import {
   Search,
   Eye,
   Sparkles,
-  Wifi,
-  WifiOff,
   RefreshCw,
   Download,
-  Paperclip,
   GraduationCap,
   Filter,
   CheckCircle,
@@ -39,17 +36,19 @@ import {
   CreditCard,
   RotateCcw,
   Copy,
-  Activity
+  Activity,
+  Maximize2,
+  Minimize2
 } from 'lucide-react';
 import { 
   User, Blog, FAQ, Assignment, Payment, SupportTicket, UserRole, Chat, Message,
   Invoice, ActivityLog, AppNotification, SOP, AssignmentReport, Agreement, AssignmentStatus, TriggeredEmail
 } from '../types';
-import { audioNotifier } from '../utils/audioNotification';
 import TutorsListAdmin from './TutorsListAdmin';
 import StudentProfilesAdmin from './StudentProfilesAdmin';
 import AssignmentLedgerView from './AssignmentLedgerView';
 import UserDataPage from './UserDataPage';
+import OperationalChatDesk from './OperationalChatDesk';
 import { store, TabLoadState } from '../lib/store';
 import {
   apiFetch,
@@ -539,17 +538,7 @@ export default function AdminDashboard({
 
   // ACTIVE SUPPORT CHATS MANAGEMENT
   const [selectedChatId, setSelectedChatId] = useState<string | null>(null);
-  const [adminReply, setAdminReply] = useState('');
-  const [adminAttachedFileName, setAdminAttachedFileName] = useState('');
-  const [adminAttachedFileUrl, setAdminAttachedFileUrl] = useState('');
-  const [replyAsTutor, setReplyAsTutor] = useState(true);
-  const [adminChatsSearch, setAdminChatsSearch] = useState<string>('');
-  const [showSubmissionHistoriesDrawer, setShowSubmissionHistoriesDrawer] = useState<boolean>(true);
-
-  const selectedChat = chats.find(c => c.id === selectedChatId);
-  const activeChatMessages = messages.filter(m => m.chatId === selectedChatId).sort(
-    (a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
-  );
+  const [, setReplyAsTutor] = useState(true);
 
   useEffect(() => {
     if (activeTab === 'chats' && chats.length > 0 && (!selectedChatId || !chats.some(c => c.id === selectedChatId))) {
@@ -567,23 +556,6 @@ export default function AdminDashboard({
       onSubscribeToChatDetails(selectedChatId);
     }
   }, [selectedChatId, onSubscribeToChatDetails]);
-
-  const handleSendAdminMessage = (e: React.FormEvent) => {
-    e.preventDefault();
-    if ((!adminReply.trim() && !adminAttachedFileName) || !selectedChatId) return;
-    const senderId = (replyAsTutor && selectedChat) ? selectedChat.tutorId : currentUser.id;
-    onSendMessage(
-      selectedChatId, 
-      senderId, 
-      adminReply.trim(),
-      adminAttachedFileUrl || undefined,
-      adminAttachedFileName || undefined
-    );
-    audioNotifier.playSentSound();
-    setAdminReply('');
-    setAdminAttachedFileName('');
-    setAdminAttachedFileUrl('');
-  };
 
   // PROFILE GENERATOR STATE
   const [genRole, setGenRole] = useState<UserRole>(UserRole.TUTOR);
@@ -977,7 +949,50 @@ export default function AdminDashboard({
   };
 
   const [selectedActionSuccess, setSelectedActionSuccess] = useState<string | null>(null);
-  const [isLedgerExpanded, setIsLedgerExpanded] = useState(false);
+  const [isPageExpanded, setIsPageExpanded] = useState(false);
+
+  const ADMIN_TAB_META: { id: string; group: string; label: string }[] = [
+    { id: 'student_profiles', group: 'Academics & Tutors', label: 'Student Profiles Directory' },
+    { id: 'tutors_list', group: 'Academics & Tutors', label: 'Tutors List' },
+    { id: 'user_data', group: 'Academics & Tutors', label: 'User Data Directory' },
+    { id: 'users', group: 'Academics & Tutors', label: 'User Ledger List' },
+    { id: 'assignments', group: 'Academics & Tutors', label: 'New Assignment Ledger' },
+    { id: 'reports', group: 'Academics & Tutors', label: 'Assignment Reports Desk' },
+    { id: 'agreements', group: 'Academics & Tutors', label: 'Student Agreements' },
+    { id: 'payments_ledger', group: 'Accounting Center', label: 'Payments Dashboard' },
+    { id: 'create_invoice', group: 'Accounting Center', label: 'Create Invoice Form' },
+    { id: 'disputes', group: 'Accounting Center', label: 'Disputes & Escrow Desk' },
+    { id: 'chats', group: 'Presence & Feed', label: 'Operational Chats Room' },
+    { id: 'notifications', group: 'Presence & Feed', label: 'Broadcast Notifications' },
+    { id: 'feedback', group: 'Presence & Feed', label: 'Tutor Feedback Ledger' },
+    { id: 'trigger_emails', group: 'Cloud Extensions', label: 'Trigger Email Console' },
+    { id: 'sops', group: 'Reference & Platform', label: 'Standard SOPs Matrix' },
+    { id: 'activity_log', group: 'Reference & Platform', label: 'Live Audit Log Tracker' },
+    { id: 'blogs', group: 'Reference & Platform', label: 'Blog Manager' },
+    { id: 'faqs', group: 'Reference & Platform', label: 'QA Helpdesk Center' },
+    { id: 'subjects', group: 'Reference & Platform', label: 'Syllabus Subjects' },
+  ];
+
+  const activeTabInfo = ADMIN_TAB_META.find(t => t.id === activeTab) || {
+    id: activeTab,
+    group: 'Admin Section',
+    label: 'Administration Console',
+  };
+
+  useEffect(() => {
+    if (typeof document === 'undefined') return;
+    document.body.style.overflow = isPageExpanded ? 'hidden' : '';
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && isPageExpanded) {
+        setIsPageExpanded(false);
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => {
+      document.body.style.overflow = '';
+      window.removeEventListener('keydown', onKeyDown);
+    };
+  }, [isPageExpanded]);
 
   const handleAddTopicSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -992,89 +1007,155 @@ export default function AdminDashboard({
     }
   };
 
-  const isAssignmentsFullWidth = activeTab === 'assignments' && isLedgerExpanded;
-
   return (
     <div
-      className={`container mx-auto px-4 md:px-8 py-8 font-sans text-left min-h-[75vh] transition-all ${
-        isAssignmentsFullWidth ? 'max-w-[1600px]' : 'max-w-7xl'
-      }`}
+      className={
+        isPageExpanded
+          ? 'fixed inset-0 z-[45] w-screen h-screen bg-slate-100 flex flex-col overflow-hidden font-sans text-left'
+          : 'container mx-auto max-w-[1440px] px-4 md:px-8 py-8 font-sans text-left min-h-[75vh] transition-all'
+      }
       id="admin-workspace"
     >
-      
-      {/* Admin Workspace header banner */}
-      <div className="bg-gray-950 text-white rounded-3xl p-6 md:p-8 mb-8 border border-gray-800 flex flex-col md:flex-row justify-between items-start md:items-center gap-6 relative overflow-hidden">
-        <div>
-          <div className="flex flex-wrap items-center gap-3">
-            <span className="text-[10px] font-mono tracking-widest text-orange-400 font-bold block uppercase leading-none">Security Platform Administration Console</span>
-            
-            {/* Real-time Connection status indicator */}
-            <div className="flex items-center gap-2 px-2.5 py-0.5 bg-white/5 border border-white/10 rounded-full text-[9px] tracking-tight">
-              {connectionStatus === 'connected' && (
-                <>
-                  <span className="relative flex h-1.5 w-1.5">
-                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                    <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500"></span>
-                  </span>
-                  <span className="font-semibold text-emerald-400 uppercase font-mono">Synced</span>
-                  {lastSyncTime && (
-                    <span className="text-gray-400 border-l border-white/10 pl-2 font-mono">
-                      {lastSyncTime}
-                    </span>
-                  )}
-                </>
-              )}
-              {connectionStatus === 'syncing' && (
-                <>
-                  <RefreshCw className="w-2.5 h-2.5 text-orange-400 animate-spin" />
-                  <span className="font-semibold text-orange-400 uppercase font-mono">Syncing</span>
-                </>
-              )}
-              {connectionStatus === 'error' && (
-                <div className="group relative flex items-center gap-1 cursor-help">
-                  <span className="relative flex h-1.5 w-1.5">
-                    <span className="absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75 animate-ping"></span>
-                    <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-red-500"></span>
-                  </span>
-                  <span className="font-semibold text-red-400 uppercase font-mono">Sync Error</span>
-                  {syncError && (
-                    <div className="absolute top-full left-0 mt-2 p-2.5 bg-gray-900 border border-red-950 rounded-xl shadow-xl text-[10px] text-gray-300 w-64 whitespace-normal hidden group-hover:block z-50 transition-all font-mono leading-relaxed normal-case">
-                      <span className="font-bold block text-red-400 mb-0.5">Details:</span>
-                      {syncError}
-                    </div>
-                  )}
-                </div>
-              )}
+      {/* Expanded Full-Page Sticky Control Bar (for non-chat pages; chats uses its own built-in full-height bar) */}
+      {isPageExpanded && activeTab !== 'chats' && (
+        <div className="bg-white border-b border-slate-200 px-4 sm:px-6 py-3 flex flex-wrap items-center justify-between gap-3 shrink-0 shadow-2xs z-30">
+          <div className="flex items-center gap-3 min-w-0">
+            <span className="px-2.5 py-1 rounded-lg bg-slate-900 text-orange-400 text-[10px] font-mono font-bold uppercase tracking-wider shrink-0">
+              Admin Full Page
+            </span>
+            <div className="min-w-0">
+              <p className="text-[11px] font-semibold text-slate-400 leading-none truncate">
+                {activeTabInfo.group}
+              </p>
+              <h2 className="text-sm sm:text-base font-bold text-slate-900 truncate mt-0.5">
+                {activeTabInfo.label}
+              </h2>
             </div>
           </div>
-          <h2 className="text-2xl md:text-3xl font-bold tracking-tight text-white font-sans mt-2">Console Access: {currentUser.name} ⚖️</h2>
-          <p className="text-xs text-gray-400 mt-1">Authorized root privileges. Audit user accounts, write education blogs, and resolve escrow dispute holds.</p>
-        </div>
-        
-        <div className="flex gap-4">
-          <div className="text-center px-3.5 bg-white/5 border border-white/10 p-2.5 rounded-2xl">
-            <span className="text-lg font-mono font-bold text-orange-400 block">{users.length}</span>
-            <span className="text-[9px] text-gray-400 font-bold block uppercase">active users</span>
+
+          <div className="flex flex-wrap items-center gap-2.5 shrink-0">
+            <select
+              aria-label="Switch admin page"
+              value={activeTab}
+              onChange={(e) => setActiveTab(e.target.value as any)}
+              className="px-3 py-2 rounded-xl text-xs font-semibold bg-slate-50 border border-slate-200 text-slate-700 focus:outline-none focus:border-orange-500 cursor-pointer"
+            >
+              {ADMIN_TAB_META.map((opt) => (
+                <option key={opt.id} value={opt.id}>
+                  {opt.label}
+                </option>
+              ))}
+            </select>
+
+            <button
+              type="button"
+              onClick={() => setIsPageExpanded(false)}
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold bg-slate-900 hover:bg-slate-800 text-white shadow-xs transition active:scale-95 cursor-pointer whitespace-nowrap"
+            >
+              <Minimize2 className="w-4 h-4 text-orange-400" />
+              <span>Exit Full Page</span>
+            </button>
           </div>
-          <div className="text-center px-3.5 bg-white/5 border border-white/10 p-2.5 rounded-2xl">
-            <span className="text-lg font-mono font-bold text-emerald-400 block">{payments.filter(p => p.status === 'escrow').length}</span>
-            <span className="text-[9px] text-gray-400 font-bold block uppercase">escrows busy</span>
+        </div>
+      )}
+
+      {/* Admin Workspace header banner (shown in normal view) */}
+      {!isPageExpanded && (
+        <div className="bg-gray-950 text-white rounded-3xl p-6 md:p-8 mb-8 border border-gray-800 flex flex-col md:flex-row justify-between items-start md:items-center gap-6 relative overflow-hidden">
+          <div>
+            <div className="flex flex-wrap items-center gap-3">
+              <span className="text-[10px] font-mono tracking-widest text-orange-400 font-bold block uppercase leading-none">Security Platform Administration Console</span>
+              
+              {/* Real-time Connection status indicator */}
+              <div className="flex items-center gap-2 px-2.5 py-0.5 bg-white/5 border border-white/10 rounded-full text-[9px] tracking-tight">
+                {connectionStatus === 'connected' && (
+                  <>
+                    <span className="relative flex h-1.5 w-1.5">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                      <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500"></span>
+                    </span>
+                    <span className="font-semibold text-emerald-400 uppercase font-mono">Synced</span>
+                    {lastSyncTime && (
+                      <span className="text-gray-400 border-l border-white/10 pl-2 font-mono">
+                        {lastSyncTime}
+                      </span>
+                    )}
+                  </>
+                )}
+                {connectionStatus === 'syncing' && (
+                  <>
+                    <RefreshCw className="w-2.5 h-2.5 text-orange-400 animate-spin" />
+                    <span className="font-semibold text-orange-400 uppercase font-mono">Syncing</span>
+                  </>
+                )}
+                {connectionStatus === 'error' && (
+                  <div className="group relative flex items-center gap-1 cursor-help">
+                    <span className="relative flex h-1.5 w-1.5">
+                      <span className="absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75 animate-ping"></span>
+                      <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-red-500"></span>
+                    </span>
+                    <span className="font-semibold text-red-400 uppercase font-mono">Sync Error</span>
+                    {syncError && (
+                      <div className="absolute top-full left-0 mt-2 p-2.5 bg-gray-900 border border-red-950 rounded-xl shadow-xl text-[10px] text-gray-300 w-64 whitespace-normal hidden group-hover:block z-50 transition-all font-mono leading-relaxed normal-case">
+                        <span className="font-bold block text-red-400 mb-0.5">Details:</span>
+                        {syncError}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+            <h2 className="text-2xl md:text-3xl font-bold tracking-tight text-white font-sans mt-2">Console Access: {currentUser.name} ⚖️</h2>
+            <p className="text-xs text-gray-400 mt-1">Authorized root privileges. Audit user accounts, write education blogs, and resolve escrow dispute holds.</p>
+          </div>
+          
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="text-center px-3.5 bg-white/5 border border-white/10 p-2.5 rounded-2xl tabular-nums">
+              <span className="text-lg font-mono font-bold text-orange-400 block">{users.length}</span>
+              <span className="text-[9px] text-gray-400 font-bold block uppercase">active users</span>
+            </div>
+            <div className="text-center px-3.5 bg-white/5 border border-white/10 p-2.5 rounded-2xl tabular-nums">
+              <span className="text-lg font-mono font-bold text-emerald-400 block">{payments.filter(p => p.status === 'escrow').length}</span>
+              <span className="text-[9px] text-gray-400 font-bold block uppercase">escrows busy</span>
+            </div>
+            <button
+              type="button"
+              onClick={() => setIsPageExpanded(true)}
+              className="inline-flex items-center gap-2 px-4 py-3 rounded-2xl text-xs font-bold bg-orange-500 hover:bg-orange-600 text-white shadow-sm transition active:scale-95 cursor-pointer whitespace-nowrap"
+              title="Expand active admin page to full screen"
+            >
+              <Maximize2 className="w-4 h-4" />
+              <span>Expand Full Page</span>
+            </button>
           </div>
         </div>
-      </div>
+      )}
 
       {selectedActionSuccess && (
-        <div id="admin-status-toast" className="bg-emerald-50 border border-emerald-200 text-emerald-800 p-4 rounded-xl text-xs flex items-center gap-2 mb-6 font-semibold shadow-xs">
+        <div
+          id="admin-status-toast"
+          className={`bg-emerald-50 border border-emerald-200 text-emerald-800 p-4 rounded-xl text-xs flex items-center gap-2 font-semibold shadow-xs ${
+            isPageExpanded ? 'mx-4 sm:mx-6 mt-4 shrink-0' : 'mb-6'
+          }`}
+        >
           <Check className="w-4 h-4 text-emerald-600" />
           <span>{selectedActionSuccess}</span>
         </div>
       )}
 
       {/* Grid: left admin sidebar / right control panels */}
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-8 items-start">
+      <div
+        className={
+          isPageExpanded
+            ? activeTab === 'chats'
+              ? 'flex-1 flex flex-col min-h-0 overflow-hidden'
+              : 'flex-1 overflow-y-auto p-4 sm:p-6'
+            : 'grid grid-cols-1 lg:grid-cols-4 gap-8 items-start'
+        }
+      >
         
         {/* Left Sticky Admin Sidebar Navigation Panel */}
-        {!isAssignmentsFullWidth && (
+        {!isPageExpanded && (
           <aside 
             id="admin-dashboard-sidebar"
             aria-label="Admin Navigation Panel"
@@ -1211,7 +1292,37 @@ export default function AdminDashboard({
         )}
 
         {/* Content switch displays */}
-        <div className={`${isAssignmentsFullWidth ? 'lg:col-span-4' : 'lg:col-span-3'} space-y-6 min-w-0`}>
+        <div
+          className={
+            isPageExpanded
+              ? activeTab === 'chats'
+                ? 'flex-1 flex flex-col min-h-0 w-full h-full'
+                : 'w-full max-w-[1720px] mx-auto space-y-6 min-w-0'
+              : 'lg:col-span-3 space-y-6 min-w-0'
+          }
+        >
+          {/* Consistent Per-Page Expand Bar for all non-chat / non-ledger tabs in standard mode */}
+          {!isPageExpanded && activeTab !== 'chats' && activeTab !== 'assignments' && (
+            <div className="bg-white rounded-2xl border border-slate-200/80 px-4 py-3 flex flex-wrap items-center justify-between gap-3 shadow-2xs">
+              <div className="min-w-0 text-left">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block leading-none">
+                  {activeTabInfo.group}
+                </span>
+                <h3 className="text-sm sm:text-base font-bold text-slate-900 truncate mt-1">
+                  {activeTabInfo.label}
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsPageExpanded(true)}
+                className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-semibold bg-slate-900 hover:bg-slate-800 text-white shadow-2xs transition active:scale-95 cursor-pointer whitespace-nowrap shrink-0"
+              >
+                <Maximize2 className="w-3.5 h-3.5 text-orange-400" />
+                <span>Expand Full Page</span>
+              </button>
+            </div>
+          )}
+
           <ErrorBoundary compact resetKey={activeTab} onReset={() => onLoadTab?.(activeTab, true)}>
             {tabStates[`admin:${activeTab}`]?.error && (
               <ErrorStatePanel
@@ -2208,8 +2319,8 @@ export default function AdminDashboard({
                 setSelectedChatId={setSelectedChatId}
                 setReplyAsTutor={setReplyAsTutor}
                 toStoreStatus={toStoreStatus}
-                isPageExpanded={isLedgerExpanded}
-                onTogglePageExpand={() => setIsLedgerExpanded(prev => !prev)}
+                isPageExpanded={isPageExpanded}
+                onTogglePageExpand={() => setIsPageExpanded(prev => !prev)}
                 onSeedMockStudentData={async () => {
                   try {
                     await store.addAssignment(
@@ -3414,696 +3525,34 @@ export default function AdminDashboard({
             </div>
           )}
 
-          {/* OPERATIONAL CHATS monitor PANEL */}
+          {/* OPERATIONAL CHATS MONITOR PANEL */}
           {activeTab === 'chats' && (
-            <div className="bg-white rounded-3xl border border-gray-150 overflow-hidden shadow-xs space-y-6 p-6" id="admin-chats-monitor-panel">
-              <div className="border-b border-gray-100 pb-4 text-left">
-                <span className="inline-flex items-center gap-1.5 rounded-full bg-orange-50 px-2.5 py-1 text-[10px] font-bold text-orange-700 uppercase tracking-widest border border-orange-200">
-                  <span className="h-1.5 w-1.5 rounded-full bg-orange-500 animate-pulse"></span> Live Systems Monitoring Deck
-                </span>
-                <h3 className="font-sans font-bold text-lg text-gray-950 mt-1">Operational Support &amp; Chat Control Desk</h3>
-                <p className="text-xs text-gray-400 mt-1">Audit, join or purge active student-tutor conversations. Enforce strict syllabus compliance rules and secure billing escrows.</p>
-              </div>
-
-              {chats.length === 0 ? (
-                <div className="py-12 text-center bg-gray-50 rounded-2xl border border-dashed border-gray-200">
-                  <MessageSquare className="w-12 h-12 text-gray-300 mx-auto mb-3" />
-                  <p className="text-sm text-gray-950 font-bold block">No ongoing conversations registered</p>
-                  <p className="text-xs text-gray-400 mt-1 max-w-sm mx-auto p-2">Tutor matching synchronization is active. When students choose services or post assignment briefs, their live rooms will instantiate here.</p>
-                </div>
-              ) : (
-                <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 min-h-[500px]">
-                  {/* LEFT COLUMN: CHAT ROOMS DIRECTORY */}
-                  <div className="lg:col-span-4 border border-gray-150 rounded-2xl overflow-hidden bg-gray-50/40 flex flex-col">
-                    <div className="bg-gray-100/80 p-3.5 border-b border-gray-150 text-left">
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-gray-700 flex items-center gap-1.5">
-                          <MessageSquare className="w-3.5 h-3.5 text-orange-600" />
-                          <span>Paired Chats Directory ({chats.length})</span>
-                        </span>
-                        <span className="text-[9.5px] font-bold bg-orange-100 text-orange-800 px-2 py-0.5 rounded-full border border-orange-200">
-                          Live Moderation
-                        </span>
-                      </div>
-                      
-                      {/* Search chats */}
-                      <div className="relative">
-                        <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-                        <input
-                          type="text"
-                          value={adminChatsSearch}
-                          onChange={(e) => setAdminChatsSearch(e.target.value)}
-                          placeholder="Filter student, tutor or subject..."
-                          className="w-full pl-8 pr-3 py-1.5 bg-white border border-gray-200 rounded-xl text-xs focus:border-orange-500 focus:ring-1 focus:ring-orange-500 outline-none transition-all placeholder:text-gray-400"
-                        />
-                      </div>
-                    </div>
-
-                    <div className="divide-y divide-gray-150 overflow-y-auto max-h-[520px] flex-1">
-                      {chats
-                        .filter((c) => {
-                          if (!adminChatsSearch.trim()) return true;
-                          const q = adminChatsSearch.toLowerCase();
-                          const s = users.find(u => u.id === c.studentId) || (c as any).pairedStudent;
-                          const t = users.find(u => u.id === c.tutorId) || (c as any).pairedTutor;
-                          return (
-                            c.subject?.toLowerCase().includes(q) ||
-                            s?.name?.toLowerCase().includes(q) ||
-                            s?.email?.toLowerCase().includes(q) ||
-                            t?.name?.toLowerCase().includes(q) ||
-                            c.id.toLowerCase().includes(q)
-                          );
-                        })
-                        .map((c) => {
-                          const student = users.find(u => u.id === c.studentId) || (c as any).pairedStudent;
-                          
-                          // Comprehensive paired tutor resolution
-                          const linkedAssignment = assignments.find(a => 
-                            (c.orderId && a.id === c.orderId) ||
-                            (a.studentId === c.studentId && a.tutorId === c.tutorId) ||
-                            (a.studentId === c.studentId && a.tutorId)
-                          );
-                          const isSupportChat = c.tutorId.startsWith('admin_') || c.tutorId === 'admin_emily' || c.tutorId === 'admin_shaka';
-                          const tutor = users.find(u => u.id === c.tutorId) || 
-                            (c as any).pairedTutor || 
-                            (linkedAssignment?.tutorId ? users.find(u => u.id === linkedAssignment.tutorId) : null);
-
-                          const lastMsg = messages.filter(m => m.chatId === c.id).sort(
-                            (a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
-                          )[0];
-
-                          const isSelected = selectedChatId === c.id;
-
-                          return (
-                            <div 
-                              key={c.id}
-                              onClick={() => setSelectedChatId(c.id)}
-                              className={`p-3.5 text-left transition-all cursor-pointer select-none space-y-2 relative border-l-4 ${
-                                isSelected 
-                                  ? 'bg-white border-l-orange-500 shadow-xs' 
-                                  : 'border-l-transparent hover:bg-gray-100/70'
-                              }`}
-                            >
-                              <div className="flex justify-between items-start gap-2">
-                                <div>
-                                  <h4 className="font-bold text-xs text-gray-900 leading-tight truncate max-w-[150px]" title={c.subject || 'Academic Consultation'}>
-                                    {c.subject || 'Academic Consultation'}
-                                  </h4>
-                                  <p className="text-[10px] text-gray-400 font-mono mt-0.5">
-                                    ID: #{c.id.split('_')[1] || c.id}
-                                  </p>
-                                </div>
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    if (confirm("Are you absolutely sure you want to permanently delete this entire chat history? All message receipts will be purged.")) {
-                                      onDeleteChat(c.id);
-                                      if (selectedChatId === c.id) setSelectedChatId(null);
-                                    }
-                                  }}
-                                  className="text-gray-400 hover:text-red-550 p-1 hover:bg-red-50 rounded transition-colors shrink-0"
-                                  title="Permanently Purge Chat logs"
-                                >
-                                  <Trash2 className="w-3.5 h-3.5" />
-                                </button>
-                              </div>
-
-                              {/* PAIRED STUDENT AND TUTOR BADGES */}
-                              <div className="space-y-1.5 block text-[11px] bg-slate-50/70 p-2 rounded-xl border border-slate-200/60">
-                                {/* Student */}
-                                <div className="flex items-center gap-2">
-                                  <ResponsiveAvatar
-                                    src={student?.avatarUrl}
-                                    alt=""
-                                    sizePx={24}
-                                    width={20}
-                                    height={20}
-                                    className="w-5 h-5 rounded-full object-cover ring-1 ring-slate-200 shrink-0"
-                                  />
-                                  <div className="truncate flex-1 min-w-0">
-                                    <span className="font-bold text-gray-900 truncate block leading-tight">{student?.name || 'Enrolled Student'}</span>
-                                    <span className="text-[9.5px] text-gray-400 truncate block leading-none">{student?.email || 'N/A'}</span>
-                                  </div>
-                                  <span className="text-[8.5px] font-bold bg-blue-50 text-blue-700 px-1.5 py-0.2 rounded border border-blue-200 shrink-0">
-                                    Student
-                                  </span>
-                                </div>
-
-                                {/* Assigned Tutor / CSR Desk */}
-                                <div className="flex items-center gap-2 pt-1 border-t border-slate-200/50">
-                                  <ResponsiveAvatar
-                                    src={isSupportChat
-                                      ? 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=64&h=64&auto=format&fit=crop&q=75'
-                                      : tutor?.avatarUrl}
-                                    alt=""
-                                    sizePx={24}
-                                    width={20}
-                                    height={20}
-                                    fallbackSrc="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=64&h=64&auto=format&fit=crop&q=75"
-                                    className="w-5 h-5 rounded-full object-cover ring-1 ring-orange-200 shrink-0"
-                                  />
-                                  <div className="truncate flex-1 min-w-0">
-                                    <span className="font-bold text-gray-900 truncate block leading-tight">
-                                      {isSupportChat ? 'Emily Vance (CSR Desk)' : (tutor?.name || 'Assigned Specialist')}
-                                    </span>
-                                    <span className="text-[9.5px] text-emerald-700 font-semibold truncate block leading-none">
-                                      {isSupportChat ? '24/7 Support Desk' : `★ ${tutor?.rating || 4.9} • Verified Tutor`}
-                                    </span>
-                                  </div>
-                                  <span className={`text-[8.5px] font-bold px-1.5 py-0.2 rounded border shrink-0 ${
-                                    isSupportChat ? 'bg-purple-50 text-purple-700 border-purple-200' : 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                                  }`}>
-                                    {isSupportChat ? 'CSR' : 'Tutor'}
-                                  </span>
-                                </div>
-
-                                {/* Paired Assignment Reference */}
-                                {linkedAssignment && (
-                                  <div className="pt-1 text-[10px] text-orange-900 font-medium flex items-center justify-between border-t border-slate-200/50">
-                                    <span className="truncate max-w-[150px]">📋 {linkedAssignment.title}</span>
-                                    <span className="font-bold uppercase text-[8.5px] bg-orange-100 text-orange-800 px-1 rounded">
-                                      {linkedAssignment.status}
-                                    </span>
-                                  </div>
-                                )}
-                              </div>
-
-                              {lastMsg ? (
-                                <p className="text-[10px] text-gray-400 truncate italic font-medium leading-none">
-                                  "{lastMsg.content.replace(/\*\*|__/g, '')}"
-                                </p>
-                              ) : (
-                                <p className="text-[10px] text-gray-350 italic font-medium leading-none">
-                                  No messages exchanged yet.
-                                </p>
-                              )}
-                            </div>
-                          );
-                        })}
-                    </div>
-                  </div>
-
-                  {/* RIGHT COLUMN: WORKSPACE MONITOR */}
-                  <div className="lg:col-span-8 border border-gray-150 rounded-2xl overflow-hidden flex flex-col justify-between bg-white">
-                    {selectedChat && selectedChatId ? (
-                      <div className="flex flex-col h-full justify-between">
-                        {(() => {
-                          const selStudent = users.find(u => u.id === selectedChat.studentId) || (selectedChat as any).pairedStudent;
-                          const selLinkedAssignment = assignments.find(a => 
-                            (selectedChat.orderId && a.id === selectedChat.orderId) ||
-                            (a.studentId === selectedChat.studentId && a.tutorId === selectedChat.tutorId) ||
-                            (a.studentId === selectedChat.studentId && a.tutorId)
-                          );
-                          const selIsSupport = selectedChat.tutorId.startsWith('admin_') || selectedChat.tutorId === 'admin_emily' || selectedChat.tutorId === 'admin_shaka';
-                          const selTutor = users.find(u => u.id === selectedChat.tutorId) || 
-                            (selectedChat as any).pairedTutor || 
-                            (selLinkedAssignment?.tutorId ? users.find(u => u.id === selLinkedAssignment.tutorId) : null);
-
-                          return (
-                            <>
-                              {/* Selected Chat info heading with Paired Tutor & Student Details */}
-                              <div className="p-4 bg-gradient-to-r from-gray-50 to-orange-50/30 border-b border-gray-150 flex flex-col md:flex-row justify-between items-start md:items-center gap-3 text-left shrink-0">
-                                <div className="space-y-1">
-                                  <div className="flex items-center gap-2">
-                                    <span className="text-[9px] font-mono bg-orange-100 text-orange-800 px-2.5 py-0.5 rounded-full border border-orange-200 font-bold uppercase tracking-wider">
-                                      Live Room: #{selectedChat.id.split('_')[1] || selectedChat.id}
-                                    </span>
-                                    <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
-                                      Paired Active Thread
-                                    </span>
-                                  </div>
-                                  <h4 className="font-bold text-sm text-[#0B1528]">
-                                    {selectedChat.subject}
-                                  </h4>
-                                  
-                                  {/* PAIRED CHAT MEMBERS SUMMARY */}
-                                  <div className="flex flex-wrap items-center gap-2 pt-1 text-xs">
-                                    {/* Student badge */}
-                                    <div className="flex items-center gap-1.5 bg-white border border-gray-200 px-2.5 py-1 rounded-xl shadow-2xs">
-                                      <span className="text-[10px] font-bold text-blue-700 uppercase">Student:</span>
-                                      <span className="font-bold text-gray-900">{selStudent?.name || 'Student'}</span>
-                                      <span className="text-[10px] text-gray-400">({selStudent?.email || 'N/A'})</span>
-                                    </div>
-
-                                    <span className="text-gray-400 font-bold">↔</span>
-
-                                    {/* Tutor badge */}
-                                    <div className="flex items-center gap-1.5 bg-white border border-gray-200 px-2.5 py-1 rounded-xl shadow-2xs">
-                                      <span className="text-[10px] font-bold text-orange-700 uppercase">
-                                        {selIsSupport ? 'Admin Support:' : 'Assigned Tutor:'}
-                                      </span>
-                                      <span className="font-bold text-gray-900">
-                                        {selIsSupport ? 'Emily Vance (CSR)' : (selTutor?.name || 'Matched Specialist')}
-                                      </span>
-                                      {!selIsSupport && (
-                                        <span className="text-[10px] text-emerald-600 font-bold">★ {selTutor?.rating || 4.9}</span>
-                                      )}
-                                    </div>
-                                  </div>
-                                </div>
-
-                                <div className="flex items-center gap-2 shrink-0">
-                                  <button
-                                    onClick={() => setShowSubmissionHistoriesDrawer(!showSubmissionHistoriesDrawer)}
-                                    className={`text-xs px-3 py-1.5 rounded-xl font-bold transition-all shadow-xs flex items-center gap-1.5 cursor-pointer border ${
-                                      showSubmissionHistoriesDrawer
-                                        ? 'bg-orange-500 text-white border-orange-600'
-                                        : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-50'
-                                    }`}
-                                    title="Toggle Student Submissions & Academic History"
-                                  >
-                                    <BookOpen className="w-3.5 h-3.5" />
-                                    <span>{showSubmissionHistoriesDrawer ? 'Hide Submissions' : 'View Submissions'}</span>
-                                  </button>
-                                  <button
-                                    onClick={() => handleTestChatConnection(selectedChatId)}
-                                    disabled={testingChatConnectionId === selectedChatId}
-                                    className="text-xs bg-white hover:bg-gray-55 border border-gray-200 text-gray-700 px-3 py-1.5 rounded-xl font-bold transition-all shadow-sm flex items-center gap-1 cursor-pointer disabled:opacity-50"
-                                    title="Verify if onSnapshot subscription is active and query last 5 messages"
-                                  >
-                                    <RefreshCw className={`w-3.5 h-3.5 text-gray-500 ${testingChatConnectionId === selectedChatId ? 'animate-spin' : ''}`} />
-                                    <span>{testingChatConnectionId === selectedChatId ? 'Testing...' : 'Test Sync'}</span>
-                                  </button>
-                                  <button
-                                    onClick={() => onSelectChat(selectedChat)}
-                                    className="text-xs bg-gray-950 hover:bg-black text-white px-3 py-1.5 rounded-xl font-bold transition-all shadow-sm flex items-center gap-1 cursor-pointer"
-                                    title="Join communication session in normal UI view overlay"
-                                  >
-                                    <span>Open In Drawer</span>
-                                    <ArrowUpRight className="w-3.5 h-3.5 text-orange-400" />
-                                  </button>
-                                </div>
-                              </div>
-
-                              {/* STUDENT SUBMISSION HISTORIES PANEL */}
-                              {showSubmissionHistoriesDrawer && (
-                                <div className="p-3.5 bg-slate-50 border-b border-gray-200 text-left shrink-0 space-y-2">
-                                  <div className="flex items-center justify-between">
-                                    <span className="text-[10px] font-bold uppercase tracking-wider text-gray-700 flex items-center gap-1.5 font-mono">
-                                      <GraduationCap className="w-3.5 h-3.5 text-orange-600" />
-                                      <span>Student Submission Histories &amp; Assigned Tutor Records</span>
-                                    </span>
-                                    <span className="text-[9.5px] font-bold bg-white border border-gray-200 px-2 py-0.5 rounded-full text-gray-600">
-                                      {assignments.filter(a => a.studentId === selectedChat.studentId).length} Submissions Total
-                                    </span>
-                                  </div>
-
-                                  {(() => {
-                                    const studentAssignments = assignments.filter(a => a.studentId === selectedChat.studentId);
-                                    if (studentAssignments.length === 0) {
-                                      return (
-                                        <p className="text-[11px] text-gray-400 italic">No formal coursework submissions recorded for this student yet.</p>
-                                      );
-                                    }
-                                    return (
-                                      <div className="space-y-2 max-h-[140px] overflow-y-auto pr-1">
-                                        {studentAssignments.map(a => {
-                                          const aTutor = users.find(u => u.id === a.tutorId);
-                                          return (
-                                            <div key={a.id} className="bg-white border border-gray-200 p-2.5 rounded-xl flex items-center justify-between gap-3 text-xs shadow-2xs">
-                                              <div className="min-w-0 flex-1">
-                                                <div className="flex items-center gap-2">
-                                                  <h5 className="font-bold text-gray-900 truncate leading-none">{a.title}</h5>
-                                                  <span className={`text-[9px] font-bold uppercase px-1.5 py-0.2 rounded border ${
-                                                    a.status === AssignmentStatus.COMPLETED ? 'bg-emerald-50 text-emerald-700 border-emerald-200' :
-                                                    a.status === AssignmentStatus.IN_PROGRESS ? 'bg-blue-50 text-blue-700 border-blue-200' :
-                                                    'bg-amber-50 text-amber-700 border-amber-200'
-                                                  }`}>
-                                                    {a.status}
-                                                  </span>
-                                                </div>
-                                                <div className="flex items-center gap-3 text-[10px] text-gray-500 mt-1">
-                                                  <span>Subject: <strong className="text-gray-700">{a.subject}</strong></span>
-                                                  <span>•</span>
-                                                  <span>Deadline: <strong className="text-gray-700">{a.deadline}</strong></span>
-                                                  <span>•</span>
-                                                  <span>Assigned Tutor: <strong className="text-orange-600">{aTutor?.name || a.tutorId || 'Unassigned'}</strong></span>
-                                                </div>
-                                              </div>
-
-                                              <div className="flex items-center gap-2 shrink-0">
-                                                {a.quoteAmount && (
-                                                  <span className="text-[11px] font-mono font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
-                                                    ${a.quoteAmount}
-                                                  </span>
-                                                )}
-                                                {a.fileUrls && a.fileUrls.length > 0 && (
-                                                  <a 
-                                                    href={a.fileUrls[0]} 
-                                                    target="_blank" 
-                                                    rel="noreferrer" 
-                                                    download
-                                                    className="p-1.5 bg-orange-50 hover:bg-orange-500 text-orange-600 hover:text-white rounded-lg transition-colors"
-                                                    title="Download attached coursework brief"
-                                                  >
-                                                    <Download className="w-3.5 h-3.5" />
-                                                  </a>
-                                                )}
-                                              </div>
-                                            </div>
-                                          );
-                                        })}
-                                      </div>
-                                    );
-                                  })()}
-                                </div>
-                              )}
-                            </>
-                          );
-                        })()}
-
-                        {/* SHARED STUDENT DOCUMENTS VAULT BAR */}
-                        {selectedChat && (
-                          <div className="px-4 py-2.5 bg-orange-50/60 border-b border-orange-200/60 text-left shrink-0">
-                            <div className="flex items-center justify-between mb-1.5">
-                              <span className="text-[10px] font-bold text-orange-950 uppercase tracking-wider flex items-center gap-1">
-                                <FileText className="w-3.5 h-3.5 text-orange-600" />
-                                <span>Student Documents &amp; Attachments Vault</span>
-                              </span>
-                              <span className="text-[9.5px] font-bold text-orange-800 bg-orange-100 px-2 py-0.5 rounded-full border border-orange-200">
-                                {(() => {
-                                  const chatDocs = activeChatMessages.filter(m => m.fileUrl);
-                                  const studentAssignments = assignments.filter(a => a.studentId === selectedChat.studentId);
-                                  const assignDocsCount = studentAssignments.reduce((acc, a) => acc + (a.fileUrls?.length || 0) + (a.tutorWorkFileUrl ? 1 : 0), 0);
-                                  return chatDocs.length + assignDocsCount;
-                                })()} Docs Available
-                              </span>
-                            </div>
-
-                            {(() => {
-                              const chatDocs = activeChatMessages.filter(m => m.fileUrl).map(m => ({
-                                name: m.fileName || 'Chat Attachment',
-                                url: m.fileUrl!,
-                                source: 'Chat File',
-                                date: new Date(m.timestamp).toLocaleDateString()
-                              }));
-
-                              const studentAssignments = assignments.filter(a => a.studentId === selectedChat.studentId);
-                              const assignDocs: { name: string; url: string; source: string; date: string }[] = [];
-                              studentAssignments.forEach(a => {
-                                if (a.fileUrls && a.fileUrls.length > 0) {
-                                  a.fileUrls.forEach((url, idx) => {
-                                    assignDocs.push({
-                                      name: (a.fileNames && a.fileNames[idx]) ? a.fileNames[idx] : `Assignment Doc #${idx + 1}`,
-                                      url,
-                                      source: `Assignment: ${a.title.slice(0, 20)}...`,
-                                      date: new Date(a.createdAt).toLocaleDateString()
-                                    });
-                                  });
-                                }
-                                if (a.tutorWorkFileUrl) {
-                                  assignDocs.push({
-                                    name: a.tutorWorkFileName || 'Final Solution Work',
-                                    url: a.tutorWorkFileUrl,
-                                    source: 'Tutor Solution Work',
-                                    date: new Date(a.createdAt).toLocaleDateString()
-                                  });
-                                }
-                              });
-
-                              const allDocs = [...chatDocs, ...assignDocs];
-
-                              if (allDocs.length === 0) {
-                                return (
-                                  <p className="text-[10px] text-gray-500 italic">No document files attached in this chat room or assignment order yet.</p>
-                                );
-                              }
-
-                              return (
-                                <div className="flex gap-2 overflow-x-auto pb-1 max-w-full">
-                                  {allDocs.map((doc, idx) => (
-                                    <div key={idx} className="bg-white border border-orange-200/80 p-1.5 rounded-xl flex items-center gap-2 shrink-0 max-w-[210px] shadow-2xs">
-                                      <FileText className="w-3.5 h-3.5 text-orange-500 shrink-0" />
-                                      <div className="min-w-0 flex-1">
-                                        <p className="text-[10px] font-bold text-gray-900 truncate leading-tight" title={doc.name}>{doc.name}</p>
-                                        <p className="text-[8.5px] text-gray-400 truncate leading-tight">{doc.source}</p>
-                                      </div>
-                                      <a 
-                                        href={doc.url} 
-                                        target="_blank" 
-                                        rel="noreferrer" 
-                                        download
-                                        className="p-1 bg-orange-100 hover:bg-orange-500 text-orange-700 hover:text-white rounded-lg transition-colors shrink-0"
-                                        title="Download document file"
-                                      >
-                                        <Download className="w-3 h-3" />
-                                      </a>
-                                    </div>
-                                  ))}
-                                </div>
-                              );
-                            })()}
-                          </div>
-                        )}
-
-                        {chatConnectionResult && chatConnectionResult.chatId === selectedChatId && (
-                          <div className={`p-4 border-b text-left text-xs font-sans space-y-3.5 ${
-                            chatConnectionResult.error 
-                              ? 'bg-red-50/75 border-red-150' 
-                              : chatConnectionResult.active 
-                                ? 'bg-emerald-50/75 border-emerald-150' 
-                                : 'bg-amber-50/75 border-amber-150'
-                          }`}>
-                            <div className="flex items-center justify-between">
-                              <h5 className="font-bold text-[12px] flex items-center gap-1.5">
-                                {chatConnectionResult.error ? (
-                                  <>
-                                    <WifiOff className="w-4 h-4 text-red-600" />
-                                    <span className="text-red-900">PostgreSQL Listener Diagnostics: Connection Failure</span>
-                                  </>
-                                ) : chatConnectionResult.active ? (
-                                  <>
-                                    <Wifi className="w-4 h-4 text-emerald-600 animate-pulse" />
-                                    <span className="text-emerald-900">PostgreSQL Listener Diagnostics: ACTIVE &amp; CONNECTED</span>
-                                  </>
-                                ) : (
-                                  <>
-                                    <WifiOff className="w-4 h-4 text-amber-600 animate-pulse" />
-                                    <span className="text-amber-900">PostgreSQL Listener Diagnostics: STANDBY / OFFLINE</span>
-                                  </>
-                                )}
-                              </h5>
-                              <button 
-                                onClick={() => setChatConnectionResult(null)}
-                                className="text-gray-400 hover:text-gray-600 font-bold p-0.5"
-                                title="Dismiss diagnostics console"
-                              >
-                                <X className="w-4 h-4" />
-                              </button>
-                            </div>
-
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-[11px]">
-                              <div className="space-y-1">
-                                <span className="text-gray-400 font-semibold block">SUBSCRIPTION STATE</span>
-                                <span className="font-bold block text-gray-800">
-                                  {chatConnectionResult.active 
-                                    ? "🟢 Live Snap Listener: Active and piping updates into storeState."
-                                    : "⚠️ Standby: Direct fetch successful, but active snapshot stream is unverified or currently disconnected."
-                                  }
-                                </span>
-                              </div>
-                              <div className="space-y-1">
-                                <span className="text-gray-400 font-semibold block">REMOTE DB HEALTH (POSTGRESQL)</span>
-                                <span className="font-bold block text-gray-800">
-                                  {chatConnectionResult.error 
-                                    ? `🔴 Read Error: ${chatConnectionResult.error}` 
-                                    : `🟢 OK (${chatConnectionResult.messagesCount} total messages found via direct query)`
-                                  }
-                                </span>
-                              </div>
-                            </div>
-
-                            {/* LAST 5 MESSAGES RETRIEVED */}
-                            <div className="space-y-1.5">
-                              <span className="text-[10px] text-gray-400 font-mono uppercase tracking-wider font-extrabold block">
-                                Last 5 Messages in Database (Direct PostgreSQL Isolation Audit)
-                              </span>
-                              {chatConnectionResult.lastMessages.length === 0 ? (
-                                <div className="p-3 bg-white/50 rounded-xl border border-dashed text-center text-gray-400 italic">
-                                  No database records found in this subcollection.
-                                </div>
-                              ) : (
-                                <div className="bg-white/95 rounded-xl border border-gray-150 overflow-hidden divide-y divide-gray-100 max-h-[140px] overflow-y-auto">
-                                  {chatConnectionResult.lastMessages.map((m, idx) => {
-                                    const sender = users.find(u => u.id === m.senderId)?.name || m.senderId;
-                                    return (
-                                      <div key={idx} className="p-2.5 flex justify-between items-start gap-3 hover:bg-gray-50/50">
-                                        <div className="min-w-0">
-                                          <span className="font-bold text-gray-900 block truncate">{sender}:</span>
-                                          <p className="text-gray-600 mt-0.5 line-clamp-2 leading-relaxed">{m.content}</p>
-                                        </div>
-                                        <span className="text-[9px] text-gray-400 font-mono shrink-0 whitespace-nowrap mt-0.5">
-                                          {m.timestamp}
-                                        </span>
-                                      </div>
-                                    );
-                                  })}
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                        )}
-
-                        {/* Interactive Message feed scroll */}
-                        <div className="p-4 space-y-3.5 overflow-y-auto max-h-[350px] min-h-[300px] flex-1 bg-gray-50/40 text-xs text-left">
-                          {chatError ? (
-                            <ErrorStatePanel
-                              title="Unable to load messages"
-                              message={chatError}
-                              onRetry={() => selectedChatId && onSubscribeToChatDetails?.(selectedChatId)}
-                            />
-                          ) : isLoadingMessages && activeChatMessages.length === 0 ? (
-                            <TabLoadingSkeleton rows={3} />
-                          ) : activeChatMessages.length === 0 ? (
-                            <div className="py-20 text-center text-gray-400 italic">
-                              No messages have been posted to this workspace room yet. Type below to send an admin moderation guide instruction.
-                            </div>
-                          ) : (
-                            activeChatMessages.map((m) => {
-                              const isSelf = m.senderId === currentUser.id;
-                              const isSystem = m.senderId === 'system';
-                              const senderUser = users.find(u => u.id === m.senderId);
-
-                              let bubbleStyle = "bg-white border border-gray-200 text-gray-800 text-left";
-                              let labelStr = senderUser?.name || 'User';
-
-                              if (isSystem) {
-                                bubbleStyle = "bg-amber-50/80 border border-amber-200 text-amber-900 border text-center font-bold font-sans tracking-wide max-w-full mx-auto md:p-3";
-                                labelStr = "🚨 ACADEMIC SECURITY SYSTEM";
-                              } else if (isSelf) {
-                                bubbleStyle = "bg-gray-900 text-white text-left ml-auto border border-gray-900";
-                                labelStr = "👑 PLATFORM ADMIN (You)";
-                              } else if (senderUser?.role === UserRole.TUTOR) {
-                                bubbleStyle = "bg-orange-55 border border-orange-200 text-orange-950 text-left";
-                                labelStr = `🎓 TUTOR: ${senderUser.name}`;
-                              } else {
-                                bubbleStyle = "bg-blue-55 border border-blue-200 text-blue-950 text-left";
-                                labelStr = `👨‍🎓 STUDENT: ${senderUser?.name || 'Student'}`;
-                              }
-
-                              return (
-                                <div key={m.id} className={`flex flex-col space-y-1 ${isSelf ? 'items-end' : isSystem ? 'items-center' : 'items-start'}`}>
-                                  <span className="text-[9px] font-bold text-gray-400 uppercase tracking-wide">
-                                    {labelStr} • {new Date(m.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                                  </span>
-                                  <div className={`p-3 rounded-2xl max-w-[85%] leading-relaxed font-semibold ${bubbleStyle}`}>
-                                    <p className="whitespace-pre-wrap">{m.content}</p>
-                                    {m.fileUrl && (
-                                      <div className="mt-2.5 p-2 rounded-xl bg-white/90 border border-gray-200/80 flex items-center justify-between text-xs font-normal text-gray-800 shadow-2xs">
-                                        <div className="flex items-center gap-1.5 truncate">
-                                          <FileText className="w-4 h-4 text-orange-600 shrink-0" />
-                                          <span className="truncate font-mono font-bold text-[11px] text-gray-900">{m.fileName || 'Attachment Document'}</span>
-                                        </div>
-                                        <a 
-                                          href={m.fileUrl} 
-                                          target="_blank" 
-                                          rel="noreferrer" 
-                                          download
-                                          className="px-2.5 py-1 bg-orange-500 hover:bg-orange-600 text-white font-bold text-[10px] rounded-lg transition-colors shrink-0 ml-2 no-underline flex items-center gap-1 cursor-pointer"
-                                        >
-                                          <Download className="w-3 h-3" />
-                                          <span>Download</span>
-                                        </a>
-                                      </div>
-                                    )}
-                                  </div>
-                                </div>
-                              );
-                            })
-                          )}
-                        </div>
-
-                        {/* Interactive message composer */}
-                        <form onSubmit={handleSendAdminMessage} className="p-3.5 border-t border-gray-150 flex flex-col gap-2.5 shrink-0" id="admin-composer-form">
-                          <div className="flex flex-wrap items-center gap-4 px-1 bg-gray-50 p-2 rounded-xl border border-gray-100">
-                            <label className="inline-flex items-center gap-1.5 cursor-pointer text-[9.5px] uppercase tracking-wider font-extrabold select-none">
-                              <input 
-                                type="radio" 
-                                name="reply-identity"
-                                checked={replyAsTutor} 
-                                onChange={() => setReplyAsTutor(true)}
-                                className="accent-orange-550 scale-95"
-                              />
-                              {(() => {
-                                const linkedAssign = assignments.find(a => 
-                                  (selectedChat.orderId && a.id === selectedChat.orderId) ||
-                                  (a.studentId === selectedChat.studentId && a.tutorId === selectedChat.tutorId) ||
-                                  (a.studentId === selectedChat.studentId && a.tutorId)
-                                );
-                                const pairedTutorObj = users.find(u => u.id === selectedChat.tutorId) || 
-                                  (selectedChat as any).pairedTutor || 
-                                  (linkedAssign?.tutorId ? users.find(u => u.id === linkedAssign.tutorId) : null);
-                                return (
-                                  <span className={replyAsTutor ? "text-orange-700 font-bold" : "text-gray-400"}>
-                                    🎭 Reply as Tutor ({pairedTutorObj?.name || 'Assigned Tutor'})
-                                  </span>
-                                );
-                              })()}
-                            </label>
-                            <label className="inline-flex items-center gap-1.5 cursor-pointer text-[9.5px] uppercase tracking-wider font-extrabold select-none">
-                              <input 
-                                type="radio" 
-                                name="reply-identity"
-                                checked={!replyAsTutor} 
-                                onChange={() => setReplyAsTutor(false)}
-                                className="accent-gray-900 scale-95"
-                              />
-                              <span className={!replyAsTutor ? "text-gray-900" : "text-gray-400"}>
-                                👑 Reply as Admin ({currentUser.name})
-                              </span>
-                            </label>
-                          </div>
-
-                          <div className="flex items-center gap-2">
-                            <label className="p-2.5 text-gray-500 hover:text-gray-800 bg-gray-50 border border-gray-200 rounded-xl cursor-pointer hover:bg-gray-100 transition-colors" title="Attach document file">
-                              <Paperclip className="w-4 h-4" />
-                              <input 
-                                type="file" 
-                                className="hidden" 
-                                onChange={(e) => {
-                                  if (e.target.files && e.target.files[0]) {
-                                    const file = e.target.files[0];
-                                    setAdminAttachedFileName(file.name);
-                                    setAdminAttachedFileUrl(URL.createObjectURL(file));
-                                  }
-                                }} 
-                              />
-                            </label>
-                            {adminAttachedFileName && (
-                              <span className="text-[10px] bg-orange-100 text-orange-800 px-2 py-1 rounded-lg font-mono font-bold truncate max-w-[140px] flex items-center gap-1 shrink-0">
-                                📎 {adminAttachedFileName}
-                                <button type="button" onClick={() => { setAdminAttachedFileName(''); setAdminAttachedFileUrl(''); }} className="text-orange-600 hover:text-red-600 ml-1 font-bold">×</button>
-                              </span>
-                            )}
-                            <input 
-                              type="text"
-                              value={adminReply}
-                              onChange={(e) => setAdminReply(e.target.value)}
-                              placeholder={`Type message to send as ${replyAsTutor ? (users.find(u => u.id === selectedChat.tutorId)?.name || (selectedChat as any).pairedTutor?.name || 'Assigned Tutor') : 'Platform Admin'}...`}
-                              className="flex-1 bg-gray-50 border border-gray-250 px-4 py-2.5 rounded-xl text-xs font-semibold focus:outline-hidden focus:border-orange-500 focus:bg-white"
-                            />
-                            <button
-                              type="submit"
-                              className="p-3.5 bg-orange-500 hover:bg-orange-600 text-white rounded-xl transition-all shadow-sm shrink-0 flex items-center justify-center cursor-pointer"
-                            >
-                              <Send className="w-3.5 h-3.5" />
-                            </button>
-                          </div>
-                        </form>
-                      </div>
-                    ) : (
-                      <div className="m-auto text-center space-y-3.5 p-6 max-w-sm">
-                        <MessageSquare className="w-12 h-12 text-gray-300 mx-auto" />
-                        <h4 className="font-bold text-sm text-[#0B1528] uppercase">Administrative Monitoring Deck</h4>
-                        <p className="text-xs text-gray-400 font-medium leading-relaxed">
-                          Select an active consultation room from the directory side panel to inspect chat message indices, post support updates, or enforce academic safety guides.
-                        </p>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
-            </div>
+            <OperationalChatDesk
+              currentUser={currentUser}
+              users={users}
+              chats={chats}
+              messages={messages}
+              assignments={assignments}
+              connectionStatus={connectionStatus}
+              isLoadingMessages={isLoadingMessages}
+              chatError={chatError}
+              selectedChatId={selectedChatId}
+              onSelectChatId={setSelectedChatId}
+              onOpenInDrawer={onSelectChat}
+              onSendMessage={onSendMessage}
+              onDeleteChat={onDeleteChat}
+              onSubscribeToChatDetails={onSubscribeToChatDetails}
+              onGetOrCreateChat={onGetOrCreateChat}
+              onTestChatConnection={handleTestChatConnection}
+              testingChatConnectionId={testingChatConnectionId}
+              chatConnectionResult={chatConnectionResult}
+              onClearConnectionResult={() => setChatConnectionResult(null)}
+              isPageExpanded={isPageExpanded}
+              onTogglePageExpand={() => setIsPageExpanded(prev => !prev)}
+              adminTabOptions={ADMIN_TAB_META.map(t => ({ id: t.id, label: t.label }))}
+              activeAdminTab={activeTab}
+              onSwitchAdminTab={(tabId) => setActiveTab(tabId as any)}
+            />
           )}
 
           {/* DISPUTES & ESCROW DESK */}

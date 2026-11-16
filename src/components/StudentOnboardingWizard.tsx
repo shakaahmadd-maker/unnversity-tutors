@@ -16,10 +16,32 @@ import {
   Trash2,
   Upload,
   X,
+  ClipboardList,
+  CheckSquare,
+  Award,
+  Layers,
+  MonitorPlay,
+  PenTool,
+  Code2,
+  LogIn,
+  LogOut,
 } from 'lucide-react';
 import { User } from '../types';
 
-export type OnboardingPathwayId = '1-1-lesson' | 'assignment' | 'coursework' | 'writing';
+export type OnboardingPathwayId =
+  | '1-1-lesson'
+  | 'assignment'
+  | 'coursework'
+  | 'writing'
+  | 'online-assignments-homework-help'
+  | 'online-quizzes-assessments'
+  | 'online-exams-tests-midterms-finals'
+  | 'online-coursework'
+  | 'online-classes'
+  | 'protected-exam'
+  | 'writing-services'
+  | 'it-project-assistance'
+  | 'online-phd-classes-management';
 
 export interface StudentOnboardingSubmitPayload {
   studentId: string;
@@ -45,6 +67,8 @@ interface StudentOnboardingWizardProps {
   onExit?: () => void;
   onSelectChatId?: (chatId: string) => void;
   onGoToChat?: () => void;
+  onNavigate?: (view: string) => void;
+  onLogout?: () => void;
 }
 
 interface PathwayOption {
@@ -99,6 +123,96 @@ const PATHWAY_OPTIONS: PathwayOption[] = [
     durationDefault: 5,
     durationOptions: [3, 5, 10, 15],
   },
+  {
+    id: 'online-assignments-homework-help',
+    title: 'Online assignments/Homework HELP',
+    description: 'Guided homework solutions & problem sets',
+    meta: 'Fast Help',
+    durationLabel: 'Target Turnaround Window',
+    durationUnit: 'Day(s)',
+    durationDefault: 3,
+    durationOptions: [1, 3, 5, 7],
+  },
+  {
+    id: 'online-quizzes-assessments',
+    title: 'Online Quizzes/Assessments',
+    description: 'Quiz prep, practice drills & walkthroughs',
+    meta: 'Score Boost',
+    durationLabel: 'Prep Session Window',
+    durationUnit: 'Hour(s)',
+    durationDefault: 2,
+    durationOptions: [1, 2, 3, 4],
+  },
+  {
+    id: 'online-exams-tests-midterms-finals',
+    title: 'Online exams/tests/midterms/finals',
+    description: 'Intensive revision for midterms & finals',
+    meta: 'Priority Match',
+    durationLabel: 'Revision Sprint Scope',
+    durationUnit: 'Hour(s)',
+    durationDefault: 3,
+    durationOptions: [2, 3, 5, 8],
+  },
+  {
+    id: 'online-coursework',
+    title: 'Online coursework',
+    description: 'Weekly modules, labs & syllabus tracking',
+    meta: 'Weekly Support',
+    durationLabel: 'Coursework Duration',
+    durationUnit: 'Week(s)',
+    durationDefault: 4,
+    durationOptions: [2, 4, 8, 12],
+  },
+  {
+    id: 'online-classes',
+    title: 'Online Classes',
+    description: 'Full-term lectures & discussion coaching',
+    meta: 'Full Term',
+    durationLabel: 'Class Coverage',
+    durationUnit: 'Week(s)',
+    durationDefault: 8,
+    durationOptions: [4, 8, 12, 16],
+  },
+  {
+    id: 'protected-exam',
+    title: 'Protected exam',
+    description: 'High-focus readiness & proctored exam prep',
+    meta: 'Expert Prep',
+    durationLabel: 'Exam Prep Hours',
+    durationUnit: 'Hour(s)',
+    durationDefault: 2,
+    durationOptions: [1, 2, 4, 6],
+  },
+  {
+    id: 'writing-services',
+    title: 'Writing Services',
+    description: 'Essays, research papers & APA/MLA editing',
+    meta: '24h Turnaround',
+    durationLabel: 'Estimated Document Scope',
+    durationUnit: 'Page(s)',
+    durationDefault: 5,
+    durationOptions: [3, 5, 10, 15],
+  },
+  {
+    id: 'it-project-assistance',
+    title: 'IT Project Assistance',
+    description: 'Coding, full-stack apps, SQL & debugging',
+    meta: 'Tech Experts',
+    durationLabel: 'Project Milestone Scope',
+    durationUnit: 'Day(s)',
+    durationDefault: 5,
+    durationOptions: [2, 5, 7, 14],
+  },
+  {
+    id: 'online-phd-classes-management',
+    title: 'Online PhD Classes/Online Classes Management',
+    description: 'Doctoral seminars, pacing & research support',
+    meta: 'PhD Faculty',
+    durationLabel: 'Management Horizon',
+    durationUnit: 'Week(s)',
+    durationDefault: 8,
+    durationOptions: [4, 8, 12, 16],
+  },
 ];
 
 const ACADEMIC_LEVELS = ['Undergraduate', "Master's", 'PhD'] as const;
@@ -118,6 +232,60 @@ const URGENCY_OPTIONS = [
   { id: 'this-week', label: 'This Week', hint: 'Standard review cadence', sla: 'standard', daysOffset: 7 },
   { id: 'ongoing', label: 'Ongoing', hint: 'Recurring study schedule', sla: 'flexible', daysOffset: 14 },
 ] as const;
+
+interface DeliverableOption {
+  id: string;
+  label: string;
+  description: string;
+}
+
+const DELIVERABLE_OPTIONS: DeliverableOption[] = [
+  {
+    id: 'abstract',
+    label: 'Abstract',
+    description: 'Concise summary of your work.',
+  },
+  {
+    id: 'executive-summary',
+    label: 'Executive Summary',
+    description: 'High-level overview for quick review.',
+  },
+  {
+    id: 'proofread-by-editor',
+    label: 'Proofread by Editor',
+    description: 'Editorial pass for grammar and flow.',
+  },
+  {
+    id: 'draft',
+    label: 'Draft',
+    description: 'Receive an interim draft for review.',
+  },
+  {
+    id: 'daily-delivery-update',
+    label: 'Daily Delivery Update',
+    description: 'Progress updates as the work proceeds.',
+  },
+  {
+    id: 'grammarly-report',
+    label: 'Grammarly Report',
+    description: 'Quality check with Grammarly.',
+  },
+  {
+    id: 'turnitin-ai-report',
+    label: 'Turnitin AI Report',
+    description: 'AI detection insights.',
+  },
+  {
+    id: 'turnitin-similarity-report',
+    label: 'Turnitin Similarity Report',
+    description: 'Similarity score report.',
+  },
+  {
+    id: 'table-of-contents',
+    label: 'Table of Contents',
+    description: 'Structured contents page.',
+  },
+];
 
 function PathwayAvatarSvg({ pathway }: { pathway: OnboardingPathwayId }) {
   if (pathway === '1-1-lesson') {
@@ -231,35 +399,59 @@ function PathwayAvatarSvg({ pathway }: { pathway: OnboardingPathwayId }) {
     );
   }
 
-  return (
-    <svg viewBox="0 0 64 64" className="w-11 h-11 drop-shadow-xs" aria-hidden="true">
-      <defs>
-        <linearGradient id="avatar4Skin" x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0%" stopColor="#FDE2C8" />
-          <stop offset="100%" stopColor="#F3B88C" />
-        </linearGradient>
-        <linearGradient id="avatar4Sweater" x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0%" stopColor="#16A34A" />
-          <stop offset="100%" stopColor="#15803D" />
-        </linearGradient>
-      </defs>
-      {/* Green Sweater */}
-      <path d="M12 57 C12 45, 19 41, 29 41 C39 41, 46 45, 46 57 Z" fill="url(#avatar4Sweater)" />
-      {/* Hair & Head */}
-      <circle cx="29" cy="25" r="12" fill="#475569" />
-      <circle cx="29" cy="27.5" r="10.2" fill="url(#avatar4Skin)" />
-      {/* Glasses */}
-      <rect x="21.5" y="24" width="6.5" height="5" rx="1.8" fill="#FFFFFF" fillOpacity="0.45" stroke="#0F172A" strokeWidth="1.5" />
-      <rect x="30" y="24" width="6.5" height="5" rx="1.8" fill="#FFFFFF" fillOpacity="0.45" stroke="#0F172A" strokeWidth="1.5" />
-      <line x1="28" y1="26.5" x2="30" y2="26.5" stroke="#0F172A" strokeWidth="1.5" />
-      <circle cx="24.8" cy="26.5" r="1.1" fill="#0F172A" />
-      <circle cx="33.2" cy="26.5" r="1.1" fill="#0F172A" />
-      <path d="M26.5 32.5 Q29 34.8 31.5 32.5" stroke="#9A3412" strokeWidth="1.5" fill="none" strokeLinecap="round" />
-      {/* Gold Quill Feather */}
-      <path d="M40 50 C41 37, 47 26, 56 20 C55 31, 50 40, 42 48 Z" fill="#F59E0B" stroke="#D97706" strokeWidth="1" />
-      <line x1="38" y1="53" x2="54" y2="22" stroke="#FEF3C7" strokeWidth="1.4" strokeLinecap="round" />
-    </svg>
-  );
+  if (pathway === 'writing') {
+    return (
+      <svg viewBox="0 0 64 64" className="w-11 h-11 drop-shadow-xs" aria-hidden="true">
+        <defs>
+          <linearGradient id="avatar4Skin" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stopColor="#FDE2C8" />
+            <stop offset="100%" stopColor="#F3B88C" />
+          </linearGradient>
+          <linearGradient id="avatar4Sweater" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stopColor="#16A34A" />
+            <stop offset="100%" stopColor="#15803D" />
+          </linearGradient>
+        </defs>
+        {/* Green Sweater */}
+        <path d="M12 57 C12 45, 19 41, 29 41 C39 41, 46 45, 46 57 Z" fill="url(#avatar4Sweater)" />
+        {/* Hair & Head */}
+        <circle cx="29" cy="25" r="12" fill="#475569" />
+        <circle cx="29" cy="27.5" r="10.2" fill="url(#avatar4Skin)" />
+        {/* Glasses */}
+        <rect x="21.5" y="24" width="6.5" height="5" rx="1.8" fill="#FFFFFF" fillOpacity="0.45" stroke="#0F172A" strokeWidth="1.5" />
+        <rect x="30" y="24" width="6.5" height="5" rx="1.8" fill="#FFFFFF" fillOpacity="0.45" stroke="#0F172A" strokeWidth="1.5" />
+        <line x1="28" y1="26.5" x2="30" y2="26.5" stroke="#0F172A" strokeWidth="1.5" />
+        <circle cx="24.8" cy="26.5" r="1.1" fill="#0F172A" />
+        <circle cx="33.2" cy="26.5" r="1.1" fill="#0F172A" />
+        <path d="M26.5 32.5 Q29 34.8 31.5 32.5" stroke="#9A3412" strokeWidth="1.5" fill="none" strokeLinecap="round" />
+        {/* Gold Quill Feather */}
+        <path d="M40 50 C41 37, 47 26, 56 20 C55 31, 50 40, 42 48 Z" fill="#F59E0B" stroke="#D97706" strokeWidth="1" />
+        <line x1="38" y1="53" x2="54" y2="22" stroke="#FEF3C7" strokeWidth="1.4" strokeLinecap="round" />
+      </svg>
+    );
+  }
+
+  switch (pathway) {
+    case 'online-assignments-homework-help':
+      return <ClipboardList className="w-6 h-6 text-[#EA580C]" aria-hidden="true" />;
+    case 'online-quizzes-assessments':
+      return <CheckSquare className="w-6 h-6 text-[#EA580C]" aria-hidden="true" />;
+    case 'online-exams-tests-midterms-finals':
+      return <Award className="w-6 h-6 text-[#EA580C]" aria-hidden="true" />;
+    case 'online-coursework':
+      return <Layers className="w-6 h-6 text-[#EA580C]" aria-hidden="true" />;
+    case 'online-classes':
+      return <MonitorPlay className="w-6 h-6 text-[#EA580C]" aria-hidden="true" />;
+    case 'protected-exam':
+      return <ShieldCheck className="w-6 h-6 text-[#EA580C]" aria-hidden="true" />;
+    case 'writing-services':
+      return <PenTool className="w-6 h-6 text-[#EA580C]" aria-hidden="true" />;
+    case 'it-project-assistance':
+      return <Code2 className="w-6 h-6 text-[#EA580C]" aria-hidden="true" />;
+    case 'online-phd-classes-management':
+    default:
+      return <GraduationCap className="w-6 h-6 text-[#EA580C]" aria-hidden="true" />;
+  }
 }
 
 const STEP_LABELS: Record<number, { badge: string; heading: string; subtitle: string }> = {
@@ -300,6 +492,8 @@ export default function StudentOnboardingWizard({
   onExit,
   onSelectChatId,
   onGoToChat,
+  onNavigate,
+  onLogout,
 }: StudentOnboardingWizardProps) {
   const [step, setStep] = useState<number>(1);
   const [selectedPathway, setSelectedPathway] = useState<OnboardingPathwayId | null>(null);
@@ -314,11 +508,18 @@ export default function StudentOnboardingWizard({
   });
   const [durationValue, setDurationValue] = useState<number>(3);
   const [goalNote, setGoalNote] = useState<string>('');
+  const [selectedDeliverables, setSelectedDeliverables] = useState<string[]>([]);
   const [attachedFiles, setAttachedFiles] = useState<Array<{ id: string; name: string; size: string }>>([]);
   const [studentName, setStudentName] = useState<string>(currentUser.name || '');
   const [studentEmail, setStudentEmail] = useState<string>(currentUser.email || '');
   const [validationError, setValidationError] = useState<string>('');
   const [isLaunching, setIsLaunching] = useState<boolean>(false);
+
+  const toggleDeliverable = (label: string) => {
+    setSelectedDeliverables((prev) =>
+      prev.includes(label) ? prev.filter((item) => item !== label) : [...prev, label]
+    );
+  };
 
   const activePathway = useMemo(
     () => PATHWAY_OPTIONS.find((p) => p.id === selectedPathway) || PATHWAY_OPTIONS[0],
@@ -430,14 +631,19 @@ export default function StudentOnboardingWizard({
     setIsLaunching(true);
     const focusLabel = selectedSubtopic.trim() ? `${selectedSubject.trim()} (${selectedSubtopic.trim()})` : selectedSubject.trim();
 
+    const isWritingService = activePathway.id === 'writing' || activePathway.id === 'writing-services';
+    const deliverablesText =
+      selectedDeliverables.length > 0 ? selectedDeliverables.join(', ') : 'None selected';
     const instructionsSummary = [
       '=== University-Tutors Student Onboarding Request ===',
+      `SERVICE CATEGORY: ${activePathway.title}`,
       `PATHWAY: ${activePathway.title}`,
       `SUBJECT & COURSE: ${focusLabel}`,
       `ACADEMIC LEVEL: ${academicLevel}`,
       `URGENCY: ${selectedUrgency.label}`,
       `TARGET DATE: ${targetDate}`,
       `ESTIMATED SCOPE: ${durationValue} ${activePathway.durationUnit}`,
+      `DELIVERABLES (OPTIONAL): ${deliverablesText}`,
       `STUDENT GOALS: ${goalNote.trim() || 'Guided academic mentoring & review'}`,
       `CONTACT: ${studentName.trim()} (${studentEmail.trim()})`,
     ].join('\n');
@@ -448,8 +654,8 @@ export default function StudentOnboardingWizard({
         title: `${focusLabel} — ${activePathway.title}`,
         subject: selectedSubject.trim() || 'General Academic Tutoring',
         deadline: targetDate,
-        wordCount: activePathway.id === 'writing' ? durationValue * 275 : 1200,
-        referenceStyle: activePathway.id === 'writing' ? 'APA Style' : 'Standard',
+        wordCount: isWritingService ? durationValue * 275 : 1200,
+        referenceStyle: isWritingService ? 'APA Style' : 'Standard',
         sourcesCount: 3,
         instructions: instructionsSummary,
         tutorId: matchedTutor?.id,
@@ -458,7 +664,9 @@ export default function StudentOnboardingWizard({
       });
 
       const tutorIdToChat = matchedTutor?.id || 'admin_shaka';
-      const welcomeMsg = `Hi ${matchedTutor?.name || 'Tutor'}, I just completed onboarding for ${activePathway.title} in ${focusLabel} (${academicLevel}, target: ${selectedUrgency.label}). ${goalNote.trim() ? `My goal: ${goalNote.trim()}` : 'Ready to get started!'}`;
+      const deliverablesChatPart =
+        selectedDeliverables.length > 0 ? ` Deliverables requested: ${selectedDeliverables.join(', ')}.` : '';
+      const welcomeMsg = `Hi ${matchedTutor?.name || 'Tutor'}, I just submitted a request for "${activePathway.title}" in ${focusLabel} (${academicLevel}, target: ${selectedUrgency.label}).${deliverablesChatPart} ${goalNote.trim() ? `My goal: ${goalNote.trim()}` : 'Ready to get started!'}`;
       const chatRes = onOpenChat(tutorIdToChat, welcomeMsg);
       if (chatRes && typeof chatRes === 'object' && 'id' in chatRes && onSelectChatId) {
         onSelectChatId((chatRes as { id: string }).id);
@@ -477,24 +685,75 @@ export default function StudentOnboardingWizard({
 
   return (
     <div className="w-full flex justify-center py-1 sm:py-3" id="student-onboarding-wizard">
-      <div className="w-full max-w-md md:max-w-lg mx-auto bg-white rounded-3xl border border-slate-200/80 shadow-sm flex flex-col relative overflow-hidden">
-        {/* Top Brand Nav Bar */}
-        <div className="flex items-center justify-between px-4 py-3.5 border-b border-slate-100 bg-white">
+      <div
+        className={`w-full mx-auto bg-white rounded-3xl border border-slate-200/80 shadow-sm flex flex-col relative overflow-hidden transition-all duration-200 ${
+          step === 1 || step === 4 ? 'max-w-md sm:max-w-2xl lg:max-w-5xl' : 'max-w-md md:max-w-lg'
+        }`}
+      >
+        {/* Top Brand Nav Bar with Official Logo & Student Login Status */}
+        <div className="flex items-center justify-between gap-2 px-4 py-3 border-b border-slate-100 bg-white">
           <div className="flex items-center gap-2.5 min-w-0">
-            <div className="w-9 h-9 rounded-xl bg-orange-500 text-white flex items-center justify-center shadow-xs shrink-0">
-              <GraduationCap className="w-5 h-5" />
-            </div>
-            <div className="min-w-0 text-left">
-              <span className="block text-sm font-bold text-slate-900 tracking-tight truncate">
-                University-Tutors
-              </span>
-              <span className="block text-[11px] font-medium text-slate-500 truncate">
-                university-tutors.com
-              </span>
-            </div>
+            <button
+              type="button"
+              onClick={() => (onExit ? onExit() : onNavigate?.('home'))}
+              className="flex items-center gap-2.5 text-left cursor-pointer focus:outline-none"
+              title="University Tutors"
+            >
+              <picture className="shrink-0">
+                <source type="image/avif" srcSet="/logo-220.avif 220w, /logo-440.avif 440w" sizes="150px" />
+                <source type="image/webp" srcSet="/logo-220.webp 220w, /logo-440.webp 440w" sizes="150px" />
+                <img
+                  src="/logo.webp"
+                  alt="University Tutors"
+                  width={150}
+                  height={57}
+                  decoding="async"
+                  referrerPolicy="no-referrer"
+                  className="h-8 sm:h-9 w-auto object-contain"
+                />
+              </picture>
+            </button>
           </div>
 
-          <div className="flex items-center gap-1.5 shrink-0">
+          <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+            {currentUser?.email ? (
+              <div className="flex items-center gap-1.5">
+                <div className="hidden sm:flex items-center gap-2 px-2.5 py-1.5 rounded-xl bg-orange-50/80 border border-orange-100">
+                  <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" />
+                  <span className="text-[11px] font-semibold text-slate-700 max-w-[130px] truncate">
+                    {currentUser.name || currentUser.email}
+                  </span>
+                </div>
+                {(onLogout || onNavigate) && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (onLogout) {
+                        onLogout();
+                      } else if (onNavigate) {
+                        onNavigate('auth');
+                      }
+                    }}
+                    className="min-h-[36px] px-2.5 flex items-center justify-center gap-1 rounded-xl border border-slate-200 bg-white text-[11px] font-semibold text-slate-600 hover:text-orange-600 hover:border-orange-300 transition-colors cursor-pointer"
+                    title="Switch or sign out of student account"
+                  >
+                    <LogOut className="w-3.5 h-3.5" />
+                    <span className="hidden sm:inline">Switch Account</span>
+                  </button>
+                )}
+              </div>
+            ) : (
+              onNavigate && (
+                <button
+                  type="button"
+                  onClick={() => onNavigate('auth')}
+                  className="min-h-[36px] px-3 flex items-center justify-center gap-1.5 rounded-xl bg-[#F97316] hover:bg-[#EA580C] text-white text-xs font-bold shadow-xs transition-colors cursor-pointer"
+                >
+                  <LogIn className="w-3.5 h-3.5" />
+                  <span>Student Login</span>
+                </button>
+              )
+            )}
             {onOpenMenu && (
               <button
                 type="button"
@@ -562,9 +821,9 @@ export default function StudentOnboardingWizard({
             </div>
           )}
 
-          {/* ================= STEP 1: LEARNING PATHWAY ================= */}
+          {/* ================= STEP 1: LEARNING PATHWAY & SERVICE SELECTION ================= */}
           {step === 1 && (
-            <div className="space-y-3" role="radiogroup" aria-label="Learning pathway">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3" role="radiogroup" aria-label="Learning pathway">
               {PATHWAY_OPTIONS.map((option) => {
                 const isSelected = selectedPathway === option.id;
                 return (
@@ -574,21 +833,21 @@ export default function StudentOnboardingWizard({
                     role="radio"
                     aria-checked={isSelected}
                     onClick={() => handleSelectPathway(option.id)}
-                    className={`w-full text-left p-3.5 rounded-2xl flex items-center gap-3.5 min-h-[76px] transition-all cursor-pointer active:scale-[0.99] ${
+                    className={`w-full text-left p-3.5 rounded-2xl flex items-center gap-3.5 min-h-[82px] transition-all cursor-pointer active:scale-[0.99] ${
                       isSelected
                         ? 'border-2 border-orange-500 bg-orange-50/40 shadow-sm'
                         : 'border border-slate-200 bg-white hover:border-orange-300'
                     }`}
                     id={`onboarding-pathway-${option.id}`}
                   >
-                    {/* Left 52x52 Warm Orange Gradient SVG Avatar Frame */}
+                    {/* Left 52x52 Warm Orange Gradient Icon Frame */}
                     <div className="w-[52px] h-[52px] rounded-xl bg-gradient-to-br from-[#FFF7ED] to-[#FFEDD5] flex items-center justify-center shrink-0 border border-orange-100/80">
                       <PathwayAvatarSvg pathway={option.id} />
                     </div>
 
                     {/* Middle Text Content */}
                     <div className="flex-1 min-w-0 space-y-0.5">
-                      <div className="text-[15px] font-bold text-slate-900 leading-tight truncate">
+                      <div className="text-[14px] font-bold text-slate-900 leading-snug line-clamp-2">
                         {option.title}
                       </div>
                       <p className="text-xs text-slate-500 line-clamp-1 leading-snug">
@@ -854,6 +1113,57 @@ export default function StudentOnboardingWizard({
                   </div>
                 )}
               </div>
+
+              {/* Deliverables (Optional) 3-Column Selection Grid */}
+              <div className="rounded-2xl border border-slate-200 bg-white p-4 sm:p-5 space-y-3.5" id="onboarding-deliverables-section">
+                <div className="space-y-0.5">
+                  <h3 className="text-sm sm:text-base font-bold text-slate-900">
+                    Deliverables (Optional)
+                  </h3>
+                  <p className="text-xs text-slate-500">
+                    Select any additional services you require.
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                  {DELIVERABLE_OPTIONS.map((item) => {
+                    const isChecked = selectedDeliverables.includes(item.label);
+                    return (
+                      <button
+                        key={item.id}
+                        type="button"
+                        role="checkbox"
+                        aria-checked={isChecked}
+                        onClick={() => toggleDeliverable(item.label)}
+                        id={`deliverable-${item.id}`}
+                        className={`text-left flex items-start gap-3 p-3 rounded-xl transition-all cursor-pointer active:scale-[0.99] ${
+                          isChecked
+                            ? 'bg-[#FFF7ED]/70 border border-orange-300 shadow-2xs'
+                            : 'bg-white border border-transparent hover:border-orange-200 hover:bg-orange-50/30'
+                        }`}
+                      >
+                        <span
+                          className={`mt-0.5 w-[18px] h-[18px] rounded-[4px] flex items-center justify-center shrink-0 transition-colors ${
+                            isChecked
+                              ? 'bg-[#F97316] border-2 border-[#F97316] text-white'
+                              : 'bg-white border-2 border-[#F97316]'
+                          }`}
+                        >
+                          {isChecked && <Check className="w-3 h-3 stroke-[3]" />}
+                        </span>
+                        <div className="min-w-0">
+                          <div className="text-xs sm:text-[13px] font-bold text-slate-900 leading-snug">
+                            {item.label}
+                          </div>
+                          <div className="text-[11px] text-slate-500 leading-snug mt-0.5">
+                            {item.description}
+                          </div>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
             </div>
           )}
 
@@ -918,6 +1228,14 @@ export default function StudentOnboardingWizard({
                     {durationValue} {activePathway.durationUnit} • {attachedFiles.length} file(s)
                   </span>
                 </div>
+                {selectedDeliverables.length > 0 && (
+                  <div className="flex items-start justify-between gap-2 pt-1 border-t border-slate-200/70">
+                    <span className="text-slate-500 shrink-0">Deliverables</span>
+                    <span className="font-bold text-[#EA580C] text-right">
+                      {selectedDeliverables.join(', ')}
+                    </span>
+                  </div>
+                )}
               </div>
 
               {/* Pre-filled Contact Details */}

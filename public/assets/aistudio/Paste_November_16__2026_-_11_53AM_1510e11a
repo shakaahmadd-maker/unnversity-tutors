@@ -1,0 +1,592 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>University Tutors — Student Dashboard (Mobile)</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'sans-serif'],
+          },
+          colors: {
+            brand: {
+              orange: '#FF7A00',
+              orangeHover: '#E86E00',
+              orangeLight: '#FFF3E8',
+              navy: '#0B1120',
+              navyCard: '#0E1526',
+              cream: '#FDFBF7',
+            }
+          }
+        }
+      }
+    }
+  </script>
+</head>
+<body class="bg-[#F8F6F2] text-slate-900 font-sans antialiased selection:bg-orange-200">
+
+  <!-- Mobile Frame Wrapper (Centers nicely on larger screens while full-bleed on mobile) -->
+  <div class="max-w-md mx-auto min-h-screen bg-[#FAF8F5] shadow-2xl relative flex flex-col pb-36 border-x border-slate-200/70">
+
+    <!-- ==================== TOP MOBILE HEADER ==================== -->
+    <header class="sticky top-0 z-30 bg-[#FAF8F5]/95 backdrop-blur-md border-b border-slate-200/70 px-4 py-3 flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <!-- Hamburger Menu Trigger -->
+        <button id="openDrawerBtn" aria-label="Open menu" class="p-2 -ml-2 rounded-xl text-slate-700 hover:bg-orange-50 active:scale-95 transition">
+          <i data-lucide="menu" class="w-6 h-6"></i>
+        </button>
+
+        <!-- Brand Logo -->
+        <a href="#" class="flex items-center gap-2">
+          <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-[#FF7A00] to-[#FF9900] flex items-center justify-center text-white font-extrabold text-lg shadow-sm">
+            U
+          </div>
+          <div class="leading-none">
+            <span class="block text-[15px] font-bold text-[#0F172A] tracking-tight">university</span>
+            <span class="block text-[13px] font-semibold text-[#0F172A] tracking-tight -mt-0.5">tutors</span>
+          </div>
+        </a>
+      </div>
+
+      <!-- Right Header Actions -->
+      <div class="flex items-center gap-1.5">
+        <!-- Search Toggle -->
+        <button id="toggleSearchBtn" aria-label="Search" class="p-2 rounded-full text-slate-600 hover:bg-slate-100 active:scale-95 transition">
+          <i data-lucide="search" class="w-5 h-5"></i>
+        </button>
+
+        <!-- Notifications -->
+        <button onclick="showToast('No new notifications')" aria-label="Notifications" class="relative p-2 rounded-full text-slate-600 hover:bg-slate-100 active:scale-95 transition">
+          <i data-lucide="bell" class="w-5 h-5"></i>
+          <span class="absolute top-2 right-2 w-2 h-2 rounded-full bg-[#FF7A00] ring-2 ring-[#FAF8F5]"></span>
+        </button>
+
+        <!-- User Profile Avatar -->
+        <button onclick="openDrawer()" class="flex items-center gap-2 pl-1">
+          <img
+            src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=100&q=80"
+            onerror="this.src='https://placehold.co/80x80/FF7A00/FFFFFF?text=Z'"
+            alt="Zakir"
+            class="w-8 h-8 rounded-full object-cover ring-2 ring-orange-200"
+          />
+        </button>
+      </div>
+    </header>
+
+    <!-- Collapsible Search Bar -->
+    <div id="mobileSearchBar" class="hidden px-4 py-2.5 bg-white border-b border-slate-200/80">
+      <div class="relative">
+        <i data-lucide="search" class="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2"></i>
+        <input
+          type="text"
+          id="serviceSearchInput"
+          placeholder="Search services, tutors, subjects..."
+          class="w-full pl-10 pr-4 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-full focus:outline-none focus:ring-2 focus:ring-[#FF7A00]/30 focus:border-[#FF7A00]"
+        />
+      </div>
+    </div>
+
+    <!-- ==================== QUICK SUPPORT PILLS ==================== -->
+    <div class="px-4 pt-3 pb-1 flex items-center gap-2 overflow-x-auto no-scrollbar">
+      <button onclick="showToast('Opening Tutor Chat...')" class="shrink-0 flex items-center gap-1.5 px-3.5 py-2 rounded-full bg-[#FFF5EB] border border-orange-200/80 text-xs font-semibold text-slate-800 active:scale-95 transition">
+        <i data-lucide="graduation-cap" class="w-3.5 h-3.5 text-[#FF7A00]"></i>
+        Tutor Chat
+      </button>
+      <button onclick="showToast('Connecting to Admin CSR...')" class="shrink-0 flex items-center gap-1.5 px-3.5 py-2 rounded-full bg-white border border-slate-200 text-xs font-semibold text-slate-700 active:scale-95 transition">
+        <i data-lucide="message-square" class="w-3.5 h-3.5 text-slate-600"></i>
+        Admin CSR
+      </button>
+      <div class="ml-auto shrink-0 flex items-center gap-1 text-[10px] font-bold tracking-wider uppercase text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-1 rounded-full">
+        <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+        Verified
+      </div>
+    </div>
+
+    <!-- ==================== MAIN CONTENT AREA ==================== -->
+    <main class="px-4 py-2.5 space-y-4 flex-1">
+
+      <!-- HERO BANNER CARD (Compact Mobile Version) -->
+      <section class="relative overflow-hidden rounded-2xl bg-gradient-to-br from-[#090E1A] via-[#0F172A] to-[#172038] p-3.5 text-white shadow-md">
+        <!-- Subtle ambient glow -->
+        <div class="absolute -right-8 -bottom-8 w-32 h-32 rounded-full bg-[#FF7A00]/20 blur-2xl pointer-events-none"></div>
+
+        <!-- Online Badge -->
+        <div class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-950/80 border border-emerald-500/30 mb-2">
+          <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+          <span class="text-[9px] font-bold tracking-widest uppercase text-emerald-400">Experts Online Now</span>
+        </div>
+
+        <!-- Headline -->
+        <h1 class="text-lg sm:text-xl font-extrabold leading-snug tracking-tight mb-1">
+          Ace your next <span class="text-[#FF8A00]">Assignment.</span>
+        </h1>
+
+        <!-- Subtitle -->
+        <p class="text-[11px] sm:text-xs text-slate-300 leading-snug mb-3">
+          Fast, reliable help for midterms &amp; finals with verified specialist tutors.
+        </p>
+
+        <!-- Action Buttons -->
+        <div class="grid grid-cols-2 gap-2">
+          <button onclick="openRequestModal()" class="flex items-center justify-center gap-1 py-2 px-2.5 rounded-lg bg-[#FF8A00] hover:bg-[#FF7A00] text-white font-semibold text-xs shadow-sm shadow-orange-500/20 active:scale-95 transition">
+            <i data-lucide="plus" class="w-3.5 h-3.5"></i>
+            Create Request
+          </button>
+          <button onclick="showToast('Starting live consultation with CSR...')" class="flex items-center justify-center py-2 px-2.5 rounded-lg bg-white/10 hover:bg-white/15 border border-white/15 text-white font-semibold text-xs active:scale-95 transition">
+            Consult with CSR
+          </button>
+        </div>
+      </section>
+
+      <!-- KPI STATS CARDS (Horizontal 3-column compact grid or responsive cards) -->
+      <section aria-label="Account Summary" class="grid grid-cols-3 gap-2.5">
+        <!-- Ongoing -->
+        <div class="bg-white rounded-2xl p-3.5 border border-slate-200/70 shadow-sm flex flex-col justify-between">
+          <div class="flex items-center justify-between mb-2">
+            <span id="ongoingCount" class="text-xl font-extrabold text-slate-900">0</span>
+            <div class="w-7 h-7 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center">
+              <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i>
+            </div>
+          </div>
+          <span class="text-[10px] font-bold tracking-wider uppercase text-slate-400">Ongoing</span>
+        </div>
+
+        <!-- Completed -->
+        <div class="bg-white rounded-2xl p-3.5 border border-slate-200/70 shadow-sm flex flex-col justify-between">
+          <div class="flex items-center justify-between mb-2">
+            <span class="text-xl font-extrabold text-slate-900">0</span>
+            <div class="w-7 h-7 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center">
+              <i data-lucide="check-circle-2" class="w-3.5 h-3.5"></i>
+            </div>
+          </div>
+          <span class="text-[10px] font-bold tracking-wider uppercase text-slate-400">Completed</span>
+        </div>
+
+        <!-- Payments -->
+        <div class="bg-white rounded-2xl p-3.5 border border-slate-200/70 shadow-sm flex flex-col justify-between">
+          <div class="flex items-center justify-between mb-2">
+            <span class="text-xl font-extrabold text-slate-900">$0</span>
+            <div class="w-7 h-7 rounded-lg bg-orange-50 text-[#FF7A00] flex items-center justify-center">
+              <i data-lucide="credit-card" class="w-3.5 h-3.5"></i>
+            </div>
+          </div>
+          <span class="text-[10px] font-bold tracking-wider uppercase text-slate-400">Payments</span>
+        </div>
+      </section>
+
+      <!-- SERVICES & PORTALS GRID -->
+      <section>
+        <div class="flex items-center justify-between mb-3">
+          <h2 class="text-sm font-bold text-slate-900">Services & Portals</h2>
+          <span class="text-xs text-slate-400 font-medium">8 Portals</span>
+        </div>
+
+        <div id="servicesGrid" class="grid grid-cols-4 gap-2.5">
+          <!-- Tutor Chats -->
+          <button onclick="showToast('Opening Tutor Chats')" class="service-item bg-white rounded-2xl p-3 border border-slate-200/70 shadow-sm flex flex-col items-center justify-center gap-2 hover:border-orange-300 active:scale-95 transition">
+            <div class="w-10 h-10 rounded-full bg-orange-50 text-[#FF7A00] flex items-center justify-center">
+              <i data-lucide="message-circle" class="w-5 h-5"></i>
+            </div>
+            <span class="text-[11px] font-semibold text-slate-700 text-center leading-tight">Tutor Chats</span>
+          </button>
+
+          <!-- Assignments -->
+          <button onclick="showToast('Opening Assignments')" class="service-item bg-white rounded-2xl p-3 border border-slate-200/70 shadow-sm flex flex-col items-center justify-center gap-2 hover:border-orange-300 active:scale-95 transition">
+            <div class="w-10 h-10 rounded-full bg-orange-50 text-[#FF7A00] flex items-center justify-center">
+              <i data-lucide="book-open" class="w-5 h-5"></i>
+            </div>
+            <span class="text-[11px] font-semibold text-slate-700 text-center leading-tight">Assignments</span>
+          </button>
+
+          <!-- CSR Support -->
+          <button onclick="showToast('Opening CSR Support')" class="service-item bg-white rounded-2xl p-3 border border-slate-200/70 shadow-sm flex flex-col items-center justify-center gap-2 hover:border-blue-300 active:scale-95 transition">
+            <div class="w-10 h-10 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center">
+              <i data-lucide="headphones" class="w-5 h-5"></i>
+            </div>
+            <span class="text-[11px] font-semibold text-slate-700 text-center leading-tight">CSR Support</span>
+          </button>
+
+          <!-- Reports -->
+          <button onclick="showToast('Opening Reports')" class="service-item bg-white rounded-2xl p-3 border border-slate-200/70 shadow-sm flex flex-col items-center justify-center gap-2 hover:border-emerald-300 active:scale-95 transition">
+            <div class="w-10 h-10 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center">
+              <i data-lucide="bar-chart-2" class="w-5 h-5"></i>
+            </div>
+            <span class="text-[11px] font-semibold text-slate-700 text-center leading-tight">Reports</span>
+          </button>
+
+          <!-- Results -->
+          <button onclick="showToast('Opening Results & Comments')" class="service-item bg-white rounded-2xl p-3 border border-slate-200/70 shadow-sm flex flex-col items-center justify-center gap-2 hover:border-indigo-300 active:scale-95 transition">
+            <div class="w-10 h-10 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center">
+              <i data-lucide="award" class="w-5 h-5"></i>
+            </div>
+            <span class="text-[11px] font-semibold text-slate-700 text-center leading-tight">Results</span>
+          </button>
+
+          <!-- Feedback -->
+          <button onclick="showToast('Opening Feedback Form')" class="service-item bg-white rounded-2xl p-3 border border-slate-200/70 shadow-sm flex flex-col items-center justify-center gap-2 hover:border-pink-300 active:scale-95 transition">
+            <div class="w-10 h-10 rounded-full bg-pink-50 text-pink-600 flex items-center justify-center">
+              <i data-lucide="heart" class="w-5 h-5"></i>
+            </div>
+            <span class="text-[11px] font-semibold text-slate-700 text-center leading-tight">Feedback</span>
+          </button>
+
+          <!-- Alerts -->
+          <button onclick="showToast('Opening Alerts')" class="service-item bg-white rounded-2xl p-3 border border-slate-200/70 shadow-sm flex flex-col items-center justify-center gap-2 hover:border-amber-300 active:scale-95 transition">
+            <div class="w-10 h-10 rounded-full bg-amber-50 text-amber-600 flex items-center justify-center">
+              <i data-lucide="bell" class="w-5 h-5"></i>
+            </div>
+            <span class="text-[11px] font-semibold text-slate-700 text-center leading-tight">Alerts</span>
+          </button>
+
+          <!-- Billing -->
+          <button onclick="showToast('Opening Billing & Payments')" class="service-item bg-white rounded-2xl p-3 border border-slate-200/70 shadow-sm flex flex-col items-center justify-center gap-2 hover:border-purple-300 active:scale-95 transition">
+            <div class="w-10 h-10 rounded-full bg-purple-50 text-purple-600 flex items-center justify-center">
+              <i data-lucide="wallet" class="w-5 h-5"></i>
+            </div>
+            <span class="text-[11px] font-semibold text-slate-700 text-center leading-tight">Billing</span>
+          </button>
+        </div>
+      </section>
+
+      <!-- RECENT REQUESTS SECTION -->
+      <section>
+        <div class="flex items-center justify-between mb-3">
+          <h2 class="text-sm font-bold text-slate-900">Recent Requests</h2>
+          <button onclick="showToast('Viewing all requests')" class="text-[11px] font-bold tracking-wider uppercase text-[#FF7A00] hover:underline">
+            View All (<span id="requestsBadgeCount">0</span>)
+          </button>
+        </div>
+
+        <!-- Requests List / Empty State Container -->
+        <div id="requestsContainer" class="bg-white rounded-2xl border border-slate-200/70 p-6 text-center shadow-sm">
+          <div class="w-12 h-12 rounded-2xl bg-orange-50 text-[#FF7A00] flex items-center justify-center mx-auto mb-3">
+            <i data-lucide="file-plus-2" class="w-6 h-6"></i>
+          </div>
+          <h3 class="text-sm font-bold text-slate-800 mb-1">No requests yet</h3>
+          <p class="text-xs text-slate-500 mb-4 max-w-[240px] mx-auto">
+            Create your first assignment or midterm request to connect with a specialist tutor.
+          </p>
+          <button onclick="openRequestModal()" class="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#FF7A00] text-white text-xs font-semibold shadow-sm active:scale-95 transition">
+            <i data-lucide="plus" class="w-4 h-4"></i>
+            Create New Request
+          </button>
+        </div>
+      </section>
+
+    </main>
+
+    <!-- ==================== FLOATING CHAT BUTTONS (ABOVE BOTTOM NAV) ==================== -->
+    <div class="fixed bottom-20 left-0 right-0 max-w-md mx-auto px-4 flex items-center justify-between pointer-events-none z-30">
+      <!-- Compact Green WhatsApp Instant Chat Pill (Bottom-Left) -->
+      <button
+        onclick="showToast('Connecting to WhatsApp Instant Chat...')"
+        aria-label="WhatsApp Instant Chat"
+        class="pointer-events-auto flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[#067D46] hover:bg-[#05683A] text-white font-bold text-[10px] tracking-wide shadow-md shadow-emerald-900/20 active:scale-95 transition"
+      >
+        <svg class="w-3.5 h-3.5 fill-current shrink-0" viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M12.031 2c-5.516 0-9.969 4.453-9.969 9.969 0 1.758.459 3.473 1.331 4.986L2 22l5.188-1.361a9.934 9.934 0 0 0 4.843 1.258h.004c5.515 0 9.968-4.453 9.968-9.969 0-2.663-1.037-5.166-2.92-7.049A9.903 9.903 0 0 0 12.031 2zm5.818 14.273c-.246.693-1.432 1.325-1.992 1.409-.511.076-1.158.108-1.869-.118-.431-.137-.984-.32-1.693-.626-2.98-1.287-4.926-4.287-5.075-4.485-.148-.198-1.212-1.612-1.212-3.075 0-1.463.767-2.182 1.039-2.48.273-.297.595-.372.793-.372.198 0 .397.002.57.01.183.009.428-.069.669.511.248.595.842 2.058.916 2.207.074.149.124.322.025.52-.099.198-.149.322-.297.496-.149.173-.313.387-.446.52-.149.148-.304.309-.13.606.173.297.77 1.27 1.653 2.057 1.136 1.013 2.094 1.327 2.391 1.476.297.148.471.124.644-.074.174-.198.743-.867.942-1.165.198-.297.396-.248.669-.149.272.099 1.734.818 2.031.967.297.148.495.223.569.347.075.124.075.718-.171 1.411z"/>
+        </svg>
+        <span>INSTANT CHAT</span>
+      </button>
+
+      <!-- Orange In-System Live Chat Bubble (Bottom-Right) -->
+      <button
+        onclick="showToast('Opening In-System Live Chat...')"
+        aria-label="In-System Chat"
+        class="pointer-events-auto w-11 h-11 rounded-full bg-gradient-to-tr from-[#FF7A00] to-[#FF9900] hover:from-[#E86E00] hover:to-[#FF8A00] text-white shadow-lg shadow-orange-500/35 flex items-center justify-center active:scale-95 transition"
+      >
+        <i data-lucide="message-square" class="w-5 h-5"></i>
+      </button>
+    </div>
+
+    <!-- ==================== FIXED BOTTOM NAVIGATION BAR ==================== -->
+    <nav aria-label="Bottom Navigation" class="fixed bottom-0 left-0 right-0 max-w-md mx-auto bg-white/95 backdrop-blur-md border-t border-slate-200 px-1 py-2 grid grid-cols-5 items-center z-30">
+      <button class="flex flex-col items-center justify-center gap-1 py-1 rounded-xl text-[#FF7A00]">
+        <i data-lucide="layout-grid" class="w-5 h-5"></i>
+        <span class="text-[10px] font-bold">Dashboard</span>
+      </button>
+
+      <button onclick="showToast('Opening Assignments')" class="flex flex-col items-center justify-center gap-1 py-1 rounded-xl text-slate-500 hover:text-slate-900">
+        <i data-lucide="book-open" class="w-5 h-5"></i>
+        <span class="text-[10px] font-medium">Assignments</span>
+      </button>
+
+      <!-- Perfectly Centered Floating Action Button -->
+      <div class="flex items-center justify-center">
+        <button onclick="openRequestModal()" aria-label="Create Request" class="-mt-7 w-12 h-12 rounded-2xl bg-gradient-to-tr from-[#FF7A00] to-[#FF9900] text-white shadow-lg shadow-orange-500/30 flex items-center justify-center active:scale-90 transition">
+          <i data-lucide="plus" class="w-6 h-6"></i>
+        </button>
+      </div>
+
+      <button onclick="showToast('Opening Tutor Chat')" class="flex flex-col items-center justify-center gap-1 py-1 rounded-xl text-slate-500 hover:text-slate-900">
+        <i data-lucide="message-square" class="w-5 h-5"></i>
+        <span class="text-[10px] font-medium">Chat</span>
+      </button>
+
+      <button onclick="showToast('Opening Payments')" class="flex flex-col items-center justify-center gap-1 py-1 rounded-xl text-slate-500 hover:text-slate-900">
+        <i data-lucide="credit-card" class="w-5 h-5"></i>
+        <span class="text-[10px] font-medium">Payments</span>
+      </button>
+    </nav>
+
+    <!-- ==================== SLIDE-OUT NAVIGATION DRAWER ==================== -->
+    <div id="drawerBackdrop" onclick="closeDrawer()" class="fixed inset-0 bg-slate-900/50 backdrop-blur-xs z-40 hidden transition-opacity"></div>
+
+    <aside id="mobileDrawer" class="fixed top-0 left-0 bottom-0 w-72 bg-[#FAF8F5] z-50 transform -translate-x-full transition-transform duration-300 ease-out flex flex-col border-r border-slate-200 shadow-2xl">
+      <!-- Drawer Header -->
+      <div class="p-4 border-b border-slate-200/80 flex items-center justify-between">
+        <div class="flex items-center gap-2">
+          <div class="w-8 h-8 rounded-lg bg-[#FF7A00] flex items-center justify-center text-white font-extrabold text-lg">U</div>
+          <span class="font-bold text-slate-900 text-base">university tutors</span>
+        </div>
+        <button onclick="closeDrawer()" class="p-1.5 rounded-lg text-slate-500 hover:bg-slate-200/60">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <!-- Student Profile Card -->
+      <div class="p-4 mx-3 mt-3 rounded-2xl bg-white border border-slate-200/70 flex items-center gap-3">
+        <img
+          src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=100&q=80"
+          onerror="this.src='https://placehold.co/80x80/FF7A00/FFFFFF?text=Z'"
+          alt="Zakir"
+          class="w-11 h-11 rounded-full object-cover"
+        />
+        <div>
+          <div class="text-sm font-bold text-slate-900">zakir</div>
+          <div class="text-[10px] font-bold tracking-wider uppercase text-[#FF7A00]">Verified Student</div>
+        </div>
+      </div>
+
+      <!-- Navigation Links (Matches Desktop Sidebar 1:1) -->
+      <div class="flex-1 overflow-y-auto px-3 py-4 space-y-1">
+        <a href="#" onclick="closeDrawer()" class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl bg-[#FFF1E6] text-[#FF7A00] font-semibold text-sm">
+          <i data-lucide="layout-grid" class="w-4 h-4"></i>
+          Dashboard
+        </a>
+        <button onclick="closeDrawer(); openRequestModal();" class="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-slate-700 hover:bg-slate-100 font-medium text-sm">
+          <i data-lucide="plus-square" class="w-4 h-4 text-slate-500"></i>
+          New Request
+        </button>
+        <button onclick="closeDrawer(); showToast('Assignments');" class="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-slate-700 hover:bg-slate-100 font-medium text-sm">
+          <i data-lucide="book-open" class="w-4 h-4 text-slate-500"></i>
+          Assignments
+        </button>
+        <button onclick="closeDrawer(); showToast('Payments');" class="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-slate-700 hover:bg-slate-100 font-medium text-sm">
+          <i data-lucide="credit-card" class="w-4 h-4 text-slate-500"></i>
+          Payments
+        </button>
+        <button onclick="closeDrawer(); showToast('Chat');" class="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-slate-700 hover:bg-slate-100 font-medium text-sm">
+          <i data-lucide="message-square" class="w-4 h-4 text-slate-500"></i>
+          Chat
+        </button>
+        <button onclick="closeDrawer(); showToast('Reports');" class="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-slate-700 hover:bg-slate-100 font-medium text-sm">
+          <i data-lucide="bar-chart-2" class="w-4 h-4 text-slate-500"></i>
+          Reports
+        </button>
+        <button onclick="closeDrawer(); showToast('Results & Comments');" class="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-slate-700 hover:bg-slate-100 font-medium text-sm">
+          <i data-lucide="award" class="w-4 h-4 text-slate-500"></i>
+          Results & Comments
+        </button>
+        <button onclick="closeDrawer(); showToast('Notifications');" class="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-slate-700 hover:bg-slate-100 font-medium text-sm">
+          <i data-lucide="bell" class="w-4 h-4 text-slate-500"></i>
+          Notifications
+        </button>
+        <button onclick="closeDrawer(); showToast('Leave Feedback');" class="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-slate-700 hover:bg-slate-100 font-medium text-sm">
+          <i data-lucide="heart" class="w-4 h-4 text-slate-500"></i>
+          Leave Feedback
+        </button>
+
+        <div class="my-3 border-t border-slate-200/80"></div>
+
+        <!-- Secondary Legal Links -->
+        <button onclick="closeDrawer(); showToast('Service Agreements');" class="w-full flex items-center gap-3 px-3.5 py-2 rounded-xl text-slate-500 hover:bg-slate-100 text-xs font-medium">
+          <i data-lucide="shield-check" class="w-4 h-4"></i>
+          Service Agreements
+        </button>
+        <button onclick="closeDrawer(); showToast('SOPs');" class="w-full flex items-center gap-3 px-3.5 py-2 rounded-xl text-slate-500 hover:bg-slate-100 text-xs font-medium">
+          <i data-lucide="file-text" class="w-4 h-4"></i>
+          SOPs
+        </button>
+        <button onclick="closeDrawer(); showToast('Terms & Conditions');" class="w-full flex items-center gap-3 px-3.5 py-2 rounded-xl text-slate-500 hover:bg-slate-100 text-xs font-medium">
+          <i data-lucide="info" class="w-4 h-4"></i>
+          Terms & Conditions
+        </button>
+        <button onclick="closeDrawer(); showToast('Refund Policy');" class="w-full flex items-center gap-3 px-3.5 py-2 rounded-xl text-slate-500 hover:bg-slate-100 text-xs font-medium">
+          <i data-lucide="rotate-ccw" class="w-4 h-4"></i>
+          Refund Policy
+        </button>
+
+        <div class="my-2 border-t border-slate-200/80"></div>
+
+        <!-- Settings & Log Out (From Updated Screenshot) -->
+        <button onclick="closeDrawer(); showToast('Opening Settings');" class="w-full flex items-center gap-3 px-3.5 py-2 rounded-xl text-slate-600 hover:bg-slate-100 text-xs font-semibold">
+          <i data-lucide="settings" class="w-4 h-4 text-slate-500"></i>
+          Settings
+        </button>
+        <button onclick="closeDrawer(); showToast('Logging out...');" class="w-full flex items-center gap-3 px-3.5 py-2 rounded-xl text-rose-600 hover:bg-rose-50 text-xs font-semibold">
+          <i data-lucide="log-out" class="w-4 h-4"></i>
+          Log Out
+        </button>
+      </div>
+    </aside>
+
+    <!-- ==================== CREATE REQUEST BOTTOM SHEET MODAL ==================== -->
+    <div id="requestModal" class="fixed inset-0 z-50 hidden items-end justify-center bg-slate-900/50 backdrop-blur-xs">
+      <div class="w-full max-w-md bg-white rounded-t-3xl p-5 shadow-2xl animate-slide-up">
+        <div class="w-10 h-1 bg-slate-300 rounded-full mx-auto mb-4"></div>
+        <div class="flex items-center justify-between mb-4">
+          <h3 class="text-lg font-bold text-slate-900">Create Assignment Request</h3>
+          <button onclick="closeRequestModal()" class="p-1.5 rounded-full bg-slate-100 text-slate-600">
+            <i data-lucide="x" class="w-4 h-4"></i>
+          </button>
+        </div>
+
+        <form id="newRequestForm" class="space-y-3.5">
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">Subject / Course</label>
+            <input type="text" id="reqSubject" required placeholder="e.g., CS301 Data Structures Midterm" class="w-full px-3.5 py-2.5 text-sm border border-slate-200 rounded-xl focus:outline-none focus:border-[#FF7A00]" />
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">Service Type</label>
+            <select id="reqType" class="w-full px-3.5 py-2.5 text-sm border border-slate-200 rounded-xl bg-white focus:outline-none focus:border-[#FF7A00]">
+              <option>Assignment Help</option>
+              <option>Midterm / Final Prep</option>
+              <option>1-on-1 Live Tutoring</option>
+              <option>Lab Report Review</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">Deadline</label>
+            <input type="date" id="reqDate" required class="w-full px-3.5 py-2.5 text-sm border border-slate-200 rounded-xl focus:outline-none focus:border-[#FF7A00]" />
+          </div>
+          <button type="submit" class="w-full py-3 rounded-xl bg-[#FF7A00] hover:bg-[#E86E00] text-white font-semibold text-sm shadow-md shadow-orange-500/20 active:scale-98 transition">
+            Submit Request
+          </button>
+        </form>
+      </div>
+    </div>
+
+    <!-- Toast Notification -->
+    <div id="toast" class="fixed bottom-36 left-1/2 -translate-x-1/2 bg-slate-900 text-white text-xs font-medium px-4 py-2.5 rounded-full shadow-lg opacity-0 pointer-events-none transition-opacity duration-200 z-50 whitespace-nowrap">
+      Action triggered
+    </div>
+
+  </div>
+
+  <script>
+    // Initialize Lucide Icons
+    lucide.createIcons();
+
+    // Drawer Controls
+    const drawer = document.getElementById('mobileDrawer');
+    const backdrop = document.getElementById('drawerBackdrop');
+    const openDrawerBtn = document.getElementById('openDrawerBtn');
+
+    function openDrawer() {
+      backdrop.classList.remove('hidden');
+      requestAnimationFrame(() => {
+        drawer.classList.remove('-translate-x-full');
+      });
+    }
+
+    function closeDrawer() {
+      drawer.classList.add('-translate-x-full');
+      setTimeout(() => {
+        backdrop.classList.add('hidden');
+      }, 250);
+    }
+
+    openDrawerBtn.addEventListener('click', openDrawer);
+
+    // Toggle Search Bar
+    const toggleSearchBtn = document.getElementById('toggleSearchBtn');
+    const mobileSearchBar = document.getElementById('mobileSearchBar');
+    const serviceSearchInput = document.getElementById('serviceSearchInput');
+
+    toggleSearchBtn.addEventListener('click', () => {
+      mobileSearchBar.classList.toggle('hidden');
+      if (!mobileSearchBar.classList.contains('hidden')) {
+        serviceSearchInput.focus();
+      }
+    });
+
+    // Live Filter Services Grid
+    serviceSearchInput.addEventListener('input', (e) => {
+      const term = e.target.value.toLowerCase();
+      document.querySelectorAll('.service-item').forEach(item => {
+        const text = item.innerText.toLowerCase();
+        item.style.display = text.includes(term) ? 'flex' : 'none';
+      });
+    });
+
+    // Request Modal Controls
+    const requestModal = document.getElementById('requestModal');
+    function openRequestModal() {
+      requestModal.classList.remove('hidden');
+      requestModal.classList.add('flex');
+    }
+    function closeRequestModal() {
+      requestModal.classList.add('hidden');
+      requestModal.classList.remove('flex');
+    }
+
+    // Handle New Request Submission (Interactive Demo)
+    const requests = [];
+    document.getElementById('newRequestForm').addEventListener('submit', (e) => {
+      e.preventDefault();
+      const subject = document.getElementById('reqSubject').value;
+      const type = document.getElementById('reqType').value;
+      const date = document.getElementById('reqDate').value;
+
+      requests.unshift({ subject, type, date });
+      document.getElementById('ongoingCount').textContent = requests.length;
+      document.getElementById('requestsBadgeCount').textContent = requests.length;
+
+      renderRequests();
+      closeRequestModal();
+      e.target.reset();
+      showToast('Request submitted successfully!');
+    });
+
+    function renderRequests() {
+      const container = document.getElementById('requestsContainer');
+      container.className = 'space-y-2.5';
+      container.innerHTML = requests.map(req => `
+        <div class="bg-white rounded-2xl p-4 border border-slate-200/80 shadow-sm flex items-center justify-between text-left">
+          <div>
+            <span class="inline-block text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-orange-50 text-[#FF7A00] mb-1">
+              ${req.type}
+            </span>
+            <h4 class="text-sm font-bold text-slate-900">${req.subject}</h4>
+            <p class="text-xs text-slate-500 mt-0.5">Due: ${req.date}</p>
+          </div>
+          <span class="text-xs font-semibold text-blue-600 bg-blue-50 px-2.5 py-1 rounded-full">
+            Matching
+          </span>
+        </div>
+      `).join('');
+    }
+
+    // Toast Helper
+    let toastTimeout;
+    function showToast(msg) {
+      const toast = document.getElementById('toast');
+      toast.textContent = msg;
+      toast.classList.remove('opacity-0');
+      clearTimeout(toastTimeout);
+      toastTimeout = setTimeout(() => {
+        toast.classList.add('opacity-0');
+      }, 2200);
+    }
+  </script>
+</body>
+</html>

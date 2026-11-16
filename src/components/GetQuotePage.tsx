@@ -58,9 +58,28 @@ export default function GetQuotePage({ currentUser, onNavigate, tutors, onOpenCh
   const [uploadedFiles, setUploadedFiles] = useState<{ id: string; name: string; size: string; progress: number }[]>([]);
   const [isDragging, setIsDragging] = useState(false);
 
-  // Notes
+  // Notes & Deliverables
   const [notes, setNotes] = useState('');
+  const [selectedDeliverables, setSelectedDeliverables] = useState<string[]>([]);
   const [errors, setErrors] = useState<Record<string, string | null>>({});
+
+  const deliverablesOptions = [
+    { id: 'abstract', label: 'Abstract', description: 'Concise summary of your work.' },
+    { id: 'executive-summary', label: 'Executive Summary', description: 'High-level overview for quick review.' },
+    { id: 'proofread-by-editor', label: 'Proofread by Editor', description: 'Editorial pass for grammar and flow.' },
+    { id: 'draft', label: 'Draft', description: 'Receive an interim draft for review.' },
+    { id: 'daily-delivery-update', label: 'Daily Delivery Update', description: 'Progress updates as the work proceeds.' },
+    { id: 'grammarly-report', label: 'Grammarly Report', description: 'Quality check with Grammarly.' },
+    { id: 'turnitin-ai-report', label: 'Turnitin AI Report', description: 'AI detection insights.' },
+    { id: 'turnitin-similarity-report', label: 'Turnitin Similarity Report', description: 'Similarity score report.' },
+    { id: 'table-of-contents', label: 'Table of Contents', description: 'Structured contents page.' },
+  ];
+
+  const toggleDeliverable = (label: string) => {
+    setSelectedDeliverables((prev) =>
+      prev.includes(label) ? prev.filter((item) => item !== label) : [...prev, label]
+    );
+  };
 
   const stepsList = [
     { s: 1, label: 'Service Selection' },
@@ -201,13 +220,26 @@ export default function GetQuotePage({ currentUser, onNavigate, tutors, onOpenCh
         {/* MOBILE COMPACT HEADER (Visible on mobile screens < md)        */}
         {/* ============================================================== */}
         <div className="md:hidden bg-gradient-to-r from-orange-600 via-orange-500 to-amber-500 p-3 text-white">
-          <div className="flex items-center justify-between text-xs mb-1.5">
-            <span className="font-black tracking-tight text-[11px] uppercase">
-              University Tutors
-            </span>
-            <span className="font-bold text-[10px] bg-white/20 px-2 py-0.5 rounded-full">
-              Step {currentStep} of 5
-            </span>
+          <div className="flex items-center justify-between gap-2 text-xs mb-1.5">
+            <picture className="bg-white/95 px-2 py-1 rounded-lg shadow-xs">
+              <source type="image/avif" srcSet="/logo-220.avif 220w, /logo-440.avif 440w" sizes="120px" />
+              <source type="image/webp" srcSet="/logo-220.webp 220w, /logo-440.webp 440w" sizes="120px" />
+              <img src="/logo.webp" alt="University Tutors" width={120} height={46} className="h-6 w-auto object-contain" />
+            </picture>
+            <div className="flex items-center gap-1.5">
+              {!currentUser && (
+                <button
+                  type="button"
+                  onClick={() => onNavigate?.('auth')}
+                  className="font-bold text-[10px] bg-white text-orange-600 px-2.5 py-1 rounded-full shadow-xs cursor-pointer"
+                >
+                  Student Login
+                </button>
+              )}
+              <span className="font-bold text-[10px] bg-white/20 px-2 py-0.5 rounded-full">
+                Step {currentStep} of 5
+              </span>
+            </div>
           </div>
           {/* Slim progress bar */}
           <div className="w-full bg-black/15 h-1.5 rounded-full overflow-hidden mb-1">
@@ -232,15 +264,17 @@ export default function GetQuotePage({ currentUser, onNavigate, tutors, onOpenCh
         {/* ============================================================== */}
         <div className="hidden md:flex md:w-72 lg:w-80 bg-gradient-to-br from-orange-600 via-orange-500 to-amber-500 p-6 text-white flex-col justify-between relative overflow-hidden shrink-0">
           <div className="relative z-10 space-y-4">
-            <div className="flex items-center gap-2 bg-white/15 backdrop-blur-md px-2.5 py-1 rounded-full w-fit border border-white/20">
-              <span className="w-1.5 h-1.5 rounded-full bg-orange-200 animate-ping"></span>
-              <span className="text-[9px] font-black uppercase tracking-widest text-orange-50">Matchmaker</span>
+            <div className="bg-white/95 px-3 py-2 rounded-2xl w-fit shadow-sm">
+              <picture>
+                <source type="image/avif" srcSet="/logo-220.avif 220w, /logo-440.avif 440w" sizes="150px" />
+                <source type="image/webp" srcSet="/logo-220.webp 220w, /logo-440.webp 440w" sizes="150px" />
+                <img src="/logo.webp" alt="University Tutors" width={150} height={57} className="h-8 w-auto object-contain" />
+              </picture>
             </div>
 
             <div>
-              <h1 className="text-2xl font-black tracking-tight leading-tight">
-                university<br />
-                <span className="text-orange-950 font-black">.tutors</span>
+              <h1 className="text-xl font-black tracking-tight leading-tight">
+                Create Academic Request
               </h1>
               <p className="text-xs text-orange-100/90 mt-1">Get an instant tailored academic quote</p>
             </div>
@@ -302,11 +336,11 @@ export default function GetQuotePage({ currentUser, onNavigate, tutors, onOpenCh
                 </div>
                 
                 <button 
-                  onClick={() => onNavigate && onNavigate('dashboard')}
+                  onClick={() => onNavigate && onNavigate(currentUser ? 'dashboard' : 'auth')}
                   className="w-full bg-orange-600 hover:bg-orange-700 text-white font-bold text-xs py-3 px-4 rounded-xl shadow-md transition-all active:scale-95 flex items-center justify-center gap-2 cursor-pointer"
                 >
                   <ChatBubbleIcon />
-                  <span>Open Student Dashboard Chat</span>
+                  <span>{currentUser ? 'Open Student Dashboard Chat' : 'Student Login to Open Chat'}</span>
                 </button>
               </div>
 
@@ -318,6 +352,7 @@ export default function GetQuotePage({ currentUser, onNavigate, tutors, onOpenCh
                     setUploadedFiles([]);
                     setSubject('');
                     setNotes('');
+                    setSelectedDeliverables([]);
                   }}
                   className="text-xs font-bold text-slate-400 hover:text-orange-600 transition underline cursor-pointer"
                 >
@@ -336,7 +371,22 @@ export default function GetQuotePage({ currentUser, onNavigate, tutors, onOpenCh
                 >
                   ← Back to Home
                 </button>
-                <span className="text-[10px] font-mono text-slate-400 font-semibold">Step {currentStep} of 5</span>
+                <div className="flex items-center gap-3">
+                  {currentUser ? (
+                    <span className="text-[11px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-1 rounded-full">
+                      Signed in: {currentUser.name || currentUser.email}
+                    </span>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => onNavigate?.('auth')}
+                      className="text-xs font-bold text-orange-600 hover:text-orange-700 bg-orange-50 hover:bg-orange-100 border border-orange-200 px-3 py-1 rounded-xl transition cursor-pointer"
+                    >
+                      Student Login
+                    </button>
+                  )}
+                  <span className="text-[10px] font-mono text-slate-400 font-semibold">Step {currentStep} of 5</span>
+                </div>
               </div>
 
               {/* STEP 1: Core Service Selection */}
@@ -582,6 +632,47 @@ export default function GetQuotePage({ currentUser, onNavigate, tutors, onOpenCh
                       className="w-full bg-white border-2 border-slate-200 rounded-xl p-2.5 text-xs font-semibold focus:outline-none focus:border-orange-500"
                     />
                   </div>
+
+                  {/* Deliverables (Optional) 3-Column Selection Grid */}
+                  <div className="rounded-xl border border-slate-200 bg-white p-3.5 space-y-2.5 text-left">
+                    <div>
+                      <h3 className="text-xs sm:text-sm font-bold text-slate-900">Deliverables (Optional)</h3>
+                      <p className="text-[11px] text-slate-500">Select any additional services you require.</p>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
+                      {deliverablesOptions.map((item) => {
+                        const isChecked = selectedDeliverables.includes(item.label);
+                        return (
+                          <button
+                            key={item.id}
+                            type="button"
+                            role="checkbox"
+                            aria-checked={isChecked}
+                            onClick={() => toggleDeliverable(item.label)}
+                            className={`text-left flex items-start gap-2.5 p-2 rounded-lg transition-all cursor-pointer ${
+                              isChecked
+                                ? 'bg-orange-50/70 border border-orange-300'
+                                : 'bg-white border border-transparent hover:border-orange-200 hover:bg-orange-50/20'
+                            }`}
+                          >
+                            <span
+                              className={`mt-0.5 w-4 h-4 rounded-[4px] flex items-center justify-center shrink-0 text-[10px] font-bold transition-colors ${
+                                isChecked
+                                  ? 'bg-[#F97316] border-2 border-[#F97316] text-white'
+                                  : 'bg-white border-2 border-[#F97316] text-transparent'
+                              }`}
+                            >
+                              ✓
+                            </span>
+                            <div className="min-w-0">
+                              <div className="text-xs font-bold text-slate-900 leading-snug">{item.label}</div>
+                              <div className="text-[10px] text-slate-500 leading-snug mt-0.5">{item.description}</div>
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
                 </div>
               )}
 
@@ -619,6 +710,12 @@ export default function GetQuotePage({ currentUser, onNavigate, tutors, onOpenCh
                       <div className="border-t border-orange-100 pt-1.5">
                         <span className="text-[10px] font-bold uppercase text-slate-400 block">Notes:</span>
                         <p className="text-slate-700 text-xs italic font-medium truncate">"{notes}"</p>
+                      </div>
+                    )}
+                    {selectedDeliverables.length > 0 && (
+                      <div className="border-t border-orange-100 pt-1.5">
+                        <span className="text-[10px] font-bold uppercase text-slate-400 block">Deliverables:</span>
+                        <p className="text-orange-700 text-xs font-bold">{selectedDeliverables.join(', ')}</p>
                       </div>
                     )}
                     {uploadedFiles.length > 0 && (

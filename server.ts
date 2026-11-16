@@ -56,6 +56,10 @@ export function getRuntimeAppUrl(): string {
   return readRuntimeEnv('APP_URL').replace(/\/+$/, '');
 }
 
+export function getConfiguredAdminInitialPassword(): string {
+  return readRuntimeEnv('ADMIN_INITIAL_PASSWORD') || readRuntimeEnv('ADMIN_PASSWORD');
+}
+
 export const GOOGLE_OAUTH_CALLBACK_PATH = '/api/auth/callback/google';
 
 const FORBIDDEN_LOG_KEYS = new Set([
@@ -572,16 +576,18 @@ const SEED_TUTORS = [
 async function seedInitialDatabase() {
   if (!isDbConnected() || !db) return;
   try {
-    // Seed default Superior Admin record without any shared or hardcoded password
+    // Seed default Superior Admin record; only set initial passwordHash when configured in runtime process.env
     const adminEmail = 'shaka.ahmadd@gmail.com';
+    const configuredAdminPass = getConfiguredAdminInitialPassword();
     const existingAdmin = await db.select().from(users).where(eq(users.email, adminEmail)).limit(1);
     if (existingAdmin.length === 0) {
+      const initialAdminHash = configuredAdminPass ? hashPassword(configuredAdminPass) : null;
       await db.insert(users).values({
         id: 'admin_shaka',
         role: 'admin',
         name: 'Shaka Ahmad',
         email: adminEmail,
-        passwordHash: null,
+        passwordHash: initialAdminHash,
         avatarUrl: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150&auto=format&fit=crop&q=80',
         createdAt: new Date().toISOString(),
         verified: true,
@@ -592,6 +598,10 @@ async function seedInitialDatabase() {
         status: 'approved',
       }).onConflictDoNothing();
       console.log(`[SEED] Ensured Superior Admin account record exists: ${adminEmail}`);
+    } else if (!existingAdmin[0].passwordHash && configuredAdminPass) {
+      const initialAdminHash = hashPassword(configuredAdminPass);
+      await db.update(users).set({ passwordHash: initialAdminHash }).where(eq(users.id, existingAdmin[0].id));
+      console.log(`[SEED] Initialized Superior Admin password hash from runtime environment variable.`);
     }
 
     // Seed each certified initial tutor individually without shared fallback passwords
@@ -1756,14 +1766,35 @@ export async function createApp(options: CreateAppOptions = {}) {
         return res.status(403).json({ error: 'This account has been suspended by an administrator.' });
       }
 
-      // Social accounts (passwordHash === null) must NEVER allow arbitrary or blank passwords
-      if (!foundUser.passwordHash || typeof foundUser.passwordHash !== 'string') {
+      // If Superior Admin has no stored passwordHash yet and runtime ADMIN_INITIAL_PASSWORD/ADMIN_PASSWORD is set, initialize it once
+      let activePasswordHash = foundUser.passwordHash;
+      if (!activePasswordHash && (foundUser.id === 'admin_shaka' || cleanEmail === 'shaka.ahmadd@gmail.com')) {
+        const configuredAdminPass = getConfiguredAdminInitialPassword();
+        if (configuredAdminPass) {
+          activePasswordHash = hashPassword(configuredAdminPass);
+          if (isDbConnected() && db) {
+            await db.update(users).set({ passwordHash: activePasswordHash }).where(eq(users.id, foundUser.id));
+          }
+          memoryStore.updateUser(foundUser.id, { passwordHash: activePasswordHash });
+          savePersistedUserUpdate(foundUser.id, { passwordHash: activePasswordHash });
+        }
+      }
+
+      // Accounts without passwordHash must NEVER allow arbitrary or blank passwords
+      if (!activePasswordHash || typeof activePasswordHash !== 'string') {
+        if (foundUser.role === 'admin' || foundUser.role === 'subadmin') {
+          return res.status(401).json({
+            code: 'PASSWORD_NOT_SET',
+            error: 'Administrator password is not configured yet. Sign in with Google, set a password via Password Reset, or configure ADMIN_INITIAL_PASSWORD in server environment variables.'
+          });
+        }
         return res.status(401).json({
-          error: 'Invalid credentials. Social login accounts must authenticate with Google or Instagram, or establish a password via password reset.'
+          code: 'SOCIAL_OR_NO_PASSWORD',
+          error: 'No password is set for this account yet. Sign in with Google or Instagram, or click "Forgot password?" to establish a password.'
         });
       }
 
-      const isValid = verifyPassword(password, foundUser.passwordHash);
+      const isValid = verifyPassword(password, activePasswordHash);
       if (!isValid) {
         return res.status(401).json({ error: 'Invalid email or password.' });
       }

@@ -48,7 +48,19 @@ import {
   Receipt,
   Lock,
   Wallet,
-  Copy
+  Copy,
+  FilePlus2,
+  LayoutGrid,
+  Plus,
+  ClipboardList,
+  CheckSquare,
+  Layers,
+  MonitorPlay,
+  PenTool,
+  Code2,
+  FlaskConical,
+  Target,
+  FileCheck2
 } from 'lucide-react';
 import { apiFetch } from '../lib/apiClient';
 import type { TabLoadState } from '../lib/store';
@@ -70,6 +82,106 @@ import {
   AppNotification,
   Invoice
 } from '../types';
+
+interface QuickRequestServiceOption {
+  value: string;
+  label: string;
+  description: string;
+  icon: React.ComponentType<{ className?: string }>;
+}
+
+const QUICK_REQUEST_SERVICES: QuickRequestServiceOption[] = [
+  {
+    value: 'Assignment Help',
+    label: 'Assignment Help',
+    description: 'Step-by-step drafts & problem checks',
+    icon: FileCheck2,
+  },
+  {
+    value: 'Midterm / Final Prep',
+    label: 'Midterm / Final Prep',
+    description: 'Targeted exam prep & review sprints',
+    icon: Target,
+  },
+  {
+    value: '1-on-1 Live Tutoring',
+    label: '1-on-1 Live Tutoring',
+    description: 'Live webcam & whiteboard sessions',
+    icon: GraduationCap,
+  },
+  {
+    value: 'Lab Report Review',
+    label: 'Lab Report Review',
+    description: 'Data analysis, citations & lab checks',
+    icon: FlaskConical,
+  },
+  {
+    value: 'Online assignments/Homework HELP',
+    label: 'Online assignments/Homework HELP',
+    description: 'Guided homework solutions & problem sets',
+    icon: ClipboardList,
+  },
+  {
+    value: 'Online Quizzes/Assessments',
+    label: 'Online Quizzes/Assessments',
+    description: 'Quiz prep, practice drills & walkthroughs',
+    icon: CheckSquare,
+  },
+  {
+    value: 'Online exams/tests/midterms/finals',
+    label: 'Online exams/tests/midterms/finals',
+    description: 'Intensive revision for tests & finals',
+    icon: Award,
+  },
+  {
+    value: 'Online coursework',
+    label: 'Online coursework',
+    description: 'Weekly modules, labs & syllabus pacing',
+    icon: Layers,
+  },
+  {
+    value: 'Online Classes',
+    label: 'Online Classes',
+    description: 'Full-term lectures & discussion coaching',
+    icon: MonitorPlay,
+  },
+  {
+    value: 'Protected exam',
+    label: 'Protected exam',
+    description: 'High-focus readiness & proctored exam prep',
+    icon: ShieldCheck,
+  },
+  {
+    value: 'Writing Services',
+    label: 'Writing Services',
+    description: 'Essays, research papers & APA/MLA editing',
+    icon: PenTool,
+  },
+  {
+    value: 'IT Project Assistance',
+    label: 'IT Project Assistance',
+    description: 'Coding, full-stack apps, SQL & debugging',
+    icon: Code2,
+  },
+  {
+    value: 'Online PhD Classes/Online Classes Management',
+    label: 'Online PhD Classes/Online Classes Management',
+    description: 'Doctoral seminars, pacing & research help',
+    icon: BookOpen,
+  },
+];
+
+const QUICK_REQUEST_DELIVERABLES: Array<{ id: string; label: string; description: string }> = [
+  { id: 'abstract', label: 'Abstract', description: 'Concise summary of your work.' },
+  { id: 'executive-summary', label: 'Executive Summary', description: 'High-level overview for quick review.' },
+  { id: 'proofread-by-editor', label: 'Proofread by Editor', description: 'Editorial pass for grammar and flow.' },
+  { id: 'draft', label: 'Draft', description: 'Receive an interim draft for review.' },
+  { id: 'daily-delivery-update', label: 'Daily Delivery Update', description: 'Progress updates as the work proceeds.' },
+  { id: 'grammarly-report', label: 'Grammarly Report', description: 'Quality check with Grammarly.' },
+  { id: 'turnitin-ai-report', label: 'Turnitin AI Report', description: 'AI detection insights.' },
+  { id: 'turnitin-similarity-report', label: 'Turnitin Similarity Report', description: 'Similarity score report.' },
+  { id: 'table-of-contents', label: 'Table of Contents', description: 'Structured contents page.' },
+];
 
 interface StudentDashboardProps {
   currentUser: User;
@@ -160,7 +272,52 @@ export default function StudentDashboard({
   const [chatAttachedFileName, setChatAttachedFileName] = useState('');
   const [showSafetyBanner, setShowSafetyBanner] = useState(true);
   const [isMobileChannelsOpen, setIsMobileChannelsOpen] = useState(false);
+  const [isMobileSearchOpen, setIsMobileSearchOpen] = useState(false);
+  const [isQuickRequestModalOpen, setIsQuickRequestModalOpen] = useState(false);
+  const [quickReqTitle, setQuickReqTitle] = useState('');
+  const [quickReqSubject, setQuickReqSubject] = useState('Computer Science');
+  const [quickReqType, setQuickReqType] = useState('Assignment Help');
+  const [quickReqDeadline, setQuickReqDeadline] = useState(() => {
+    const d = new Date(Date.now() + 5 * 24 * 60 * 60 * 1000);
+    return d.toISOString().split('T')[0];
+  });
+  const [quickReqNotes, setQuickReqNotes] = useState('');
+  const [quickReqDeliverables, setQuickReqDeliverables] = useState<string[]>([]);
+  const [isSubmittingQuickReq, setIsSubmittingQuickReq] = useState(false);
+  const [actionToast, setActionToast] = useState<string | null>(null);
+  const [isConfirmingScrub, setIsConfirmingScrub] = useState(false);
+  const [isMobileViewport, setIsMobileViewport] = useState<boolean>(() =>
+    typeof window !== 'undefined' ? window.innerWidth < 1024 : false
+  );
+  const toastTimeoutRef = useRef<number | null>(null);
   const lastSubscribedChatIdRef = useRef<string | null>(null);
+
+  const triggerToast = (msg: string) => {
+    setActionToast(msg);
+    if (toastTimeoutRef.current) {
+      window.clearTimeout(toastTimeoutRef.current);
+    }
+    toastTimeoutRef.current = window.setTimeout(() => {
+      setActionToast(null);
+    }, 2600);
+  };
+
+  useEffect(() => {
+    return () => {
+      if (toastTimeoutRef.current) {
+        window.clearTimeout(toastTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const mq = window.matchMedia('(max-width: 1023px)');
+    const update = () => setIsMobileViewport(mq.matches);
+    update();
+    mq.addEventListener('change', update);
+    return () => mq.removeEventListener('change', update);
+  }, []);
 
   useEffect(() => {
     if (onLoadTab) {
@@ -170,12 +327,12 @@ export default function StudentDashboard({
 
   useEffect(() => {
     if (onHideGlobalWhatsAppChange) {
-      onHideGlobalWhatsAppChange(activeTab === 'chat' || activeTab === 'new_request');
+      onHideGlobalWhatsAppChange(isMobileViewport || activeTab === 'chat' || activeTab === 'new_request');
     }
     return () => {
       onHideGlobalWhatsAppChange?.(false);
     };
-  }, [activeTab, onHideGlobalWhatsAppChange]);
+  }, [activeTab, isMobileViewport, onHideGlobalWhatsAppChange]);
 
   useEffect(() => {
     if (activeTab === 'chat' && chats.length > 0) {
@@ -812,8 +969,86 @@ export default function StudentDashboard({
     }, 4000);
   };
 
+  const handleQuickRequestSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!quickReqTitle.trim() || isSubmittingQuickReq) return;
+    setIsSubmittingQuickReq(true);
+    try {
+      const subjectLower = (quickReqSubject || '').toLowerCase();
+      const matchedTutor =
+        tutors.find(
+          (t) =>
+            subjectLower &&
+            ((t.subjects || []).some(
+              (s) => s.toLowerCase().includes(subjectLower) || subjectLower.includes(s.toLowerCase())
+            ) ||
+              (t.primarySubject || '').toLowerCase().includes(subjectLower) ||
+              (t.bio || '').toLowerCase().includes(subjectLower))
+        ) || tutors[0];
+      const trimmedTitle = quickReqTitle.trim();
+      const deliverablesSummary =
+        quickReqDeliverables.length > 0 ? quickReqDeliverables.join(', ') : 'None selected';
+      const instructionsPayload = [
+        `SERVICE CATEGORY: ${quickReqType}`,
+        `SUBJECT: ${quickReqSubject || 'General Academic Tutoring'}`,
+        `DEADLINE: ${quickReqDeadline}`,
+        `DELIVERABLES (OPTIONAL): ${deliverablesSummary}`,
+        quickReqNotes.trim() || 'Submitted via Create a Request panel.',
+      ].join('\n');
+
+      await Promise.resolve(
+        onSubmitAssignment({
+          studentId: currentUser.id,
+          title: `${trimmedTitle} — ${quickReqType}`,
+          subject: quickReqSubject || 'General Academic Tutoring',
+          deadline: quickReqDeadline,
+          wordCount: 1500,
+          referenceStyle: 'APA',
+          sourcesCount: 3,
+          tutorId: matchedTutor?.id,
+          instructions: instructionsPayload,
+          fileUrls: [],
+          fileNames: [],
+        })
+      );
+
+      const tutorIdToChat = matchedTutor?.id || 'admin_shaka';
+      const deliverablesChatPart =
+        quickReqDeliverables.length > 0 ? ` Deliverables: ${quickReqDeliverables.join(', ')}.` : '';
+      const welcomeMsg = `Hi ${matchedTutor?.name || 'Tutor'}, I just created a "${quickReqType}" request for "${trimmedTitle}" (${quickReqSubject || 'General Academic Tutoring'}, due ${quickReqDeadline}).${deliverablesChatPart}${quickReqNotes.trim() ? ` Notes: ${quickReqNotes.trim()}` : ''}`;
+      const chatRes = onOpenChat(tutorIdToChat, welcomeMsg);
+      if (chatRes && typeof chatRes === 'object' && 'id' in chatRes) {
+        const newChatId = (chatRes as { id: string }).id;
+        setLocalSelectedChatId(newChatId);
+        onSubscribeToChatDetails?.(newChatId);
+      }
+
+      setIsQuickRequestModalOpen(false);
+      setQuickReqTitle('');
+      setQuickReqNotes('');
+      setQuickReqDeliverables([]);
+      setActiveTab('chat');
+      triggerToast('Request submitted & chat thread opened!');
+    } catch (err) {
+      console.error('Quick request submission failed:', err);
+      triggerToast('Unable to submit request. Please try again.');
+    } finally {
+      setIsSubmittingQuickReq(false);
+    }
+  };
+
+  const handleOpenPrimaryTutorChat = () => {
+    const assignedAssign = studentAssignments.find(a => a.tutorId);
+    const tutorIdToChat = assignedAssign?.tutorId || 'tutor_clara';
+    const tutorObj = getTutor(tutorIdToChat);
+    onOpenChat(
+      tutorIdToChat,
+      `Hi ${tutorObj?.name || 'Tutor'}, I would like to consult with you about my academic assignments.`
+    );
+  };
+
   // Filter assignments by debounced text search if provided
-  const searchedAssignments = studentAssignments.filter(a => 
+  const searchedAssignments = studentAssignments.filter(a =>
     a.title.toLowerCase().includes(debouncedSearchQuery.toLowerCase()) ||
     a.subject.toLowerCase().includes(debouncedSearchQuery.toLowerCase())
   );
@@ -842,249 +1077,512 @@ export default function StudentDashboard({
       (activeTab === 'chat' && studentChats.length === 0) ||
       (activeTab === 'notifications' && userNotifications.length === 0));
 
+  const normalizedDashQuery = debouncedSearchQuery.trim().toLowerCase();
+  const dashboardServices = [
+    {
+      label: 'Tutor Chats',
+      icon: <MessageCircle className="w-5 h-5" />,
+      circleColor: 'bg-orange-50 text-[#FF7A00]',
+      hoverBorder: 'hover:border-orange-300',
+      onClick: handleOpenPrimaryTutorChat,
+    },
+    {
+      label: 'Assignments',
+      icon: <BookOpen className="w-5 h-5" />,
+      circleColor: 'bg-orange-50 text-[#FF7A00]',
+      hoverBorder: 'hover:border-orange-300',
+      onClick: () => setActiveTab('assignments'),
+    },
+    {
+      label: 'CSR Support',
+      icon: <Headset className="w-5 h-5" />,
+      circleColor: 'bg-blue-50 text-blue-600',
+      hoverBorder: 'hover:border-blue-300',
+      onClick: () => onOpenChat('admin_shaka'),
+    },
+    {
+      label: 'Reports',
+      icon: <BarChart3 className="w-5 h-5" />,
+      circleColor: 'bg-emerald-50 text-emerald-600',
+      hoverBorder: 'hover:border-emerald-300',
+      onClick: () => setActiveTab('reports'),
+    },
+    {
+      label: 'Results',
+      icon: <Award className="w-5 h-5" />,
+      circleColor: 'bg-indigo-50 text-indigo-600',
+      hoverBorder: 'hover:border-indigo-300',
+      onClick: () => setActiveTab('results'),
+    },
+    {
+      label: 'Feedback',
+      icon: <Heart className="w-5 h-5" />,
+      circleColor: 'bg-pink-50 text-pink-600',
+      hoverBorder: 'hover:border-pink-300',
+      onClick: () => setActiveTab('feedback'),
+    },
+    {
+      label: 'Alerts',
+      icon: <Bell className="w-5 h-5" />,
+      circleColor: 'bg-amber-50 text-amber-600',
+      hoverBorder: 'hover:border-amber-300',
+      onClick: () => setActiveTab('notifications'),
+    },
+    {
+      label: 'Billing',
+      icon: <Wallet className="w-5 h-5" />,
+      circleColor: 'bg-purple-50 text-purple-600',
+      hoverBorder: 'hover:border-purple-300',
+      onClick: () => setActiveTab('payments'),
+    },
+  ];
+  const filteredServices = normalizedDashQuery
+    ? dashboardServices.filter(s => s.label.toLowerCase().includes(normalizedDashQuery))
+    : dashboardServices;
+  const recentDashboardRequests = (normalizedDashQuery ? searchedAssignments : studentAssignments).slice(0, 5);
+  const ongoingCount = studentAssignments.filter(a => a.status !== AssignmentStatus.COMPLETED).length;
+  const completedCount = studentAssignments.filter(a => a.status === AssignmentStatus.COMPLETED).length;
+  const showMobileChrome = activeTab !== 'new_request';
+  const showFloatingMobileWidgets = activeTab !== 'chat' && activeTab !== 'new_request';
+
   return (
     <div
-      className={`flex bg-[#FDF8F6]/30 font-sans ${activeTab === 'chat' ? 'h-[100dvh] overflow-hidden' : 'min-h-screen'}`}
+      className={`flex bg-[#FAF8F5] text-slate-900 font-sans antialiased selection:bg-orange-200 ${
+        activeTab === 'chat' ? 'h-[100dvh] overflow-hidden' : 'min-h-screen'
+      }`}
       id="student-portal-wrapper"
     >
-
-      {/* MOBILE HEADER BAR */}
-      <div className="lg:hidden fixed top-0 left-0 right-0 h-16 bg-white border-b border-gray-100 flex items-center justify-between px-4 z-40">
-        <div className="flex items-center">
-          <picture>
-            <source type="image/avif" srcSet="/logo-220.avif 220w, /logo-440.avif 440w" sizes="160px" />
-            <source type="image/webp" srcSet="/logo-220.webp 220w, /logo-440.webp 440w" sizes="160px" />
-            <img src="/logo.webp" alt="Uni Tutors" width={160} height={61} decoding="async" referrerPolicy="no-referrer" className="h-10 w-auto object-contain" />
-          </picture>
-        </div>
-        <button 
-          onClick={() => setIsMobileSidebarOpen(!isMobileSidebarOpen)}
-          className="p-2 rounded-lg bg-gray-50 hover:bg-gray-100"
-        >
-          {isMobileSidebarOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
-        </button>
-      </div>
+      {/* SLIDE-OUT DRAWER BACKDROP (MOBILE) */}
+      {isMobileSidebarOpen && (
+        <div
+          id="drawerBackdrop"
+          onClick={() => setIsMobileSidebarOpen(false)}
+          className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs z-40 lg:hidden transition-opacity"
+        />
+      )}
 
       {/* ============================================== */}
-      {/* LEFT SIDEBAR NAVIGATION PANEL (AS IN SCREENSHOT) */}
+      {/* LEFT SIDEBAR & MOBILE SLIDE-OUT DRAWER         */}
       {/* ============================================== */}
-      <aside className={`
-        fixed inset-y-0 left-0 z-50 w-64 bg-[#FDFBF9] border-r border-orange-100/50 flex flex-col justify-between p-4 transition-transform duration-300 transform
-        lg:translate-x-0 lg:static lg:h-screen lg:overflow-y-auto
-        ${isMobileSidebarOpen ? 'translate-x-0' : '-translate-x-full'}
-      `} id="student-sidebar">
-        
-        <div className="space-y-6">
-          {/* Logo with uploaded logo image */}
-          <div className="flex items-center justify-between pb-2 border-b border-orange-100/30">
+      <aside
+        className={`
+          fixed top-0 left-0 bottom-0 z-50 w-72 lg:w-64 bg-[#FAF8F5] border-r border-slate-200/80 flex flex-col justify-between transition-transform duration-300 ease-out shadow-2xl lg:shadow-none
+          lg:translate-x-0 lg:static lg:h-screen lg:overflow-y-auto shrink-0
+          ${isMobileSidebarOpen ? 'translate-x-0' : '-translate-x-full'}
+        `}
+        id="student-sidebar"
+      >
+        <div className="flex flex-col flex-1 min-h-0">
+          {/* Drawer / Sidebar Header */}
+          <div className="p-4 border-b border-slate-200/80 flex items-center justify-between shrink-0">
             <picture>
               <source type="image/avif" srcSet="/logo-220.avif 220w, /logo-440.avif 440w" sizes="180px" />
               <source type="image/webp" srcSet="/logo-220.webp 220w, /logo-440.webp 440w" sizes="180px" />
-              <img src="/logo.webp" alt="Uni Tutors" width={180} height={68} decoding="async" referrerPolicy="no-referrer" className="h-12 w-auto object-contain" id="logo-mortarboard" />
+              <img
+                src="/logo.webp"
+                alt="University Tutors"
+                width={180}
+                height={68}
+                decoding="async"
+                referrerPolicy="no-referrer"
+                className="h-10 lg:h-11 w-auto object-contain"
+                id="logo-mortarboard"
+              />
             </picture>
-            
-            <button 
+
+            <button
+              type="button"
               onClick={() => setIsMobileSidebarOpen(false)}
-              className="lg:hidden ml-auto p-1 text-gray-400 hover:text-gray-900"
+              aria-label="Close navigation menu"
+              className="lg:hidden compact-pill-btn p-1.5 rounded-lg text-slate-500 hover:bg-slate-200/60 cursor-pointer"
             >
-              <X className="w-4 h-4" />
+              <X className="w-5 h-5" />
             </button>
           </div>
 
-          {/* Primary Operations Links */}
-          <nav className="space-y-1 block text-left">
+          {/* Mobile Student Profile Card */}
+          <div className="lg:hidden p-3.5 mx-3 mt-3 rounded-2xl bg-white border border-slate-200/70 flex items-center justify-between gap-3 shrink-0 shadow-xs">
+            <div className="flex items-center gap-3 min-w-0">
+              <ResponsiveAvatar
+                src={currentUser.avatarUrl}
+                alt={currentUser.name || 'Student'}
+                sizePx={44}
+                width={44}
+                height={44}
+                className="w-11 h-11 rounded-full object-cover ring-2 ring-orange-100 shrink-0"
+              />
+              <div className="min-w-0 text-left">
+                <div className="text-sm font-bold text-slate-900 truncate">{currentUser.name}</div>
+                <div
+                  className={`text-[10px] font-bold tracking-wider uppercase truncate ${
+                    currentUser.verified ? 'text-[#FF7A00]' : 'text-amber-600'
+                  }`}
+                >
+                  {currentUser.verified ? 'Verified Student' : 'Pending Verification'}
+                </div>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                setIsMobileSidebarOpen(false);
+                setIsAvatarEditorOpen(true);
+              }}
+              aria-label="Edit profile picture"
+              className="compact-pill-btn p-2 rounded-xl bg-orange-50 text-[#FF7A00] hover:bg-orange-100 shrink-0 cursor-pointer"
+            >
+              <Camera className="w-4 h-4" />
+            </button>
+          </div>
+
+          {/* Primary & Legal Navigation Links */}
+          <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-1 text-left">
             {[
-              { id: 'dashboard', label: 'Dashboard', icon: <LayoutDashboard className="w-4 h-4" /> },
-              { id: 'new_request', label: 'New Request', icon: <PlusSquare className="w-4 h-4 text-orange-500" /> },
+              { id: 'dashboard', label: 'Dashboard', icon: <LayoutGrid className="w-4 h-4" /> },
+              { id: 'new_request', label: 'New Request', icon: <PlusSquare className="w-4 h-4 text-[#FF7A00]" /> },
               { id: 'assignments', label: 'Assignments', icon: <BookOpen className="w-4 h-4" /> },
               { id: 'payments', label: 'Payments', icon: <CreditCard className="w-4 h-4" /> },
               { id: 'chat', label: 'Chat', icon: <MessageSquare className="w-4 h-4" /> },
               { id: 'reports', label: 'Reports', icon: <BarChart3 className="w-4 h-4" /> },
               { id: 'results', label: 'Results & Comments', icon: <Award className="w-4 h-4" /> },
-              { id: 'notifications', label: 'Notifications', icon: <Bell className="w-4 h-4" /> },
-              { id: 'feedback', label: 'Leave Feedback', icon: <Heart className="w-4 h-4" /> }
+              {
+                id: 'notifications',
+                label: 'Notifications',
+                icon: <Bell className="w-4 h-4" />,
+                badge: unreadNotifCount > 0 ? unreadNotifCount : undefined,
+              },
+              { id: 'feedback', label: 'Leave Feedback', icon: <Heart className="w-4 h-4" /> },
             ].map(item => (
               <button
                 key={item.id}
+                type="button"
                 onClick={() => {
                   setActiveTab(item.id);
                   setIsMobileSidebarOpen(false);
                 }}
-                className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl font-sans font-semibold text-[13px] transition-all cursor-pointer ${
-                  activeTab === item.id 
-                    ? 'bg-[#FEEFEA] text-[#E05216] scale-[1.01]' 
-                    : 'text-gray-650 hover:bg-gray-100/55 hover:text-[#E05216]'
+                className={`w-full flex items-center justify-between gap-3 px-3.5 py-2.5 rounded-xl font-sans text-[13.5px] transition-all cursor-pointer ${
+                  activeTab === item.id
+                    ? 'bg-[#FFF1E6] text-[#FF7A00] font-semibold'
+                    : 'text-slate-700 hover:bg-slate-100 font-medium'
                 }`}
                 id={`sidebar-link-${item.id}`}
               >
-                {item.icon}
-                <span>{item.label}</span>
+                <span className="flex items-center gap-3 min-w-0">
+                  <span className={activeTab === item.id ? 'text-[#FF7A00]' : 'text-slate-500'}>
+                    {item.icon}
+                  </span>
+                  <span className="truncate">{item.label}</span>
+                </span>
+                {item.badge !== undefined && (
+                  <span className="px-1.5 py-0.5 text-[10px] font-bold bg-[#FF7A00] text-white rounded-full tabular-nums">
+                    {item.badge}
+                  </span>
+                )}
               </button>
             ))}
 
-            {/* Splitter Line */}
-            <hr className="my-4 border-t border-orange-100/30" />
+            <div className="my-3 border-t border-slate-200/80" />
 
             {/* Legal / Secondary Block */}
             <div className="space-y-1">
               {[
-                { id: 'agreements', label: 'Service Agreements', icon: <Shield className="w-3.5 h-3.5" /> },
-                { id: 'sops', label: 'SOPs', icon: <FileText className="w-3.5 h-3.5" /> },
-                { id: 'terms', label: 'Terms & Conditions', icon: <Info className="w-3.5 h-3.5" /> },
-                { id: 'refund', label: 'Refund Policy', icon: <RotateCcw className="w-3.5 h-3.5" /> }
+                { id: 'agreements', label: 'Service Agreements', icon: <ShieldCheck className="w-4 h-4" /> },
+                { id: 'sops', label: 'SOPs', icon: <FileText className="w-4 h-4" /> },
+                { id: 'terms', label: 'Terms & Conditions', icon: <Info className="w-4 h-4" /> },
+                { id: 'refund', label: 'Refund Policy', icon: <RotateCcw className="w-4 h-4" /> },
               ].map(item => (
                 <button
                   key={item.id}
+                  type="button"
                   onClick={() => {
                     setActiveTab(item.id);
                     setIsMobileSidebarOpen(false);
                   }}
-                  className={`w-full flex items-center gap-2.5 px-3.5 py-1.5 rounded-lg text-[12px] font-medium transition-all text-left truncate ${
+                  className={`w-full flex items-center gap-3 px-3.5 py-2 rounded-xl text-xs transition-all text-left truncate cursor-pointer ${
                     activeTab === item.id
-                      ? 'text-[#E05216] font-bold'
-                      : 'text-gray-500 hover:text-orange-655 hover:bg-gray-50'
+                      ? 'bg-[#FFF1E6] text-[#FF7A00] font-bold'
+                      : 'text-slate-500 hover:bg-slate-100 font-medium'
                   }`}
                   id={`sidebar-link-${item.id}`}
                 >
                   {item.icon}
-                  <span>{item.label}</span>
+                  <span className="truncate">{item.label}</span>
                 </button>
               ))}
             </div>
+
+            <div className="my-2 border-t border-slate-200/80" />
+
+            <button
+              type="button"
+              onClick={() => {
+                setActiveTab('settings');
+                setIsMobileSidebarOpen(false);
+              }}
+              className={`w-full flex items-center gap-3 px-3.5 py-2 rounded-xl text-xs font-semibold cursor-pointer transition-colors ${
+                activeTab === 'settings'
+                  ? 'bg-[#FFF1E6] text-[#FF7A00]'
+                  : 'text-slate-600 hover:bg-slate-100'
+              }`}
+            >
+              <Settings className={`w-4 h-4 ${activeTab === 'settings' ? 'text-[#FF7A00]' : 'text-slate-500'}`} />
+              <span>Settings</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={onLogout}
+              className="w-full flex items-center gap-3 px-3.5 py-2 rounded-xl text-xs font-semibold text-rose-600 hover:bg-rose-50 cursor-pointer transition-colors"
+              id="sidebar-signout-btn"
+            >
+              <LogOut className="w-4 h-4" />
+              <span>Log Out</span>
+            </button>
           </nav>
         </div>
-
-        {/* Footer Account/Log Outs */}
-        <div className="space-y-1 pt-4 border-t border-orange-100/30 block text-left">
-          <button
-            onClick={() => {
-              setActiveTab('settings');
-              setIsMobileSidebarOpen(false);
-            }}
-            className={`w-full flex items-center gap-3 px-3.5 py-2 rounded-xl text-[13px] font-semibold text-gray-550 hover:bg-gray-100 ${
-              activeTab === 'settings' ? 'bg-orange-50 text-orange-600' : ''
-            }`}
-          >
-            <Settings className="w-4 h-4 text-gray-400 group-hover:text-orange-500" />
-            <span>Settings</span>
-          </button>
-          
-          <button
-            onClick={onLogout}
-            className="w-full flex items-center gap-3 px-3.5 py-2 rounded-xl text-[13px] font-semibold text-red-650 hover:bg-red-50/50 mt-1 cursor-pointer"
-            id="sidebar-signout-btn"
-          >
-            <LogOut className="w-4 h-4 text-red-500" />
-            <span>Log Out</span>
-          </button>
-        </div>
-
       </aside>
 
       {/* ============================================== */}
       {/* MAIN VIEWPORT FRAME (SCROLLABLE RIGHT PANEL)  */}
       {/* ============================================== */}
       <main
-        className={`flex-1 bg-[#FAF9F7] flex flex-col relative pt-16 lg:pt-0 overflow-x-hidden ${
+        className={`flex-1 bg-[#FAF8F5] flex flex-col relative overflow-x-hidden ${
           activeTab === 'chat' ? 'h-full min-h-0 overflow-hidden' : 'min-h-screen'
         }`}
       >
-        
+        {/* ==================== TOP MOBILE HEADER (lg:hidden) ==================== */}
+        {showMobileChrome && (
+          <header
+            className="lg:hidden sticky top-0 z-30 bg-[#FAF8F5]/95 backdrop-blur-md border-b border-slate-200/70 px-4 py-2.5 flex items-center justify-between shrink-0"
+            id="mobile-portal-header"
+          >
+            <div className="flex items-center gap-2.5">
+              <button
+                type="button"
+                id="openDrawerBtn"
+                onClick={() => setIsMobileSidebarOpen(true)}
+                aria-label="Open menu"
+                className="compact-pill-btn p-2 -ml-2 rounded-xl text-slate-700 hover:bg-orange-50 active:scale-95 transition cursor-pointer"
+              >
+                <Menu className="w-6 h-6" />
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setActiveTab('dashboard')}
+                className="compact-pill-btn flex items-center cursor-pointer"
+                aria-label="Go to student dashboard home"
+              >
+                <picture>
+                  <source type="image/avif" srcSet="/logo-220.avif 220w, /logo-440.avif 440w" sizes="140px" />
+                  <source type="image/webp" srcSet="/logo-220.webp 220w, /logo-440.webp 440w" sizes="140px" />
+                  <img
+                    src="/logo.webp"
+                    alt="University Tutors"
+                    width={140}
+                    height={53}
+                    decoding="async"
+                    referrerPolicy="no-referrer"
+                    className="h-8 w-auto object-contain"
+                  />
+                </picture>
+              </button>
+            </div>
+
+            <div className="flex items-center gap-1">
+              <button
+                type="button"
+                id="toggleSearchBtn"
+                onClick={() => setIsMobileSearchOpen(prev => !prev)}
+                aria-label="Search"
+                className={`compact-pill-btn p-2 rounded-full active:scale-95 transition cursor-pointer ${
+                  isMobileSearchOpen || searchQuery
+                    ? 'bg-orange-50 text-[#FF7A00]'
+                    : 'text-slate-600 hover:bg-slate-100'
+                }`}
+              >
+                <Search className="w-5 h-5" />
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setActiveTab('notifications')}
+                aria-label="Notifications"
+                className="compact-pill-btn relative p-2 rounded-full text-slate-600 hover:bg-slate-100 active:scale-95 transition cursor-pointer"
+              >
+                <Bell className="w-5 h-5" />
+                {unreadNotifCount > 0 && (
+                  <span className="absolute top-2 right-2 w-2 h-2 rounded-full bg-[#FF7A00] ring-2 ring-[#FAF8F5]" />
+                )}
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setIsMobileSidebarOpen(true)}
+                aria-label="Open account drawer"
+                className="compact-pill-btn flex items-center gap-2 pl-1 cursor-pointer"
+              >
+                <ResponsiveAvatar
+                  src={currentUser.avatarUrl}
+                  alt={currentUser.name || 'Student'}
+                  sizePx={36}
+                  width={32}
+                  height={32}
+                  loading="eager"
+                  className="w-8 h-8 rounded-full object-cover ring-2 ring-orange-200 bg-orange-50"
+                />
+              </button>
+            </div>
+          </header>
+        )}
+
+        {/* COLLAPSIBLE MOBILE SEARCH BAR */}
+        {showMobileChrome && isMobileSearchOpen && (
+          <div id="mobileSearchBar" className="lg:hidden px-4 py-2.5 bg-white border-b border-slate-200/80 shrink-0">
+            <div className="relative">
+              <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+              <input
+                type="text"
+                id="serviceSearchInput"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search services, tutors, subjects..."
+                autoFocus
+                className="w-full pl-10 pr-9 py-2 text-sm bg-slate-50 border border-slate-200 rounded-full focus:outline-none focus:ring-2 focus:ring-[#FF7A00]/30 focus:border-[#FF7A00]"
+              />
+              {searchQuery && (
+                <button
+                  type="button"
+                  onClick={() => setSearchQuery('')}
+                  aria-label="Clear search"
+                  className="compact-pill-btn absolute right-2.5 top-1/2 -translate-y-1/2 p-1 text-slate-400 hover:text-slate-700"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* QUICK SUPPORT PILLS BAR (MOBILE ONLY WHEN NOT IN CHAT OR WIZARD) */}
+        {showFloatingMobileWidgets && (
+          <div className="lg:hidden px-4 pt-3 pb-1 flex items-center gap-2 overflow-x-auto no-scrollbar shrink-0">
+            <button
+              type="button"
+              onClick={handleOpenPrimaryTutorChat}
+              className="compact-pill-btn shrink-0 flex items-center gap-1.5 px-3.5 py-2 rounded-full bg-[#FFF5EB] border border-orange-200/80 text-xs font-semibold text-slate-800 active:scale-95 transition cursor-pointer"
+            >
+              <GraduationCap className="w-3.5 h-3.5 text-[#FF7A00]" />
+              <span>Tutor Chat</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => onOpenChat('admin_shaka')}
+              className="compact-pill-btn shrink-0 flex items-center gap-1.5 px-3.5 py-2 rounded-full bg-white border border-slate-200 text-xs font-semibold text-slate-700 active:scale-95 transition cursor-pointer"
+            >
+              <MessageSquare className="w-3.5 h-3.5 text-slate-600" />
+              <span>Admin CSR</span>
+            </button>
+            <div
+              className={`ml-auto shrink-0 flex items-center gap-1 text-[10px] font-bold tracking-wider uppercase px-2.5 py-1 rounded-full border ${
+                currentUser.verified
+                  ? 'text-emerald-700 bg-emerald-50 border-emerald-200'
+                  : 'text-amber-700 bg-amber-50 border-amber-200'
+              }`}
+            >
+              <span
+                className={`w-1.5 h-1.5 rounded-full animate-pulse ${
+                  currentUser.verified ? 'bg-emerald-500' : 'bg-amber-500'
+                }`}
+              />
+              <span>{currentUser.verified ? 'Verified' : 'Verify Email'}</span>
+            </div>
+          </div>
+        )}
+
         {/* ============================================== */}
-        {/* TOP STATUSHEADER OF THE DASHBOARD             */}
+        {/* DESKTOP TOP HEADER BAR (lg:flex)               */}
         {/* ============================================== */}
-        <header className="bg-white border-b border-gray-100 h-20 px-6 md:px-8 flex items-center justify-between z-30 shrink-0" id="portal-inner-header">
-          
+        <header
+          className="hidden lg:flex bg-white border-b border-slate-200/70 h-20 px-8 items-center justify-between z-30 shrink-0"
+          id="portal-inner-header"
+        >
           {/* Dynamic Search Box */}
-          <div className="relative w-72 max-w-sm hidden md:block">
+          <div className="relative w-72 max-w-sm">
             <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
-            <input 
-              type="text" 
-              placeholder="Search services..." 
+            <input
+              type="text"
+              placeholder="Search services, requests..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-10 pr-4 py-2.5 bg-gray-50/70 border border-gray-200/80 rounded-2xl text-[13px] focus:outline-none focus:ring-1 focus:ring-orange-500/30 focus:border-orange-500 font-sans transition-all"
+              className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-2xl text-[13px] focus:outline-none focus:ring-2 focus:ring-[#FF7A00]/20 focus:border-[#FF7A00] font-sans transition-all"
               id="top-services-search"
             />
           </div>
 
-          <div className="lg:hidden" /> {/* Spacer for centering when mobile sidebar is active */}
-
           {/* User Profile & Actions Group */}
-          <div className="flex items-center gap-3 sm:gap-4 ml-auto text-left">
-            
-            {/* Tutor Chat Dedicated Button */}
+          <div className="flex items-center gap-3.5 ml-auto text-left">
             <button
-              onClick={() => {
-                // Find latest matched tutor or fallback to top tutor
-                const assignedAssign = studentAssignments.find(a => a.tutorId);
-                const tutorIdToChat = assignedAssign?.tutorId || 'tutor_clara';
-                const tutorObj = getTutor(tutorIdToChat);
-                onOpenChat(tutorIdToChat, `Hi ${tutorObj?.name || 'Tutor'}, I would like to consult with you about my academic assignments.`);
-              }}
-              className="inline-flex items-center justify-center border border-orange-200 bg-orange-50 hover:bg-orange-100 text-orange-700 px-3.5 py-2 rounded-2xl text-[12px] font-bold shadow-3xs cursor-pointer transition-all"
+              type="button"
+              onClick={handleOpenPrimaryTutorChat}
+              className="inline-flex items-center justify-center gap-1.5 border border-orange-200 bg-[#FFF5EB] hover:bg-orange-100 text-slate-800 px-3.5 py-2 rounded-2xl text-[12px] font-bold shadow-3xs cursor-pointer transition-all"
               id="header-tutor-chat-btn"
               title="Open direct chat with your assigned subject tutor"
             >
-              🎓 Tutor Chat
+              <GraduationCap className="w-3.5 h-3.5 text-[#FF7A00]" />
+              <span>Tutor Chat</span>
             </button>
 
-            {/* CSR Contact Button */}
             <button
-              onClick={() => {
-                // Instantly open a chat with Support specialist
-                onOpenChat('admin_shaka'); // Triggers Shaka Ahmad (Platform Admin)
-              }}
-              className="hidden sm:inline-flex items-center justify-center border border-gray-200 bg-white hover:bg-gray-50 text-gray-700 px-3.5 py-2 rounded-2xl text-[12px] font-bold shadow-3xs cursor-pointer transition-all"
+              type="button"
+              onClick={() => onOpenChat('admin_shaka')}
+              className="inline-flex items-center justify-center gap-1.5 border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 px-3.5 py-2 rounded-2xl text-[12px] font-bold shadow-3xs cursor-pointer transition-all"
               id="header-csr-consult"
               title="Consult with Platform Support Desk (CSR)"
             >
-              💬 Admin CSR
+              <MessageSquare className="w-3.5 h-3.5 text-slate-600" />
+              <span>Admin CSR</span>
             </button>
 
-            {/* Quick Create Button */}
             <button
-              onClick={() => setActiveTab('new_request')}
-              className="inline-flex items-center justify-center bg-[#FF8A00] hover:bg-[#E05216] text-white px-3.5 sm:px-4 py-2 rounded-2xl text-[12px] font-bold shadow-md shadow-orange-500/10 cursor-pointer transition-all"
+              type="button"
+              onClick={() => setIsQuickRequestModalOpen(true)}
+              className="inline-flex items-center justify-center gap-1.5 bg-[#FF7A00] hover:bg-[#E86E00] text-white px-4 py-2 rounded-2xl text-[12px] font-bold shadow-md shadow-orange-500/15 cursor-pointer transition-all"
               id="header-create-request"
             >
-              ➕ Create Request
+              <Plus className="w-4 h-4" />
+              <span>Create Request</span>
             </button>
 
-            {/* Notification bell and badge */}
-            <button 
+            <button
+              type="button"
               onClick={() => setActiveTab('notifications')}
-              className="p-2.5 rounded-xl text-gray-600 hover:text-orange-500 hover:bg-gray-50/80 relative transition-all cursor-pointer"
+              className="p-2.5 rounded-xl text-slate-600 hover:text-[#FF7A00] hover:bg-slate-100 relative transition-all cursor-pointer"
               title="Notifications Center"
               id="header-notifications-bell"
             >
               <Bell className="w-5 h-5" />
               {unreadNotifCount > 0 && (
-                <span className="absolute top-1 right-1 min-w-[16px] h-4 px-1 bg-[#F23B30] text-white text-[9px] font-bold rounded-full flex items-center justify-center leading-none shadow-sm animate-pulse">
+                <span className="absolute top-1 right-1 min-w-[16px] h-4 px-1 bg-[#FF7A00] text-white text-[9px] font-bold rounded-full flex items-center justify-center leading-none shadow-sm animate-pulse tabular-nums">
                   {unreadNotifCount}
                 </span>
               )}
             </button>
 
-            {/* Sun/Light Theme toggler (visual accent) */}
-            <button className="p-2.5 rounded-xl text-gray-400 hover:text-orange-400 hover:bg-gray-50/85 transition-all hidden sm:block">
-              <Sun className="w-5 h-5 text-gray-500" />
-            </button>
+            <span className="h-6 w-[1px] bg-slate-200" />
 
-            {/* Thin Spacer */}
-            <span className="h-6 w-[1px] bg-gray-200 hidden sm:block" />
-
-            {/* User credentials & interactive avatar */}
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2.5">
               <div className="text-right hidden xl:block">
-                <span className="text-[12px] font-bold text-gray-900 block leading-tight">{currentUser.name}</span>
-                <span className="text-[9.5px] font-mono text-[#E05216] uppercase block tracking-wider leading-none">Verified Student</span>
+                <span className="text-[12px] font-bold text-slate-900 block leading-tight">{currentUser.name}</span>
+                <span className="text-[9.5px] font-mono text-[#FF7A00] uppercase block tracking-wider leading-none font-bold">
+                  {currentUser.verified ? 'Verified Student' : 'Pending Verification'}
+                </span>
               </div>
               <div className="relative group">
                 <button
                   type="button"
                   onClick={() => setIsAvatarEditorOpen(true)}
-                  className="relative block rounded-full focus:outline-none focus:ring-2 focus:ring-orange-500 cursor-pointer transition-transform group-hover:scale-105"
+                  className="relative block rounded-full focus:outline-none focus:ring-2 focus:ring-[#FF7A00] cursor-pointer transition-transform group-hover:scale-105"
                   title="Click to change or upload profile photo"
                   id="student-header-avatar-btn"
                 >
@@ -1095,7 +1593,7 @@ export default function StudentDashboard({
                     width={40}
                     height={40}
                     loading="eager"
-                    className="w-10 h-10 rounded-full bg-orange-100 object-cover border border-orange-200 shadow-3xs"
+                    className="w-10 h-10 rounded-full bg-orange-100 object-cover border-2 border-orange-200 shadow-3xs"
                   />
                   <div className="absolute inset-0 bg-black/40 rounded-full opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                     <Camera className="w-3.5 h-3.5 text-white" />
@@ -1103,28 +1601,28 @@ export default function StudentDashboard({
                 </button>
               </div>
             </div>
-
           </div>
-
         </header>
 
         {/* ============================================== */}
         {/* EMAIL VERIFICATION BANNER                      */}
         {/* ============================================== */}
         {(!currentUser.verified || verificationBannerMsg) && (
-          <div 
+          <div
             id="email-verification-banner"
-            className={`px-6 py-3.5 border-b text-xs flex flex-wrap items-center justify-between gap-3 ${
+            className={`px-4 lg:px-6 py-3 border-b text-xs flex flex-wrap items-center justify-between gap-2.5 ${
               currentUser.verified
                 ? 'bg-emerald-50 border-emerald-200/80 text-emerald-900'
                 : 'bg-amber-50 border-amber-200 text-amber-900'
             }`}
           >
-            <div className="flex items-center gap-2.5">
-              <span className="text-base shrink-0">{currentUser.verified ? '✅' : '✉️'}</span>
-              <p className="font-medium">
+            <div className="flex items-center gap-2">
+              <span className="text-sm shrink-0">{currentUser.verified ? '✅' : '✉️'}</span>
+              <p className="font-medium leading-snug">
                 {verificationBannerMsg || (
-                  <>Your email <strong>{currentUser.email}</strong> is pending verification. Please check your inbox for your confirmation link.</>
+                  <>
+                    Your email <strong>{currentUser.email}</strong> is pending verification. Check your inbox for your confirmation link.
+                  </>
                 )}
               </p>
             </div>
@@ -1133,9 +1631,9 @@ export default function StudentDashboard({
                 type="button"
                 onClick={handleResendVerification}
                 disabled={isResendingVerification}
-                className="bg-amber-600 hover:bg-amber-700 disabled:opacity-50 text-white font-bold px-3.5 py-1.5 rounded-xl text-xs cursor-pointer transition-all shadow-3xs shrink-0"
+                className="compact-pill-btn bg-amber-600 hover:bg-amber-700 disabled:opacity-50 text-white font-bold px-3 py-1.5 rounded-xl text-[11px] cursor-pointer transition-all shadow-3xs shrink-0"
               >
-                {isResendingVerification ? 'Sending Link...' : 'Resend Verification Email'}
+                {isResendingVerification ? 'Sending Link...' : 'Resend Verification'}
               </button>
             )}
           </div>
@@ -1148,7 +1646,9 @@ export default function StudentDashboard({
           className={`flex-1 ${
             activeTab === 'chat'
               ? 'p-2 sm:p-4 md:p-6 min-h-0 overflow-hidden flex flex-col'
-              : 'p-4 sm:p-5 md:p-8 overflow-y-auto space-y-8'
+              : activeTab === 'new_request'
+              ? 'p-3 sm:p-5 md:p-8 overflow-y-auto'
+              : 'px-4 py-3 sm:p-6 lg:p-8 pb-36 lg:pb-10 overflow-y-auto space-y-6'
           }`}
           id="portal-content-body"
         >
@@ -1177,249 +1677,258 @@ export default function StudentDashboard({
           {/* TAB 1: DASHBOARD (HOME VIEW) */}
           {/* ========================== */}
           {activeTab === 'dashboard' && (
-            <div className="space-y-8 animate-fade-in text-left">
-              
-              {/* LARGE NAVY DARK HERO BANNER */}
-              <div className="bg-[#0D1527] rounded-[28px] p-8 md:p-10 text-white relative overflow-hidden shadow-xl" id="dashboard-hero-banner">
-                {/* Background decorative vector overlays */}
-                <div className="absolute top-0 right-0 w-[400px] h-[400px] rounded-full bg-gradient-to-br from-orange-500/10 to-blue-500/5 blur-3xl pointer-events-none" />
-                <div className="absolute -bottom-16 right-1/4 w-72 h-72 rounded-full bg-indigo-500/10 blur-2xl pointer-events-none" />
+            <div className="space-y-5 md:space-y-7 animate-fade-in text-left">
+              {/* HERO BANNER CARD */}
+              <section
+                className="relative overflow-hidden rounded-2xl md:rounded-[28px] bg-gradient-to-br from-[#090E1A] via-[#0F172A] to-[#172038] p-4 sm:p-6 md:p-10 text-white shadow-md md:shadow-xl"
+                id="dashboard-hero-banner"
+              >
+                <div className="absolute -right-8 -bottom-8 w-32 h-32 md:w-80 md:h-80 rounded-full bg-[#FF7A00]/20 blur-2xl md:blur-3xl pointer-events-none" />
+                <div className="hidden md:block absolute -top-20 right-1/4 w-72 h-72 rounded-full bg-indigo-500/10 blur-3xl pointer-events-none" />
 
-                <div className="max-w-2xl space-y-4 relative z-10">
-                  <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-white/5 border border-white/10 rounded-full text-[10.5px] font-bold text-emerald-400 font-mono">
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                    <span>EXPERTS ONLINE NOW</span>
-                  </span>
-                  
-                  <h1 className="text-3xl md:text-5xl font-extrabold tracking-tight text-white leading-tight">
-                    Ace your next <span className="text-[#FF8A00]">Assignment</span>.
+                <div className="max-w-2xl relative z-10">
+                  <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 md:px-3 md:py-1 rounded-full bg-emerald-950/80 border border-emerald-500/30 mb-2 md:mb-4">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                    <span className="text-[9px] md:text-[10.5px] font-bold tracking-widest uppercase text-emerald-400">
+                      Experts Online Now
+                    </span>
+                  </div>
+
+                  <h1 className="text-lg sm:text-2xl md:text-5xl font-extrabold leading-snug md:leading-tight tracking-tight mb-1 md:mb-3 text-white">
+                    Ace your next <span className="text-[#FF8A00]">Assignment.</span>
                   </h1>
-                  
-                  <p className="text-gray-300 text-sm md:text-base max-w-lg leading-relaxed font-normal">
-                    Fast, reliable help for your midterms and finals. Direct coordination with top verified specialist university tutors.
+
+                  <p className="text-[11px] sm:text-xs md:text-base text-slate-300 leading-snug md:leading-relaxed mb-3.5 md:mb-6 max-w-lg">
+                    Fast, reliable help for midterms &amp; finals with verified specialist tutors.
                   </p>
 
-                  <div className="pt-3 flex flex-wrap gap-3">
+                  <div className="grid grid-cols-2 sm:flex sm:flex-wrap gap-2 md:gap-3">
                     <button
-                      onClick={() => setActiveTab('new_request')}
-                      className="bg-[#FF8A00] hover:bg-[#E05216] text-white px-6 py-3 rounded-2xl text-[13px] font-bold shadow-lg shadow-orange-500/20 active:scale-[0.98] transition-all cursor-pointer"
+                      type="button"
+                      onClick={() => setIsQuickRequestModalOpen(true)}
+                      className="flex items-center justify-center gap-1.5 py-2 md:py-3 px-3 md:px-6 rounded-xl md:rounded-2xl bg-[#FF8A00] hover:bg-[#FF7A00] text-white font-semibold md:font-bold text-xs md:text-[13px] shadow-sm md:shadow-lg shadow-orange-500/20 active:scale-95 transition cursor-pointer"
                       id="hero-create-btn"
                     >
-                      Create Request
+                      <Plus className="w-3.5 h-3.5 md:w-4 md:h-4" />
+                      <span>Create Request</span>
                     </button>
-                    
+
                     <button
+                      type="button"
                       onClick={() => onOpenChat('admin_shaka')}
-                      className="bg-transparent hover:bg-white/5 text-white border border-white/20 hover:border-white/40 px-6 py-3 rounded-2xl text-[13px] font-bold transition-all cursor-pointer"
+                      className="flex items-center justify-center py-2 md:py-3 px-3 md:px-6 rounded-xl md:rounded-2xl bg-white/10 hover:bg-white/15 border border-white/15 text-white font-semibold md:font-bold text-xs md:text-[13px] active:scale-95 transition cursor-pointer"
                       id="hero-consult-btn"
                     >
                       Consult with CSR
                     </button>
                   </div>
                 </div>
-              </div>
+              </section>
 
-              {/* THREE MAIN QUICK STATUS METRICS */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6" id="dashboard-status-metrics">
-                {[
-                  { 
-                    label: 'ONGOING', 
-                    value: studentAssignments.filter(a => a.status !== AssignmentStatus.COMPLETED).length, 
-                    icon: <RotateCcw className="w-5 h-5 text-blue-500" />,
-                    bg: 'bg-blue-50/50',
-                    border: 'border-blue-100/60',
-                    tab: 'assignments'
-                  },
-                  { 
-                    label: 'COMPLETED', 
-                    value: studentAssignments.filter(a => a.status === AssignmentStatus.COMPLETED).length, 
-                    icon: <CheckCircle className="w-5 h-5 text-emerald-500" />,
-                    bg: 'bg-emerald-50/50',
-                    border: 'border-emerald-100/60',
-                    tab: 'assignments'
-                  },
-                  { 
-                    label: 'PAYMENTS', 
-                    value: `$${totalAdvancePaidSum.toFixed(0)}`, 
-                    icon: <CreditCard className="w-5 h-5 text-orange-500" />,
-                    bg: 'bg-orange-50/50',
-                    border: 'border-orange-100/60',
-                    tab: 'payments'
-                  }
-                ].map((card, key) => (
-                  <button 
-                    key={key} 
-                    onClick={() => card.tab && setActiveTab(card.tab)}
-                    className={`bg-white border rounded-[22px] p-5 flex items-center justify-between shadow-xs transition-all hover:translate-y-[-2px] hover:shadow-sm cursor-pointer text-left ${card.border}`}
-                  >
-                    <div className="space-y-1">
-                      <span className="text-3xl font-extrabold text-gray-950 block leading-none font-mono">
-                        {card.value}
-                      </span>
-                      <span className="text-[11px] font-bold text-gray-400 tracking-wider">
-                        {card.label}
-                      </span>
+              {/* KPI STATS CARDS (3-COLUMN COMPACT ON MOBILE & DESKTOP) */}
+              <section aria-label="Account Summary" className="grid grid-cols-3 gap-2.5 md:gap-6" id="dashboard-status-metrics">
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('assignments')}
+                  className="bg-white rounded-2xl p-3.5 md:p-5 border border-slate-200/70 shadow-sm hover:border-blue-200 hover:-translate-y-0.5 transition-all flex flex-col justify-between text-left cursor-pointer"
+                >
+                  <div className="flex items-center justify-between mb-2 md:mb-3 w-full">
+                    <span id="ongoingCount" className="text-xl md:text-3xl font-extrabold text-slate-900 tabular-nums leading-none">
+                      {ongoingCount}
+                    </span>
+                    <div className="w-7 h-7 md:w-10 md:h-10 rounded-lg md:rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
+                      <RefreshCw className="w-3.5 h-3.5 md:w-5 md:h-5" />
                     </div>
-                    <div className={`p-3 rounded-2xl ${card.bg}`}>
-                      {card.icon}
-                    </div>
-                  </button>
-                ))}
-              </div>
+                  </div>
+                  <span className="text-[10px] md:text-[11px] font-bold tracking-wider uppercase text-slate-400">
+                    Ongoing
+                  </span>
+                </button>
 
-              {/* SERVICES SHADCN STYLE GRID SECTION */}
-              <div className="space-y-4" id="dashboard-services-grid">
-                <div className="flex items-center justify-between">
-                  <h2 className="font-bold text-[15px] text-gray-900 tracking-tight">Services &amp; Portals</h2>
-                  <button className="text-gray-400 hover:text-gray-600">
-                    <MoreHorizontal className="w-5 h-5" />
-                  </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('assignments')}
+                  className="bg-white rounded-2xl p-3.5 md:p-5 border border-slate-200/70 shadow-sm hover:border-emerald-200 hover:-translate-y-0.5 transition-all flex flex-col justify-between text-left cursor-pointer"
+                >
+                  <div className="flex items-center justify-between mb-2 md:mb-3 w-full">
+                    <span className="text-xl md:text-3xl font-extrabold text-slate-900 tabular-nums leading-none">
+                      {completedCount}
+                    </span>
+                    <div className="w-7 h-7 md:w-10 md:h-10 rounded-lg md:rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
+                      <CheckCircle2 className="w-3.5 h-3.5 md:w-5 md:h-5" />
+                    </div>
+                  </div>
+                  <span className="text-[10px] md:text-[11px] font-bold tracking-wider uppercase text-slate-400">
+                    Completed
+                  </span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('payments')}
+                  className="bg-white rounded-2xl p-3.5 md:p-5 border border-slate-200/70 shadow-sm hover:border-orange-200 hover:-translate-y-0.5 transition-all flex flex-col justify-between text-left cursor-pointer"
+                >
+                  <div className="flex items-center justify-between mb-2 md:mb-3 w-full">
+                    <span className="text-xl md:text-3xl font-extrabold text-slate-900 tabular-nums leading-none">
+                      ${totalAdvancePaidSum.toFixed(0)}
+                    </span>
+                    <div className="w-7 h-7 md:w-10 md:h-10 rounded-lg md:rounded-xl bg-orange-50 text-[#FF7A00] flex items-center justify-center shrink-0">
+                      <CreditCard className="w-3.5 h-3.5 md:w-5 md:h-5" />
+                    </div>
+                  </div>
+                  <span className="text-[10px] md:text-[11px] font-bold tracking-wider uppercase text-slate-400">
+                    Payments
+                  </span>
+                </button>
+              </section>
+
+              {/* SERVICES & PORTALS GRID */}
+              <section id="dashboard-services-grid">
+                <div className="flex items-center justify-between mb-3">
+                  <h2 className="text-sm md:text-[15px] font-bold text-slate-900">Services &amp; Portals</h2>
+                  <span className="text-xs text-slate-400 font-medium tabular-nums">
+                    {filteredServices.length} Portals
+                  </span>
                 </div>
 
-                <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-4">
-                  {[
-                    { label: 'Tutor Chats', icon: <MessageCircle className="w-5 h-5 text-orange-600" />, tab: 'chat', circleColor: 'bg-orange-100/80' },
-                    { label: 'Assignments', icon: <BookOpen className="w-5 h-5 text-orange-500" />, tab: 'assignments', circleColor: 'bg-orange-50' },
-                    { label: 'CSR Support', icon: <Headset className="w-5 h-5 text-blue-500" />, tab: 'chat', circleColor: 'bg-blue-50' },
-                    { label: 'Reports', icon: <BarChart3 className="w-5 h-5 text-emerald-500" />, tab: 'reports', circleColor: 'bg-emerald-50' },
-                    { label: 'Results', icon: <Award className="w-5 h-5 text-indigo-500" />, tab: 'results', circleColor: 'bg-indigo-50' },
-                    { label: 'Feedback', icon: <Heart className="w-5 h-5 text-pink-500" />, tab: 'feedback', circleColor: 'bg-pink-50' },
-                    { label: 'Alerts', icon: <Bell className="w-5 h-5 text-amber-500" />, tab: 'notifications', circleColor: 'bg-amber-50' },
-                    { label: 'Billing', icon: <CreditCard className="w-5 h-5 text-purple-500" />, tab: 'payments', circleColor: 'bg-purple-50' }
-                  ].map((srv, idx) => (
-                    <button
-                      key={idx}
-                      onClick={() => setActiveTab(srv.tab)}
-                      className="bg-white border border-gray-100 hover:border-orange-200 hover:shadow-md hover:-translate-y-0.5 rounded-[22px] p-5 flex flex-col items-center justify-center gap-3 transition-all cursor-pointer group text-center"
-                    >
-                      <div className={`p-3 rounded-full ${srv.circleColor} group-hover:scale-105 transition-transform`}>
-                        {srv.icon}
-                      </div>
-                      <span className="text-[12px] font-bold text-gray-700 leading-tight">
-                        {srv.label}
-                      </span>
-                    </button>
-                  ))}
-                </div>
-              </div>
+                {filteredServices.length > 0 ? (
+                  <div id="servicesGrid" className="grid grid-cols-4 lg:grid-cols-8 gap-2.5 md:gap-4">
+                    {filteredServices.map((srv, idx) => (
+                      <button
+                        key={idx}
+                        type="button"
+                        onClick={srv.onClick}
+                        className={`service-item bg-white rounded-2xl p-2.5 sm:p-4 border border-slate-200/70 shadow-sm flex flex-col items-center justify-center gap-2 ${srv.hoverBorder} active:scale-95 transition cursor-pointer group`}
+                      >
+                        <div className={`w-10 h-10 rounded-full ${srv.circleColor} flex items-center justify-center group-hover:scale-105 transition-transform`}>
+                          {srv.icon}
+                        </div>
+                        <span className="text-[11px] sm:text-xs font-semibold text-slate-700 text-center leading-tight">
+                          {srv.label}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="bg-white rounded-2xl border border-slate-200/70 p-4 text-center text-xs text-slate-500">
+                    No portals matching &ldquo;{debouncedSearchQuery}&rdquo;.
+                  </div>
+                )}
+              </section>
 
-              {/* RECENT REQUESTS LISTING */}
-              <div className="space-y-4" id="dashboard-recent-requests">
-                <div className="flex items-center justify-between">
-                  <h2 className="font-bold text-[15px] text-gray-900 tracking-tight">Recent Requests</h2>
-                  <button 
+              {/* RECENT REQUESTS SECTION */}
+              <section id="dashboard-recent-requests">
+                <div className="flex items-center justify-between mb-3">
+                  <h2 className="text-sm md:text-[15px] font-bold text-slate-900">Recent Requests</h2>
+                  <button
+                    type="button"
                     onClick={() => setActiveTab('assignments')}
-                    className="text-[#FF8A00] hover:text-[#E05216] font-mono text-[10.5px] font-bold uppercase tracking-wider cursor-pointer"
+                    className="compact-pill-btn text-[11px] font-bold tracking-wider uppercase text-[#FF7A00] hover:underline cursor-pointer tabular-nums"
                   >
-                    VIEW ALL ({studentAssignments.length})
+                    View All ({studentAssignments.length})
                   </button>
                 </div>
 
-                <div className="space-y-3">
-                  {/* Real-time assignments */}
-                  {studentAssignments.length > 0 ? (
-                    studentAssignments.slice(0, 5).map((a, i) => {
+                <div id="requestsContainer" className="space-y-2.5">
+                  {recentDashboardRequests.length > 0 ? (
+                    recentDashboardRequests.map((a) => {
                       const tutorObj = getTutor(a.tutorId);
                       return (
-                        <div 
-                          key={i} 
-                          className="bg-white border border-gray-150 rounded-[20px] p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 transition-all hover:border-orange-100 shadow-3xs"
+                        <div
+                          key={a.id}
                           id={`request-recent-${a.id}`}
+                          className="bg-white rounded-2xl p-4 sm:p-5 border border-slate-200/80 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-3.5 text-left hover:border-orange-200 transition-all"
                         >
-                          <div className="flex items-center gap-4 text-left">
-                            <div className="p-3 bg-orange-50 rounded-2xl border border-orange-100/50 text-[#FF8A00] shrink-0">
-                              <BookMarked className="w-5 h-5 shrink-0" />
-                            </div>
-                            <div>
-                              <span className="text-[11px] font-bold text-gray-400 font-mono uppercase block leading-none">
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-2 flex-wrap mb-1.5">
+                              <span className="inline-block text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-orange-50 text-[#FF7A00]">
                                 {a.subject}
                               </span>
-                              <h3 className="font-bold text-sm text-gray-950 mt-1 leading-snug">
-                                {a.title}
-                              </h3>
-                              <div className="flex items-center gap-2 mt-1.5 flex-wrap">
-                                <span className="text-[11px] text-gray-500 font-medium">
-                                  ASSIGNED TO: <strong className={tutorObj ? "text-orange-600 font-bold" : "text-gray-400 italic"}>{tutorObj?.name || 'Automatching...'}</strong>
-                                </span>
-                                {tutorObj && (
-                                  <span className="text-[10px] bg-emerald-50 text-emerald-700 font-mono px-1.5 py-0.2 rounded border border-emerald-200">
-                                    ★ {tutorObj.rating || 4.9}
-                                  </span>
-                                )}
-                              </div>
+                              <span className="text-[10px] font-semibold text-blue-600 bg-blue-50 px-2.5 py-0.5 rounded-full uppercase">
+                                {a.status || 'Matching'}
+                              </span>
+                            </div>
+                            <h4 className="text-sm font-bold text-slate-900 leading-snug">{a.title}</h4>
+                            <div className="flex items-center gap-3 mt-1 text-xs text-slate-500 flex-wrap">
+                              <span className="tabular-nums">Due: {a.deadline}</span>
+                              <span>•</span>
+                              <span>
+                                Tutor:{' '}
+                                <strong className={tutorObj ? 'text-[#FF7A00] font-semibold' : 'text-slate-400 font-medium'}>
+                                  {tutorObj?.name || 'Automatching...'}
+                                </strong>
+                              </span>
                             </div>
                           </div>
 
-                          <div className="flex items-center gap-3 w-full sm:w-auto justify-between sm:justify-end flex-wrap">
-                            <div className="text-right">
-                              <span className="inline-flex bg-orange-100/60 text-[#E05216] text-[10.5px] font-bold px-2.5 py-1 rounded-full uppercase leading-none font-mono">
-                                {a.status}
-                              </span>
-                              <span className="text-[11px] text-gray-400 font-medium block mt-1.5 font-mono">
-                                Due: {a.deadline}
-                              </span>
-                            </div>
-
-                            {/* Direct Tutor Chat & CSR Actions */}
-                            <div className="flex items-center gap-1.5">
-                              {tutorObj ? (
-                                <button
-                                  type="button"
-                                  onClick={() => onOpenChat(tutorObj.id, `Hi ${tutorObj.name}, I would like to check in on my assignment: "${a.title}".`)}
-                                  className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-orange-500 hover:bg-orange-600 text-white rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer"
-                                  title={`Chat with ${tutorObj.name}`}
-                                >
-                                  <MessageCircle className="w-3.5 h-3.5" />
-                                  <span>Tutor Chat</span>
-                                </button>
-                              ) : (
-                                <button
-                                  type="button"
-                                  onClick={() => onOpenChat('admin_shaka', `Hi CSR desk, could you please give me an update on matching for assignment: "${a.title}"?`)}
-                                  className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-orange-500 hover:bg-orange-600 text-white rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer"
-                                >
-                                  <Headset className="w-3.5 h-3.5" />
-                                  <span>CSR Match Desk</span>
-                                </button>
-                              )}
-                              
+                          <div className="flex items-center gap-2 shrink-0 flex-wrap">
+                            {tutorObj ? (
                               <button
                                 type="button"
-                                onClick={() => onOpenChat('admin_shaka')}
-                                className="inline-flex items-center gap-1 px-2.5 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl text-xs font-semibold cursor-pointer transition-colors"
-                                title="Platform Support CSR"
+                                onClick={() =>
+                                  onOpenChat(
+                                    tutorObj.id,
+                                    `Hi ${tutorObj.name}, I would like to check in on my assignment: "${a.title}".`
+                                  )
+                                }
+                                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[#FF7A00] hover:bg-[#E86E00] text-white rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer"
                               >
-                                <span>CSR</span>
+                                <MessageCircle className="w-3.5 h-3.5" />
+                                <span>Tutor Chat</span>
                               </button>
-                            </div>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  onOpenChat(
+                                    'admin_shaka',
+                                    `Hi CSR desk, could you please give me an update on matching for assignment: "${a.title}"?`
+                                  )
+                                }
+                                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[#FF7A00] hover:bg-[#E86E00] text-white rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer"
+                              >
+                                <Headset className="w-3.5 h-3.5" />
+                                <span>CSR Match</span>
+                              </button>
+                            )}
+
+                            <button
+                              type="button"
+                              onClick={() => onOpenChat('admin_shaka')}
+                              className="inline-flex items-center gap-1 px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-semibold cursor-pointer transition-colors"
+                              title="Platform Support CSR"
+                            >
+                              <span>CSR</span>
+                            </button>
                           </div>
                         </div>
                       );
                     })
                   ) : (
-                    <div className="bg-white border border-dashed border-gray-200 rounded-[20px] p-8 text-center space-y-3">
-                      <div className="w-12 h-12 rounded-2xl bg-orange-50 text-orange-500 mx-auto flex items-center justify-center">
-                        <BookOpen className="w-6 h-6" />
+                    <div className="bg-white rounded-2xl border border-slate-200/70 p-6 md:p-8 text-center shadow-sm">
+                      <div className="w-12 h-12 rounded-2xl bg-orange-50 text-[#FF7A00] flex items-center justify-center mx-auto mb-3">
+                        <FilePlus2 className="w-6 h-6" />
                       </div>
-                      <div className="space-y-1">
-                        <h3 className="font-bold text-sm text-gray-900">No active assignment requests yet</h3>
-                        <p className="text-xs text-gray-500 max-w-md mx-auto">
-                          Submit your course syllabus or assignment brief to get automatically matched with a top certified tutor.
-                        </p>
-                      </div>
+                      <h3 className="text-sm font-bold text-slate-800 mb-1">
+                        {normalizedDashQuery ? 'No matching requests' : 'No requests yet'}
+                      </h3>
+                      <p className="text-xs text-slate-500 mb-4 max-w-[260px] mx-auto">
+                        {normalizedDashQuery
+                          ? `No assignment briefs matched "${debouncedSearchQuery}".`
+                          : 'Create your first assignment or midterm request to connect with a specialist tutor.'}
+                      </p>
                       <button
                         type="button"
-                        onClick={() => setActiveTab('new_request')}
-                        className="inline-flex items-center gap-1.5 bg-orange-500 hover:bg-orange-600 text-white px-4 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer shadow-xs"
+                        onClick={() => setIsQuickRequestModalOpen(true)}
+                        className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#FF7A00] hover:bg-[#E86E00] text-white text-xs font-semibold shadow-sm active:scale-95 transition cursor-pointer"
                       >
-                        <PlusSquare className="w-4 h-4" />
-                        <span>Start Assignment Matching</span>
+                        <Plus className="w-4 h-4" />
+                        <span>Create New Request</span>
                       </button>
                     </div>
                   )}
                 </div>
-              </div>
-
+              </section>
             </div>
           )}
 
@@ -1440,166 +1949,275 @@ export default function StudentDashboard({
                 if (onSubscribeToChatDetails) onSubscribeToChatDetails(chatId);
               }}
               onGoToChat={() => setActiveTab('chat')}
+              onNavigate={onNavigate}
+              onLogout={onLogout}
             />
           )}
 
           {/* ================================== */}
-          {/* TAB 3: ASSIGNMENTS MONITOR TABLE */}
+          {/* TAB 3: ASSIGNMENTS MONITOR         */}
           {/* ================================== */}
           {activeTab === 'assignments' && (
-            <div className="bg-white rounded-3xl border border-gray-150 overflow-hidden shadow-xs animate-fade-in text-left">
-              <div className="p-6 border-b border-gray-150 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+            <div className="bg-white rounded-2xl md:rounded-3xl border border-slate-200/80 overflow-hidden shadow-xs animate-fade-in text-left">
+              <div className="p-4 sm:p-6 border-b border-slate-100 flex flex-col md:flex-row justify-between items-start md:items-center gap-3.5">
                 <div>
-                  <h3 className="font-bold text-base text-gray-950 font-sans tracking-tight">University Assignments Monitor</h3>
-                  <p className="text-xs text-gray-400 font-medium">Verify completion percentages, download tutor references, and release funds securely.</p>
+                  <h3 className="font-bold text-base text-slate-900 font-sans tracking-tight">University Assignments Monitor</h3>
+                  <p className="text-xs text-slate-500 font-medium mt-0.5">Verify completion percentages, download tutor references, and release funds securely.</p>
                 </div>
 
-                <div className="relative w-full md:w-64">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-3.5 h-3.5" />
-                  <input 
-                    type="text" 
-                    placeholder="Search titles..." 
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="w-full pl-9 pr-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs focus:ring-1 focus:ring-orange-500/30 font-sans"
-                  />
+                <div className="flex items-center gap-2 w-full md:w-auto">
+                  <div className="relative flex-1 md:w-64">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-3.5 h-3.5" />
+                    <input
+                      type="text"
+                      placeholder="Search titles..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:border-[#FF7A00] font-sans"
+                    />
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setIsQuickRequestModalOpen(true)}
+                    className="shrink-0 inline-flex items-center gap-1 px-3 py-2 bg-[#FF7A00] hover:bg-[#E86E00] text-white rounded-xl text-xs font-bold shadow-xs cursor-pointer"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span className="hidden sm:inline">New</span>
+                  </button>
                 </div>
               </div>
 
               {searchedAssignments.length > 0 ? (
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left text-xs border-collapse">
-                    <thead>
-                      <tr className="bg-gray-50 border-b border-gray-150 text-gray-400 uppercase font-mono tracking-wider text-[10px]">
-                        <th className="p-4 font-bold">Submission Details</th>
-                        <th className="p-4 font-bold">Scientific Mentor</th>
-                        <th className="p-4 font-bold">Due Deadline</th>
-                        <th className="p-4 font-bold">Progress Tracker</th>
-                        <th className="p-4 font-bold text-right">Integrity Status Checks</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-100 font-sans">
-                      {paginatedAssignments.map((a) => {
-                        const tutor = getTutor(a.tutorId);
-                        return (
-                          <tr key={a.id} id={`assignment-row-${a.id}`} className="hover:bg-gray-50/50">
-                            
-                            <td className="p-4 max-w-xs space-y-1">
-                              <span className="font-bold text-gray-900 block truncate">{a.title}</span>
-                              <div className="flex gap-1.5 flex-wrap text-[10px]">
-                                <span className="bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded">{a.referenceStyle}</span>
-                                <span className="bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded">{a.wordCount} words</span>
-                              </div>
-                            </td>
+                <>
+                  {/* MOBILE CARD LIST (< md) */}
+                  <div className="md:hidden divide-y divide-slate-100">
+                    {paginatedAssignments.map((a) => {
+                      const tutor = getTutor(a.tutorId);
+                      return (
+                        <div key={a.id} id={`assignment-card-${a.id}`} className="p-4 space-y-3">
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="min-w-0">
+                              <span className="inline-block text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-orange-50 text-[#FF7A00] mb-1">
+                                {a.subject}
+                              </span>
+                              <h4 className="font-bold text-sm text-slate-900 leading-snug">{a.title}</h4>
+                            </div>
+                            <span className="shrink-0 text-[10px] font-bold px-2.5 py-1 rounded-full uppercase bg-orange-100/70 text-[#FF7A00] font-mono">
+                              {a.status}
+                            </span>
+                          </div>
 
-                            <td className="p-4">
+                          <div className="flex items-center justify-between text-xs text-slate-500">
+                            <span className="tabular-nums">Due: {a.deadline}</span>
+                            <span className="tabular-nums font-semibold text-slate-700">{a.progressPercent}% Complete</span>
+                          </div>
+
+                          <div className="w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
+                            <div
+                              className="bg-[#FF7A00] h-1.5 rounded-full transition-all duration-300"
+                              style={{ width: `${a.progressPercent}%` }}
+                            />
+                          </div>
+
+                          <div className="flex items-center justify-between gap-2 pt-1 flex-wrap">
+                            {tutor ? (
+                              <div className="flex items-center gap-2">
+                                <ResponsiveAvatar src={tutor.avatarUrl} alt="" sizePx={28} width={24} height={24} className="w-6 h-6 rounded-full border object-cover" />
+                                <span className="text-xs font-semibold text-slate-800">{tutor.name}</span>
+                              </div>
+                            ) : (
+                              <span className="text-xs text-slate-400 italic">Matching specialist...</span>
+                            )}
+
+                            <div className="flex items-center gap-1.5 flex-wrap">
                               {tutor ? (
-                                <div className="space-y-1.5">
-                                  <div className="flex items-center gap-2">
-                                    <ResponsiveAvatar src={tutor.avatarUrl} alt="" sizePx={32} width={24} height={24} className="w-6 h-6 rounded-full border object-cover" />
-                                    <span className="font-bold text-gray-800">{tutor.name}</span>
-                                  </div>
-                                  <div className="flex items-center gap-1.5">
-                                    <button 
-                                      type="button"
-                                      onClick={() => onOpenChat(tutor.id, `Hi ${tutor.name}, let's coordinate on assignment "${a.title}".`)}
-                                      className="inline-flex items-center gap-1 px-2.5 py-1 bg-orange-500 hover:bg-orange-600 text-white rounded-lg text-[10.5px] font-bold transition-all shadow-3xs cursor-pointer"
-                                      title={`Open direct Tutor Chat with ${tutor.name}`}
-                                    >
-                                      <MessageCircle className="w-3 h-3" />
-                                      <span>Tutor Chat</span>
-                                    </button>
-                                    <button 
-                                      type="button"
-                                      onClick={() => onOpenChat('admin_shaka')}
-                                      className="inline-flex items-center gap-1 px-2 py-1 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-[10.5px] font-semibold transition-all cursor-pointer"
-                                      title="Consult with CSR support desk"
-                                    >
-                                      <Headset className="w-3 h-3 text-gray-500" />
-                                      <span>CSR</span>
-                                    </button>
-                                  </div>
-                                </div>
-                              ) : (
-                                <div className="space-y-1">
-                                  <span className="text-gray-400 italic block text-[11px]">Matching candidate...</span>
-                                  <button 
-                                    type="button"
-                                    onClick={() => onOpenChat('admin_shaka', `Hi CSR desk, please update me on matching for: "${a.title}".`)}
-                                    className="inline-flex items-center gap-1 px-2.5 py-1 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-[10.5px] font-semibold transition-all cursor-pointer"
-                                  >
-                                    <Headset className="w-3 h-3 text-gray-500" />
-                                    <span>Consult CSR</span>
-                                  </button>
-                                </div>
+                                <button
+                                  type="button"
+                                  onClick={() => onOpenChat(tutor.id, `Hi ${tutor.name}, let's coordinate on assignment "${a.title}".`)}
+                                  className="inline-flex items-center gap-1 px-2.5 py-1.5 bg-[#FF7A00] hover:bg-[#E86E00] text-white rounded-xl text-[11px] font-bold cursor-pointer"
+                                >
+                                  <MessageCircle className="w-3 h-3" />
+                                  <span>Tutor Chat</span>
+                                </button>
+                              ) : null}
+                              <button
+                                type="button"
+                                onClick={() => onOpenChat('admin_shaka', `Hi CSR desk, update on "${a.title}" please.`)}
+                                className="inline-flex items-center gap-1 px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-[11px] font-semibold cursor-pointer"
+                              >
+                                <Headset className="w-3 h-3 text-slate-500" />
+                                <span>CSR</span>
+                              </button>
+                              {a.tutorWorkFileUrl && (
+                                <a
+                                  href={a.tutorWorkFileUrl}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="bg-emerald-600 text-white font-bold px-2.5 py-1.5 rounded-xl text-[11px] flex items-center gap-1"
+                                >
+                                  <Download className="w-3 h-3" />
+                                  <span>Solution</span>
+                                </a>
                               )}
-                            </td>
-
-                            <td className="p-4 font-mono font-medium text-gray-650">
-                              {a.deadline}
-                            </td>
-
-                            <td className="p-4 max-w-[130px] space-y-1.5">
-                              <div className="flex justify-between text-[10px] text-gray-500 font-mono">
-                                <span>Completed Status:</span>
-                                <span>{a.progressPercent}%</span>
-                              </div>
-                              <div className="w-full bg-gray-150 rounded-full h-1.5 overflow-hidden">
-                                <div 
-                                  className="bg-orange-500 h-1.5 rounded-full transition-all duration-300" 
-                                  style={{ width: `${a.progressPercent}%` }}
-                                />
-                              </div>
-                            </td>
-
-                            <td className="p-4 text-right space-y-1.5">
-                              <div>
-                                <span className="inline-block text-[10px] font-bold px-2.5 py-1 rounded-full uppercase bg-orange-100/50 text-orange-700 font-mono">
-                                  {a.status}
-                                </span>
-                              </div>
-
-                              <div className="flex gap-1.5 justify-end">
-                                {/* Download work trigger if tutor has uploaded */}
-                                {a.tutorWorkFileUrl && (
-                                  <a
-                                    href={a.tutorWorkFileUrl}
-                                    target="_blank"
-                                    rel="noreferrer"
-                                    className="bg-emerald-500 hover:bg-emerald-650 text-white font-bold px-2.5 py-1.5 rounded-xl text-[10px] flex items-center gap-1 cursor-pointer shadow-sm shadow-emerald-500/10"
+                              {a.status === AssignmentStatus.COMPLETED && !a.reviewed && (
+                                <>
+                                  <button
+                                    type="button"
+                                    onClick={() => setShowReviewModal(a.id)}
+                                    className="bg-[#FF7A00] text-white font-bold px-2.5 py-1.5 rounded-xl text-[11px] flex items-center gap-1 cursor-pointer"
                                   >
-                                    <Download className="w-3.5 h-3.5" />
-                                    <span>Download Solution</span>
-                                  </a>
-                                )}
+                                    <ThumbsUp className="w-3 h-3" />
+                                    <span>Approve</span>
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => setShowRevisionModal(a.id)}
+                                    className="bg-white border border-slate-200 text-slate-700 font-bold px-2.5 py-1.5 rounded-xl text-[11px] flex items-center gap-1 cursor-pointer"
+                                  >
+                                    <RotateCcw className="w-3 h-3" />
+                                    <span>Revision</span>
+                                  </button>
+                                </>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
 
-                                {/* Revision or Approval modals */}
-                                {a.status === AssignmentStatus.COMPLETED && !a.reviewed && (
-                                  <>
-                                    <button
-                                      onClick={() => setShowReviewModal(a.id)}
-                                      className="bg-orange-500 hover:bg-orange-600 text-white font-bold px-2.5 py-1.5 rounded-xl text-[10px] flex items-center gap-1 cursor-pointer transition-all"
-                                    >
-                                      <ThumbsUp className="w-3.5 h-3.5" />
-                                      <span>Approve Delivery</span>
-                                    </button>
-                                    <button
-                                      onClick={() => setShowRevisionModal(a.id)}
-                                      className="bg-white hover:bg-gray-100 border text-gray-700 font-bold px-2 py-1.5 rounded-xl text-[10px] flex items-center gap-1 cursor-pointer"
-                                    >
-                                      <RotateCcw className="w-3.5 h-3.5" />
-                                      <span>Revision</span>
-                                    </button>
-                                  </>
-                                )}
-                              </div>
-                            </td>
+                  {/* DESKTOP TABLE (md+) */}
+                  <div className="hidden md:block overflow-x-auto">
+                    <table className="w-full text-left text-xs border-collapse">
+                      <thead>
+                        <tr className="bg-slate-50 border-b border-slate-100 text-slate-400 uppercase font-mono tracking-wider text-[10px]">
+                          <th className="p-4 font-bold">Submission Details</th>
+                          <th className="p-4 font-bold">Scientific Mentor</th>
+                          <th className="p-4 font-bold">Due Deadline</th>
+                          <th className="p-4 font-bold">Progress Tracker</th>
+                          <th className="p-4 font-bold text-right">Integrity Status Checks</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100 font-sans">
+                        {paginatedAssignments.map((a) => {
+                          const tutor = getTutor(a.tutorId);
+                          return (
+                            <tr key={a.id} id={`assignment-row-${a.id}`} className="hover:bg-slate-50/50">
+                              <td className="p-4 max-w-xs space-y-1">
+                                <span className="font-bold text-slate-900 block truncate">{a.title}</span>
+                                <div className="flex gap-1.5 flex-wrap text-[10px]">
+                                  <span className="bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded">{a.referenceStyle}</span>
+                                  <span className="bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded tabular-nums">{a.wordCount} words</span>
+                                </div>
+                              </td>
 
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
+                              <td className="p-4">
+                                {tutor ? (
+                                  <div className="space-y-1.5">
+                                    <div className="flex items-center gap-2">
+                                      <ResponsiveAvatar src={tutor.avatarUrl} alt="" sizePx={32} width={24} height={24} className="w-6 h-6 rounded-full border object-cover" />
+                                      <span className="font-bold text-slate-800">{tutor.name}</span>
+                                    </div>
+                                    <div className="flex items-center gap-1.5">
+                                      <button
+                                        type="button"
+                                        onClick={() => onOpenChat(tutor.id, `Hi ${tutor.name}, let's coordinate on assignment "${a.title}".`)}
+                                        className="inline-flex items-center gap-1 px-2.5 py-1 bg-[#FF7A00] hover:bg-[#E86E00] text-white rounded-lg text-[10.5px] font-bold transition-all shadow-3xs cursor-pointer"
+                                        title={`Open direct Tutor Chat with ${tutor.name}`}
+                                      >
+                                        <MessageCircle className="w-3 h-3" />
+                                        <span>Tutor Chat</span>
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={() => onOpenChat('admin_shaka')}
+                                        className="inline-flex items-center gap-1 px-2 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-[10.5px] font-semibold transition-all cursor-pointer"
+                                        title="Consult with CSR support desk"
+                                      >
+                                        <Headset className="w-3 h-3 text-slate-500" />
+                                        <span>CSR</span>
+                                      </button>
+                                    </div>
+                                  </div>
+                                ) : (
+                                  <div className="space-y-1">
+                                    <span className="text-slate-400 italic block text-[11px]">Matching candidate...</span>
+                                    <button
+                                      type="button"
+                                      onClick={() => onOpenChat('admin_shaka', `Hi CSR desk, please update me on matching for: "${a.title}".`)}
+                                      className="inline-flex items-center gap-1 px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-[10.5px] font-semibold transition-all cursor-pointer"
+                                    >
+                                      <Headset className="w-3 h-3 text-slate-500" />
+                                      <span>Consult CSR</span>
+                                    </button>
+                                  </div>
+                                )}
+                              </td>
+
+                              <td className="p-4 font-mono font-medium text-slate-600 tabular-nums">
+                                {a.deadline}
+                              </td>
+
+                              <td className="p-4 max-w-[130px] space-y-1.5">
+                                <div className="flex justify-between text-[10px] text-slate-500 font-mono tabular-nums">
+                                  <span>Completed:</span>
+                                  <span>{a.progressPercent}%</span>
+                                </div>
+                                <div className="w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
+                                  <div
+                                    className="bg-[#FF7A00] h-1.5 rounded-full transition-all duration-300"
+                                    style={{ width: `${a.progressPercent}%` }}
+                                  />
+                                </div>
+                              </td>
+
+                              <td className="p-4 text-right space-y-1.5">
+                                <div>
+                                  <span className="inline-block text-[10px] font-bold px-2.5 py-1 rounded-full uppercase bg-orange-100/60 text-[#FF7A00] font-mono">
+                                    {a.status}
+                                  </span>
+                                </div>
+
+                                <div className="flex gap-1.5 justify-end">
+                                  {a.tutorWorkFileUrl && (
+                                    <a
+                                      href={a.tutorWorkFileUrl}
+                                      target="_blank"
+                                      rel="noreferrer"
+                                      className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-2.5 py-1.5 rounded-xl text-[10px] flex items-center gap-1 cursor-pointer shadow-sm shadow-emerald-500/10"
+                                    >
+                                      <Download className="w-3.5 h-3.5" />
+                                      <span>Download Solution</span>
+                                    </a>
+                                  )}
+
+                                  {a.status === AssignmentStatus.COMPLETED && !a.reviewed && (
+                                    <>
+                                      <button
+                                        onClick={() => setShowReviewModal(a.id)}
+                                        className="bg-[#FF7A00] hover:bg-[#E86E00] text-white font-bold px-2.5 py-1.5 rounded-xl text-[10px] flex items-center gap-1 cursor-pointer transition-all"
+                                      >
+                                        <ThumbsUp className="w-3.5 h-3.5" />
+                                        <span>Approve Delivery</span>
+                                      </button>
+                                      <button
+                                        onClick={() => setShowRevisionModal(a.id)}
+                                        className="bg-white hover:bg-slate-100 border text-slate-700 font-bold px-2 py-1.5 rounded-xl text-[10px] flex items-center gap-1 cursor-pointer"
+                                      >
+                                        <RotateCcw className="w-3.5 h-3.5" />
+                                        <span>Revision</span>
+                                      </button>
+                                    </>
+                                  )}
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+
                   <div className="px-4 pb-4">
                     <PaginationBar
                       page={safeAssignmentsPage}
@@ -1610,16 +2228,18 @@ export default function StudentDashboard({
                       itemLabel="assignments"
                     />
                   </div>
-                </div>
+                </>
               ) : (
-                <div className="p-12 text-center bg-gray-50 rounded-3xl border border-dashed border-gray-200">
-                  <FileText className="w-10 h-10 text-gray-300 mx-auto mb-3" />
-                  <p className="text-xs text-gray-650 font-medium">No student assignment briefs registered.</p>
-                  <button 
-                    onClick={() => setActiveTab('new_request')}
-                    className="mt-3 inline-flex bg-orange-500 hover:bg-orange-650 text-white font-bold text-xs px-4 py-2 rounded-xl transition-all"
+                <div className="p-10 text-center bg-slate-50/70 border-t border-slate-100">
+                  <FilePlus2 className="w-10 h-10 text-slate-300 mx-auto mb-3" />
+                  <p className="text-xs text-slate-600 font-medium">No student assignment briefs registered.</p>
+                  <button
+                    type="button"
+                    onClick={() => setIsQuickRequestModalOpen(true)}
+                    className="mt-3 inline-flex items-center gap-1.5 bg-[#FF7A00] hover:bg-[#E86E00] text-white font-bold text-xs px-4 py-2 rounded-xl transition-all cursor-pointer"
                   >
-                    🚀 Submit Your First Brief
+                    <Plus className="w-4 h-4" />
+                    <span>Submit Your First Brief</span>
                   </button>
                 </div>
               )}
@@ -1794,172 +2414,267 @@ export default function StudentDashboard({
                 </div>
 
                 {assignmentPaymentRows.length > 0 ? (
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-left text-xs border-collapse">
-                      <thead>
-                        <tr className="bg-slate-50 border-b border-gray-150 text-slate-500 uppercase font-mono tracking-wider text-[10px]">
-                          <th className="p-4 font-bold">Assignment ID &amp; Title</th>
-                          <th className="p-4 font-bold">Total Amount</th>
-                          <th className="p-4 font-bold">Advance Paid</th>
-                          <th className="p-4 font-bold">Balance Amount</th>
-                          <th className="p-4 font-bold text-center">Payment Status</th>
-                          <th className="p-4 font-bold text-right">Actions</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-gray-100">
-                        {assignmentPaymentRows.map((row) => (
-                          <tr key={row.id} className="hover:bg-slate-50/60 transition-colors">
-                            
-                            {/* Column 1: Assignment ID & Title */}
-                            <td className="p-4">
-                              <div className="space-y-1">
-                                <span className="font-bold text-gray-950 text-xs block leading-snug">
-                                  {row.title}
-                                </span>
-                                <div className="flex flex-wrap items-center gap-1.5 text-[10px]">
-                                  <button
-                                    onClick={() => handleCopyRef(row.id)}
-                                    className="font-mono text-slate-500 hover:text-orange-600 bg-slate-100 hover:bg-orange-50 px-1.5 py-0.5 rounded transition-all flex items-center gap-1 cursor-pointer"
-                                    title="Click to copy assignment reference ID"
-                                  >
-                                    <Copy className="w-2.5 h-2.5" />
-                                    <span>#{row.id}</span>
-                                    {copiedRefId === row.id && (
-                                      <span className="text-[9px] text-emerald-600 font-bold ml-0.5">Copied!</span>
-                                    )}
-                                  </button>
-                                  <span className="text-orange-600 font-bold bg-orange-50 px-2 py-0.5 rounded-full">
-                                    {row.subject}
-                                  </span>
-                                  {row.tutorName && (
-                                    <span className="text-slate-600 bg-slate-100 px-2 py-0.5 rounded-full">
-                                      🎓 {row.tutorName}
-                                    </span>
-                                  )}
-                                </div>
-                              </div>
-                            </td>
-
-                            {/* Column 2: Total Amount */}
-                            <td className="p-4 font-mono font-bold text-slate-900">
-                              {row.totalAmount > 0 ? (
-                                <span className="text-sm font-extrabold text-slate-900">${row.totalAmount.toFixed(2)}</span>
-                              ) : (
-                                <span className="text-slate-400 italic text-[11px] font-sans font-medium">Pending Quote</span>
-                              )}
-                            </td>
-
-                            {/* Column 3: Advance Paid */}
-                            <td className="p-4 font-mono">
-                              {row.advancePaid > 0 ? (
-                                <div className="space-y-0.5">
-                                  <span className="text-xs font-bold text-emerald-700 block">${row.advancePaid.toFixed(2)}</span>
-                                  <span className="inline-block text-[9px] bg-emerald-50 text-emerald-700 px-1.5 py-0.2 rounded font-sans font-semibold">
-                                    Escrowed
-                                  </span>
-                                </div>
-                              ) : (
-                                <span className="text-slate-400 text-xs">$0.00</span>
-                              )}
-                            </td>
-
-                            {/* Column 4: Balance Amount */}
-                            <td className="p-4 font-mono">
-                              {row.balanceAmount > 0 ? (
-                                <div className="space-y-0.5">
-                                  <span className="text-xs font-bold text-orange-700 block">${row.balanceAmount.toFixed(2)}</span>
-                                  <span className="inline-block text-[9px] bg-orange-50 text-orange-700 px-1.5 py-0.2 rounded font-sans font-semibold">
-                                    Due on approval
-                                  </span>
-                                </div>
-                              ) : row.totalAmount > 0 ? (
-                                <span className="text-emerald-600 font-bold text-xs">$0.00 (Settled)</span>
-                              ) : (
-                                <span className="text-slate-400 text-xs">—</span>
-                              )}
-                            </td>
-
-                            {/* Column 5: Payment Status */}
-                            <td className="p-4 text-center">
-                              <span className={`inline-block font-bold text-[10px] px-2.5 py-1 rounded-full border uppercase tracking-wider font-mono ${row.statusBadgeClass}`}>
-                                {row.statusText}
-                              </span>
-                            </td>
-
-                            {/* Column 6: Actions */}
-                            <td className="p-4 text-right">
-                              <div className="flex items-center justify-end gap-1.5 flex-wrap">
-                                
-                                {/* Pay Advance Action if pending */}
-                                {row.totalAmount > 0 && row.advancePaid === 0 && (
-                                  <button
-                                    onClick={() => setPaymentModal({
-                                      isOpen: true,
-                                      assignmentId: row.id,
-                                      title: row.title,
-                                      amount: Number((row.totalAmount * 0.5).toFixed(2)),
-                                      type: 'advance'
-                                    })}
-                                    className="bg-orange-500 hover:bg-orange-600 text-white font-bold text-[10.5px] px-3 py-1.5 rounded-xl shadow-xs transition-all cursor-pointer flex items-center gap-1"
-                                  >
-                                    <CreditCard className="w-3 h-3" />
-                                    <span>Pay Advance (${(row.totalAmount * 0.5).toFixed(2)})</span>
-                                  </button>
-                                )}
-
-                                {/* Pay Balance Action if advance is paid but balance remains */}
-                                {row.advancePaid > 0 && row.balanceAmount > 0 && (
-                                  <button
-                                    onClick={() => setPaymentModal({
-                                      isOpen: true,
-                                      assignmentId: row.id,
-                                      title: row.title,
-                                      amount: row.balanceAmount,
-                                      type: 'balance'
-                                    })}
-                                    className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-[10.5px] px-3 py-1.5 rounded-xl shadow-xs transition-all cursor-pointer flex items-center gap-1"
-                                  >
-                                    <Lock className="w-3 h-3" />
-                                    <span>Settle Balance (${row.balanceAmount.toFixed(2)})</span>
-                                  </button>
-                                )}
-
-                                {/* Chat with Tutor or Support */}
+                  <>
+                    {/* MOBILE PAYMENT CARDS (< md) */}
+                    <div className="md:hidden divide-y divide-slate-100">
+                      {assignmentPaymentRows.map((row) => (
+                        <div key={row.id} className="p-4 space-y-3">
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="min-w-0">
+                              <h4 className="font-bold text-sm text-slate-900 leading-snug">{row.title}</h4>
+                              <div className="flex flex-wrap items-center gap-1.5 mt-1 text-[10px]">
                                 <button
-                                  onClick={() => {
-                                    const matchedChat = studentChats.find(c => c.subject.includes(row.subject) || c.subject.includes(row.title));
-                                    if (matchedChat) {
-                                      setLocalSelectedChatId(matchedChat.id);
-                                      setActiveTab('chat');
-                                    } else {
-                                      onOpenChat('admin_shaka', `Regarding billing for Assignment #${row.id} ("${row.title}").`);
-                                    }
-                                  }}
-                                  className="p-1.5 text-slate-500 hover:text-slate-900 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
-                                  title="Discuss payment details in chat"
+                                  type="button"
+                                  onClick={() => handleCopyRef(row.id)}
+                                  className="compact-pill-btn font-mono text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded flex items-center gap-1 cursor-pointer"
                                 >
-                                  <MessageSquare className="w-3.5 h-3.5" />
+                                  <Copy className="w-2.5 h-2.5" />
+                                  <span>#{row.id}</span>
+                                  {copiedRefId === row.id && (
+                                    <span className="text-[9px] text-emerald-600 font-bold ml-0.5">Copied!</span>
+                                  )}
                                 </button>
+                                <span className="text-[#FF7A00] font-bold bg-orange-50 px-2 py-0.5 rounded-full">
+                                  {row.subject}
+                                </span>
                               </div>
-                            </td>
+                            </div>
+                            <span className={`shrink-0 font-bold text-[9.5px] px-2 py-0.5 rounded-full border uppercase font-mono ${row.statusBadgeClass}`}>
+                              {row.statusText}
+                            </span>
+                          </div>
 
+                          <div className="grid grid-cols-3 gap-2 bg-slate-50 rounded-xl p-2.5 text-xs">
+                            <div>
+                              <span className="text-[10px] text-slate-400 uppercase font-bold block">Total</span>
+                              <span className="font-mono font-bold text-slate-900 tabular-nums">
+                                {row.totalAmount > 0 ? `$${row.totalAmount.toFixed(2)}` : 'Pending'}
+                              </span>
+                            </div>
+                            <div>
+                              <span className="text-[10px] text-slate-400 uppercase font-bold block">Advance</span>
+                              <span className="font-mono font-bold text-emerald-700 tabular-nums">${row.advancePaid.toFixed(2)}</span>
+                            </div>
+                            <div>
+                              <span className="text-[10px] text-slate-400 uppercase font-bold block">Balance</span>
+                              <span className="font-mono font-bold text-[#FF7A00] tabular-nums">
+                                {row.totalAmount > 0 ? `$${row.balanceAmount.toFixed(2)}` : '—'}
+                              </span>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center justify-end gap-2 flex-wrap">
+                            {row.totalAmount > 0 && row.advancePaid === 0 && (
+                              <button
+                                type="button"
+                                onClick={() => setPaymentModal({
+                                  isOpen: true,
+                                  assignmentId: row.id,
+                                  title: row.title,
+                                  amount: Number((row.totalAmount * 0.5).toFixed(2)),
+                                  type: 'advance'
+                                })}
+                                className="bg-[#FF7A00] hover:bg-[#E86E00] text-white font-bold text-xs px-3 py-1.5 rounded-xl shadow-xs cursor-pointer flex items-center gap-1"
+                              >
+                                <CreditCard className="w-3.5 h-3.5" />
+                                <span>Pay Advance (${(row.totalAmount * 0.5).toFixed(2)})</span>
+                              </button>
+                            )}
+                            {row.advancePaid > 0 && row.balanceAmount > 0 && (
+                              <button
+                                type="button"
+                                onClick={() => setPaymentModal({
+                                  isOpen: true,
+                                  assignmentId: row.id,
+                                  title: row.title,
+                                  amount: row.balanceAmount,
+                                  type: 'balance'
+                                })}
+                                className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs px-3 py-1.5 rounded-xl shadow-xs cursor-pointer flex items-center gap-1"
+                              >
+                                <Lock className="w-3.5 h-3.5" />
+                                <span>Settle (${row.balanceAmount.toFixed(2)})</span>
+                              </button>
+                            )}
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const matchedChat = studentChats.find(c => c.subject.includes(row.subject) || c.subject.includes(row.title));
+                                if (matchedChat) {
+                                  setLocalSelectedChatId(matchedChat.id);
+                                  setActiveTab('chat');
+                                } else {
+                                  onOpenChat('admin_shaka', `Regarding billing for Assignment #${row.id} ("${row.title}").`);
+                                }
+                              }}
+                              className="px-2.5 py-1.5 text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-xl text-xs font-semibold flex items-center gap-1 cursor-pointer"
+                            >
+                              <MessageSquare className="w-3.5 h-3.5" />
+                              <span>Discuss</span>
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* DESKTOP PAYMENT TABLE (md+) */}
+                    <div className="hidden md:block overflow-x-auto">
+                      <table className="w-full text-left text-xs border-collapse">
+                        <thead>
+                          <tr className="bg-slate-50 border-b border-gray-150 text-slate-500 uppercase font-mono tracking-wider text-[10px]">
+                            <th className="p-4 font-bold">Assignment ID &amp; Title</th>
+                            <th className="p-4 font-bold">Total Amount</th>
+                            <th className="p-4 font-bold">Advance Paid</th>
+                            <th className="p-4 font-bold">Balance Amount</th>
+                            <th className="p-4 font-bold text-center">Payment Status</th>
+                            <th className="p-4 font-bold text-right">Actions</th>
                           </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
+                        </thead>
+                        <tbody className="divide-y divide-gray-100">
+                          {assignmentPaymentRows.map((row) => (
+                            <tr key={row.id} className="hover:bg-slate-50/60 transition-colors">
+                              <td className="p-4">
+                                <div className="space-y-1">
+                                  <span className="font-bold text-gray-950 text-xs block leading-snug">
+                                    {row.title}
+                                  </span>
+                                  <div className="flex flex-wrap items-center gap-1.5 text-[10px]">
+                                    <button
+                                      onClick={() => handleCopyRef(row.id)}
+                                      className="font-mono text-slate-500 hover:text-orange-600 bg-slate-100 hover:bg-orange-50 px-1.5 py-0.5 rounded transition-all flex items-center gap-1 cursor-pointer"
+                                      title="Click to copy assignment reference ID"
+                                    >
+                                      <Copy className="w-2.5 h-2.5" />
+                                      <span>#{row.id}</span>
+                                      {copiedRefId === row.id && (
+                                        <span className="text-[9px] text-emerald-600 font-bold ml-0.5">Copied!</span>
+                                      )}
+                                    </button>
+                                    <span className="text-orange-600 font-bold bg-orange-50 px-2 py-0.5 rounded-full">
+                                      {row.subject}
+                                    </span>
+                                    {row.tutorName && (
+                                      <span className="text-slate-600 bg-slate-100 px-2 py-0.5 rounded-full">
+                                        🎓 {row.tutorName}
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
+                              </td>
+
+                              <td className="p-4 font-mono font-bold text-slate-900 tabular-nums">
+                                {row.totalAmount > 0 ? (
+                                  <span className="text-sm font-extrabold text-slate-900">${row.totalAmount.toFixed(2)}</span>
+                                ) : (
+                                  <span className="text-slate-400 italic text-[11px] font-sans font-medium">Pending Quote</span>
+                                )}
+                              </td>
+
+                              <td className="p-4 font-mono tabular-nums">
+                                {row.advancePaid > 0 ? (
+                                  <div className="space-y-0.5">
+                                    <span className="text-xs font-bold text-emerald-700 block">${row.advancePaid.toFixed(2)}</span>
+                                    <span className="inline-block text-[9px] bg-emerald-50 text-emerald-700 px-1.5 py-0.2 rounded font-sans font-semibold">
+                                      Escrowed
+                                    </span>
+                                  </div>
+                                ) : (
+                                  <span className="text-slate-400 text-xs">$0.00</span>
+                                )}
+                              </td>
+
+                              <td className="p-4 font-mono tabular-nums">
+                                {row.balanceAmount > 0 ? (
+                                  <div className="space-y-0.5">
+                                    <span className="text-xs font-bold text-orange-700 block">${row.balanceAmount.toFixed(2)}</span>
+                                    <span className="inline-block text-[9px] bg-orange-50 text-orange-700 px-1.5 py-0.2 rounded font-sans font-semibold">
+                                      Due on approval
+                                    </span>
+                                  </div>
+                                ) : row.totalAmount > 0 ? (
+                                  <span className="text-emerald-600 font-bold text-xs">$0.00 (Settled)</span>
+                                ) : (
+                                  <span className="text-slate-400 text-xs">—</span>
+                                )}
+                              </td>
+
+                              <td className="p-4 text-center">
+                                <span className={`inline-block font-bold text-[10px] px-2.5 py-1 rounded-full border uppercase tracking-wider font-mono ${row.statusBadgeClass}`}>
+                                  {row.statusText}
+                                </span>
+                              </td>
+
+                              <td className="p-4 text-right">
+                                <div className="flex items-center justify-end gap-1.5 flex-wrap">
+                                  {row.totalAmount > 0 && row.advancePaid === 0 && (
+                                    <button
+                                      onClick={() => setPaymentModal({
+                                        isOpen: true,
+                                        assignmentId: row.id,
+                                        title: row.title,
+                                        amount: Number((row.totalAmount * 0.5).toFixed(2)),
+                                        type: 'advance'
+                                      })}
+                                      className="bg-orange-500 hover:bg-orange-600 text-white font-bold text-[10.5px] px-3 py-1.5 rounded-xl shadow-xs transition-all cursor-pointer flex items-center gap-1"
+                                    >
+                                      <CreditCard className="w-3 h-3" />
+                                      <span>Pay Advance (${(row.totalAmount * 0.5).toFixed(2)})</span>
+                                    </button>
+                                  )}
+
+                                  {row.advancePaid > 0 && row.balanceAmount > 0 && (
+                                    <button
+                                      onClick={() => setPaymentModal({
+                                        isOpen: true,
+                                        assignmentId: row.id,
+                                        title: row.title,
+                                        amount: row.balanceAmount,
+                                        type: 'balance'
+                                      })}
+                                      className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-[10.5px] px-3 py-1.5 rounded-xl shadow-xs transition-all cursor-pointer flex items-center gap-1"
+                                    >
+                                      <Lock className="w-3 h-3" />
+                                      <span>Settle Balance (${row.balanceAmount.toFixed(2)})</span>
+                                    </button>
+                                  )}
+
+                                  <button
+                                    onClick={() => {
+                                      const matchedChat = studentChats.find(c => c.subject.includes(row.subject) || c.subject.includes(row.title));
+                                      if (matchedChat) {
+                                        setLocalSelectedChatId(matchedChat.id);
+                                        setActiveTab('chat');
+                                      } else {
+                                        onOpenChat('admin_shaka', `Regarding billing for Assignment #${row.id} ("${row.title}").`);
+                                      }
+                                    }}
+                                    className="p-1.5 text-slate-500 hover:text-slate-900 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
+                                    title="Discuss payment details in chat"
+                                  >
+                                    <MessageSquare className="w-3.5 h-3.5" />
+                                  </button>
+                                </div>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </>
                 ) : (
-                  <div className="p-12 text-center bg-gray-50/50">
-                    <CreditCard className="w-10 h-10 text-gray-300 mx-auto mb-3" />
-                    <h4 className="font-bold text-gray-700 text-sm">No Active Assignment Payments Logged</h4>
-                    <p className="text-xs text-gray-400 mt-1 max-w-sm mx-auto">
+                  <div className="p-10 text-center bg-slate-50/50">
+                    <CreditCard className="w-10 h-10 text-slate-300 mx-auto mb-3" />
+                    <h4 className="font-bold text-slate-700 text-sm">No Active Assignment Payments Logged</h4>
+                    <p className="text-xs text-slate-400 mt-1 max-w-sm mx-auto">
                       Submit an academic brief or lesson request to activate itemized billing quotes and escrow milestones.
                     </p>
                     <button
-                      onClick={() => setActiveTab('new_request')}
-                      className="mt-4 inline-flex items-center gap-2 bg-orange-600 hover:bg-orange-700 text-white text-xs font-bold px-4 py-2 rounded-xl transition-all cursor-pointer"
+                      type="button"
+                      onClick={() => setIsQuickRequestModalOpen(true)}
+                      className="mt-4 inline-flex items-center gap-1.5 bg-[#FF7A00] hover:bg-[#E86E00] text-white text-xs font-bold px-4 py-2 rounded-xl transition-all cursor-pointer"
                     >
-                      <span>🚀 Submit Your First Brief</span>
+                      <Plus className="w-4 h-4" />
+                      <span>Submit Your First Brief</span>
                     </button>
                   </div>
                 )}
@@ -3278,22 +3993,40 @@ export default function StudentDashboard({
                   />
                 </div>
 
-                <div className="flex items-center justify-between p-3.5 bg-red-50/50 rounded-2xl border border-red-100">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5 bg-red-50/50 rounded-2xl border border-red-100">
                   <div>
-                    <span className="font-bold text-xs text-red-955 block font-sans">Deactivate Platform Credentials</span>
-                    <span className="text-[10.5px] text-red-750 leading-tight font-sans">Completely scrub local reference files and credentials. This action cannot be reversed.</span>
+                    <span className="font-bold text-xs text-red-950 block font-sans">Deactivate Platform Credentials</span>
+                    <span className="text-[10.5px] text-red-700 leading-tight font-sans">Completely scrub local reference files and credentials. This action cannot be reversed.</span>
                   </div>
-                  <button 
-                    onClick={() => {
-                      if (confirm('Verify: Scrub all information permanently?')) {
-                        localStorage.clear();
-                        window.location.reload();
-                      }
-                    }} 
-                    className="bg-red-500 hover:bg-red-600 text-white font-bold text-[10px] px-3.5 py-2.5 rounded-xl transition-colors cursor-pointer text-center font-sans tracking-wide"
-                  >
-                    Scrub Storage
-                  </button>
+                  {isConfirmingScrub ? (
+                    <div className="flex items-center gap-2 shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => setIsConfirmingScrub(false)}
+                        className="bg-white border border-slate-200 text-slate-700 font-bold text-[10px] px-3 py-2 rounded-xl cursor-pointer"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          localStorage.clear();
+                          window.location.reload();
+                        }}
+                        className="bg-red-600 hover:bg-red-700 text-white font-bold text-[10px] px-3 py-2 rounded-xl cursor-pointer"
+                      >
+                        Confirm Scrub
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => setIsConfirmingScrub(true)}
+                      className="bg-red-500 hover:bg-red-600 text-white font-bold text-[10px] px-3.5 py-2.5 rounded-xl transition-colors cursor-pointer text-center font-sans tracking-wide shrink-0"
+                    >
+                      Scrub Storage
+                    </button>
+                  )}
                 </div>
               </div>
             </div>
@@ -3303,17 +4036,109 @@ export default function StudentDashboard({
           </ErrorBoundary>
         </div>
 
+        {/* ==================== MOBILE FLOATING CHAT BUTTONS (ABOVE BOTTOM NAV) ==================== */}
+        {showFloatingMobileWidgets && (
+          <div className="lg:hidden fixed bottom-20 left-0 right-0 px-4 flex items-center justify-between pointer-events-none z-30">
+            <button
+              type="button"
+              onClick={() => onOpenWhatsApp?.()}
+              aria-label="WhatsApp Instant Chat"
+              className="compact-pill-btn pointer-events-auto flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[#067D46] hover:bg-[#05683A] text-white font-bold text-[10px] tracking-wide shadow-md shadow-emerald-900/20 active:scale-95 transition cursor-pointer"
+            >
+              <svg className="w-3.5 h-3.5 fill-current shrink-0" viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M12.031 2c-5.516 0-9.969 4.453-9.969 9.969 0 1.758.459 3.473 1.331 4.986L2 22l5.188-1.361a9.934 9.934 0 0 0 4.843 1.258h.004c5.515 0 9.968-4.453 9.968-9.969 0-2.663-1.037-5.166-2.92-7.049A9.903 9.903 0 0 0 12.031 2zm5.818 14.273c-.246.693-1.432 1.325-1.992 1.409-.511.076-1.158.108-1.869-.118-.431-.137-.984-.32-1.693-.626-2.98-1.287-4.926-4.287-5.075-4.485-.148-.198-1.212-1.612-1.212-3.075 0-1.463.767-2.182 1.039-2.48.273-.297.595-.372.793-.372.198 0 .397.002.57.01.183.009.428-.069.669.511.248.595.842 2.058.916 2.207.074.149.124.322.025.52-.099.198-.149.322-.297.496-.149.173-.313.387-.446.52-.149.148-.304.309-.13.606.173.297.77 1.27 1.653 2.057 1.136 1.013 2.094 1.327 2.391 1.476.297.148.471.124.644-.074.174-.198.743-.867.942-1.165.198-.297.396-.248.669-.149.272.099 1.734.818 2.031.967.297.148.495.223.569.347.075.124.075.718-.171 1.411z" />
+              </svg>
+              <span>INSTANT CHAT</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                setActiveTab('chat');
+                onOpenChat('admin_shaka');
+              }}
+              aria-label="In-System Chat"
+              className="pointer-events-auto w-11 h-11 rounded-full bg-gradient-to-tr from-[#FF7A00] to-[#FF9900] hover:from-[#E86E00] hover:to-[#FF8A00] text-white shadow-lg shadow-orange-500/35 flex items-center justify-center active:scale-95 transition cursor-pointer"
+            >
+              <MessageSquare className="w-5 h-5" />
+            </button>
+          </div>
+        )}
+
+        {/* ==================== MOBILE FIXED BOTTOM NAVIGATION BAR ==================== */}
+        {showFloatingMobileWidgets && (
+          <nav
+            aria-label="Bottom Navigation"
+            className="lg:hidden fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-md border-t border-slate-200 px-1 py-2 grid grid-cols-5 items-center z-30"
+          >
+            <button
+              type="button"
+              onClick={() => setActiveTab('dashboard')}
+              className={`compact-pill-btn flex flex-col items-center justify-center gap-1 py-1 rounded-xl cursor-pointer transition-colors ${
+                activeTab === 'dashboard' ? 'text-[#FF7A00]' : 'text-slate-500 hover:text-slate-900'
+              }`}
+            >
+              <LayoutGrid className="w-5 h-5" />
+              <span className={`text-[10px] ${activeTab === 'dashboard' ? 'font-bold' : 'font-medium'}`}>Dashboard</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setActiveTab('assignments')}
+              className={`compact-pill-btn flex flex-col items-center justify-center gap-1 py-1 rounded-xl cursor-pointer transition-colors ${
+                activeTab === 'assignments' ? 'text-[#FF7A00]' : 'text-slate-500 hover:text-slate-900'
+              }`}
+            >
+              <BookOpen className="w-5 h-5" />
+              <span className={`text-[10px] ${activeTab === 'assignments' ? 'font-bold' : 'font-medium'}`}>Assignments</span>
+            </button>
+
+            <div className="flex items-center justify-center">
+              <button
+                type="button"
+                onClick={() => setIsQuickRequestModalOpen(true)}
+                aria-label="Create Request"
+                className="-mt-7 w-12 h-12 rounded-2xl bg-gradient-to-tr from-[#FF7A00] to-[#FF9900] text-white shadow-lg shadow-orange-500/30 flex items-center justify-center active:scale-90 transition cursor-pointer"
+              >
+                <Plus className="w-6 h-6" />
+              </button>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setActiveTab('chat')}
+              className={`compact-pill-btn flex flex-col items-center justify-center gap-1 py-1 rounded-xl cursor-pointer transition-colors ${
+                activeTab === 'chat' ? 'text-[#FF7A00]' : 'text-slate-500 hover:text-slate-900'
+              }`}
+            >
+              <MessageSquare className="w-5 h-5" />
+              <span className={`text-[10px] ${activeTab === 'chat' ? 'font-bold' : 'font-medium'}`}>Chat</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setActiveTab('payments')}
+              className={`compact-pill-btn flex flex-col items-center justify-center gap-1 py-1 rounded-xl cursor-pointer transition-colors ${
+                activeTab === 'payments' ? 'text-[#FF7A00]' : 'text-slate-500 hover:text-slate-900'
+              }`}
+            >
+              <CreditCard className="w-5 h-5" />
+              <span className={`text-[10px] ${activeTab === 'payments' ? 'font-bold' : 'font-medium'}`}>Payments</span>
+            </button>
+          </nav>
+        )}
+
         {/* ======================================================== */}
-        {/* FLOATING DIRECT LIVE CHAT ASSISTANCE WIDGET (CSR)      */}
-        {/* Hidden in chat and onboarding views to avoid overlap   */}
+        {/* DESKTOP FLOATING DIRECT LIVE CHAT ASSISTANCE WIDGET      */}
         {/* ======================================================== */}
-        {activeTab !== 'chat' && activeTab !== 'new_request' && (
+        {showFloatingMobileWidgets && (
           <button
+            type="button"
             onClick={() => {
               setActiveTab('chat');
-              onOpenChat('admin_shaka'); // Directly link support chat
+              onOpenChat('admin_shaka');
             }}
-            className="fixed bottom-6 right-6 bg-[#FF8A00] hover:bg-[#E05216] text-white p-4 rounded-full shadow-2xl z-40 transition-all cursor-pointer flex items-center justify-center gap-2 font-bold font-sans tracking-wide text-xs group"
+            className="hidden lg:flex fixed bottom-6 right-6 bg-[#FF8A00] hover:bg-[#E05216] text-white p-4 rounded-full shadow-2xl z-40 transition-all cursor-pointer items-center justify-center gap-2 font-bold font-sans tracking-wide text-xs group"
             id="floating-live-chat"
           >
             <MessageCircle className="w-5 h-5 shrink-0" />
@@ -3324,6 +4149,233 @@ export default function StudentDashboard({
         )}
 
       </main>
+
+      {/* ==================== CREATE REQUEST BOTTOM SHEET MODAL ==================== */}
+      {isQuickRequestModalOpen && (
+        <div
+          id="requestModal"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setIsQuickRequestModalOpen(false);
+          }}
+          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-slate-900/50 backdrop-blur-xs p-0 sm:p-4 animate-fade-in text-left"
+        >
+          <div className="w-full max-w-md sm:max-w-2xl lg:max-w-4xl max-h-[92vh] overflow-y-auto bg-white rounded-t-3xl sm:rounded-3xl p-5 sm:p-6 shadow-2xl animate-slide-up">
+            <div className="w-10 h-1 bg-slate-300 rounded-full mx-auto mb-4 sm:hidden" />
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h3 className="text-lg font-bold text-slate-900">Create a Request</h3>
+                <p className="text-xs text-slate-500 mt-0.5">Choose a service category and enter your course details to start a tutor chat.</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsQuickRequestModalOpen(false)}
+                aria-label="Close modal"
+                className="compact-pill-btn p-1.5 rounded-full bg-slate-100 text-slate-600 hover:bg-slate-200 cursor-pointer shrink-0"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <form id="newRequestForm" onSubmit={handleQuickRequestSubmit} className="space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-2">
+                  Select Service Category
+                </label>
+                <div
+                  id="reqTypeGrid"
+                  role="radiogroup"
+                  aria-label="Service Category"
+                  className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5"
+                >
+                  {QUICK_REQUEST_SERVICES.map((service) => {
+                    const isSelected = quickReqType === service.value;
+                    const IconComp = service.icon;
+                    return (
+                      <button
+                        key={service.value}
+                        type="button"
+                        role="radio"
+                        aria-checked={isSelected}
+                        onClick={() => setQuickReqType(service.value)}
+                        className={`w-full text-left p-3 rounded-2xl flex items-center gap-3 transition-all cursor-pointer active:scale-[0.99] ${
+                          isSelected
+                            ? 'border-2 border-[#FF7A00] bg-orange-50/50 shadow-xs'
+                            : 'border border-slate-200 bg-white hover:border-orange-300 hover:bg-orange-50/20'
+                        }`}
+                      >
+                        <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#FFF7ED] to-[#FFEDD5] flex items-center justify-center shrink-0 border border-orange-100/80">
+                          <IconComp className="w-5 h-5 text-[#EA580C]" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="text-xs font-bold text-slate-900 leading-snug line-clamp-2">
+                            {service.label}
+                          </div>
+                          <div className="text-[11px] text-slate-500 leading-snug truncate mt-0.5">
+                            {service.description}
+                          </div>
+                        </div>
+                        <span
+                          className={`w-5 h-5 rounded-full flex items-center justify-center shrink-0 transition-colors ${
+                            isSelected
+                              ? 'bg-[#FF7A00] text-white'
+                              : 'border border-slate-300 bg-white text-transparent'
+                          }`}
+                        >
+                          <Check className="w-3 h-3 stroke-[2.75]" />
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div className="sm:col-span-1">
+                  <label htmlFor="reqSubject" className="block text-xs font-semibold text-slate-700 mb-1">
+                    Assignment / Course Title
+                  </label>
+                  <input
+                    type="text"
+                    id="reqSubject"
+                    required
+                    value={quickReqTitle}
+                    onChange={(e) => setQuickReqTitle(e.target.value)}
+                    placeholder="e.g., CS301 Data Structures Midterm"
+                    className="w-full px-3.5 py-2.5 text-sm border border-slate-200 rounded-xl focus:outline-none focus:border-[#FF7A00]"
+                  />
+                </div>
+
+                <div>
+                  <label htmlFor="reqAcademicSubject" className="block text-xs font-semibold text-slate-700 mb-1">
+                    Subject
+                  </label>
+                  <select
+                    id="reqAcademicSubject"
+                    value={quickReqSubject}
+                    onChange={(e) => setQuickReqSubject(e.target.value)}
+                    className="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl bg-white focus:outline-none focus:border-[#FF7A00]"
+                  >
+                    <option value="Computer Science">Computer Science</option>
+                    <option value="Mathematics">Mathematics</option>
+                    <option value="Biology">Biology</option>
+                    <option value="Chemistry">Chemistry</option>
+                    <option value="Physics">Physics</option>
+                    <option value="Economics">Economics</option>
+                    <option value="Business">Business</option>
+                    <option value="Nursing">Nursing</option>
+                    <option value="Literature">Literature</option>
+                    <option value="Engineering">Engineering</option>
+                    <option value="General Academic Tutoring">Other Subject</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label htmlFor="reqDate" className="block text-xs font-semibold text-slate-700 mb-1">
+                    Deadline
+                  </label>
+                  <input
+                    type="date"
+                    id="reqDate"
+                    required
+                    value={quickReqDeadline}
+                    onChange={(e) => setQuickReqDeadline(e.target.value)}
+                    className="w-full px-3.5 py-2.5 text-sm border border-slate-200 rounded-xl focus:outline-none focus:border-[#FF7A00]"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label htmlFor="reqNotes" className="block text-xs font-semibold text-slate-700 mb-1">
+                  Brief Instructions (Optional)
+                </label>
+                <textarea
+                  id="reqNotes"
+                  rows={2}
+                  value={quickReqNotes}
+                  onChange={(e) => setQuickReqNotes(e.target.value)}
+                  placeholder="Any key rubric notes, citation style, or topics to focus on..."
+                  className="w-full px-3.5 py-2 text-sm border border-slate-200 rounded-xl focus:outline-none focus:border-[#FF7A00]"
+                />
+              </div>
+
+              <div className="rounded-2xl border border-slate-200 bg-slate-50/40 p-3.5 space-y-2.5">
+                <div>
+                  <h4 className="text-xs font-bold text-slate-900">Deliverables (Optional)</h4>
+                  <p className="text-[11px] text-slate-500">Select any additional services you require.</p>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                  {QUICK_REQUEST_DELIVERABLES.map((item) => {
+                    const isChecked = quickReqDeliverables.includes(item.label);
+                    return (
+                      <button
+                        key={item.id}
+                        type="button"
+                        role="checkbox"
+                        aria-checked={isChecked}
+                        onClick={() =>
+                          setQuickReqDeliverables((prev) =>
+                            prev.includes(item.label)
+                              ? prev.filter((x) => x !== item.label)
+                              : [...prev, item.label]
+                          )
+                        }
+                        className={`text-left flex items-start gap-2.5 p-2 rounded-xl transition-all cursor-pointer ${
+                          isChecked
+                            ? 'bg-orange-50/80 border border-orange-300'
+                            : 'bg-white border border-slate-200/80 hover:border-orange-300'
+                        }`}
+                      >
+                        <span
+                          className={`mt-0.5 w-4 h-4 rounded-[4px] flex items-center justify-center shrink-0 transition-colors ${
+                            isChecked
+                              ? 'bg-[#F97316] border-2 border-[#F97316] text-white'
+                              : 'bg-white border-2 border-[#F97316]'
+                          }`}
+                        >
+                          {isChecked && <Check className="w-2.5 h-2.5 stroke-[3]" />}
+                        </span>
+                        <div className="min-w-0">
+                          <div className="text-[11px] font-bold text-slate-900 leading-snug">{item.label}</div>
+                          <div className="text-[10px] text-slate-500 leading-snug">{item.description}</div>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <button
+                type="submit"
+                disabled={isSubmittingQuickReq}
+                className="w-full py-3 rounded-xl bg-[#FF7A00] hover:bg-[#E86E00] disabled:opacity-60 text-white font-semibold text-sm shadow-md shadow-orange-500/20 active:scale-98 transition cursor-pointer"
+              >
+                {isSubmittingQuickReq ? 'Submitting Request...' : 'Submit Request'}
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setIsQuickRequestModalOpen(false);
+                  setActiveTab('new_request');
+                }}
+                className="compact-inline-link w-full text-center text-xs font-semibold text-[#FF7A00] hover:underline pt-1 cursor-pointer"
+              >
+                Need to upload syllabus files or set word count? Open Full Guide →
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ACTION TOAST NOTIFICATION */}
+      {actionToast && (
+        <div
+          id="toast"
+          className="fixed bottom-28 lg:bottom-8 left-1/2 -translate-x-1/2 bg-slate-900 text-white text-xs font-medium px-4 py-2.5 rounded-full shadow-lg pointer-events-none z-50 whitespace-nowrap animate-fade-in"
+        >
+          {actionToast}
+        </div>
+      )}
 
       {/* RATING & REVIEWS APPROVAL POPUP WIDGET */}
       {showReviewModal && (

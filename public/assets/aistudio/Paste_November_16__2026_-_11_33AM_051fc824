@@ -1,0 +1,1207 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Operational Support & Chat Control Desk</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts: Inter & JetBrains Mono -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                        mono: ['JetBrains Mono', 'monospace'],
+                    },
+                    colors: {
+                        brand: {
+                            50: '#fff7ed',
+                            100: '#ffedd5',
+                            500: '#f97316',
+                            600: '#ea580c',
+                            700: '#c2410c',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        /* Custom sleek scrollbars */
+        ::-webkit-scrollbar {
+            width: 5px;
+            height: 5px;
+        }
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 9999px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8;
+        }
+        /* Smooth transition for full-screen expansion */
+        .desk-container {
+            transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+    </style>
+</head>
+<body class="bg-slate-100 text-slate-800 font-sans antialiased min-h-screen flex flex-col">
+
+    <!-- Main Wrapper (Simulates page padding when not expanded, fills viewport when expanded) -->
+    <div id="appWrapper" class="desk-container flex-1 flex flex-col max-w-[1600px] w-full mx-auto p-3 sm:p-6">
+        
+        <!-- Outer Control Desk Card -->
+        <div id="deskCard" class="desk-container bg-white rounded-2xl shadow-sm border border-slate-200/80 flex flex-col flex-1 overflow-hidden min-h-[820px]">
+            
+            <!-- TOP HEADER BAR -->
+            <header class="px-5 py-4 border-b border-slate-200/80 bg-white flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 shrink-0">
+                <div class="space-y-1">
+                    <div class="inline-flex items-center gap-2 px-2.5 py-0.5 rounded-full bg-brand-50 border border-brand-200 text-brand-700 text-[11px] font-semibold tracking-wider uppercase">
+                        <span class="w-1.5 h-1.5 rounded-full bg-brand-500 animate-pulse"></span>
+                        Live Systems Monitoring Deck
+                    </div>
+                    <h1 class="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">
+                        Operational Support & Chat Control Desk
+                    </h1>
+                    <p class="text-xs sm:text-sm text-slate-500">
+                        Audit, join, or moderate active student-tutor conversations. Enforce syllabus compliance & secure billing escrows.
+                    </p>
+                </div>
+
+                <!-- Global Deck Controls & EXPAND BUTTON -->
+                <div class="flex flex-wrap items-center gap-2.5">
+                    <!-- Quick Stats Pill -->
+                    <div class="hidden sm:flex items-center gap-3 px-3.5 py-2 rounded-xl bg-slate-50 border border-slate-200/70 text-xs">
+                        <div class="flex items-center gap-1.5">
+                            <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
+                            <span class="text-slate-500">Online Users:</span>
+                            <span class="font-semibold text-slate-800">18</span>
+                        </div>
+                        <span class="text-slate-300">|</span>
+                        <div class="flex items-center gap-1.5">
+                            <span class="text-slate-500">Active Rooms:</span>
+                            <span class="font-semibold text-slate-800">22</span>
+                        </div>
+                    </div>
+
+                    <!-- Toggle Context Drawer Button -->
+                    <button id="toggleInspectorBtn" onclick="toggleInspector()" class="inline-flex items-center gap-2 px-3.5 py-2.5 rounded-xl text-xs font-semibold bg-slate-100 hover:bg-slate-200/80 text-slate-700 border border-slate-200 transition active:scale-95">
+                        <i data-lucide="panel-right" class="w-4 h-4 text-slate-600"></i>
+                        <span id="inspectorBtnText">Hide Records</span>
+                    </button>
+
+                    <!-- EXPAND FULL PAGE BUTTON -->
+                    <button id="expandPageBtn" onclick="toggleFullScreen()" class="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-semibold bg-slate-900 hover:bg-slate-800 text-white shadow-sm transition active:scale-95">
+                        <i id="expandIcon" data-lucide="maximize-2" class="w-4 h-4 text-brand-400"></i>
+                        <span id="expandText">Expand Full Page</span>
+                    </button>
+                </div>
+            </header>
+
+            <!-- 3-COLUMN WORKSPACE BODY -->
+            <div class="flex-1 flex flex-col lg:flex-row overflow-hidden relative">
+
+                <!-- ========================================== -->
+                <!-- LEFT PANE: ALL USERS & CHAT ROOMS LIST     -->
+                <!-- ========================================== -->
+                <aside class="w-full lg:w-[340px] xl:w-[370px] border-b lg:border-b-0 lg:border-r border-slate-200/80 bg-slate-50/60 flex flex-col shrink-0 max-h-[420px] lg:max-h-none">
+                    
+                    <!-- Directory Header & View Switcher -->
+                    <div class="p-3.5 border-b border-slate-200/80 bg-white space-y-3 shrink-0">
+                        <div class="flex items-center justify-between">
+                            <span class="text-xs font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
+                                <i data-lucide="users" class="w-3.5 h-3.5 text-brand-500"></i>
+                                Directory & Rooms
+                            </span>
+                            <span class="px-2 py-0.5 text-[11px] font-semibold rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                Live Sync
+                            </span>
+                        </div>
+
+                        <!-- Search Input -->
+                        <div class="relative">
+                            <i data-lucide="search" class="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2"></i>
+                            <input 
+                                type="text" 
+                                id="searchInput"
+                                oninput="filterDirectory()"
+                                placeholder="Search user, email, ID or subject..." 
+                                class="w-full pl-9 pr-3 py-2 bg-slate-100/80 hover:bg-slate-100 focus:bg-white border border-slate-200 rounded-xl text-xs text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 transition"
+                            >
+                        </div>
+
+                        <!-- Filter Tabs: All Users vs Paired Chats vs Students vs Tutors -->
+                        <div class="grid grid-cols-4 gap-1 p-1 bg-slate-100 rounded-xl text-[11px] font-medium">
+                            <button onclick="setDirectoryTab('rooms')" id="tab-rooms" class="dir-tab py-1.5 px-2 rounded-lg bg-white text-slate-900 shadow-xs font-semibold transition">
+                                Rooms (5)
+                            </button>
+                            <button onclick="setDirectoryTab('all-users')" id="tab-all-users" class="dir-tab py-1.5 px-2 rounded-lg text-slate-600 hover:text-slate-900 transition">
+                                All Users (8)
+                            </button>
+                            <button onclick="setDirectoryTab('students')" id="tab-students" class="dir-tab py-1.5 px-2 rounded-lg text-slate-600 hover:text-slate-900 transition">
+                                Students
+                            </button>
+                            <button onclick="setDirectoryTab('tutors')" id="tab-tutors" class="dir-tab py-1.5 px-2 rounded-lg text-slate-600 hover:text-slate-900 transition">
+                                Tutors
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Scrollable List Container -->
+                    <div id="directoryList" class="flex-1 overflow-y-auto p-2.5 space-y-2">
+                        <!-- Dynamically populated via JS -->
+                    </div>
+                </aside>
+
+                <!-- ========================================== -->
+                <!-- CENTER PANE: ACTIVE CHAT ROOM              -->
+                <!-- ========================================== -->
+                <main class="flex-1 flex flex-col bg-white min-w-0">
+                    
+                    <!-- Chat Room Top Bar (Clean, Scannable Participant Header) -->
+                    <div class="px-4 sm:px-6 py-3.5 border-b border-slate-200/80 bg-white flex flex-col gap-3 shrink-0">
+                        <div class="flex flex-wrap items-center justify-between gap-3">
+                            <div class="flex items-center gap-3 min-w-0">
+                                <!-- Overlapping Avatars -->
+                                <div class="relative flex -space-x-2.5 shrink-0">
+                                    <img id="activeStudentAvatar" src="https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100&auto=format&fit=crop&q=80" onerror="this.src='https://placehold.co/40x40/e2e8f0/475569?text=AW'" alt="Student" class="w-10 h-10 rounded-full object-cover ring-2 ring-white">
+                                    <img id="activeTutorAvatar" src="https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=100&auto=format&fit=crop&q=80" onerror="this.src='https://placehold.co/40x40/ffedd5/c2410c?text=CS'" alt="Tutor" class="w-10 h-10 rounded-full object-cover ring-2 ring-white">
+                                    <span class="w-3 h-3 rounded-full bg-emerald-500 ring-2 ring-white absolute bottom-0 right-0"></span>
+                                </div>
+
+                                <div class="min-w-0">
+                                    <div class="flex items-center gap-2 flex-wrap">
+                                        <h2 id="activeRoomTitle" class="text-sm sm:text-base font-bold text-slate-900 truncate">
+                                            Adam Woo ↔ Dr. Clara Stirling
+                                        </h2>
+                                        <button onclick="copyRoomId()" title="Click to copy Room ID" class="inline-flex items-center gap-1 font-mono text-[11px] px-2 py-0.5 rounded-md bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 font-medium transition cursor-pointer">
+                                            <span id="activeRoomId">#1794746583002</span>
+                                            <i data-lucide="copy" class="w-3 h-3 text-slate-400"></i>
+                                        </button>
+                                        <span class="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                            <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                                            Active
+                                        </span>
+                                    </div>
+                                    <p id="activeRoomSubtitle" class="text-xs text-slate-500 truncate mt-0.5">
+                                        Biology (Cell Biology) — 1-on-1 Live Tutoring • Escrow Secured
+                                    </p>
+                                </div>
+                            </div>
+
+                            <!-- Room Moderation Actions -->
+                            <div class="flex items-center gap-2">
+                                <button onclick="triggerActionToast('Synced latest messages & escrow logs.')" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium text-slate-700 bg-slate-100 hover:bg-slate-200/70 border border-slate-200 transition" title="Force Sync">
+                                    <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i>
+                                    <span class="hidden sm:inline">Sync</span>
+                                </button>
+                                <button onclick="triggerActionToast('System compliance reminder sent to participants.')" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium text-amber-700 bg-amber-50 hover:bg-amber-100 border border-amber-200 transition" title="Send Compliance Reminder">
+                                    <i data-lucide="shield-alert" class="w-3.5 h-3.5"></i>
+                                    <span class="hidden sm:inline">Warn</span>
+                                </button>
+                                <button onclick="openPurgeModal()" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 transition" title="Purge Thread">
+                                    <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+                                    <span class="hidden sm:inline">Purge</span>
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- SEPARATE CHAT CHANNELS SWITCHER (CSR CHAT VS TUTOR CHAT) -->
+                        <div class="flex items-center justify-between gap-2 pt-2.5 border-t border-slate-100 flex-wrap">
+                            <div class="inline-flex p-1 bg-slate-100 rounded-xl border border-slate-200/80 gap-1">
+                                <button onclick="switchChatChannel('tutor')" id="channel-tab-tutor" class="flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-semibold bg-emerald-600 text-white shadow-xs transition">
+                                    <i data-lucide="graduation-cap" class="w-3.5 h-3.5"></i>
+                                    <span>1. Tutor Consultation Chat</span>
+                                    <span id="tutorMsgBadge" class="px-1.5 py-0.2 rounded-full text-[10px] bg-white/20 text-white font-bold">3</span>
+                                </button>
+                                <button onclick="switchChatChannel('csr')" id="channel-tab-csr" class="flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-medium text-slate-600 hover:text-slate-900 hover:bg-white/60 transition">
+                                    <i data-lucide="headphones" class="w-3.5 h-3.5 text-brand-600"></i>
+                                    <span>2. CSR Support Desk Chat</span>
+                                    <span id="csrMsgBadge" class="px-1.5 py-0.2 rounded-full text-[10px] bg-brand-100 text-brand-700 font-bold">2</span>
+                                </button>
+                            </div>
+                            <span id="channelHintText" class="text-[11px] text-emerald-700 bg-emerald-50 border border-emerald-200/70 px-2.5 py-1 rounded-lg font-medium">
+                                Academic Thread: Student ↔ Tutor
+                            </span>
+                        </div>
+                    </div>
+
+                    <!-- Chat Messages Feed -->
+                    <div id="chatMessagesContainer" class="flex-1 overflow-y-auto p-4 sm:p-6 space-y-5 bg-emerald-50/20 transition-colors duration-300">
+                        <!-- Dynamically populated via JS -->
+                    </div>
+
+                    <!-- Admin / Moderator Dual-Role Message Input Bar -->
+                    <div id="composerWrapper" class="p-3.5 sm:p-4 bg-white border-t-2 border-emerald-500/40 shrink-0 transition-colors duration-300">
+                        <form onsubmit="sendAdminMessage(event)" class="flex flex-col gap-2.5">
+                            <!-- Top Bar: Identity Selector + One-Click Quick Replies -->
+                            <div class="flex flex-wrap items-center justify-between gap-2">
+                                <!-- Identity Role Toggle: Talk as CSR vs Talk as Tutor -->
+                                <div class="flex items-center gap-2">
+                                    <span class="text-[11px] font-bold text-slate-500 uppercase tracking-wider">You are talking as:</span>
+                                    <div class="inline-flex p-0.5 bg-slate-100 rounded-lg border border-slate-200">
+                                        <button type="button" onclick="setSenderIdentity('tutor')" id="roleBtn-tutor" class="flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-semibold bg-emerald-600 text-white shadow-2xs transition">
+                                            <i data-lucide="graduation-cap" class="w-3.5 h-3.5"></i>
+                                            <span id="roleBtnTutorLabel">Tutor (Dr. Clara Stirling)</span>
+                                        </button>
+                                        <button type="button" onclick="setSenderIdentity('csr')" id="roleBtn-csr" class="flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-semibold text-slate-600 hover:text-slate-900 transition">
+                                            <i data-lucide="headphones" class="w-3.5 h-3.5 text-brand-600"></i>
+                                            <span>CSR Support</span>
+                                        </button>
+                                    </div>
+                                </div>
+                                <span id="activePostingBadge" class="text-[11px] text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-0.5 rounded-full font-medium">
+                                    Replying in Tutor Consultation Chat
+                                </span>
+                            </div>
+
+                            <!-- One-Click Quick Reply Chips (Contextual to CSR vs Tutor) -->
+                            <div id="quickRepliesBar" class="flex items-center gap-1.5 overflow-x-auto pb-0.5">
+                                <!-- Populated via JS -->
+                            </div>
+
+                            <!-- Input Field & Submit -->
+                            <div class="flex items-center gap-2">
+                                <input 
+                                    type="text" 
+                                    id="adminMessageInput"
+                                    placeholder="Type a message as Tutor..." 
+                                    class="flex-1 px-4 py-2.5 bg-slate-50 focus:bg-white border border-slate-200 rounded-xl text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition"
+                                >
+                                <button type="submit" id="sendMsgSubmitBtn" class="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs transition active:scale-95 shrink-0 cursor-pointer">
+                                    <span id="sendBtnLabel">Send as Tutor</span>
+                                    <i data-lucide="send" class="w-3.5 h-3.5"></i>
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </main>
+
+                <!-- ========================================================= -->
+                <!-- RIGHT PANE: COLLAPSIBLE CONTEXT, SUBMISSIONS & DOCUMENTS  -->
+                <!-- ========================================================= -->
+                <aside id="inspectorDrawer" class="w-full lg:w-[340px] xl:w-[380px] border-t lg:border-t-0 lg:border-l border-slate-200/80 bg-slate-50/70 flex flex-col shrink-0 overflow-y-auto">
+                    
+                    <!-- Participants Card -->
+                    <div class="p-4 border-b border-slate-200/80 bg-white space-y-3">
+                        <h3 class="text-xs font-bold uppercase tracking-wider text-slate-400">
+                            Thread Participants
+                        </h3>
+                        
+                        <!-- Student Mini Profile -->
+                        <div class="p-3 rounded-xl bg-slate-50 border border-slate-200/70 flex items-center justify-between gap-2">
+                            <div class="flex items-center gap-2.5 min-w-0">
+                                <img id="inspectorStudentAvatar" src="https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100&auto=format&fit=crop&q=80" onerror="this.src='https://placehold.co/36x36/e2e8f0/475569?text=AW'" class="w-9 h-9 rounded-full object-cover">
+                                <div class="min-w-0">
+                                    <div class="flex items-center gap-1.5">
+                                        <p id="inspectorStudentName" class="text-xs font-bold text-slate-900 truncate">Adam Woo</p>
+                                        <span class="px-1.5 py-0.2 rounded text-[10px] font-semibold bg-blue-100 text-blue-700">Student</span>
+                                    </div>
+                                    <p id="inspectorStudentEmail" class="text-[11px] text-slate-500 truncate">xpertutor1@gmail.com</p>
+                                </div>
+                            </div>
+                            <button onclick="triggerActionToast('Opened Student profile audit')" class="p-1.5 text-slate-400 hover:text-slate-700 rounded-lg hover:bg-slate-200/50 transition">
+                                <i data-lucide="external-link" class="w-3.5 h-3.5"></i>
+                            </button>
+                        </div>
+
+                        <!-- Tutor Mini Profile -->
+                        <div class="p-3 rounded-xl bg-slate-50 border border-slate-200/70 flex items-center justify-between gap-2">
+                            <div class="flex items-center gap-2.5 min-w-0">
+                                <img id="inspectorTutorAvatar" src="https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=100&auto=format&fit=crop&q=80" onerror="this.src='https://placehold.co/36x36/ffedd5/c2410c?text=CS'" class="w-9 h-9 rounded-full object-cover">
+                                <div class="min-w-0">
+                                    <div class="flex items-center gap-1.5">
+                                        <p id="inspectorTutorName" class="text-xs font-bold text-slate-900 truncate">Dr. Clara Stirling</p>
+                                        <span class="px-1.5 py-0.2 rounded text-[10px] font-semibold bg-emerald-100 text-emerald-700">Tutor</span>
+                                    </div>
+                                    <p id="inspectorTutorRating" class="text-[11px] text-slate-500 truncate">★ 4.9 • Verified Specialist</p>
+                                </div>
+                            </div>
+                            <button onclick="triggerActionToast('Opened Tutor verification dossier')" class="p-1.5 text-slate-400 hover:text-slate-700 rounded-lg hover:bg-slate-200/50 transition">
+                                <i data-lucide="external-link" class="w-3.5 h-3.5"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Student Submission Histories -->
+                    <div class="p-4 border-b border-slate-200/80 space-y-3">
+                        <div class="flex items-center justify-between">
+                            <h3 class="text-xs font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
+                                <i data-lucide="graduation-cap" class="w-3.5 h-3.5 text-brand-500"></i>
+                                Submission Histories
+                            </h3>
+                            <span id="submissionsCount" class="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-slate-200/70 text-slate-700">
+                                2 Total
+                            </span>
+                        </div>
+
+                        <div id="submissionsList" class="space-y-2.5">
+                            <!-- Populated via JS -->
+                        </div>
+                    </div>
+
+                    <!-- Student Documents & Attachments Vault -->
+                    <div class="p-4 space-y-3">
+                        <div class="flex items-center justify-between">
+                            <h3 class="text-xs font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
+                                <i data-lucide="folder-lock" class="w-3.5 h-3.5 text-brand-500"></i>
+                                Documents Vault
+                            </h3>
+                            <span id="docsCount" class="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-brand-100 text-brand-700">
+                                2 Files
+                            </span>
+                        </div>
+
+                        <div id="documentsList" class="space-y-2">
+                            <!-- Populated via JS -->
+                        </div>
+                    </div>
+
+                </aside>
+
+            </div>
+        </div>
+    </div>
+
+    <!-- Custom Toast Notification (Replaces alert()) -->
+    <div id="toastNotification" class="fixed bottom-5 right-5 z-50 transform translate-y-20 opacity-0 transition-all duration-300 pointer-events-none">
+        <div class="bg-slate-900 text-white px-4 py-3 rounded-xl shadow-lg border border-slate-700 flex items-center gap-2.5 text-xs font-medium">
+            <i data-lucide="check-circle-2" class="w-4 h-4 text-emerald-400 shrink-0"></i>
+            <span id="toastMessage">Action completed</span>
+        </div>
+    </div>
+
+    <!-- Custom Confirmation Modal (Replaces confirm()) -->
+    <div id="purgeModal" class="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-xs hidden items-center justify-center p-4">
+        <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-xl border border-slate-200 space-y-4">
+            <div class="flex items-center gap-3 text-rose-600">
+                <div class="w-10 h-10 rounded-full bg-rose-100 flex items-center justify-center shrink-0">
+                    <i data-lucide="alert-triangle" class="w-5 h-5"></i>
+                </div>
+                <div>
+                    <h3 class="text-base font-bold text-slate-900">Purge Active Chat Thread?</h3>
+                    <p class="text-xs text-slate-500">This will archive logs and terminate live messaging for this room.</p>
+                </div>
+            </div>
+            <div class="flex items-center justify-end gap-2 pt-2">
+                <button onclick="closePurgeModal()" class="px-4 py-2 rounded-xl text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 transition">
+                    Cancel
+                </button>
+                <button onclick="confirmPurge()" class="px-4 py-2 rounded-xl text-xs font-semibold text-white bg-rose-600 hover:bg-rose-700 transition">
+                    Yes, Purge Thread
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ==========================================
+        // MOCK DATA FOR USERS & CHAT ROOMS
+        // Each room holds SEPARATE chats:
+        // 1. tutorMessages (Student <-> Tutor consultation thread)
+        // 2. csrMessages   (Student/Tutor <-> CSR Support Desk thread)
+        // ==========================================
+        const chatRooms = [
+            {
+                id: "#1794746583002",
+                subject: "Biology (Cell Biology) — 1-on-1 Live Tutoring",
+                status: "IN PROGRESS",
+                unread: 2,
+                lastTime: "05:45 PM",
+                lastMessage: "Shall we begin with the cellular respiration module?",
+                student: {
+                    name: "Adam Woo",
+                    email: "xpertutor1@gmail.com",
+                    avatar: "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100&auto=format&fit=crop&q=80",
+                    online: true
+                },
+                tutor: {
+                    name: "Dr. Clara Stirling",
+                    email: "clara.stirling@edu.org",
+                    rating: "4.9",
+                    avatar: "https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=100&auto=format&fit=crop&q=80",
+                    online: true
+                },
+                submissions: [
+                    { title: "Biology (Cell Biology) — 1-on-1 Live Tutoring", subject: "Biology", deadline: "2026-11-18", tutor: "Dr. Marcus Vance", status: "IN PROGRESS" },
+                    { title: "Science (Physics (Classical & Quantum)) Sustained Coursework", subject: "Science", deadline: "2026-11-16", tutor: "Dr. Clara Stirling", status: "IN PROGRESS" }
+                ],
+                documents: [
+                    { name: "Einladung Aufnahmetest_11.pdf", assignment: "Biology (Cell Biology)" },
+                    { name: "dna-rna-protein-translation.docx", assignment: "Science (Physics)" }
+                ],
+                tutorMessages: [
+                    {
+                        senderRole: "student",
+                        senderName: "Adam Woo",
+                        time: "05:43 PM",
+                        text: 'Hi Dr. Clara Stirling, I was just automatically matched with you through the e-Optimal Matching System for "Science" (Physics (Classical & Quantum)), scheduled for 16. My Final Draft brief has been secured in our platform workspace. Looking forward to your guidance!'
+                    },
+                    {
+                        senderRole: "student",
+                        senderName: "Adam Woo",
+                        time: "05:43 PM",
+                        text: "how are you doing today ?"
+                    },
+                    {
+                        senderRole: "tutor",
+                        senderName: "Dr. Clara Stirling",
+                        time: "05:45 PM",
+                        text: "Hello Adam! I am doing great, thank you. I have just reviewed your uploaded DNA-RNA translation brief and physics syllabus outline. Shall we begin with the cellular respiration module first?"
+                    }
+                ],
+                csrMessages: [
+                    {
+                        senderRole: "student",
+                        senderName: "Adam Woo",
+                        time: "05:30 PM",
+                        text: "Hi Support Desk, can you confirm my billing escrow for the Biology 1-on-1 session is active?"
+                    },
+                    {
+                        senderRole: "csr",
+                        senderName: "CSR Support Desk",
+                        time: "05:32 PM",
+                        text: "Hello Adam! Yes, your escrow deposit (#ESC-9921) is verified and locked safely. You can now collaborate directly with Dr. Clara Stirling."
+                    }
+                ]
+            },
+            {
+                id: "#1794769513866",
+                subject: "Organic Chemistry — Lab Report Review",
+                status: "IN PROGRESS",
+                unread: 0,
+                lastTime: "04:18 PM",
+                lastMessage: "Please send over a formal price quote for this...",
+                student: {
+                    name: "Adam Woo",
+                    email: "xpertutor1@gmail.com",
+                    avatar: "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100&auto=format&fit=crop&q=80",
+                    online: true
+                },
+                tutor: {
+                    name: "Dr. Marcus Vance",
+                    email: "m.vance@chem.edu",
+                    rating: "4.98",
+                    avatar: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&auto=format&fit=crop&q=80",
+                    online: true
+                },
+                submissions: [
+                    { title: "Organic Chemistry Synthesis Pathway", subject: "Chemistry", deadline: "2026-11-20", tutor: "Dr. Marcus Vance", status: "IN PROGRESS" }
+                ],
+                documents: [
+                    { name: "Reaction_Mechanisms_Lab4.pdf", assignment: "Organic Chemistry" }
+                ],
+                tutorMessages: [
+                    {
+                        senderRole: "student",
+                        senderName: "Adam Woo",
+                        time: "04:15 PM",
+                        text: "Hi Dr. Vance, I need help verifying my stereochemistry diagrams before Friday."
+                    },
+                    {
+                        senderRole: "student",
+                        senderName: "Adam Woo",
+                        time: "04:18 PM",
+                        text: "Please send over a formal price quote for this sustained consultation."
+                    }
+                ],
+                csrMessages: [
+                    {
+                        senderRole: "csr",
+                        senderName: "CSR Support Desk",
+                        time: "04:00 PM",
+                        text: "Reminder: All milestone quotes must be submitted inside the official workspace escrow panel."
+                    }
+                ]
+            },
+            {
+                id: "#1794767244818",
+                subject: "Macroeconomics — Econometrics Modeling",
+                status: "ESCROW LOCKED",
+                unread: 1,
+                lastTime: "03:05 PM",
+                lastMessage: "I have uploaded the Stata dataset into the vault.",
+                student: {
+                    name: "Exam Assign",
+                    email: "exams.assign@gmail.com",
+                    avatar: "https://placehold.co/100x100/e0e7ff/3730a3?text=EA",
+                    online: false
+                },
+                tutor: {
+                    name: "Dr. Clara Stirling",
+                    email: "clara.stirling@edu.org",
+                    rating: "4.9",
+                    avatar: "https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=100&auto=format&fit=crop&q=80",
+                    online: true
+                },
+                submissions: [
+                    { title: "GDP Regression Analysis", subject: "Economics", deadline: "2026-11-19", tutor: "Dr. Clara Stirling", status: "IN PROGRESS" }
+                ],
+                documents: [
+                    { name: "Q3_Macro_Dataset.xlsx", assignment: "Macroeconomics" }
+                ],
+                tutorMessages: [
+                    {
+                        senderRole: "student",
+                        senderName: "Exam Assign",
+                        time: "03:05 PM",
+                        text: "I have uploaded the Stata dataset into the vault. Let me know when you can run the regression check."
+                    }
+                ],
+                csrMessages: [
+                    {
+                        senderRole: "student",
+                        senderName: "Exam Assign",
+                        time: "02:55 PM",
+                        text: "Can CSR extend my deadline by 24 hours if needed?"
+                    }
+                ]
+            },
+            {
+                id: "#1794781109421",
+                subject: "Computer Science — Distributed Systems",
+                status: "IN PROGRESS",
+                unread: 0,
+                lastTime: "01:50 PM",
+                lastMessage: "Raft consensus algorithm notes look solid!",
+                student: {
+                    name: "Sophia Lin",
+                    email: "sophia.lin@cs-dept.io",
+                    avatar: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100&auto=format&fit=crop&q=80",
+                    online: true
+                },
+                tutor: {
+                    name: "Prof. Julian Mercer",
+                    email: "j.mercer@tech.edu",
+                    rating: "4.95",
+                    avatar: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=100&auto=format&fit=crop&q=80",
+                    online: true
+                },
+                submissions: [
+                    { title: "Fault-Tolerant Key-Value Store", subject: "Computer Science", deadline: "2026-11-22", tutor: "Prof. Julian Mercer", status: "IN PROGRESS" }
+                ],
+                documents: [
+                    { name: "raft_architecture_spec.pdf", assignment: "Distributed Systems" }
+                ],
+                tutorMessages: [
+                    {
+                        senderRole: "tutor",
+                        senderName: "Prof. Julian Mercer",
+                        time: "01:50 PM",
+                        text: "Raft consensus algorithm notes look solid! Make sure edge cases for leader election timeout are covered."
+                    }
+                ],
+                csrMessages: []
+            },
+            {
+                id: "#1794790041289",
+                subject: "Applied Statistics — Bayesian Inference",
+                status: "REVIEW",
+                unread: 0,
+                lastTime: "11:12 AM",
+                lastMessage: "Thank you for clarifying the Markov Chain steps.",
+                student: {
+                    name: "Liam O'Connor",
+                    email: "liam.oconnor@stats.net",
+                    avatar: "https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?w=100&auto=format&fit=crop&q=80",
+                    online: false
+                },
+                tutor: {
+                    name: "Dr. Elena Rostova",
+                    email: "e.rostova@math.org",
+                    rating: "5.0",
+                    avatar: "https://images.unsplash.com/photo-1580489944761-15a19d654956?w=100&auto=format&fit=crop&q=80",
+                    online: true
+                },
+                submissions: [
+                    { title: "MCMC Posterior Sampling", subject: "Statistics", deadline: "2026-11-17", tutor: "Dr. Elena Rostova", status: "IN PROGRESS" }
+                ],
+                documents: [
+                    { name: "bayesian_priors_model.R", assignment: "Applied Statistics" }
+                ],
+                tutorMessages: [
+                    {
+                        senderRole: "student",
+                        senderName: "Liam O'Connor",
+                        time: "11:12 AM",
+                        text: "Thank you for clarifying the Markov Chain steps. Ready for final review."
+                    }
+                ],
+                csrMessages: []
+            }
+        ];
+
+        // Extract unique list of all users (Students & Tutors) so every single user can be listed cleanly
+        const allUsersDirectory = [
+            { name: "Adam Woo", email: "xpertutor1@gmail.com", role: "Student", online: true, activeRooms: 2, avatar: "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100&auto=format&fit=crop&q=80", roomId: "#1794746583002" },
+            { name: "Dr. Clara Stirling", email: "clara.stirling@edu.org", role: "Tutor", rating: "4.9", online: true, activeRooms: 2, avatar: "https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=100&auto=format&fit=crop&q=80", roomId: "#1794746583002" },
+            { name: "Dr. Marcus Vance", email: "m.vance@chem.edu", role: "Tutor", rating: "4.98", online: true, activeRooms: 1, avatar: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&auto=format&fit=crop&q=80", roomId: "#1794769513866" },
+            { name: "Exam Assign", email: "exams.assign@gmail.com", role: "Student", online: false, activeRooms: 1, avatar: "https://placehold.co/100x100/e0e7ff/3730a3?text=EA", roomId: "#1794767244818" },
+            { name: "Sophia Lin", email: "sophia.lin@cs-dept.io", role: "Student", online: true, activeRooms: 1, avatar: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100&auto=format&fit=crop&q=80", roomId: "#1794781109421" },
+            { name: "Prof. Julian Mercer", email: "j.mercer@tech.edu", role: "Tutor", rating: "4.95", online: true, activeRooms: 1, avatar: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=100&auto=format&fit=crop&q=80", roomId: "#1794781109421" },
+            { name: "Liam O'Connor", email: "liam.oconnor@stats.net", role: "Student", online: false, activeRooms: 1, avatar: "https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?w=100&auto=format&fit=crop&q=80", roomId: "#1794790041289" },
+            { name: "Dr. Elena Rostova", email: "e.rostova@math.org", role: "Tutor", rating: "5.0", online: true, activeRooms: 1, avatar: "https://images.unsplash.com/photo-1580489944761-15a19d654956?w=100&auto=format&fit=crop&q=80", roomId: "#1794790041289" }
+        ];
+
+        // ==========================================
+        // STATE MANAGEMENT
+        // ==========================================
+        let activeRoomId = "#1794746583002";
+        let currentTab = "rooms"; // 'rooms' | 'all-users' | 'students' | 'tutors'
+        let activeChatChannel = "tutor"; // 'tutor' (Student <-> Tutor chat) | 'csr' (Separate CSR Support chat)
+        let senderIdentity = "tutor"; // 'tutor' | 'csr'
+        let isExpanded = false;
+        let isInspectorVisible = true;
+
+        // ==========================================
+        // RENDER DIRECTORY (ROOMS OR ALL USERS)
+        // ==========================================
+        function renderDirectory() {
+            const listEl = document.getElementById("directoryList");
+            const query = document.getElementById("searchInput").value.toLowerCase().trim();
+            listEl.innerHTML = "";
+
+            if (currentTab === "rooms") {
+                const filteredRooms = chatRooms.filter(room =>
+                    room.student.name.toLowerCase().includes(query) ||
+                    room.tutor.name.toLowerCase().includes(query) ||
+                    room.subject.toLowerCase().includes(query) ||
+                    room.id.toLowerCase().includes(query)
+                );
+
+                if (filteredRooms.length === 0) {
+                    listEl.innerHTML = `<div class="text-center py-8 text-xs text-slate-400">No matching chat rooms found.</div>`;
+                    return;
+                }
+
+                filteredRooms.forEach(room => {
+                    const isSelected = room.id === activeRoomId;
+                    const card = document.createElement("div");
+                    card.onclick = () => selectRoom(room.id);
+                    card.className = `p-3 rounded-xl border cursor-pointer transition-all ${
+                        isSelected
+                            ? "bg-white border-brand-500 ring-2 ring-brand-500/15 shadow-xs"
+                            : "bg-white/80 hover:bg-white border-slate-200/80 hover:border-slate-300"
+                    }`;
+
+                    card.innerHTML = `
+                        <div class="flex items-center justify-between gap-2 mb-2">
+                            <span class="font-mono text-[10px] font-semibold px-1.5 py-0.5 rounded bg-slate-100 text-slate-600">
+                                ${room.id}
+                            </span>
+                            <div class="flex items-center gap-1.5">
+                                <span class="text-[10px] text-slate-400">${room.lastTime}</span>
+                                ${room.unread > 0 ? `<span class="px-1.5 py-0.2 rounded-full bg-brand-600 text-white text-[10px] font-bold">${room.unread} new</span>` : ""}
+                            </div>
+                        </div>
+
+                        <!-- Student & Tutor Compact Pair -->
+                        <div class="flex items-center gap-2.5 mb-2">
+                            <div class="relative flex -space-x-2 shrink-0">
+                                <img src="${room.student.avatar}" onerror="this.src='https://placehold.co/32x32/e2e8f0/475569?text=S'" class="w-8 h-8 rounded-full object-cover ring-2 ring-white">
+                                <img src="${room.tutor.avatar}" onerror="this.src='https://placehold.co/32x32/ffedd5/c2410c?text=T'" class="w-8 h-8 rounded-full object-cover ring-2 ring-white">
+                                <span class="w-2.5 h-2.5 rounded-full ${room.student.online ? 'bg-emerald-500' : 'bg-slate-300'} ring-2 ring-white absolute -bottom-0.5 -right-0.5"></span>
+                            </div>
+                            <div class="min-w-0 flex-1">
+                                <p class="text-xs font-bold text-slate-900 truncate">
+                                    ${room.student.name} <span class="text-slate-400 font-normal">↔</span> ${room.tutor.name}
+                                </p>
+                                <p class="text-[11px] text-slate-500 truncate">${room.subject}</p>
+                            </div>
+                        </div>
+
+                        <!-- Channel Counters & Last Message Preview -->
+                        <div class="flex items-center justify-between gap-2 pt-1.5 border-t border-slate-100">
+                            <p class="text-[11px] text-slate-500 truncate flex-1">"${room.lastMessage}"</p>
+                            <div class="flex items-center gap-1 shrink-0">
+                                <span title="Tutor Chat Messages" class="px-1.5 py-0.5 rounded text-[9px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200/70">
+                                    T:${room.tutorMessages.length}
+                                </span>
+                                <span title="CSR Chat Messages" class="px-1.5 py-0.5 rounded text-[9px] font-bold bg-brand-50 text-brand-700 border border-brand-200/70">
+                                    CSR:${room.csrMessages.length}
+                                </span>
+                            </div>
+                        </div>
+                    `;
+                    listEl.appendChild(card);
+                });
+            } else {
+                // ALL USERS / STUDENTS / TUTORS LIST VIEW
+                const filteredUsers = allUsersDirectory.filter(u => {
+                    const matchesSearch = u.name.toLowerCase().includes(query) || u.email.toLowerCase().includes(query);
+                    if (currentTab === "students") return matchesSearch && u.role === "Student";
+                    if (currentTab === "tutors") return matchesSearch && u.role === "Tutor";
+                    return matchesSearch;
+                });
+
+                if (filteredUsers.length === 0) {
+                    listEl.innerHTML = `<div class="text-center py-8 text-xs text-slate-400">No users match your filter.</div>`;
+                    return;
+                }
+
+                filteredUsers.forEach(user => {
+                    const isStudent = user.role === "Student";
+                    const userCard = document.createElement("div");
+                    userCard.onclick = () => {
+                        selectRoom(user.roomId);
+                        triggerActionToast(`Opened active chat room for ${user.name}`);
+                    };
+                    userCard.className = "p-3 rounded-xl bg-white hover:bg-slate-50 border border-slate-200/80 hover:border-brand-300 cursor-pointer transition flex items-center justify-between gap-3";
+
+                    userCard.innerHTML = `
+                        <div class="flex items-center gap-3 min-w-0">
+                            <div class="relative shrink-0">
+                                <img src="${user.avatar}" onerror="this.src='https://placehold.co/36x36/e2e8f0/475569?text=U'" class="w-9 h-9 rounded-full object-cover">
+                                <span class="w-2.5 h-2.5 rounded-full ${user.online ? 'bg-emerald-500' : 'bg-slate-300'} ring-2 ring-white absolute bottom-0 right-0"></span>
+                            </div>
+                            <div class="min-w-0">
+                                <div class="flex items-center gap-1.5">
+                                    <p class="text-xs font-bold text-slate-900 truncate">${user.name}</p>
+                                    <span class="px-1.5 py-0.2 rounded text-[10px] font-semibold ${isStudent ? 'bg-blue-50 text-blue-700 border border-blue-200/60' : 'bg-emerald-50 text-emerald-700 border border-emerald-200/60'}">
+                                        ${user.role}
+                                    </span>
+                                </div>
+                                <p class="text-[11px] text-slate-500 truncate">${user.email}</p>
+                            </div>
+                        </div>
+                        <div class="text-right shrink-0">
+                            <span class="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-slate-100 hover:bg-brand-50 text-slate-700 hover:text-brand-700 text-[11px] font-semibold transition">
+                                <span>Chat</span>
+                                <i data-lucide="arrow-up-right" class="w-3 h-3"></i>
+                            </span>
+                        </div>
+                    `;
+                    listEl.appendChild(userCard);
+                });
+            }
+
+            lucide.createIcons();
+        }
+
+        // ==========================================
+        // SELECT ROOM & RENDER CHAT + INSPECTOR
+        // ==========================================
+        function selectRoom(roomId) {
+            activeRoomId = roomId;
+            const room = chatRooms.find(r => r.id === roomId);
+            if (!room) return;
+
+            room.unread = 0;
+
+            // Update Chat Header
+            document.getElementById("activeStudentAvatar").src = room.student.avatar;
+            document.getElementById("activeTutorAvatar").src = room.tutor.avatar;
+            document.getElementById("activeRoomTitle").textContent = `${room.student.name} ↔ ${room.tutor.name}`;
+            document.getElementById("activeRoomId").textContent = room.id;
+            document.getElementById("activeRoomSubtitle").textContent = `${room.subject} • Escrow Secured`;
+
+            // Update Role Switcher Tutor Name dynamically for this room
+            document.getElementById("roleBtnTutorLabel").textContent = `Tutor (${room.tutor.name})`;
+            updateChannelBadges(room);
+            updateComposerUI(room);
+
+            // Update Inspector Participants
+            document.getElementById("inspectorStudentAvatar").src = room.student.avatar;
+            document.getElementById("inspectorStudentName").textContent = room.student.name;
+            document.getElementById("inspectorStudentEmail").textContent = room.student.email;
+
+            document.getElementById("inspectorTutorAvatar").src = room.tutor.avatar;
+            document.getElementById("inspectorTutorName").textContent = room.tutor.name;
+            document.getElementById("inspectorTutorRating").textContent = `★ ${room.tutor.rating} • Verified Specialist`;
+
+            // Render Messages for active channel
+            renderMessages(room);
+
+            // Render Submissions
+            const subList = document.getElementById("submissionsList");
+            document.getElementById("submissionsCount").textContent = `${room.submissions.length} Total`;
+            subList.innerHTML = room.submissions.map(sub => `
+                <div class="p-3 rounded-xl bg-white border border-slate-200/80 space-y-1.5 shadow-2xs">
+                    <div class="flex items-start justify-between gap-2">
+                        <p class="text-xs font-semibold text-slate-900 leading-snug">${sub.title}</p>
+                        <button onclick="triggerActionToast('Downloading submission record...')" class="p-1.5 rounded-lg bg-brand-50 text-brand-600 hover:bg-brand-100 shrink-0 transition" title="Download Record">
+                            <i data-lucide="download" class="w-3.5 h-3.5"></i>
+                        </button>
+                    </div>
+                    <div class="flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-slate-500">
+                        <span>Subject: <strong class="text-slate-700">${sub.subject}</strong></span>
+                        <span>•</span>
+                        <span>Due: <strong class="text-slate-700">${sub.deadline}</strong></span>
+                    </div>
+                    <div class="pt-1 flex items-center justify-between">
+                        <span class="text-[10px] text-slate-500">Tutor: <span class="text-brand-600 font-semibold">${sub.tutor}</span></span>
+                        <span class="px-1.5 py-0.5 rounded text-[9px] font-bold bg-blue-50 text-blue-700 border border-blue-200/70">${sub.status}</span>
+                    </div>
+                </div>
+            `).join("");
+
+            // Render Documents Vault
+            const docList = document.getElementById("documentsList");
+            document.getElementById("docsCount").textContent = `${room.documents.length} Files`;
+            docList.innerHTML = room.documents.map(doc => `
+                <div class="p-2.5 rounded-xl bg-white border border-slate-200/80 flex items-center justify-between gap-2.5 hover:border-brand-300 transition">
+                    <div class="flex items-center gap-2.5 min-w-0">
+                        <div class="w-8 h-8 rounded-lg bg-brand-50 border border-brand-200/70 flex items-center justify-center text-brand-600 shrink-0">
+                            <i data-lucide="file-text" class="w-4 h-4"></i>
+                        </div>
+                        <div class="min-w-0">
+                            <p class="text-xs font-semibold text-slate-800 truncate">${doc.name}</p>
+                            <p class="text-[10px] text-slate-400 truncate">${doc.assignment}</p>
+                        </div>
+                    </div>
+                    <button onclick="triggerActionToast('Downloading ${doc.name}...')" class="p-1.5 rounded-lg text-slate-500 hover:text-brand-600 hover:bg-brand-50 shrink-0 transition">
+                        <i data-lucide="download" class="w-4 h-4"></i>
+                    </button>
+                </div>
+            `).join("");
+
+            renderDirectory();
+            lucide.createIcons();
+        }
+
+        // Switch between the separate CSR Support Chat and Tutor Consultation Chat
+        function switchChatChannel(channel) {
+            activeChatChannel = channel;
+            // Automatically align the reply identity with the selected chat channel
+            senderIdentity = channel;
+
+            const tutorTab = document.getElementById("channel-tab-tutor");
+            const csrTab = document.getElementById("channel-tab-csr");
+            const hintText = document.getElementById("channelHintText");
+            const feedContainer = document.getElementById("chatMessagesContainer");
+            const tutorBadge = document.getElementById("tutorMsgBadge");
+            const csrBadge = document.getElementById("csrMsgBadge");
+
+            if (channel === "tutor") {
+                tutorTab.className = "flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-semibold bg-emerald-600 text-white shadow-xs transition";
+                tutorBadge.className = "px-1.5 py-0.2 rounded-full text-[10px] bg-white/20 text-white font-bold";
+                csrTab.className = "flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-medium text-slate-600 hover:text-slate-900 hover:bg-white/60 transition";
+                csrBadge.className = "px-1.5 py-0.2 rounded-full text-[10px] bg-brand-100 text-brand-700 font-bold";
+                hintText.className = "text-[11px] text-emerald-700 bg-emerald-50 border border-emerald-200/70 px-2.5 py-1 rounded-lg font-medium";
+                hintText.textContent = "Academic Thread: Student ↔ Tutor";
+                feedContainer.classList.remove("bg-orange-50/25");
+                feedContainer.classList.add("bg-emerald-50/20");
+            } else {
+                csrTab.className = "flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-semibold bg-brand-600 text-white shadow-xs transition";
+                csrBadge.className = "px-1.5 py-0.2 rounded-full text-[10px] bg-white/20 text-white font-bold";
+                tutorTab.className = "flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-medium text-slate-600 hover:text-slate-900 hover:bg-white/60 transition";
+                tutorBadge.className = "px-1.5 py-0.2 rounded-full text-[10px] bg-emerald-100 text-emerald-700 font-bold";
+                hintText.className = "text-[11px] text-brand-700 bg-brand-50 border border-brand-200/70 px-2.5 py-1 rounded-lg font-medium";
+                hintText.textContent = "Support Desk Thread: Private CSR Assistance";
+                feedContainer.classList.remove("bg-emerald-50/20");
+                feedContainer.classList.add("bg-orange-50/25");
+            }
+
+            const room = chatRooms.find(r => r.id === activeRoomId);
+            if (room) {
+                updateComposerUI(room);
+                renderMessages(room);
+            }
+        }
+
+        // Toggle Admin Sender Role between CSR Support and Tutor
+        function setSenderIdentity(role) {
+            senderIdentity = role;
+            // Also switch to the corresponding separate chat thread so messages go to the right chat
+            if (activeChatChannel !== role) {
+                switchChatChannel(role);
+                return;
+            }
+            const room = chatRooms.find(r => r.id === activeRoomId);
+            if (room) updateComposerUI(room);
+        }
+
+        function updateComposerUI(room) {
+            const csrBtn = document.getElementById("roleBtn-csr");
+            const tutorBtn = document.getElementById("roleBtn-tutor");
+            const badge = document.getElementById("activePostingBadge");
+            const input = document.getElementById("adminMessageInput");
+            const submitBtn = document.getElementById("sendMsgSubmitBtn");
+            const sendLabel = document.getElementById("sendBtnLabel");
+            const composerWrapper = document.getElementById("composerWrapper");
+            const quickRepliesBar = document.getElementById("quickRepliesBar");
+
+            if (senderIdentity === "csr") {
+                csrBtn.className = "flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-semibold bg-brand-600 text-white shadow-2xs transition";
+                tutorBtn.className = "flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-semibold text-slate-600 hover:text-slate-900 transition";
+                badge.className = "text-[11px] text-brand-700 bg-brand-50 border border-brand-200 px-2.5 py-0.5 rounded-full font-medium";
+                badge.textContent = "Replying in CSR Support Desk Chat";
+                input.placeholder = "Write support reply as CSR Desk...";
+                input.className = "flex-1 px-4 py-2.5 bg-slate-50 focus:bg-white border border-slate-200 rounded-xl text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 transition";
+                submitBtn.className = "inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold bg-brand-600 hover:bg-brand-700 text-white shadow-xs transition active:scale-95 shrink-0 cursor-pointer";
+                sendLabel.textContent = "Send as CSR";
+                composerWrapper.className = "p-3.5 sm:p-4 bg-white border-t-2 border-brand-500/50 shrink-0 transition-colors duration-300";
+
+                const csrTemplates = [
+                    "Your billing escrow is verified and active.",
+                    "Please keep all payments & files inside the platform workspace.",
+                    "I have extended your submission review window by 24 hours.",
+                    "How else can Operational Support assist you today?"
+                ];
+                quickRepliesBar.innerHTML = `<span class="text-[10px] font-semibold text-slate-400 shrink-0">Quick CSR:</span>` + csrTemplates.map(t => `
+                    <button type="button" onclick="insertQuickReply('${t.replace(/'/g, "\\'")}')" class="px-2.5 py-1 rounded-lg bg-brand-50/80 hover:bg-brand-100 text-brand-800 border border-brand-200/70 text-[11px] font-medium whitespace-nowrap transition cursor-pointer">
+                        ${t}
+                    </button>
+                `).join("");
+            } else {
+                tutorBtn.className = "flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-semibold bg-emerald-600 text-white shadow-2xs transition";
+                csrBtn.className = "flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-semibold text-slate-600 hover:text-slate-900 transition";
+                badge.className = "text-[11px] text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-0.5 rounded-full font-medium";
+                badge.textContent = `Replying as ${room.tutor.name} in Tutor Chat`;
+                input.placeholder = `Reply to ${room.student.name} as ${room.tutor.name}...`;
+                input.className = "flex-1 px-4 py-2.5 bg-slate-50 focus:bg-white border border-slate-200 rounded-xl text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition";
+                submitBtn.className = "inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs transition active:scale-95 shrink-0 cursor-pointer";
+                sendLabel.textContent = "Send as Tutor";
+                composerWrapper.className = "p-3.5 sm:p-4 bg-white border-t-2 border-emerald-500/50 shrink-0 transition-colors duration-300";
+
+                const tutorTemplates = [
+                    "I have reviewed your uploaded files in the vault.",
+                    "Let's walk through the methodology step by step.",
+                    "Could you upload your latest draft brief so I can check it?",
+                    "Everything looks aligned with your syllabus deadline!"
+                ];
+                quickRepliesBar.innerHTML = `<span class="text-[10px] font-semibold text-slate-400 shrink-0">Quick Tutor:</span>` + tutorTemplates.map(t => `
+                    <button type="button" onclick="insertQuickReply('${t.replace(/'/g, "\\'")}')" class="px-2.5 py-1 rounded-lg bg-emerald-50/80 hover:bg-emerald-100 text-emerald-800 border border-emerald-200/70 text-[11px] font-medium whitespace-nowrap transition cursor-pointer">
+                        ${t}
+                    </button>
+                `).join("");
+            }
+        }
+
+        function insertQuickReply(text) {
+            const input = document.getElementById("adminMessageInput");
+            input.value = text;
+            input.focus();
+        }
+
+        function copyRoomId() {
+            const tempInput = document.createElement("input");
+            tempInput.value = activeRoomId;
+            document.body.appendChild(tempInput);
+            tempInput.select();
+            document.execCommand("copy");
+            document.body.removeChild(tempInput);
+            triggerActionToast(`Copied Room ID ${activeRoomId} to clipboard`);
+        }
+
+        function updateChannelBadges(room) {
+            document.getElementById("tutorMsgBadge").textContent = room.tutorMessages.length;
+            document.getElementById("csrMsgBadge").textContent = room.csrMessages.length;
+        }
+
+        function renderMessages(room) {
+            const container = document.getElementById("chatMessagesContainer");
+            container.innerHTML = "";
+
+            const messagesList = activeChatChannel === "csr" ? room.csrMessages : room.tutorMessages;
+
+            if (messagesList.length === 0) {
+                container.innerHTML = `
+                    <div class="h-full flex flex-col items-center justify-center text-center py-12 px-4">
+                        <div class="w-12 h-12 rounded-2xl bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-400 mb-3">
+                            <i data-lucide="${activeChatChannel === 'csr' ? 'headphones' : 'message-square'}" class="w-6 h-6"></i>
+                        </div>
+                        <p class="text-sm font-semibold text-slate-700">No messages in this ${activeChatChannel === 'csr' ? 'CSR Support' : 'Tutor Consultation'} thread yet</p>
+                        <p class="text-xs text-slate-400 mt-1 max-w-sm">Use the composer below to start the conversation as ${activeChatChannel === 'csr' ? 'CSR Support Desk' : room.tutor.name}.</p>
+                    </div>
+                `;
+                lucide.createIcons();
+                return;
+            }
+
+            messagesList.forEach(msg => {
+                const wrapper = document.createElement("div");
+
+                if (msg.senderRole === "csr") {
+                    // CSR Support Message (Right Aligned with Brand Orange Styling)
+                    wrapper.className = "flex flex-col items-end ml-auto max-w-2xl";
+                    wrapper.innerHTML = `
+                        <div class="flex items-center gap-2 mb-1 px-1">
+                            <span class="text-[11px] text-slate-400">${msg.time} •</span>
+                            <span class="text-xs font-semibold text-slate-700">${msg.senderName}</span>
+                            <span class="px-1.5 py-0.2 rounded text-[10px] font-bold bg-brand-100 text-brand-700 uppercase">CSR Desk</span>
+                        </div>
+                        <div class="px-4 py-3 rounded-2xl rounded-tr-sm bg-brand-600 text-white text-sm leading-relaxed shadow-xs">
+                            ${msg.text}
+                        </div>
+                    `;
+                } else if (msg.senderRole === "student") {
+                    // Student Bubble (Left Aligned)
+                    wrapper.className = "flex flex-col items-start max-w-2xl";
+                    wrapper.innerHTML = `
+                        <div class="flex items-center gap-2 mb-1 px-1">
+                            <span class="px-1.5 py-0.2 rounded text-[10px] font-bold bg-blue-100 text-blue-700 uppercase">Student</span>
+                            <span class="text-xs font-semibold text-slate-700">${msg.senderName}</span>
+                            <span class="text-[11px] text-slate-400">• ${msg.time}</span>
+                        </div>
+                        <div class="px-4 py-3 rounded-2xl rounded-tl-sm bg-white border border-blue-200/80 text-slate-800 text-sm leading-relaxed shadow-2xs">
+                            ${msg.text}
+                        </div>
+                    `;
+                } else {
+                    // Tutor Bubble (Right Aligned for clear visual distinction)
+                    wrapper.className = "flex flex-col items-end ml-auto max-w-2xl";
+                    wrapper.innerHTML = `
+                        <div class="flex items-center gap-2 mb-1 px-1">
+                            <span class="text-[11px] text-slate-400">${msg.time} •</span>
+                            <span class="text-xs font-semibold text-slate-700">${msg.senderName}</span>
+                            <span class="px-1.5 py-0.2 rounded text-[10px] font-bold bg-emerald-100 text-emerald-700 uppercase">Tutor</span>
+                        </div>
+                        <div class="px-4 py-3 rounded-2xl rounded-tr-sm bg-slate-900 text-white text-sm leading-relaxed shadow-xs">
+                            ${msg.text}
+                        </div>
+                    `;
+                }
+
+                container.appendChild(wrapper);
+            });
+
+            container.scrollTop = container.scrollHeight;
+            lucide.createIcons();
+        }
+
+        // ==========================================
+        // INTERACTIVE CONTROLS
+        // ==========================================
+        function setDirectoryTab(tab) {
+            currentTab = tab;
+            document.querySelectorAll(".dir-tab").forEach(btn => {
+                btn.classList.remove("bg-white", "text-slate-900", "shadow-xs", "font-semibold");
+                btn.classList.add("text-slate-600");
+            });
+            const activeBtn = document.getElementById(`tab-${tab}`);
+            activeBtn.classList.add("bg-white", "text-slate-900", "shadow-xs", "font-semibold");
+            activeBtn.classList.remove("text-slate-600");
+            renderDirectory();
+        }
+
+        function filterDirectory() {
+            renderDirectory();
+        }
+
+        function sendAdminMessage(event) {
+            event.preventDefault();
+            const input = document.getElementById("adminMessageInput");
+            const text = input.value.trim();
+            if (!text) return;
+
+            const room = chatRooms.find(r => r.id === activeRoomId);
+            if (!room) return;
+
+            const now = new Date();
+            const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+            if (senderIdentity === "csr") {
+                room.csrMessages.push({
+                    senderRole: "csr",
+                    senderName: "CSR Support Desk",
+                    time: timeStr,
+                    text: text
+                });
+                room.lastMessage = `[CSR]: ${text}`;
+            } else {
+                room.tutorMessages.push({
+                    senderRole: "tutor",
+                    senderName: room.tutor.name,
+                    time: timeStr,
+                    text: text
+                });
+                room.lastMessage = `[${room.tutor.name}]: ${text}`;
+            }
+            room.lastTime = timeStr;
+
+            input.value = "";
+            updateChannelBadges(room);
+            renderMessages(room);
+            renderDirectory();
+        }
+
+        // EXPAND FULL PAGE TOGGLE
+        function toggleFullScreen() {
+            isExpanded = !isExpanded;
+            const wrapper = document.getElementById("appWrapper");
+            const card = document.getElementById("deskCard");
+            const expandText = document.getElementById("expandText");
+            const expandIcon = document.getElementById("expandIcon");
+
+            if (isExpanded) {
+                wrapper.classList.remove("max-w-[1600px]", "p-3", "sm:p-6");
+                wrapper.classList.add("max-w-full", "p-0", "h-screen");
+                card.classList.remove("rounded-2xl", "min-h-[820px]");
+                card.classList.add("rounded-none", "h-full");
+                expandText.textContent = "Exit Full Page";
+                expandIcon.setAttribute("data-lucide", "minimize-2");
+                triggerActionToast("Expanded Control Desk to Full Screen");
+            } else {
+                wrapper.classList.add("max-w-[1600px]", "p-3", "sm:p-6");
+                wrapper.classList.remove("max-w-full", "p-0", "h-screen");
+                card.classList.add("rounded-2xl", "min-h-[820px]");
+                card.classList.remove("rounded-none", "h-full");
+                expandText.textContent = "Expand Full Page";
+                expandIcon.setAttribute("data-lucide", "maximize-2");
+            }
+            lucide.createIcons();
+        }
+
+        // TOGGLE RIGHT INSPECTOR DRAWER
+        function toggleInspector() {
+            isInspectorVisible = !isInspectorVisible;
+            const drawer = document.getElementById("inspectorDrawer");
+            const btnText = document.getElementById("inspectorBtnText");
+
+            if (isInspectorVisible) {
+                drawer.classList.remove("hidden");
+                drawer.classList.add("flex");
+                btnText.textContent = "Hide Records";
+            } else {
+                drawer.classList.add("hidden");
+                drawer.classList.remove("flex");
+                btnText.textContent = "Show Records";
+            }
+        }
+
+        // TOAST & MODAL HELPERS
+        let toastTimeout;
+        function triggerActionToast(message) {
+            const toast = document.getElementById("toastNotification");
+            document.getElementById("toastMessage").textContent = message;
+            toast.classList.remove("translate-y-20", "opacity-0");
+            clearTimeout(toastTimeout);
+            toastTimeout = setTimeout(() => {
+                toast.classList.add("translate-y-20", "opacity-0");
+            }, 3000);
+        }
+
+        function openPurgeModal() {
+            const modal = document.getElementById("purgeModal");
+            modal.classList.remove("hidden");
+            modal.classList.add("flex");
+        }
+
+        function closePurgeModal() {
+            const modal = document.getElementById("purgeModal");
+            modal.classList.add("hidden");
+            modal.classList.remove("flex");
+        }
+
+        function confirmPurge() {
+            closePurgeModal();
+            triggerActionToast(`Thread ${activeRoomId} archived & purged.`);
+        }
+
+        // Initialize UI on Load
+        window.onload = function() {
+            selectRoom("#1794746583002");
+            lucide.createIcons();
+        };
+    </script>
+</body>
+</html>
