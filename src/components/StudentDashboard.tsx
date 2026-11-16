@@ -67,7 +67,8 @@ import type { TabLoadState } from '../lib/store';
 import ErrorBoundary from './ErrorBoundary';
 import { TabLoadingSkeleton, ErrorStatePanel, PaginationBar } from './ui/StatePanels';
 import { ResponsiveAvatar } from './ResponsiveImage';
-import StudentOnboardingWizard from './StudentOnboardingWizard';
+import ServiceAvatarSvg from './ServiceAvatarSvg';
+import StudentOnboardingWizard, { PATHWAY_OPTIONS, type OnboardingPathwayId } from './StudentOnboardingWizard';
 import { 
   User, 
   UserRole,
@@ -274,6 +275,7 @@ export default function StudentDashboard({
   const [isMobileChannelsOpen, setIsMobileChannelsOpen] = useState(false);
   const [isMobileSearchOpen, setIsMobileSearchOpen] = useState(false);
   const [isQuickRequestModalOpen, setIsQuickRequestModalOpen] = useState(false);
+  const [preselectedWizardPathway, setPreselectedWizardPathway] = useState<OnboardingPathwayId | null>(null);
   const [quickReqTitle, setQuickReqTitle] = useState('');
   const [quickReqSubject, setQuickReqSubject] = useState('Computer Science');
   const [quickReqType, setQuickReqType] = useState('Assignment Help');
@@ -300,6 +302,14 @@ export default function StudentDashboard({
     toastTimeoutRef.current = window.setTimeout(() => {
       setActionToast(null);
     }, 2600);
+  };
+
+  const openStepByStepRequestWizard = (pathwayId?: OnboardingPathwayId | null) => {
+    setPreselectedWizardPathway(pathwayId ?? null);
+    setActiveTab('new_request');
+    if (typeof window !== 'undefined') {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
   };
 
   useEffect(() => {
@@ -975,16 +985,32 @@ export default function StudentDashboard({
     setIsSubmittingQuickReq(true);
     try {
       const subjectLower = (quickReqSubject || '').toLowerCase();
-      const matchedTutor =
-        tutors.find(
-          (t) =>
-            subjectLower &&
-            ((t.subjects || []).some(
-              (s) => s.toLowerCase().includes(subjectLower) || subjectLower.includes(s.toLowerCase())
-            ) ||
-              (t.primarySubject || '').toLowerCase().includes(subjectLower) ||
-              (t.bio || '').toLowerCase().includes(subjectLower))
-        ) || tutors[0];
+      const requestLower = (quickReqType || '').toLowerCase();
+      const existingChatTutors = new Set(
+        studentChats
+          .filter((c) => c.tutorId && !c.tutorId.startsWith('admin_') && c.tutorId !== 'admin_emily' && c.tutorId !== 'admin_shaka')
+          .map((c) => c.tutorId)
+      );
+      const existingAssignTutors = new Set(
+        studentAssignments.map((a) => a.tutorId).filter((id): id is string => Boolean(id))
+      );
+      const rankedTutors = [...tutors].sort((a, b) => {
+        const scoreTutor = (t: User) => {
+          let s = Number(t.rating || 4.8);
+          if (existingChatTutors.has(t.id)) s += 12;
+          if (existingAssignTutors.has(t.id)) s += 8;
+          if (t.verified) s += 3;
+          const haystack = [t.primarySubject || '', ...(t.subjects || []), t.bio || ''].join(' ').toLowerCase();
+          if (subjectLower && haystack.includes(subjectLower)) s += 18;
+          if (requestLower && haystack.includes(requestLower.split('/')[0])) s += 6;
+          return s;
+        };
+        return scoreTutor(b) - scoreTutor(a);
+      });
+      const matchedTutor = rankedTutors[0] || tutors[0];
+      const existingChatWithTutor = matchedTutor
+        ? studentChats.find((c) => c.tutorId === matchedTutor.id)
+        : undefined;
       const trimmedTitle = quickReqTitle.trim();
       const deliverablesSummary =
         quickReqDeliverables.length > 0 ? quickReqDeliverables.join(', ') : 'None selected';
@@ -1021,6 +1047,9 @@ export default function StudentDashboard({
         const newChatId = (chatRes as { id: string }).id;
         setLocalSelectedChatId(newChatId);
         onSubscribeToChatDetails?.(newChatId);
+      } else if (existingChatWithTutor) {
+        setLocalSelectedChatId(existingChatWithTutor.id);
+        onSubscribeToChatDetails?.(existingChatWithTutor.id);
       }
 
       setIsQuickRequestModalOpen(false);
@@ -1139,6 +1168,13 @@ export default function StudentDashboard({
   const filteredServices = normalizedDashQuery
     ? dashboardServices.filter(s => s.label.toLowerCase().includes(normalizedDashQuery))
     : dashboardServices;
+  const filteredAcademicServices = normalizedDashQuery
+    ? PATHWAY_OPTIONS.filter(
+        (p) =>
+          p.title.toLowerCase().includes(normalizedDashQuery) ||
+          p.description.toLowerCase().includes(normalizedDashQuery)
+      )
+    : PATHWAY_OPTIONS;
   const recentDashboardRequests = (normalizedDashQuery ? searchedAssignments : studentAssignments).slice(0, 5);
   const ongoingCount = studentAssignments.filter(a => a.status !== AssignmentStatus.COMPLETED).length;
   const completedCount = studentAssignments.filter(a => a.status === AssignmentStatus.COMPLETED).length;
@@ -1546,7 +1582,7 @@ export default function StudentDashboard({
 
             <button
               type="button"
-              onClick={() => setIsQuickRequestModalOpen(true)}
+              onClick={() => openStepByStepRequestWizard()}
               className="inline-flex items-center justify-center gap-1.5 bg-[#FF7A00] hover:bg-[#E86E00] text-white px-4 py-2 rounded-2xl text-[12px] font-bold shadow-md shadow-orange-500/15 cursor-pointer transition-all"
               id="header-create-request"
             >
@@ -1705,7 +1741,7 @@ export default function StudentDashboard({
                   <div className="grid grid-cols-2 sm:flex sm:flex-wrap gap-2 md:gap-3">
                     <button
                       type="button"
-                      onClick={() => setIsQuickRequestModalOpen(true)}
+                      onClick={() => openStepByStepRequestWizard()}
                       className="flex items-center justify-center gap-1.5 py-2 md:py-3 px-3 md:px-6 rounded-xl md:rounded-2xl bg-[#FF8A00] hover:bg-[#FF7A00] text-white font-semibold md:font-bold text-xs md:text-[13px] shadow-sm md:shadow-lg shadow-orange-500/20 active:scale-95 transition cursor-pointer"
                       id="hero-create-btn"
                     >
@@ -1814,6 +1850,60 @@ export default function StudentDashboard({
                     No portals matching &ldquo;{debouncedSearchQuery}&rdquo;.
                   </div>
                 )}
+
+                {/* ACADEMIC TUTORING SERVICES SHOWCASE WITH SPECIALIST AVATARS */}
+                <div className="mt-5" id="dashboard-academic-services">
+                  <div className="flex items-center justify-between mb-3 gap-2">
+                    <div>
+                      <h3 className="text-sm md:text-[15px] font-bold text-slate-900">
+                        Academic Services (Choose Step by Step)
+                      </h3>
+                      <p className="text-[11px] text-slate-500">
+                        Select any service avatar to start a step-by-step request &amp; optimal tutor match.
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => openStepByStepRequestWizard()}
+                      className="shrink-0 text-xs font-bold text-[#FF7A00] hover:underline cursor-pointer"
+                    >
+                      All {PATHWAY_OPTIONS.length} Services →
+                    </button>
+                  </div>
+
+                  {filteredAcademicServices.length > 0 ? (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5 md:gap-3">
+                      {filteredAcademicServices.map((service) => (
+                        <button
+                          key={service.id}
+                          type="button"
+                          onClick={() => openStepByStepRequestWizard(service.id)}
+                          id={`dashboard-service-${service.id}`}
+                          className="w-full text-left p-3.5 rounded-2xl border border-slate-200/80 bg-white hover:border-[#FF7A00] hover:bg-orange-50/30 shadow-2xs flex items-center gap-3.5 transition-all cursor-pointer active:scale-[0.99] group"
+                        >
+                          <div className="w-[52px] h-[52px] rounded-xl bg-gradient-to-br from-[#FFF7ED] to-[#FFEDD5] flex items-center justify-center shrink-0 border border-orange-100/80 group-hover:scale-105 transition-transform">
+                            <ServiceAvatarSvg serviceKey={service.id} className="w-11 h-11 drop-shadow-xs" />
+                          </div>
+                          <div className="flex-1 min-w-0 space-y-0.5">
+                            <div className="text-xs sm:text-[13px] font-bold text-slate-900 leading-snug line-clamp-2 group-hover:text-[#EA580C] transition-colors">
+                              {service.title}
+                            </div>
+                            <p className="text-[11px] text-slate-500 line-clamp-1 leading-snug">
+                              {service.description}
+                            </p>
+                            <span className="inline-block text-[10px] font-semibold text-orange-600">
+                              {service.meta}
+                            </span>
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="bg-white rounded-2xl border border-slate-200/70 p-4 text-center text-xs text-slate-500">
+                      No academic services matching &ldquo;{debouncedSearchQuery}&rdquo;.
+                    </div>
+                  )}
+                </div>
               </section>
 
               {/* RECENT REQUESTS SECTION */}
@@ -1919,7 +2009,7 @@ export default function StudentDashboard({
                       </p>
                       <button
                         type="button"
-                        onClick={() => setIsQuickRequestModalOpen(true)}
+                        onClick={() => openStepByStepRequestWizard()}
                         className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#FF7A00] hover:bg-[#E86E00] text-white text-xs font-semibold shadow-sm active:scale-95 transition cursor-pointer"
                       >
                         <Plus className="w-4 h-4" />
@@ -1939,16 +2029,25 @@ export default function StudentDashboard({
             <StudentOnboardingWizard
               currentUser={currentUser}
               tutors={tutors}
+              chats={studentChats}
+              existingAssignments={studentAssignments}
+              initialPathway={preselectedWizardPathway}
               onSubmitAssignment={onSubmitAssignment}
               onOpenChat={onOpenChat}
               onOpenWhatsApp={onOpenWhatsApp}
               onOpenMenu={() => setIsMobileSidebarOpen(true)}
-              onExit={() => setActiveTab('dashboard')}
+              onExit={() => {
+                setPreselectedWizardPathway(null);
+                setActiveTab('dashboard');
+              }}
               onSelectChatId={(chatId) => {
                 setLocalSelectedChatId(chatId);
                 if (onSubscribeToChatDetails) onSubscribeToChatDetails(chatId);
               }}
-              onGoToChat={() => setActiveTab('chat')}
+              onGoToChat={() => {
+                setPreselectedWizardPathway(null);
+                setActiveTab('chat');
+              }}
               onNavigate={onNavigate}
               onLogout={onLogout}
             />
@@ -1978,7 +2077,7 @@ export default function StudentDashboard({
                   </div>
                   <button
                     type="button"
-                    onClick={() => setIsQuickRequestModalOpen(true)}
+                    onClick={() => openStepByStepRequestWizard()}
                     className="shrink-0 inline-flex items-center gap-1 px-3 py-2 bg-[#FF7A00] hover:bg-[#E86E00] text-white rounded-xl text-xs font-bold shadow-xs cursor-pointer"
                   >
                     <Plus className="w-3.5 h-3.5" />
@@ -2235,7 +2334,7 @@ export default function StudentDashboard({
                   <p className="text-xs text-slate-600 font-medium">No student assignment briefs registered.</p>
                   <button
                     type="button"
-                    onClick={() => setIsQuickRequestModalOpen(true)}
+                    onClick={() => openStepByStepRequestWizard()}
                     className="mt-3 inline-flex items-center gap-1.5 bg-[#FF7A00] hover:bg-[#E86E00] text-white font-bold text-xs px-4 py-2 rounded-xl transition-all cursor-pointer"
                   >
                     <Plus className="w-4 h-4" />
@@ -2670,7 +2769,7 @@ export default function StudentDashboard({
                     </p>
                     <button
                       type="button"
-                      onClick={() => setIsQuickRequestModalOpen(true)}
+                      onClick={() => openStepByStepRequestWizard()}
                       className="mt-4 inline-flex items-center gap-1.5 bg-[#FF7A00] hover:bg-[#E86E00] text-white text-xs font-bold px-4 py-2 rounded-xl transition-all cursor-pointer"
                     >
                       <Plus className="w-4 h-4" />
@@ -2891,7 +2990,7 @@ export default function StudentDashboard({
                       const supportChat = studentChats.find(c => c.tutorId === 'admin_emily' || c.tutorId.startsWith('admin_'));
                       
                       // AUTOMATED TUTOR MATCHING LOGIC:
-                      // Strictly display tutors who have been automatically assigned by the system
+                      // Display tutors assigned to student requests OR already present in student's tutor chats
                       const assignedTutorIds = new Set<string>(
                         studentAssignments
                           .filter(a => a.tutorId && !a.tutorId.startsWith('admin_') && a.tutorId !== 'admin_emily' && a.tutorId !== 'admin_shaka')
@@ -2899,7 +2998,7 @@ export default function StudentDashboard({
                       );
 
                       const assignedTutorChats = studentChats.filter(c => 
-                        !c.tutorId.startsWith('admin_') && c.tutorId !== 'admin_emily' && assignedTutorIds.has(c.tutorId)
+                        !c.tutorId.startsWith('admin_') && c.tutorId !== 'admin_emily' && c.tutorId !== 'admin_shaka'
                       );
 
                       const filteredTutorChats = assignedTutorChats.filter(c => {
@@ -4096,7 +4195,7 @@ export default function StudentDashboard({
             <div className="flex items-center justify-center">
               <button
                 type="button"
-                onClick={() => setIsQuickRequestModalOpen(true)}
+                onClick={() => openStepByStepRequestWizard()}
                 aria-label="Create Request"
                 className="-mt-7 w-12 h-12 rounded-2xl bg-gradient-to-tr from-[#FF7A00] to-[#FF9900] text-white shadow-lg shadow-orange-500/30 flex items-center justify-center active:scale-90 transition cursor-pointer"
               >
@@ -4189,7 +4288,6 @@ export default function StudentDashboard({
                 >
                   {QUICK_REQUEST_SERVICES.map((service) => {
                     const isSelected = quickReqType === service.value;
-                    const IconComp = service.icon;
                     return (
                       <button
                         key={service.value}
@@ -4203,8 +4301,8 @@ export default function StudentDashboard({
                             : 'border border-slate-200 bg-white hover:border-orange-300 hover:bg-orange-50/20'
                         }`}
                       >
-                        <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#FFF7ED] to-[#FFEDD5] flex items-center justify-center shrink-0 border border-orange-100/80">
-                          <IconComp className="w-5 h-5 text-[#EA580C]" />
+                        <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-[#FFF7ED] to-[#FFEDD5] flex items-center justify-center shrink-0 border border-orange-100/80">
+                          <ServiceAvatarSvg serviceKey={service.value} className="w-10 h-10 drop-shadow-xs" />
                         </div>
                         <div className="flex-1 min-w-0">
                           <div className="text-xs font-bold text-slate-900 leading-snug line-clamp-2">

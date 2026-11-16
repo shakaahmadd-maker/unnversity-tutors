@@ -1,0 +1,691 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>universitytutors.com — Redesigned Interactive Footer</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'system-ui', '-apple-system', 'sans-serif'],
+          },
+          colors: {
+            cream: {
+              50: '#FFFBF7',
+              100: '#FFF6EE',
+              200: '#FDF5ED',
+              300: '#F8E7D7',
+              400: '#F3D8C2',
+            },
+            terracotta: {
+              600: '#C2410C',
+              700: '#9A3412',
+              800: '#7C2D12',
+              900: '#431407',
+            },
+          },
+        },
+      },
+    };
+  </script>
+  <style>
+    /* Smooth grid-row transition for accordions without fixed max-height clipping */
+    .accordion-content {
+      display: grid;
+      grid-template-rows: 0fr;
+      transition: grid-template-rows 0.32s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.25s ease;
+      opacity: 0;
+    }
+    .accordion-content.is-open {
+      grid-template-rows: 1fr;
+      opacity: 1;
+    }
+    .accordion-inner {
+      overflow: hidden;
+    }
+    /* Smooth chevron rotation */
+    .chevron-icon {
+      transition: transform 0.28s cubic-bezier(0.22, 1, 0.36, 1);
+    }
+    .is-expanded .chevron-icon {
+      transform: rotate(180deg);
+    }
+    /* Hide horizontal scrollbar for mobile topic strip while keeping touch scroll */
+    .no-scrollbar::-webkit-scrollbar {
+      display: none;
+    }
+    .no-scrollbar {
+      -ms-overflow-style: none;
+      scrollbar-width: none;
+    }
+  </style>
+</head>
+<body class="bg-stone-100 text-stone-800 font-sans antialiased min-h-screen flex flex-col justify-between">
+
+  <!-- Subtle Page Context Header & Responsive Viewport Preview Bar -->
+  <header class="bg-white border-b border-stone-200/80 sticky top-0 z-30 shadow-sm">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3.5 flex flex-wrap items-center justify-between gap-4">
+      <div class="flex items-center gap-3">
+        <div class="w-8 h-8 rounded-lg bg-terracotta-700 text-white flex items-center justify-center font-bold text-sm shadow-xs">
+          UT
+        </div>
+        <div>
+          <div class="flex items-center gap-2">
+            <span class="font-semibold text-stone-900 text-sm tracking-tight">universitytutors.com</span>
+            <span class="text-[11px] font-medium px-2 py-0.5 rounded-full bg-amber-100/80 text-terracotta-700 border border-amber-200/80">
+              Footer UI Redesign
+            </span>
+          </div>
+          <p class="text-xs text-stone-500 hidden sm:block">
+            Interactive preview — click expandable tool drawers, study topics, or integrity disclosures below
+          </p>
+        </div>
+      </div>
+
+      <!-- Optional Viewport Width Switcher for Desktop / Tablet / Mobile Testing -->
+      <div class="flex items-center gap-1.5 bg-stone-100 p-1 rounded-xl border border-stone-200/80" role="group" aria-label="Viewport Preview Switcher">
+        <button type="button" onclick="setPreviewWidth('desktop')" id="btn-desktop"
+          class="viewport-btn px-3 py-1.5 rounded-lg text-xs font-medium transition-all text-stone-600 hover:text-stone-900 flex items-center gap-1.5">
+          <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <rect x="2" y="3" width="20" height="14" rx="2" />
+            <path d="M8 21h8M12 17v4" />
+          </svg>
+          <span>Desktop</span>
+        </button>
+        <button type="button" onclick="setPreviewWidth('tablet')" id="btn-tablet"
+          class="viewport-btn px-3 py-1.5 rounded-lg text-xs font-medium transition-all text-stone-600 hover:text-stone-900 flex items-center gap-1.5">
+          <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <rect x="4" y="2" width="16" height="20" rx="2" />
+            <circle cx="12" cy="18" r="1" />
+          </svg>
+          <span>Tablet</span>
+        </button>
+        <button type="button" onclick="setPreviewWidth('mobile')" id="btn-mobile"
+          class="viewport-btn px-3 py-1.5 rounded-lg text-xs font-medium transition-all bg-white text-stone-900 shadow-xs flex items-center gap-1.5">
+          <svg class="w-3.5 h-3.5 text-terracotta-700" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <rect x="6" y="2" width="12" height="20" rx="2" />
+            <circle cx="12" cy="18" r="1" />
+          </svg>
+          <span>Mobile</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Subtle Simulated Page Content Spacer -->
+  <main class="flex-1 flex items-center justify-center px-4 py-6 sm:py-10">
+    <div class="max-w-xl text-center space-y-1.5">
+      <div class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white border border-stone-200 text-xs font-medium text-stone-500 shadow-2xs">
+        <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+        Compact Mobile Preview Active
+      </div>
+      <p class="text-xs sm:text-sm text-stone-500">
+        Switch between <span class="font-medium text-stone-700">Mobile</span>, <span class="font-medium text-stone-700">Tablet</span>, and <span class="font-medium text-stone-700">Desktop</span> above to inspect the compact footer footprint.
+      </p>
+    </div>
+  </main>
+
+  <!-- Toast Notification Banner (Replaces alert() for link clicks) -->
+  <div id="toast-notification"
+    class="fixed bottom-4 right-4 z-50 transform translate-y-20 opacity-0 pointer-events-none transition-all duration-300 bg-stone-900 text-white px-3.5 py-2.5 rounded-xl shadow-lg border border-stone-700/80 flex items-center gap-2.5 max-w-xs sm:max-w-sm">
+    <span class="w-2 h-2 rounded-full bg-amber-400 shrink-0"></span>
+    <p id="toast-message" class="text-xs font-medium leading-relaxed text-stone-100"></p>
+  </div>
+
+  <!-- Viewport Frame Wrapper (Defaults to Mobile width to showcase compact mobile height) -->
+  <div id="preview-wrapper" class="w-full max-w-md mx-auto shadow-xl border-x border-stone-300 transition-all duration-300">
+
+    <!-- ===================================================================== -->
+    <!-- REDESIGNED UNIVERSITYTUTORS.COM FOOTER COMPONENT (MOBILE-COMPACT)     -->
+    <!-- ===================================================================== -->
+    <footer class="bg-cream-100 border-t border-cream-400 text-stone-800 selection:bg-amber-200 selection:text-terracotta-900">
+      <div class="max-w-7xl mx-auto px-3.5 sm:px-6 lg:px-8 py-5 sm:pt-10 sm:pb-8 space-y-4 sm:space-y-9">
+
+        <!-- 1. TOP INTERACTIVE TOOL SUITES SECTION (Compact on Mobile, 2-Col on Desktop) -->
+        <section aria-label="Browser-Local Academic Tool Suites" class="grid grid-cols-1 lg:grid-cols-2 gap-3 sm:gap-6 items-start">
+
+          <!-- CARD 1: FREE UNIVERSITY MATHEMATICS & STATISTICS SUITE -->
+          <div class="bg-cream-50/90 rounded-xl sm:rounded-2xl border border-cream-400 p-3.5 sm:p-6 shadow-2xs hover:border-amber-400/80 transition-colors flex flex-col justify-between">
+            <div>
+              <!-- Privacy / Local Processing Badge -->
+              <div class="flex flex-wrap items-center justify-between gap-1.5 mb-2 sm:mb-3">
+                <span class="inline-flex items-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-full text-[10px] sm:text-[11px] font-semibold uppercase tracking-wider bg-cream-200 text-terracotta-700 border border-cream-400">
+                  <svg class="w-3 h-3 sm:w-3.5 sm:h-3.5 text-terracotta-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                  </svg>
+                  27 Solvers
+                </span>
+                <span class="inline-flex items-center gap-1 text-[10px] sm:text-[11px] font-medium text-stone-500">
+                  <svg class="w-3 h-3 sm:w-3.5 sm:h-3.5 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                  </svg>
+                  Browser-Local
+                </span>
+              </div>
+
+              <!-- Title & Concise 2-Line Clamped Description on Mobile -->
+              <h2 class="text-xs sm:text-[15px] font-bold tracking-wide text-stone-900 uppercase leading-snug">
+                FREE UNIVERSITY MATHEMATICS &amp; STATISTICS SUITE (27 INTERACTIVE SOLVERS)
+              </h2>
+              <p class="mt-1 sm:mt-2 text-[11px] sm:text-[13px] text-stone-600 leading-snug sm:leading-relaxed line-clamp-2 sm:line-clamp-none">
+                100% browser-local Algebra, Trigonometry, Calculus, Linear Algebra, Statistics, ODE, and RSA calculators.
+              </p>
+            </div>
+
+            <!-- Compact Action Bar -->
+            <div class="mt-2.5 sm:mt-5 pt-2.5 sm:pt-4 border-t border-cream-300 flex flex-wrap items-center justify-between gap-2">
+              <a href="#math-stats-hub" onclick="notifyAction(event, 'Mathematics & Stats Hub (27 Tools)')"
+                class="group inline-flex items-center gap-1 text-[11px] sm:text-[13px] font-semibold text-terracotta-700 hover:text-terracotta-800 transition-colors">
+                <span>Math &amp; Stats Hub (27)</span>
+                <span aria-hidden="true" class="transition-transform duration-200 group-hover:translate-x-1">&rarr;</span>
+              </a>
+
+              <button type="button" id="math-solvers-btn" aria-expanded="false" aria-controls="math-solvers-drawer"
+                onclick="toggleAccordion('math-solvers-drawer', 'math-solvers-btn')"
+                class="inline-flex items-center gap-1.5 px-2.5 sm:px-3.5 py-1.5 sm:py-2 rounded-lg sm:rounded-xl bg-white hover:bg-cream-200/70 text-stone-800 text-[11px] sm:text-xs font-semibold border border-cream-400 shadow-2xs hover:border-terracotta-600/40 transition-all cursor-pointer">
+                <span id="math-solvers-btn-label">All 27 Solvers</span>
+                <svg class="w-3 h-3 sm:w-3.5 sm:h-3.5 text-terracotta-700 chevron-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.2">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" />
+                </svg>
+              </button>
+            </div>
+
+            <!-- Expandable Math Solvers Grid Drawer -->
+            <div id="math-solvers-drawer" class="accordion-content">
+              <div class="accordion-inner">
+                <div class="mt-3 pt-3 border-t border-dashed border-cream-400">
+                  <div class="flex items-center justify-between mb-2">
+                    <span class="text-[10px] sm:text-[11px] font-semibold uppercase tracking-wider text-terracotta-700">
+                      Featured &amp; Categorized Solvers
+                    </span>
+                    <span class="text-[10px] sm:text-[11px] text-stone-500">Zero server latency</span>
+                  </div>
+                  <div class="grid grid-cols-1 sm:grid-cols-2 gap-1.5 sm:gap-2">
+                    <a href="#solver-integral" onclick="notifyAction(event, 'Calculus Integral & Derivative Solver')"
+                      class="group flex items-center justify-between p-2 sm:p-2.5 rounded-lg sm:rounded-xl bg-white border border-cream-300 hover:border-terracotta-600/50 hover:bg-cream-200/40 transition-all">
+                      <div>
+                        <p class="text-[11px] sm:text-xs font-semibold text-stone-800 group-hover:text-terracotta-700">Calculus Integral Solver</p>
+                        <p class="text-[10px] sm:text-[11px] text-stone-500">Definite, indefinite &amp; symbolic</p>
+                      </div>
+                      <span class="text-xs text-terracotta-600 opacity-70 group-hover:opacity-100 group-hover:translate-x-0.5 transition-all">&rarr;</span>
+                    </a>
+
+                    <a href="#solver-eigenvalue" onclick="notifyAction(event, 'Matrix Eigenvalue & SVD Calculator')"
+                      class="group flex items-center justify-between p-2 sm:p-2.5 rounded-lg sm:rounded-xl bg-white border border-cream-300 hover:border-terracotta-600/50 hover:bg-cream-200/40 transition-all">
+                      <div>
+                        <p class="text-[11px] sm:text-xs font-semibold text-stone-800 group-hover:text-terracotta-700">Matrix Eigenvalue Calculator</p>
+                        <p class="text-[10px] sm:text-[11px] text-stone-500">RREF, determinants &amp; eigenvectors</p>
+                      </div>
+                      <span class="text-xs text-terracotta-600 opacity-70 group-hover:opacity-100 group-hover:translate-x-0.5 transition-all">&rarr;</span>
+                    </a>
+
+                    <a href="#solver-rsa" onclick="notifyAction(event, 'RSA Key & Modular Arithmetic Generator')"
+                      class="group flex items-center justify-between p-2 sm:p-2.5 rounded-lg sm:rounded-xl bg-white border border-cream-300 hover:border-terracotta-600/50 hover:bg-cream-200/40 transition-all">
+                      <div>
+                        <p class="text-[11px] sm:text-xs font-semibold text-stone-800 group-hover:text-terracotta-700">RSA Key Generator</p>
+                        <p class="text-[10px] sm:text-[11px] text-stone-500">Prime factorization &amp; totient steps</p>
+                      </div>
+                      <span class="text-xs text-terracotta-600 opacity-70 group-hover:opacity-100 group-hover:translate-x-0.5 transition-all">&rarr;</span>
+                    </a>
+
+                    <a href="#solver-ode" onclick="notifyAction(event, 'Differential Equations (ODE) Solver')"
+                      class="group flex items-center justify-between p-2 sm:p-2.5 rounded-lg sm:rounded-xl bg-white border border-cream-300 hover:border-terracotta-600/50 hover:bg-cream-200/40 transition-all">
+                      <div>
+                        <p class="text-[11px] sm:text-xs font-semibold text-stone-800 group-hover:text-terracotta-700">ODE Solver</p>
+                        <p class="text-[10px] sm:text-[11px] text-stone-500">1st &amp; 2nd order linear ODEs</p>
+                      </div>
+                      <span class="text-xs text-terracotta-600 opacity-70 group-hover:opacity-100 group-hover:translate-x-0.5 transition-all">&rarr;</span>
+                    </a>
+
+                    <a href="#solver-zscore" onclick="notifyAction(event, 'Z-Score & Hypothesis Tester')"
+                      class="group flex items-center justify-between p-2 sm:p-2.5 rounded-lg sm:rounded-xl bg-white border border-cream-300 hover:border-terracotta-600/50 hover:bg-cream-200/40 transition-all">
+                      <div>
+                        <p class="text-[11px] sm:text-xs font-semibold text-stone-800 group-hover:text-terracotta-700">Z-Score &amp; Hypothesis Tester</p>
+                        <p class="text-[10px] sm:text-[11px] text-stone-500">p-values, t-tests &amp; ANOVA tables</p>
+                      </div>
+                      <span class="text-xs text-terracotta-600 opacity-70 group-hover:opacity-100 group-hover:translate-x-0.5 transition-all">&rarr;</span>
+                    </a>
+
+                    <a href="#solver-trig" onclick="notifyAction(event, 'Trigonometry & Fourier Series Plotter')"
+                      class="group flex items-center justify-between p-2 sm:p-2.5 rounded-lg sm:rounded-xl bg-white border border-cream-300 hover:border-terracotta-600/50 hover:bg-cream-200/40 transition-all">
+                      <div>
+                        <p class="text-[11px] sm:text-xs font-semibold text-stone-800 group-hover:text-terracotta-700">Trig &amp; Complex Plane Tool</p>
+                        <p class="text-[10px] sm:text-[11px] text-stone-500">Euler form, identities &amp; unit circle</p>
+                      </div>
+                      <span class="text-xs text-terracotta-600 opacity-70 group-hover:opacity-100 group-hover:translate-x-0.5 transition-all">&rarr;</span>
+                    </a>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- CARD 2: FREE STUDENT TOOLS SUITE -->
+          <div class="bg-cream-50/90 rounded-xl sm:rounded-2xl border border-cream-400 p-3.5 sm:p-6 shadow-2xs hover:border-amber-400/80 transition-colors flex flex-col justify-between">
+            <div>
+              <!-- Privacy / Local Processing Badge -->
+              <div class="flex flex-wrap items-center justify-between gap-1.5 mb-2 sm:mb-3">
+                <span class="inline-flex items-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-full text-[10px] sm:text-[11px] font-semibold uppercase tracking-wider bg-cream-200 text-terracotta-700 border border-cream-400">
+                  <svg class="w-3 h-3 sm:w-3.5 sm:h-3.5 text-terracotta-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" />
+                  </svg>
+                  Academic Utilities
+                </span>
+                <span class="inline-flex items-center gap-1 text-[10px] sm:text-[11px] font-medium text-stone-500">
+                  <svg class="w-3 h-3 sm:w-3.5 sm:h-3.5 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                  </svg>
+                  Zero-Upload
+                </span>
+              </div>
+
+              <!-- Title & Concise Description -->
+              <h2 class="text-xs sm:text-[15px] font-bold tracking-wide text-stone-900 uppercase leading-snug">
+                FREE STUDENT TOOLS SUITE (100% LOCAL BROWSER UTILITIES)
+              </h2>
+              <p class="mt-1 sm:mt-2 text-[11px] sm:text-[13px] text-stone-600 leading-snug sm:leading-relaxed line-clamp-2 sm:line-clamp-none">
+                Zero-upload PDF, citation, chart, resume, image compression, OCR, and GPA tools for university students.
+              </p>
+
+              <!-- Compact Hub Links Pill Bar (Single-Row Scroll on Mobile, Wrap on Desktop) -->
+              <div class="mt-2.5 sm:mt-4 flex items-center gap-1.5 overflow-x-auto no-scrollbar flex-nowrap sm:flex-wrap pb-0.5 sm:pb-0">
+                <a href="#math-hub" onclick="notifyAction(event, 'Math Hub (27 Tools)')"
+                  class="group shrink-0 inline-flex items-center gap-1 px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-md sm:rounded-lg bg-cream-200/80 hover:bg-terracotta-700 text-terracotta-700 hover:text-white text-[11px] sm:text-xs font-semibold border border-cream-400 hover:border-terracotta-700 transition-all">
+                  <span>Math (27)</span>
+                  <span aria-hidden="true" class="transition-transform group-hover:translate-x-0.5">&rarr;</span>
+                </a>
+                <a href="#biology-hub" onclick="notifyAction(event, 'Biology Hub (14 Tools)')"
+                  class="group shrink-0 inline-flex items-center gap-1 px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-md sm:rounded-lg bg-cream-200/80 hover:bg-terracotta-700 text-terracotta-700 hover:text-white text-[11px] sm:text-xs font-semibold border border-cream-400 hover:border-terracotta-700 transition-all">
+                  <span>Biology (14)</span>
+                  <span aria-hidden="true" class="transition-transform group-hover:translate-x-0.5">&rarr;</span>
+                </a>
+                <a href="#chemistry-hub" onclick="notifyAction(event, 'Chemistry Hub (16 Tools)')"
+                  class="group shrink-0 inline-flex items-center gap-1 px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-md sm:rounded-lg bg-cream-200/80 hover:bg-terracotta-700 text-terracotta-700 hover:text-white text-[11px] sm:text-xs font-semibold border border-cream-400 hover:border-terracotta-700 transition-all">
+                  <span>Chemistry (16)</span>
+                  <span aria-hidden="true" class="transition-transform group-hover:translate-x-0.5">&rarr;</span>
+                </a>
+                <a href="#all-student-tools" onclick="notifyAction(event, 'All Student Tools Directory')"
+                  class="group shrink-0 inline-flex items-center gap-1 px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-md sm:rounded-lg bg-white hover:bg-terracotta-700 text-terracotta-700 hover:text-white text-[11px] sm:text-xs font-semibold border border-cream-400 hover:border-terracotta-700 transition-all">
+                  <span>All Tools</span>
+                  <span aria-hidden="true" class="transition-transform group-hover:translate-x-0.5">&rarr;</span>
+                </a>
+              </div>
+            </div>
+
+            <!-- Compact Action Bar -->
+            <div class="mt-2.5 sm:mt-4 pt-2.5 sm:pt-4 border-t border-cream-300 flex items-center justify-between gap-2">
+              <span class="text-[11px] sm:text-xs text-stone-500">Offline WebAssembly</span>
+
+              <button type="button" id="student-tools-btn" aria-expanded="false" aria-controls="student-tools-drawer"
+                onclick="toggleAccordion('student-tools-drawer', 'student-tools-btn')"
+                class="inline-flex items-center gap-1.5 px-2.5 sm:px-3.5 py-1.5 sm:py-2 rounded-lg sm:rounded-xl bg-white hover:bg-cream-200/70 text-stone-800 text-[11px] sm:text-xs font-semibold border border-cream-400 shadow-2xs hover:border-terracotta-600/40 transition-all cursor-pointer">
+                <span id="student-tools-btn-label">Individual Tools</span>
+                <svg class="w-3 h-3 sm:w-3.5 sm:h-3.5 text-terracotta-700 chevron-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.2">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" />
+                </svg>
+              </button>
+            </div>
+
+            <!-- Expandable Individual Student Tools Drawer -->
+            <div id="student-tools-drawer" class="accordion-content">
+              <div class="accordion-inner">
+                <div class="mt-3 pt-3 border-t border-dashed border-cream-400">
+                  <div class="flex items-center justify-between mb-2">
+                    <span class="text-[10px] sm:text-[11px] font-semibold uppercase tracking-wider text-terracotta-700">
+                      Browser-Local Student Utilities
+                    </span>
+                    <span class="text-[10px] sm:text-[11px] text-stone-500">Files never leave device</span>
+                  </div>
+                  <div class="grid grid-cols-1 sm:grid-cols-2 gap-1.5 sm:gap-2">
+                    <a href="#tool-pdf" onclick="notifyAction(event, 'Zero-Upload PDF Merger & Splitter')"
+                      class="group flex items-center justify-between p-2 sm:p-2.5 rounded-lg sm:rounded-xl bg-white border border-cream-300 hover:border-terracotta-600/50 hover:bg-cream-200/40 transition-all">
+                      <div>
+                        <p class="text-[11px] sm:text-xs font-semibold text-stone-800 group-hover:text-terracotta-700">Zero-Upload PDF Merger</p>
+                        <p class="text-[10px] sm:text-[11px] text-stone-500">Merge, split &amp; compress lecture PDFs</p>
+                      </div>
+                      <span class="text-xs text-terracotta-600 opacity-70 group-hover:opacity-100 group-hover:translate-x-0.5 transition-all">&rarr;</span>
+                    </a>
+
+                    <a href="#tool-citation" onclick="notifyAction(event, 'APA / MLA / Harvard Citation Generator')"
+                      class="group flex items-center justify-between p-2 sm:p-2.5 rounded-lg sm:rounded-xl bg-white border border-cream-300 hover:border-terracotta-600/50 hover:bg-cream-200/40 transition-all">
+                      <div>
+                        <p class="text-[11px] sm:text-xs font-semibold text-stone-800 group-hover:text-terracotta-700">APA/MLA Citation Generator</p>
+                        <p class="text-[10px] sm:text-[11px] text-stone-500">APA 7th, MLA 9th, Chicago &amp; BibTeX</p>
+                      </div>
+                      <span class="text-xs text-terracotta-600 opacity-70 group-hover:opacity-100 group-hover:translate-x-0.5 transition-all">&rarr;</span>
+                    </a>
+
+                    <a href="#tool-gpa" onclick="notifyAction(event, 'University GPA & Weighted Grade Calculator')"
+                      class="group flex items-center justify-between p-2 sm:p-2.5 rounded-lg sm:rounded-xl bg-white border border-cream-300 hover:border-terracotta-600/50 hover:bg-cream-200/40 transition-all">
+                      <div>
+                        <p class="text-[11px] sm:text-xs font-semibold text-stone-800 group-hover:text-terracotta-700">GPA &amp; Grade Calculator</p>
+                        <p class="text-[10px] sm:text-[11px] text-stone-500">4.0 scale, UK Honours &amp; WAM</p>
+                      </div>
+                      <span class="text-xs text-terracotta-600 opacity-70 group-hover:opacity-100 group-hover:translate-x-0.5 transition-all">&rarr;</span>
+                    </a>
+
+                    <a href="#tool-image" onclick="notifyAction(event, 'Browser Image Compressor & Converter')"
+                      class="group flex items-center justify-between p-2 sm:p-2.5 rounded-lg sm:rounded-xl bg-white border border-cream-300 hover:border-terracotta-600/50 hover:bg-cream-200/40 transition-all">
+                      <div>
+                        <p class="text-[11px] sm:text-xs font-semibold text-stone-800 group-hover:text-terracotta-700">Browser Image Compressor</p>
+                        <p class="text-[10px] sm:text-[11px] text-stone-500">Optimize lab figures &amp; WebP/PNG</p>
+                      </div>
+                      <span class="text-xs text-terracotta-600 opacity-70 group-hover:opacity-100 group-hover:translate-x-0.5 transition-all">&rarr;</span>
+                    </a>
+
+                    <a href="#tool-ocr" onclick="notifyAction(event, 'Client-Side OCR Lecture Notes Scanner')"
+                      class="group flex items-center justify-between p-2 sm:p-2.5 rounded-lg sm:rounded-xl bg-white border border-cream-300 hover:border-terracotta-600/50 hover:bg-cream-200/40 transition-all">
+                      <div>
+                        <p class="text-[11px] sm:text-xs font-semibold text-stone-800 group-hover:text-terracotta-700">Client-Side OCR Scanner</p>
+                        <p class="text-[10px] sm:text-[11px] text-stone-500">Extract text from whiteboard photos</p>
+                      </div>
+                      <span class="text-xs text-terracotta-600 opacity-70 group-hover:opacity-100 group-hover:translate-x-0.5 transition-all">&rarr;</span>
+                    </a>
+
+                    <a href="#tool-resume" onclick="notifyAction(event, 'Academic CV & LaTeX Resume Builder')"
+                      class="group flex items-center justify-between p-2 sm:p-2.5 rounded-lg sm:rounded-xl bg-white border border-cream-300 hover:border-terracotta-600/50 hover:bg-cream-200/40 transition-all">
+                      <div>
+                        <p class="text-[11px] sm:text-xs font-semibold text-stone-800 group-hover:text-terracotta-700">Academic CV &amp; Chart Builder</p>
+                        <p class="text-[10px] sm:text-[11px] text-stone-500">Clean publication &amp; lab templates</p>
+                      </div>
+                      <span class="text-xs text-terracotta-600 opacity-70 group-hover:opacity-100 group-hover:translate-x-0.5 transition-all">&rarr;</span>
+                    </a>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+        </section>
+
+        <!-- Divider -->
+        <div class="border-t border-cream-400/80"></div>
+
+        <!-- 2. MIDDLE SECTION: POPULAR ACADEMIC TOPICS (Single-Row Scroll on Mobile, Wrapped on Desktop) -->
+        <section aria-labelledby="popular-topics-heading" class="space-y-2 sm:space-y-4">
+          <div class="flex items-center justify-between gap-2">
+            <div class="flex items-center gap-1.5 sm:gap-2">
+              <span class="w-5 h-5 sm:w-6 sm:h-6 rounded-md sm:rounded-lg bg-cream-200 border border-cream-400 flex items-center justify-center text-terracotta-700 shrink-0">
+                <svg class="w-3 h-3 sm:w-3.5 sm:h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+                </svg>
+              </span>
+              <h3 id="popular-topics-heading" class="text-[11px] sm:text-xs font-bold tracking-wider uppercase text-stone-800">
+                POPULAR ACADEMIC TOPICS &amp; STUDY GUIDES
+              </h3>
+            </div>
+            <span class="text-[10px] sm:text-[11px] font-medium text-stone-500 shrink-0">
+              <span class="sm:hidden">Swipe &rarr;</span>
+              <span class="hidden sm:inline">Curated student learning pathways</span>
+            </span>
+          </div>
+
+          <!-- Horizontal Scrollable Pill Strip on Mobile (Single Row), Multi-Row Wrap on Desktop -->
+          <div class="flex items-center gap-1.5 sm:gap-2.5 overflow-x-auto no-scrollbar flex-nowrap sm:flex-wrap pb-0.5 sm:pb-0">
+            <a href="#topic-find-tutors" onclick="notifyAction(event, 'Topic: find university tutors online')"
+              class="group shrink-0 inline-flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-3.5 py-1.5 sm:py-2 rounded-lg sm:rounded-xl bg-white hover:bg-cream-50 text-stone-700 hover:text-terracotta-700 text-[11px] sm:text-xs font-medium border border-cream-400 hover:border-terracotta-600/50 shadow-2xs sm:hover:-translate-y-0.5 transition-all duration-200">
+              <span>find university tutors online</span>
+              <span aria-hidden="true" class="text-terracotta-600/70 group-hover:text-terracotta-700 group-hover:translate-x-0.5 transition-transform">&rarr;</span>
+            </a>
+
+            <a href="#topic-final-exam" onclick="notifyAction(event, 'Topic: prepare for final exam questions')"
+              class="group shrink-0 inline-flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-3.5 py-1.5 sm:py-2 rounded-lg sm:rounded-xl bg-white hover:bg-cream-50 text-stone-700 hover:text-terracotta-700 text-[11px] sm:text-xs font-medium border border-cream-400 hover:border-terracotta-600/50 shadow-2xs sm:hover:-translate-y-0.5 transition-all duration-200">
+              <span>prepare for final exam questions</span>
+              <span aria-hidden="true" class="text-terracotta-600/70 group-hover:text-terracotta-700 group-hover:translate-x-0.5 transition-transform">&rarr;</span>
+            </a>
+
+            <a href="#topic-essay-structure" onclick="notifyAction(event, 'Topic: academic essay structure help')"
+              class="group shrink-0 inline-flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-3.5 py-1.5 sm:py-2 rounded-lg sm:rounded-xl bg-white hover:bg-cream-50 text-stone-700 hover:text-terracotta-700 text-[11px] sm:text-xs font-medium border border-cream-400 hover:border-terracotta-600/50 shadow-2xs sm:hover:-translate-y-0.5 transition-all duration-200">
+              <span>academic essay structure help</span>
+              <span aria-hidden="true" class="text-terracotta-600/70 group-hover:text-terracotta-700 group-hover:translate-x-0.5 transition-transform">&rarr;</span>
+            </a>
+
+            <a href="#topic-urgent-tutoring" onclick="notifyAction(event, 'Topic: urgent academic tutoring help')"
+              class="group shrink-0 inline-flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-3.5 py-1.5 sm:py-2 rounded-lg sm:rounded-xl bg-white hover:bg-cream-50 text-stone-700 hover:text-terracotta-700 text-[11px] sm:text-xs font-medium border border-cream-400 hover:border-terracotta-600/50 shadow-2xs sm:hover:-translate-y-0.5 transition-all duration-200">
+              <span>urgent academic tutoring help</span>
+              <span aria-hidden="true" class="text-terracotta-600/70 group-hover:text-terracotta-700 group-hover:translate-x-0.5 transition-transform">&rarr;</span>
+            </a>
+
+            <a href="#topic-study-guide" onclick="notifyAction(event, 'Topic: online study guide assistance')"
+              class="group shrink-0 inline-flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-3.5 py-1.5 sm:py-2 rounded-lg sm:rounded-xl bg-white hover:bg-cream-50 text-stone-700 hover:text-terracotta-700 text-[11px] sm:text-xs font-medium border border-cream-400 hover:border-terracotta-600/50 shadow-2xs sm:hover:-translate-y-0.5 transition-all duration-200">
+              <span>online study guide assistance</span>
+              <span aria-hidden="true" class="text-terracotta-600/70 group-hover:text-terracotta-700 group-hover:translate-x-0.5 transition-transform">&rarr;</span>
+            </a>
+
+            <a href="#topic-coursework-mentoring" onclick="notifyAction(event, 'Topic: professional coursework mentoring')"
+              class="group shrink-0 inline-flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-3.5 py-1.5 sm:py-2 rounded-lg sm:rounded-xl bg-white hover:bg-cream-50 text-stone-700 hover:text-terracotta-700 text-[11px] sm:text-xs font-medium border border-cream-400 hover:border-terracotta-600/50 shadow-2xs sm:hover:-translate-y-0.5 transition-all duration-200">
+              <span>professional coursework mentoring</span>
+              <span aria-hidden="true" class="text-terracotta-600/70 group-hover:text-terracotta-700 group-hover:translate-x-0.5 transition-transform">&rarr;</span>
+            </a>
+
+            <a href="#topic-dissertation-format" onclick="notifyAction(event, 'Topic: dissertation format review')"
+              class="group shrink-0 inline-flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-3.5 py-1.5 sm:py-2 rounded-lg sm:rounded-xl bg-white hover:bg-cream-50 text-stone-700 hover:text-terracotta-700 text-[11px] sm:text-xs font-medium border border-cream-400 hover:border-terracotta-600/50 shadow-2xs sm:hover:-translate-y-0.5 transition-all duration-200">
+              <span>dissertation format review</span>
+              <span aria-hidden="true" class="text-terracotta-600/70 group-hover:text-terracotta-700 group-hover:translate-x-0.5 transition-transform">&rarr;</span>
+            </a>
+
+            <a href="#topic-grammar-citation" onclick="notifyAction(event, 'Topic: grammar and citation proofreading')"
+              class="group shrink-0 inline-flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-3.5 py-1.5 sm:py-2 rounded-lg sm:rounded-xl bg-white hover:bg-cream-50 text-stone-700 hover:text-terracotta-700 text-[11px] sm:text-xs font-medium border border-cream-400 hover:border-terracotta-600/50 shadow-2xs sm:hover:-translate-y-0.5 transition-all duration-200">
+              <span>grammar and citation proofreading</span>
+              <span aria-hidden="true" class="text-terracotta-600/70 group-hover:text-terracotta-700 group-hover:translate-x-0.5 transition-transform">&rarr;</span>
+            </a>
+
+            <a href="#topic-math-derivation" onclick="notifyAction(event, 'Topic: math derivation step-by-step coaching')"
+              class="group shrink-0 inline-flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-3.5 py-1.5 sm:py-2 rounded-lg sm:rounded-xl bg-white hover:bg-cream-50 text-stone-700 hover:text-terracotta-700 text-[11px] sm:text-xs font-medium border border-cream-400 hover:border-terracotta-600/50 shadow-2xs sm:hover:-translate-y-0.5 transition-all duration-200">
+              <span>math derivation step-by-step coaching</span>
+              <span aria-hidden="true" class="text-terracotta-600/70 group-hover:text-terracotta-700 group-hover:translate-x-0.5 transition-transform">&rarr;</span>
+            </a>
+
+            <a href="#topic-software-project" onclick="notifyAction(event, 'Topic: guided software project tutor')"
+              class="group shrink-0 inline-flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-3.5 py-1.5 sm:py-2 rounded-lg sm:rounded-xl bg-white hover:bg-cream-50 text-stone-700 hover:text-terracotta-700 text-[11px] sm:text-xs font-medium border border-cream-400 hover:border-terracotta-600/50 shadow-2xs sm:hover:-translate-y-0.5 transition-all duration-200">
+              <span>guided software project tutor</span>
+              <span aria-hidden="true" class="text-terracotta-600/70 group-hover:text-terracotta-700 group-hover:translate-x-0.5 transition-transform">&rarr;</span>
+            </a>
+          </div>
+        </section>
+
+        <!-- 3. PLATFORM IDENTITY & ACADEMIC INTEGRITY DISCLOSURES ACCORDION (Ultra-Compact) -->
+        <section aria-label="Platform Identity and Academic Integrity Disclosures" class="pt-0.5">
+          <div class="flex flex-col items-center">
+            <button type="button" id="disclosures-btn" aria-expanded="false" aria-controls="disclosures-drawer"
+              onclick="toggleAccordion('disclosures-drawer', 'disclosures-btn')"
+              class="group inline-flex items-center gap-1.5 px-3 py-1.5 sm:px-3.5 sm:py-1.5 rounded-full bg-white hover:bg-cream-50 text-stone-900 border border-cream-400 hover:border-terracotta-600/60 shadow-2xs transition-all cursor-pointer">
+              <span class="w-4 h-4 rounded-full bg-cream-200 text-terracotta-700 flex items-center justify-center shrink-0 group-hover:bg-terracotta-700 group-hover:text-white transition-colors">
+                <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                </svg>
+              </span>
+              <span class="text-[11px] sm:text-xs font-semibold text-stone-800 group-hover:text-terracotta-800 transition-colors">
+                Platform Identity &amp; Academic Integrity Disclosures
+              </span>
+              <svg class="w-3 h-3 text-terracotta-700 chevron-icon shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" />
+              </svg>
+            </button>
+            <p class="mt-1 text-[10px] text-stone-500 text-center">
+              Click to open legal, identity &amp; academic integrity disclosures
+            </p>
+          </div>
+
+          <!-- Expandable Disclosure Panel -->
+          <div id="disclosures-drawer" class="accordion-content">
+            <div class="accordion-inner">
+              <div class="mt-2.5 sm:mt-3.5 bg-white rounded-xl sm:rounded-2xl border border-cream-400 p-3 sm:p-4 shadow-xs">
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-3.5 sm:gap-5">
+                  <!-- Disclosure Column 1 -->
+                  <div class="space-y-1">
+                    <div class="flex items-center gap-1.5 text-terracotta-700">
+                      <svg class="w-3.5 h-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+                      </svg>
+                      <h4 class="text-[11px] font-bold uppercase tracking-wider">Academic Integrity Policy</h4>
+                    </div>
+                    <p class="text-[11px] sm:text-xs text-stone-600 leading-relaxed">
+                      universitytutors.com strictly prohibits contract cheating, ghostwriting, or unauthorized exam assistance. All tutoring, derivation coaching, and structural feedback are designed exclusively to build independent student comprehension in compliance with university honor codes.
+                    </p>
+                  </div>
+
+                  <!-- Disclosure Column 2 -->
+                  <div class="space-y-1">
+                    <div class="flex items-center gap-1.5 text-terracotta-700">
+                      <svg class="w-3.5 h-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                      </svg>
+                      <h4 class="text-[11px] font-bold uppercase tracking-wider">Browser-Local Privacy Guarantee</h4>
+                    </div>
+                    <p class="text-[11px] sm:text-xs text-stone-600 leading-relaxed">
+                      Every mathematical solver, PDF utility, OCR scanner, and citation tool in our free suites executes 100% locally inside your browser sandbox. Student documents, equations, and files are never uploaded to external servers or used for model training.
+                    </p>
+                  </div>
+
+                  <!-- Disclosure Column 3 -->
+                  <div class="space-y-1">
+                    <div class="flex items-center gap-1.5 text-terracotta-700">
+                      <svg class="w-3.5 h-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                      <h4 class="text-[11px] font-bold uppercase tracking-wider">Regional Curriculum Alignment</h4>
+                    </div>
+                    <p class="text-[11px] sm:text-xs text-stone-600 leading-relaxed">
+                      Platform educational resources, grading calculators, and citation standards are calibrated to support higher-education frameworks across the United Kingdom (UK), United States (US), Canada (CA), Australia (AU), New Zealand (NZ), and Ireland (IE).
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- Divider -->
+        <div class="border-t border-cream-400"></div>
+
+        <!-- 4. CENTERED COMPACT BOTTOM BAR -->
+        <div class="flex flex-col items-center justify-center text-center gap-2.5 sm:gap-3 pt-0.5 sm:pt-1">
+          <!-- Centered Copyright & Regional Curriculum Notice -->
+          <p class="text-[11px] sm:text-xs text-stone-600 leading-snug sm:leading-relaxed max-w-2xl mx-auto text-center">
+            &copy; 2026 universitytutors.com. All Rights Reserved. Created under educational technology guidelines for UK, US, CA, AU, NZ &amp; IE local curriculum support.
+          </p>
+
+          <!-- Centered Inline Navigation Links -->
+          <nav aria-label="Footer Legal and Portal Links" class="flex flex-wrap items-center justify-center gap-x-3.5 gap-y-1.5 sm:gap-x-5 sm:gap-y-2 text-[11px] sm:text-xs font-semibold text-stone-700 text-center">
+            <a href="#privacy-policy" onclick="notifyAction(event, 'Privacy Policy')"
+              class="hover:text-terracotta-700 transition-colors">
+              Privacy Policy
+            </a>
+            <a href="#terms-of-service" onclick="notifyAction(event, 'Terms of Service')"
+              class="hover:text-terracotta-700 transition-colors">
+              Terms of Service
+            </a>
+            <a href="#google-disclosure" onclick="notifyAction(event, 'Google Disclosure')"
+              class="hover:text-terracotta-700 transition-colors">
+              Google Disclosure
+            </a>
+            <a href="#contact-us" onclick="notifyAction(event, 'Contact Us')"
+              class="hover:text-terracotta-700 transition-colors">
+              Contact Us
+            </a>
+            <a href="#system-sop" onclick="notifyAction(event, 'System SOP')"
+              class="hover:text-terracotta-700 transition-colors">
+              System SOP
+            </a>
+            <a href="#admin-portal" onclick="notifyAction(event, 'Admin Portal')"
+              class="hover:text-terracotta-700 transition-colors">
+              Admin Portal
+            </a>
+          </nav>
+        </div>
+
+      </div>
+    </footer>
+    <!-- ===================================================================== -->
+    <!-- END FOOTER COMPONENT                                                  -->
+    <!-- ===================================================================== -->
+
+  </div>
+
+  <script>
+    /**
+     * Toggles smooth CSS grid-row accordion drawers and updates ARIA + button state.
+     * @param {string} drawerId - The ID of the expandable drawer container.
+     * @param {string} btnId - The ID of the trigger button.
+     */
+    function toggleAccordion(drawerId, btnId) {
+      const drawer = document.getElementById(drawerId);
+      const btn = document.getElementById(btnId);
+      if (!drawer || !btn) return;
+
+      const isOpen = drawer.classList.toggle('is-open');
+      btn.classList.toggle('is-expanded', isOpen);
+      btn.setAttribute('aria-expanded', String(isOpen));
+
+      // Update descriptive button labels where applicable
+      if (btnId === 'math-solvers-btn') {
+        const label = document.getElementById('math-solvers-btn-label');
+        if (label) label.textContent = isOpen ? 'Hide Solvers' : 'All 27 Solvers';
+      } else if (btnId === 'student-tools-btn') {
+        const label = document.getElementById('student-tools-btn-label');
+        if (label) label.textContent = isOpen ? 'Hide Tools' : 'Individual Tools';
+      }
+    }
+
+    /**
+     * Displays a non-intrusive toast message when demo footer links are clicked.
+     * @param {Event} event - The click event.
+     * @param {string} destinationName - Human-readable label of the clicked item.
+     */
+    let toastTimeout;
+    function notifyAction(event, destinationName) {
+      event.preventDefault();
+      const toast = document.getElementById('toast-notification');
+      const msg = document.getElementById('toast-message');
+      if (!toast || !msg) return;
+
+      msg.textContent = `Navigated to: ${destinationName}`;
+      toast.classList.remove('translate-y-20', 'opacity-0');
+      toast.classList.add('translate-y-0', 'opacity-100');
+
+      clearTimeout(toastTimeout);
+      toastTimeout = setTimeout(() => {
+        toast.classList.remove('translate-y-0', 'opacity-100');
+        toast.classList.add('translate-y-20', 'opacity-0');
+      }, 2600);
+    }
+
+    /**
+     * Allows toggling Desktop, Tablet, and Mobile widths inside the preview frame.
+     * @param {'desktop'|'tablet'|'mobile'} mode
+     */
+    function setPreviewWidth(mode) {
+      const wrapper = document.getElementById('preview-wrapper');
+      const buttons = document.querySelectorAll('.viewport-btn');
+      if (!wrapper) return;
+
+      buttons.forEach((b) => {
+        b.classList.remove('bg-white', 'text-stone-900', 'shadow-xs');
+        b.classList.add('text-stone-600');
+      });
+
+      const activeBtn = document.getElementById(`btn-${mode}`);
+      if (activeBtn) {
+        activeBtn.classList.add('bg-white', 'text-stone-900', 'shadow-xs');
+        activeBtn.classList.remove('text-stone-600');
+      }
+
+      wrapper.classList.remove('max-w-full', 'max-w-3xl', 'max-w-md', 'shadow-xl', 'border-x', 'border-stone-300');
+      if (mode === 'desktop') {
+        wrapper.classList.add('max-w-full');
+      } else if (mode === 'tablet') {
+        wrapper.classList.add('max-w-3xl', 'shadow-xl', 'border-x', 'border-stone-300');
+      } else if (mode === 'mobile') {
+        wrapper.classList.add('max-w-md', 'shadow-xl', 'border-x', 'border-stone-300');
+      }
+    }
+  </script>
+</body>
+</html>

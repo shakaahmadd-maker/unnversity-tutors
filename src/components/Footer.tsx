@@ -1,16 +1,4 @@
 import React, { useState } from 'react';
-import { 
-  GraduationCap, 
-  Mail, 
-  Phone, 
-  MapPin, 
-  ExternalLink,
-  ShieldAlert,
-  ShieldCheck,
-  ChevronDown,
-  Shield
-} from 'lucide-react';
-import FooterLocationsSubjects from './FooterLocationsSubjects';
 import { isModifiedAnchorClick } from '../data/dedicatedServiceRoutes';
 
 const FooterToolDirectories = React.lazy(() => import('./FooterToolDirectories'));
@@ -21,12 +9,112 @@ interface FooterProps {
 }
 
 export default function Footer({ onNavigate, onOpenBecomeTutor }: FooterProps) {
-  const [isDisclosureOpen, setIsDisclosureOpen] = useState(false);
-  const [isMathToolsOpen, setIsMathToolsOpen] = useState(false);
+  const [isMathSolversOpen, setIsMathSolversOpen] = useState(false);
+  const [showAllMathDirectory, setShowAllMathDirectory] = useState(false);
   const [isStudentToolsOpen, setIsStudentToolsOpen] = useState(false);
+  const [showAllStudentDirectory, setShowAllStudentDirectory] = useState(false);
+  const [isDisclosuresOpen, setIsDisclosuresOpen] = useState(false);
 
-  // Compliant SEO keywords strictly aligned with Google Ads and Academic Integrity Policies
-  const seoKeywords = [
+  const handleLinkClick = (
+    e: React.MouseEvent<HTMLAnchorElement>,
+    view: string,
+    scrollTop = true
+  ) => {
+    if (!isModifiedAnchorClick(e)) {
+      e.preventDefault();
+      onNavigate(view);
+      if (scrollTop && typeof window !== 'undefined') {
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      }
+    }
+  };
+
+  const handleButtonNav = (view: string) => {
+    onNavigate(view);
+    if (typeof window !== 'undefined') {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  };
+
+  const featuredMathSolvers = [
+    {
+      title: 'Calculus Integral Solver',
+      subtitle: 'Definite, indefinite & symbolic',
+      href: '/tools/math/definite-integral-riemann-plotter',
+      viewKey: 'tools/math/definite-integral-riemann-plotter',
+    },
+    {
+      title: 'Matrix Eigenvalue Calculator',
+      subtitle: 'RREF, determinants & eigenvectors',
+      href: '/tools/math/eigenvalues-eigenvectors-calculator',
+      viewKey: 'tools/math/eigenvalues-eigenvectors-calculator',
+    },
+    {
+      title: 'RSA Key Generator',
+      subtitle: 'Prime factorization & totient steps',
+      href: '/tools/math/number-theory-modular-rsa-calculator',
+      viewKey: 'tools/math/number-theory-modular-rsa-calculator',
+    },
+    {
+      title: 'ODE Solver',
+      subtitle: '1st & 2nd order linear ODEs',
+      href: '/tools/math/ode-slope-field-rk4-plotter',
+      viewKey: 'tools/math/ode-slope-field-rk4-plotter',
+    },
+    {
+      title: 'Z-Score & Hypothesis Tester',
+      subtitle: 'p-values, t-tests & ANOVA tables',
+      href: '/tools/math/hypothesis-testing-suite',
+      viewKey: 'tools/math/hypothesis-testing-suite',
+    },
+    {
+      title: 'Trig & Complex Plane Tool',
+      subtitle: 'Euler form, identities & unit circle',
+      href: '/tools/math/complex-number-polar-converter',
+      viewKey: 'tools/math/complex-number-polar-converter',
+    },
+  ];
+
+  const featuredStudentTools = [
+    {
+      title: 'Zero-Upload PDF Merger',
+      subtitle: 'Merge, split & compress lecture PDFs',
+      href: '/tools/merge-pdf',
+      viewKey: 'tools/merge-pdf',
+    },
+    {
+      title: 'APA/MLA Citation Generator',
+      subtitle: 'APA 7th, MLA 9th, Chicago & BibTeX',
+      href: '/tools/citation-generator',
+      viewKey: 'tools/citation-generator',
+    },
+    {
+      title: 'GPA & Grade Calculator',
+      subtitle: '4.0 scale, UK Honours & WAM',
+      href: '/tools/cgpa-word-pomodoro',
+      viewKey: 'tools/cgpa-word-pomodoro',
+    },
+    {
+      title: 'Browser Image Compressor',
+      subtitle: 'Optimize lab figures & WebP/PNG',
+      href: '/tools/image-compressor',
+      viewKey: 'tools/image-compressor',
+    },
+    {
+      title: 'Client-Side OCR Scanner',
+      subtitle: 'Extract text from whiteboard photos',
+      href: '/tools/ocr-image-to-text',
+      viewKey: 'tools/ocr-image-to-text',
+    },
+    {
+      title: 'Academic CV & Chart Builder',
+      subtitle: 'Clean publication & lab templates',
+      href: '/tools/cv-maker',
+      viewKey: 'tools/cv-maker',
+    },
+  ];
+
+  const seoTopics = [
     { text: 'find university tutors online', href: '/tutors', view: 'tutors' },
     { text: 'prepare for final exam questions', href: '/services/coursework-track', view: 'service-coursework' },
     { text: 'academic essay structure help', href: '/services/essay-reference-checks', view: 'service-essay' },
@@ -36,454 +124,651 @@ export default function Footer({ onNavigate, onOpenBecomeTutor }: FooterProps) {
     { text: 'dissertation format review', href: '/services/essay-reference-checks', view: 'service-essay' },
     { text: 'grammar and citation proofreading', href: '/services/essay-reference-checks', view: 'service-essay' },
     { text: 'math derivation step-by-step coaching', href: '/services/1-on-1-live-tutoring', view: 'service-1on1' },
-    { text: 'guided software project tutor', href: '/services/assignment-guidance', view: 'service-assignment' }
+    { text: 'guided software project tutor', href: '/services/assignment-guidance', view: 'service-assignment' },
   ];
+
   return (
-    <footer className="bg-[#ffeedd] border-t-2 border-[#ffab85] text-[#542104] font-sans" id="main-footer">
-
-
-      {/* Popular International Locations & Popular Online Subjects Section */}
-      <FooterLocationsSubjects
-        onNavigateLocation={(city) => {
-          onNavigate(`location:${city}`);
-        }}
-        onNavigateSubject={(subj) => {
-          onNavigate(`subject:${subj}`);
-        }}
-        onNavigateCountry={(slug) => {
-          onNavigate(`online-tutoring-${slug}`);
-        }}
-        onNavigateService={(serviceSlug) => {
-          onNavigate(serviceSlug);
-        }}
-      />
-
-      {/* Main Footer Links */}
-      <div className="container mx-auto px-4 md:px-8 py-16 max-w-7xl">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-12">
-          
-          {/* Brand Col */}
-          <div className="space-y-4">
-            <div className="flex items-center">
-              <picture>
-                <source
-                  type="image/avif"
-                  srcSet="/logo-440.avif"
-                />
-                <source
-                  type="image/webp"
-                  srcSet="/logo-220.webp 220w, /logo-440.webp 440w"
-                  sizes="220px"
-                />
-                <img 
-                  src="/logo.webp" 
-                  alt="Uni Tutors" 
-                  width={220}
-                  height={84}
-                  loading="lazy"
-                  decoding="async"
-                  className="h-10 sm:h-12 md:h-14 w-auto max-w-[220px] sm:max-w-[250px] object-contain"
-                />
-              </picture>
-            </div>
-            <p className="text-xs text-[#542104]/90 leading-relaxed font-medium">
-              Your Global Partner for Academic Success. Connecting premium degree-seeking students with native certified subject experts across major English-speaking networks.
-            </p>
-            <div className="text-xs space-y-2.5 pt-3 text-[#542104]/90">
-              <div className="flex items-center gap-2.5 group">
-                <Mail className="w-4 h-4 text-orange-600 group-hover:scale-110 transition-transform" />
-                <span className="group-hover:text-orange-700 transition-colors font-semibold">support@universitytutors.com</span>
-              </div>
-              <div className="flex items-center gap-2.5 group">
-                <Phone className="w-4 h-4 text-orange-600 group-hover:scale-110 transition-transform" />
-                <span className="group-hover:text-orange-700 transition-colors font-semibold">+1 (800) 123-TUTOR</span>
-              </div>
-              <div className="flex items-center gap-2.5 group">
-                <MapPin className="w-4 h-4 text-orange-600 group-hover:scale-110 transition-transform" />
-                <span className="group-hover:text-orange-700 transition-colors font-semibold">London • New York • Sydney</span>
-              </div>
-            </div>
-          </div>
-
-          {/* Quick Nav Links */}
-          <div className="space-y-4">
-            <h3 className="text-xs font-display font-bold text-[#331301] uppercase tracking-widest pb-1 border-b border-[#ffab85]/60 mb-2">Academic Portals</h3>
-            <ul className="text-xs space-y-1.5 font-semibold">
-              {[
-                { name: 'All Tutoring Services Hub', view: 'services', href: '/services' },
-                { name: '1-on-1 Live Tutoring', view: 'service-1on1', href: '/services/1-on-1-live-tutoring' },
-                { name: 'Assignment Guidance', view: 'service-assignment', href: '/services/assignment-guidance' },
-                { name: 'Coursework Track', view: 'service-coursework', href: '/services/coursework-track' },
-                { name: 'Essay & Reference Checks', view: 'service-essay', href: '/services/essay-reference-checks' },
-                { name: 'WhatsApp Academic Hotline', view: 'whatsapp', href: '/whatsapp' },
-                { name: 'Become a Tutor (Apply Now)', action: 'become-tutor' },
-                { name: 'About Founding Team', view: 'about', href: '/about' },
-                { name: 'Knowledge Center (Blog)', view: 'blog', href: '/blog' },
-              ].map((link, idx) => (
-                <li key={idx}>
-                  {link.href ? (
-                    <a
-                      id={`footer-nav-link-${idx}`}
-                      href={link.href}
-                      onClick={(e) => {
-                        if (!isModifiedAnchorClick(e)) {
-                          e.preventDefault();
-                          if (link.view) onNavigate(link.view);
-                        }
-                      }}
-                      className="inline-flex items-center min-h-[28px] py-1 hover:text-orange-700 hover:translate-x-1.5 transition-all text-left cursor-pointer text-[#542104] hover:font-bold"
-                    >
-                      {link.name}
-                    </a>
-                  ) : (
-                    <button 
-                      id={`footer-nav-link-${idx}`}
-                      onClick={() => {
-                        if (link.action === 'become-tutor' && onOpenBecomeTutor) {
-                          onOpenBecomeTutor();
-                        }
-                      }} 
-                      className="inline-flex items-center min-h-[28px] py-1 hover:text-orange-700 hover:translate-x-1.5 transition-all text-left cursor-pointer text-[#542104] hover:font-bold"
-                    >
-                      {link.name}
-                    </button>
-                  )}
-                </li>
-              ))}
-            </ul>
-          </div>
-
-          {/* Trust Certifications */}
-          <div className="space-y-4">
-            <h3 className="text-xs font-display font-bold text-[#331301] uppercase tracking-widest pb-1 border-b border-[#ffab85]/60 mb-2 font-display">Policy & Trust Links</h3>
-            <ul className="text-xs space-y-1.5 font-semibold">
-              {[
-                { name: 'Standard Operating Procedures (SOP)', view: 'sop' },
-                { name: 'Payments Escrow Guarantee', view: 'payments_info' },
-                { name: 'Privacy Policy & GDPR Disclosure', view: 'privacy' },
-                { name: 'User Data Deletion Instructions', view: 'data-deletion' },
-                { name: 'Terms of Service & Escrow Agreement', view: 'terms' },
-                { name: 'Google OAuth Disclosure', view: 'google-disclosure' },
-                { name: 'Frequently Asked Questions (FAQs)', view: 'faqs' },
-                { name: 'Contact 24/7 Human Advising', view: 'contact' }
-              ].map((link, idx) => (
-                <li key={idx}>
-                  <button 
-                    id={`footer-policy-link-${idx}`}
-                    onClick={() => onNavigate(link.view)} 
-                    className="inline-flex items-center min-h-[28px] py-1 hover:text-orange-700 hover:translate-x-1.5 transition-all text-left cursor-pointer text-[#542104] hover:font-bold"
-                  >
-                    {link.name}
-                  </button>
-                </li>
-              ))}
-            </ul>
-          </div>
-
-          {/* Platform Trust Badge */}
-          <div className="space-y-4 bg-[#fffbf7] p-6 rounded-2xl border border-[#ffab85]/60 shadow-xs">
-            <h3 className="text-xs font-display font-bold text-[#331301] uppercase tracking-wider flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-              Secure Custom Escrow
-            </h3>
-            <p className="text-[11px] text-[#542104]/90 leading-relaxed font-semibold">
-              We leverage safe, administrator-monitored holding escrow to lock tuition fees securely. Tutors are only paid after successful deliverables are finalized and authorized by students.
-            </p>
-            <div className="flex gap-2 pt-1 font-mono text-[9px] font-bold">
-              <span className="bg-[#ffece1] text-orange-800 px-2.5 py-1 rounded-md border border-[#fed7aa]/50">Manual Checks</span>
-              <span className="bg-emerald-50 text-emerald-800 px-2.5 py-1 rounded-md border border-emerald-200 font-bold">SSL Encrypted</span>
-            </div>
-          </div>
-
-        </div>
-
-        {/* Free University Mathematics & Statistics Suite (All 27 Standalone Pages) */}
-        <div className="mt-12 pt-8 border-t border-[#ffab85]/55">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3">
+    <footer
+      id="main-footer"
+      className="bg-cream-100 border-t border-cream-400 text-stone-800 selection:bg-amber-200 selection:text-terracotta-900 font-sans print:hidden"
+    >
+      <div className="max-w-7xl mx-auto px-3.5 sm:px-6 lg:px-8 py-5 sm:pt-10 sm:pb-8 space-y-4 sm:space-y-9">
+        {/* 1. TOP INTERACTIVE TOOL SUITES SECTION (Compact on Mobile, 2-Col on Desktop) */}
+        <section
+          aria-label="Browser-Local Academic Tool Suites"
+          className="grid grid-cols-1 lg:grid-cols-2 gap-3 sm:gap-6 items-start"
+        >
+          {/* CARD 1: FREE UNIVERSITY MATHEMATICS & STATISTICS SUITE */}
+          <div className="bg-cream-50/90 rounded-xl sm:rounded-2xl border border-cream-400 p-3.5 sm:p-6 shadow-2xs hover:border-amber-400/80 transition-colors flex flex-col justify-between text-left">
             <div>
-              <h3 className="text-xs font-display font-bold text-[#331301] uppercase tracking-widest">
-                Free University Mathematics &amp; Statistics Suite (27 Interactive Solvers)
-              </h3>
-              <p className="text-[11px] text-[#542104]/90 mt-0.5 font-medium">
+              {/* Privacy / Local Processing Badge */}
+              <div className="flex flex-wrap items-center justify-between gap-1.5 mb-2 sm:mb-3">
+                <span className="inline-flex items-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-full text-[10px] sm:text-[11px] font-semibold uppercase tracking-wider bg-cream-200 text-terracotta-700 border border-cream-400">
+                  <svg
+                    className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-terracotta-600"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"
+                    />
+                  </svg>
+                  27 Solvers
+                </span>
+                <span className="inline-flex items-center gap-1 text-[10px] sm:text-[11px] font-medium text-stone-500">
+                  <svg
+                    className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-emerald-600"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
+                    />
+                  </svg>
+                  Browser-Local
+                </span>
+              </div>
+
+              {/* Title & Concise 2-Line Clamped Description on Mobile */}
+              <h2 className="text-xs sm:text-[15px] font-bold tracking-wide text-stone-900 uppercase leading-snug">
+                FREE UNIVERSITY MATHEMATICS &amp; STATISTICS SUITE (27 INTERACTIVE SOLVERS)
+              </h2>
+              <p className="mt-1 sm:mt-2 text-[11px] sm:text-[13px] text-stone-600 leading-snug sm:leading-relaxed line-clamp-2 sm:line-clamp-none">
                 100% browser-local Algebra, Trigonometry, Calculus, Linear Algebra, Statistics, ODE, and RSA calculators.
               </p>
             </div>
-            <div className="flex flex-wrap items-center gap-3">
+
+            {/* Compact Action Bar */}
+            <div className="mt-2.5 sm:mt-5 pt-2.5 sm:pt-4 border-t border-cream-300 flex flex-wrap items-center justify-between gap-2">
               <a
                 href="/tools/math"
-                onClick={(e) => {
-                  if (!isModifiedAnchorClick(e)) {
-                    e.preventDefault();
-                    onNavigate('tools/math');
-                  }
-                }}
-                className="inline-flex items-center min-h-[36px] py-1 text-xs font-bold text-orange-700 hover:text-orange-900 hover:underline whitespace-nowrap cursor-pointer"
+                onClick={(e) => handleLinkClick(e, 'tools/math')}
+                className="group inline-flex items-center gap-1 text-[11px] sm:text-[13px] font-semibold text-terracotta-700 hover:text-terracotta-800 transition-colors cursor-pointer"
               >
-                Mathematics &amp; Stats Hub (27 Tools) →
+                <span>Math &amp; Stats Hub (27)</span>
+                <span aria-hidden="true" className="transition-transform duration-200 group-hover:translate-x-1">
+                  &rarr;
+                </span>
               </a>
+
               <button
                 type="button"
-                onClick={() => setIsMathToolsOpen((prev) => !prev)}
-                aria-expanded={isMathToolsOpen}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 min-h-[36px] rounded-xl bg-[#fffbf7] border border-[#ffab85]/60 hover:border-orange-500 text-xs font-bold text-[#542104] hover:text-orange-800 transition-colors cursor-pointer"
+                id="math-solvers-btn"
+                aria-expanded={isMathSolversOpen}
+                aria-controls="math-solvers-drawer"
+                onClick={() => setIsMathSolversOpen((prev) => !prev)}
+                className={`inline-flex items-center gap-1.5 px-2.5 sm:px-3.5 py-1.5 sm:py-2 rounded-lg sm:rounded-xl bg-white hover:bg-cream-200/70 text-stone-800 text-[11px] sm:text-xs font-semibold border border-cream-400 shadow-2xs hover:border-terracotta-600/40 transition-all cursor-pointer ${
+                  isMathSolversOpen ? 'is-expanded' : ''
+                }`}
               >
-                <span>{isMathToolsOpen ? 'Hide 27 Math Solvers' : 'Show All 27 Math Solvers'}</span>
-                <ChevronDown className={`w-3.5 h-3.5 transition-transform ${isMathToolsOpen ? 'rotate-180' : ''}`} />
+                <span id="math-solvers-btn-label">
+                  {isMathSolversOpen ? 'Hide Solvers' : 'All 27 Solvers'}
+                </span>
+                <svg
+                  className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-terracotta-700 chevron-icon"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  strokeWidth="2.2"
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                </svg>
               </button>
+            </div>
+
+            {/* Expandable Math Solvers Grid Drawer */}
+            <div
+              id="math-solvers-drawer"
+              className={`accordion-content ${isMathSolversOpen ? 'is-open' : ''}`}
+            >
+              <div className="accordion-inner">
+                <div className="mt-3 pt-3 border-t border-dashed border-cream-400">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-[10px] sm:text-[11px] font-semibold uppercase tracking-wider text-terracotta-700">
+                      Featured &amp; Categorized Solvers
+                    </span>
+                    <span className="text-[10px] sm:text-[11px] text-stone-500">Zero server latency</span>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 sm:gap-2">
+                    {featuredMathSolvers.map((solver) => (
+                      <a
+                        key={solver.viewKey}
+                        href={solver.href}
+                        onClick={(e) => handleLinkClick(e, solver.viewKey)}
+                        className="group flex items-center justify-between p-2 sm:p-2.5 rounded-lg sm:rounded-xl bg-white border border-cream-300 hover:border-terracotta-600/50 hover:bg-cream-200/40 transition-all cursor-pointer"
+                      >
+                        <div>
+                          <p className="text-[11px] sm:text-xs font-semibold text-stone-800 group-hover:text-terracotta-700">
+                            {solver.title}
+                          </p>
+                          <p className="text-[10px] sm:text-[11px] text-stone-500">{solver.subtitle}</p>
+                        </div>
+                        <span className="text-xs text-terracotta-600 opacity-70 group-hover:opacity-100 group-hover:translate-x-0.5 transition-all">
+                          &rarr;
+                        </span>
+                      </a>
+                    ))}
+                  </div>
+
+                  <div className="mt-2.5 flex items-center justify-between gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setShowAllMathDirectory((prev) => !prev)}
+                      className="text-[11px] font-semibold text-terracotta-700 hover:text-terracotta-800 underline cursor-pointer"
+                    >
+                      {showAllMathDirectory ? 'Hide full 27-solver list' : 'Expand full 27-solver directory'}
+                    </button>
+                    <a
+                      href="/tools/math"
+                      onClick={(e) => handleLinkClick(e, 'tools/math')}
+                      className="text-[11px] font-semibold text-stone-600 hover:text-terracotta-700 cursor-pointer"
+                    >
+                      Open Math Hub &rarr;
+                    </a>
+                  </div>
+
+                  {showAllMathDirectory && (
+                    <React.Suspense
+                      fallback={
+                        <div className="py-3 text-xs text-stone-500 font-medium">
+                          Loading all 27 math solvers...
+                        </div>
+                      }
+                    >
+                      <FooterToolDirectories mode="math" onNavigate={onNavigate} />
+                    </React.Suspense>
+                  )}
+                </div>
+              </div>
             </div>
           </div>
 
-          {isMathToolsOpen && (
-            <React.Suspense fallback={<div className="py-4 text-xs text-[#542104]/80 font-semibold">Loading math solvers directory...</div>}>
-              <FooterToolDirectories mode="math" onNavigate={onNavigate} />
-            </React.Suspense>
-          )}
-        </div>
-
-        {/* Free Student Tools Global SEO Directory (All Standalone Pages) */}
-        <div className="mt-10 pt-8 border-t border-[#ffab85]/55">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3">
+          {/* CARD 2: FREE STUDENT TOOLS SUITE */}
+          <div className="bg-cream-50/90 rounded-xl sm:rounded-2xl border border-cream-400 p-3.5 sm:p-6 shadow-2xs hover:border-amber-400/80 transition-colors flex flex-col justify-between text-left">
             <div>
-              <h3 className="text-xs font-display font-bold text-[#331301] uppercase tracking-widest">
-                Free Student Tools Suite (100% Local Browser Utilities)
-              </h3>
-              <p className="text-[11px] text-[#542104]/90 mt-0.5 font-medium">
+              {/* Privacy / Local Processing Badge */}
+              <div className="flex flex-wrap items-center justify-between gap-1.5 mb-2 sm:mb-3">
+                <span className="inline-flex items-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-full text-[10px] sm:text-[11px] font-semibold uppercase tracking-wider bg-cream-200 text-terracotta-700 border border-cream-400">
+                  <svg
+                    className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-terracotta-600"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z"
+                    />
+                  </svg>
+                  Academic Utilities
+                </span>
+                <span className="inline-flex items-center gap-1 text-[10px] sm:text-[11px] font-medium text-stone-500">
+                  <svg
+                    className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-emerald-600"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"
+                    />
+                  </svg>
+                  Zero-Upload
+                </span>
+              </div>
+
+              {/* Title & Concise Description */}
+              <h2 className="text-xs sm:text-[15px] font-bold tracking-wide text-stone-900 uppercase leading-snug">
+                FREE STUDENT TOOLS SUITE (100% LOCAL BROWSER UTILITIES)
+              </h2>
+              <p className="mt-1 sm:mt-2 text-[11px] sm:text-[13px] text-stone-600 leading-snug sm:leading-relaxed line-clamp-2 sm:line-clamp-none">
                 Zero-upload PDF, citation, chart, resume, image compression, OCR, and GPA tools for university students.
               </p>
+
+              {/* Compact Hub Links Pill Bar (Single-Row Scroll on Mobile, Wrap on Desktop) */}
+              <div className="mt-2.5 sm:mt-4 flex items-center gap-1.5 overflow-x-auto no-scrollbar flex-nowrap sm:flex-wrap pb-0.5 sm:pb-0">
+                <a
+                  href="/tools/math"
+                  onClick={(e) => handleLinkClick(e, 'tools/math')}
+                  className="group shrink-0 inline-flex items-center gap-1 px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-md sm:rounded-lg bg-cream-200/80 hover:bg-terracotta-700 text-terracotta-700 hover:text-white text-[11px] sm:text-xs font-semibold border border-cream-400 hover:border-terracotta-700 transition-all cursor-pointer"
+                >
+                  <span>Math (27)</span>
+                  <span aria-hidden="true" className="transition-transform group-hover:translate-x-0.5">
+                    &rarr;
+                  </span>
+                </a>
+                <a
+                  href="/tools/biology"
+                  onClick={(e) => handleLinkClick(e, 'tools/biology')}
+                  className="group shrink-0 inline-flex items-center gap-1 px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-md sm:rounded-lg bg-cream-200/80 hover:bg-terracotta-700 text-terracotta-700 hover:text-white text-[11px] sm:text-xs font-semibold border border-cream-400 hover:border-terracotta-700 transition-all cursor-pointer"
+                >
+                  <span>Biology (14)</span>
+                  <span aria-hidden="true" className="transition-transform group-hover:translate-x-0.5">
+                    &rarr;
+                  </span>
+                </a>
+                <a
+                  href="/tools/chemistry"
+                  onClick={(e) => handleLinkClick(e, 'tools/chemistry')}
+                  className="group shrink-0 inline-flex items-center gap-1 px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-md sm:rounded-lg bg-cream-200/80 hover:bg-terracotta-700 text-terracotta-700 hover:text-white text-[11px] sm:text-xs font-semibold border border-cream-400 hover:border-terracotta-700 transition-all cursor-pointer"
+                >
+                  <span>Chemistry (16)</span>
+                  <span aria-hidden="true" className="transition-transform group-hover:translate-x-0.5">
+                    &rarr;
+                  </span>
+                </a>
+                <a
+                  href="/tools"
+                  onClick={(e) => handleLinkClick(e, 'tools')}
+                  className="group shrink-0 inline-flex items-center gap-1 px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-md sm:rounded-lg bg-white hover:bg-terracotta-700 text-terracotta-700 hover:text-white text-[11px] sm:text-xs font-semibold border border-cream-400 hover:border-terracotta-700 transition-all cursor-pointer"
+                >
+                  <span>All Tools</span>
+                  <span aria-hidden="true" className="transition-transform group-hover:translate-x-0.5">
+                    &rarr;
+                  </span>
+                </a>
+              </div>
             </div>
-            <div className="flex flex-wrap items-center gap-3">
-              <a
-                href="/tools/math"
-                onClick={(e) => {
-                  if (!isModifiedAnchorClick(e)) {
-                    e.preventDefault();
-                    onNavigate('tools/math');
-                  }
-                }}
-                className="inline-flex items-center min-h-[32px] py-1 text-xs font-bold text-orange-700 hover:text-orange-900 hover:underline whitespace-nowrap cursor-pointer"
-              >
-                Math Hub (27 Tools) →
-              </a>
-              <a
-                href="/tools/biology"
-                onClick={(e) => {
-                  if (!isModifiedAnchorClick(e)) {
-                    e.preventDefault();
-                    onNavigate('tools/biology');
-                  }
-                }}
-                className="inline-flex items-center min-h-[32px] py-1 text-xs font-bold text-orange-700 hover:text-orange-900 hover:underline whitespace-nowrap cursor-pointer"
-              >
-                Biology Hub (14 Tools) →
-              </a>
-              <a
-                href="/tools/chemistry"
-                onClick={(e) => {
-                  if (!isModifiedAnchorClick(e)) {
-                    e.preventDefault();
-                    onNavigate('tools/chemistry');
-                  }
-                }}
-                className="inline-flex items-center min-h-[32px] py-1 text-xs font-bold text-orange-700 hover:text-orange-900 hover:underline whitespace-nowrap cursor-pointer"
-              >
-                Chemistry Hub (16 Tools) →
-              </a>
-              <a
-                href="/tools"
-                onClick={(e) => {
-                  if (!isModifiedAnchorClick(e)) {
-                    e.preventDefault();
-                    onNavigate('tools');
-                  }
-                }}
-                className="inline-flex items-center min-h-[32px] py-1 text-xs font-bold text-orange-700 hover:text-orange-900 hover:underline whitespace-nowrap cursor-pointer"
-              >
-                All Student Tools →
-              </a>
+
+            {/* Compact Action Bar */}
+            <div className="mt-2.5 sm:mt-4 pt-2.5 sm:pt-4 border-t border-cream-300 flex items-center justify-between gap-2">
+              <span className="text-[11px] sm:text-xs text-stone-500">Offline WebAssembly</span>
+
               <button
                 type="button"
-                onClick={() => setIsStudentToolsOpen((prev) => !prev)}
+                id="student-tools-btn"
                 aria-expanded={isStudentToolsOpen}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 min-h-[36px] rounded-xl bg-[#fffbf7] border border-[#ffab85]/60 hover:border-orange-500 text-xs font-bold text-[#542104] hover:text-orange-800 transition-colors cursor-pointer"
+                aria-controls="student-tools-drawer"
+                onClick={() => setIsStudentToolsOpen((prev) => !prev)}
+                className={`inline-flex items-center gap-1.5 px-2.5 sm:px-3.5 py-1.5 sm:py-2 rounded-lg sm:rounded-xl bg-white hover:bg-cream-200/70 text-stone-800 text-[11px] sm:text-xs font-semibold border border-cream-400 shadow-2xs hover:border-terracotta-600/40 transition-all cursor-pointer ${
+                  isStudentToolsOpen ? 'is-expanded' : ''
+                }`}
               >
-                <span>{isStudentToolsOpen ? 'Hide Individual Tools' : 'Show Individual Tools'}</span>
-                <ChevronDown className={`w-3.5 h-3.5 transition-transform ${isStudentToolsOpen ? 'rotate-180' : ''}`} />
+                <span id="student-tools-btn-label">
+                  {isStudentToolsOpen ? 'Hide Tools' : 'Individual Tools'}
+                </span>
+                <svg
+                  className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-terracotta-700 chevron-icon"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  strokeWidth="2.2"
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                </svg>
               </button>
             </div>
-          </div>
 
-          {isStudentToolsOpen && (
-            <React.Suspense fallback={<div className="py-4 text-xs text-[#542104]/80 font-semibold">Loading student tools directory...</div>}>
-              <FooterToolDirectories mode="student" onNavigate={onNavigate} />
-            </React.Suspense>
-          )}
-        </div>
-
-        {/* Gray Unethical Search Term Links Section */}
-        <div className="mt-16 pt-8 border-t border-[#ffab85]/55" id="google-ads-keywords">
-          <div className="flex items-center gap-2 mb-4">
-            <ShieldAlert className="w-4 h-4 text-orange-700" />
-            <h3 className="text-[10px] font-display font-bold text-[#331301] uppercase tracking-widest">Students Also Ask For (SEO Search Index)</h3>
-          </div>
-          <div className="flex flex-wrap gap-2.5 text-[11px]">
-            {seoKeywords.map((kw, idx) => (
-              <a
-                key={idx}
-                id={`seo-keyword-${idx}`}
-                href={kw.href}
-                onClick={(e) => {
-                  if (!isModifiedAnchorClick(e)) {
-                    e.preventDefault();
-                    onNavigate(kw.view);
-                  }
-                }}
-                rel="nofollow"
-                className="text-[#542104] hover:text-orange-800 hover:bg-[#ffece1] hover:border-[#ffab85] transition-all duration-200 cursor-pointer inline-flex items-center min-h-[32px] border border-[#ffab85]/45 px-3 py-1.5 rounded-lg bg-[#fffbf7]"
-              >
-                {kw.text}
-              </a>
-            ))}
-          </div>
-
-
-          {/* Collapsible Disclosure Toggle Button */}
-          <div className="flex flex-col items-center justify-center mt-8 mb-3">
-            <button
-              id="toggleDisclosureBtn"
-              type="button"
-              onClick={() => setIsDisclosureOpen((prev) => !prev)}
-              aria-expanded={isDisclosureOpen}
-              aria-controls="footerDisclosurePanel"
-              className="group inline-flex items-center gap-2.5 px-5 py-2.5 min-h-[44px] rounded-full bg-white hover:bg-orange-50/80 border border-[#ffab85]/70 hover:border-orange-300 shadow-2xs hover:shadow-xs transition-all duration-200 text-xs sm:text-sm font-semibold text-[#542104] hover:text-orange-700 focus:outline-none focus:ring-2 focus:ring-orange-400 cursor-pointer"
+            {/* Expandable Individual Student Tools Drawer */}
+            <div
+              id="student-tools-drawer"
+              className={`accordion-content ${isStudentToolsOpen ? 'is-open' : ''}`}
             >
-              <Shield className="w-4 h-4 text-orange-600 shrink-0" />
-              <span id="btnText">
-                {isDisclosureOpen
-                  ? 'Hide Platform Identity & Academic Integrity Disclosures'
-                  : 'View Platform Identity & Academic Integrity Disclosures'}
+              <div className="accordion-inner">
+                <div className="mt-3 pt-3 border-t border-dashed border-cream-400">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-[10px] sm:text-[11px] font-semibold uppercase tracking-wider text-terracotta-700">
+                      Browser-Local Student Utilities
+                    </span>
+                    <span className="text-[10px] sm:text-[11px] text-stone-500">Files never leave device</span>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 sm:gap-2">
+                    {featuredStudentTools.map((tool) => (
+                      <a
+                        key={tool.viewKey}
+                        href={tool.href}
+                        onClick={(e) => handleLinkClick(e, tool.viewKey)}
+                        className="group flex items-center justify-between p-2 sm:p-2.5 rounded-lg sm:rounded-xl bg-white border border-cream-300 hover:border-terracotta-600/50 hover:bg-cream-200/40 transition-all cursor-pointer"
+                      >
+                        <div>
+                          <p className="text-[11px] sm:text-xs font-semibold text-stone-800 group-hover:text-terracotta-700">
+                            {tool.title}
+                          </p>
+                          <p className="text-[10px] sm:text-[11px] text-stone-500">{tool.subtitle}</p>
+                        </div>
+                        <span className="text-xs text-terracotta-600 opacity-70 group-hover:opacity-100 group-hover:translate-x-0.5 transition-all">
+                          &rarr;
+                        </span>
+                      </a>
+                    ))}
+                  </div>
+
+                  <div className="mt-2.5 flex items-center justify-between gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setShowAllStudentDirectory((prev) => !prev)}
+                      className="text-[11px] font-semibold text-terracotta-700 hover:text-terracotta-800 underline cursor-pointer"
+                    >
+                      {showAllStudentDirectory ? 'Hide full tools directory' : 'Expand all student tools'}
+                    </button>
+                    <a
+                      href="/tools"
+                      onClick={(e) => handleLinkClick(e, 'tools')}
+                      className="text-[11px] font-semibold text-stone-600 hover:text-terracotta-700 cursor-pointer"
+                    >
+                      Open Tools Suite &rarr;
+                    </a>
+                  </div>
+
+                  {showAllStudentDirectory && (
+                    <React.Suspense
+                      fallback={
+                        <div className="py-3 text-xs text-stone-500 font-medium">
+                          Loading student utilities directory...
+                        </div>
+                      }
+                    >
+                      <FooterToolDirectories mode="student" onNavigate={onNavigate} />
+                    </React.Suspense>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* Divider */}
+        <div className="border-t border-cream-400/80" />
+
+        {/* 2. MIDDLE SECTION: POPULAR ACADEMIC TOPICS (Single-Row Scroll on Mobile, Wrapped on Desktop) */}
+        <section aria-labelledby="popular-topics-heading" className="space-y-2 sm:space-y-4">
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-1.5 sm:gap-2">
+              <span className="w-5 h-5 sm:w-6 sm:h-6 rounded-md sm:rounded-lg bg-cream-200 border border-cream-400 flex items-center justify-center text-terracotta-700 shrink-0">
+                <svg
+                  className="w-3 h-3 sm:w-3.5 sm:h-3.5"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"
+                  />
+                </svg>
               </span>
-              <ChevronDown
-                className={`w-4 h-4 text-stone-600 group-hover:text-orange-600 transition-transform duration-300 ${
-                  isDisclosureOpen ? 'rotate-180 text-orange-600' : ''
-                }`}
-              />
-            </button>
-            <span className="text-[11px] text-[#542104]/85 mt-1.5 select-none font-medium">
-              Click to {isDisclosureOpen ? 'close' : 'open'} legal, identity &amp; academic integrity disclosures
+              <h3
+                id="popular-topics-heading"
+                className="text-[11px] sm:text-xs font-bold tracking-wider uppercase text-stone-800"
+              >
+                POPULAR ACADEMIC TOPICS &amp; STUDY GUIDES
+              </h3>
+            </div>
+            <span className="text-[10px] sm:text-[11px] font-medium text-stone-500 shrink-0">
+              <span className="sm:hidden">Swipe &rarr;</span>
+              <span className="hidden sm:inline">Curated student learning pathways</span>
             </span>
           </div>
 
-          {/* Collapsible Disclosures Container */}
+          {/* Horizontal Scrollable Pill Strip on Mobile (Single Row), Multi-Row Wrap on Desktop */}
+          <div
+            id="google-ads-keywords"
+            className="flex items-center gap-1.5 sm:gap-2.5 overflow-x-auto no-scrollbar flex-nowrap sm:flex-wrap pb-0.5 sm:pb-0"
+          >
+            {seoTopics.map((topic, idx) => (
+              <a
+                key={idx}
+                id={`seo-keyword-${idx}`}
+                href={topic.href}
+                rel="nofollow"
+                onClick={(e) => handleLinkClick(e, topic.view)}
+                className="group shrink-0 inline-flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-3.5 py-1.5 sm:py-2 rounded-lg sm:rounded-xl bg-white hover:bg-cream-50 text-stone-700 hover:text-terracotta-700 text-[11px] sm:text-xs font-medium border border-cream-400 hover:border-terracotta-600/50 shadow-2xs sm:hover:-translate-y-0.5 transition-all duration-200 cursor-pointer"
+              >
+                <span>{topic.text}</span>
+                <span
+                  aria-hidden="true"
+                  className="text-terracotta-600/70 group-hover:text-terracotta-700 group-hover:translate-x-0.5 transition-transform"
+                >
+                  &rarr;
+                </span>
+              </a>
+            ))}
+          </div>
+        </section>
+
+        {/* 3. PLATFORM IDENTITY & ACADEMIC INTEGRITY DISCLOSURES ACCORDION (Ultra-Compact) */}
+        <section aria-label="Platform Identity and Academic Integrity Disclosures" className="pt-0.5">
+          <div className="flex flex-col items-center">
+            <button
+              type="button"
+              id="toggleDisclosureBtn"
+              aria-expanded={isDisclosuresOpen}
+              aria-controls="footerDisclosurePanel"
+              onClick={() => setIsDisclosuresOpen((prev) => !prev)}
+              className={`group inline-flex items-center gap-1.5 px-3 py-1.5 sm:px-3.5 sm:py-1.5 rounded-full bg-white hover:bg-cream-50 text-stone-900 border border-cream-400 hover:border-terracotta-600/60 shadow-2xs transition-all cursor-pointer ${
+                isDisclosuresOpen ? 'is-expanded' : ''
+              }`}
+            >
+              <span className="w-4 h-4 rounded-full bg-cream-200 text-terracotta-700 flex items-center justify-center shrink-0 group-hover:bg-terracotta-700 group-hover:text-white transition-colors">
+                <svg
+                  className="w-3 h-3"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"
+                  />
+                </svg>
+              </span>
+              <span
+                id="btnText"
+                className="text-[11px] sm:text-xs font-semibold text-stone-800 group-hover:text-terracotta-800 transition-colors"
+              >
+                Platform Identity &amp; Academic Integrity Disclosures
+              </span>
+              <svg
+                className="w-3 h-3 text-terracotta-700 chevron-icon shrink-0"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                strokeWidth="2.2"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+              </svg>
+            </button>
+            <p className="mt-1 text-[10px] text-stone-500 text-center">
+              Click to {isDisclosuresOpen ? 'close' : 'open'} legal, identity &amp; academic integrity disclosures
+            </p>
+          </div>
+
+          {/* Expandable Disclosure Panel */}
           <div
             id="footerDisclosurePanel"
-            className={`transition-all duration-400 ease-in-out overflow-hidden ${
-              isDisclosureOpen ? 'max-h-[1400px] opacity-100 mt-4 space-y-4' : 'max-h-0 opacity-0 pointer-events-none mt-0 space-y-0'
-            }`}
+            className={`accordion-content ${isDisclosuresOpen ? 'is-open' : ''}`}
           >
-            {isDisclosureOpen && (
-            <>
-            {/* Application Overview & Google API Disclosure */}
-            <div className="p-6 bg-[#fffbf7] border border-[#ffab85]/55 rounded-3xl space-y-4 text-left shadow-2xs">
-              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 border-b border-[#ffab85]/35 pb-3">
-                <div className="space-y-1">
-                  <span className="text-[10px] font-bold text-orange-700 uppercase tracking-widest block font-sans">
-                    Platform Identity &amp; Services
-                  </span>
-                  <h4 className="text-sm font-extrabold text-[#331301] tracking-tight font-display">
-                    Application Overview
-                  </h4>
+            <div className="accordion-inner">
+              <div className="mt-2.5 sm:mt-3.5 bg-white rounded-xl sm:rounded-2xl border border-cream-400 p-3 sm:p-4 shadow-xs text-left space-y-3">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5 sm:gap-5">
+                  {/* Disclosure Column 1 */}
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-1.5 text-terracotta-700">
+                      <svg
+                        className="w-3.5 h-3.5 shrink-0"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"
+                        />
+                      </svg>
+                      <h4 className="text-[11px] font-bold uppercase tracking-wider">Academic Integrity Policy</h4>
+                    </div>
+                    <p className="text-[11px] sm:text-xs text-stone-600 leading-relaxed">
+                      universitytutors.com strictly prohibits contract cheating, ghostwriting, or unauthorized exam assistance. All tutoring, derivation coaching, and structural feedback are designed exclusively to build independent student comprehension in compliance with university honor codes.
+                    </p>
+                  </div>
+
+                  {/* Disclosure Column 2 */}
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-1.5 text-terracotta-700">
+                      <svg
+                        className="w-3.5 h-3.5 shrink-0"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
+                        />
+                      </svg>
+                      <h4 className="text-[11px] font-bold uppercase tracking-wider">Browser-Local Privacy Guarantee</h4>
+                    </div>
+                    <p className="text-[11px] sm:text-xs text-stone-600 leading-relaxed">
+                      Every mathematical solver, PDF utility, OCR scanner, and citation tool in our free suites executes 100% locally inside your browser sandbox. Student documents, equations, and files are never uploaded to external servers or used for model training.
+                    </p>
+                  </div>
+
+                  {/* Disclosure Column 3 */}
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-1.5 text-terracotta-700">
+                      <svg
+                        className="w-3.5 h-3.5 shrink-0"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                        />
+                      </svg>
+                      <h4 className="text-[11px] font-bold uppercase tracking-wider">Regional Curriculum Alignment</h4>
+                    </div>
+                    <p className="text-[11px] sm:text-xs text-stone-600 leading-relaxed">
+                      Platform educational resources, grading calculators, and citation standards are calibrated to support higher-education frameworks across the United Kingdom (UK), United States (US), Canada (CA), Australia (AU), New Zealand (NZ), and Ireland (IE).
+                    </p>
+                  </div>
                 </div>
-                <span className="inline-flex items-center gap-1.5 text-[10px] bg-emerald-50 text-emerald-800 border border-emerald-200/60 px-2.5 py-1 rounded-full font-bold">
-                  <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
-                  Verified Google API &amp; Privacy Protocols
-                </span>
-              </div>
-              <p className="text-xs text-[#542104]/90 leading-relaxed font-sans font-semibold">
-                <strong>University-tutors</strong> is an integrated academic support platform designed to connect students with expert educational consultants and tutors. This application facilitates secure, real-time consultation chats, document sharing for assignment briefs, and streamlined project tracking between students and administrative teams to enhance the overall learning experience.
-              </p>
-              <div className="pt-1 flex justify-end text-xs">
-                <button 
-                  onClick={() => { onNavigate('google-disclosure'); window.scrollTo({ top: 0, behavior: 'smooth' }); }} 
-                  className="text-orange-700 hover:text-orange-900 font-bold hover:underline inline-flex items-center gap-1 transition-all"
-                >
-                  View Google OAuth Disclosure →
-                </button>
-              </div>
-            </div>
 
-            {/* Core Academic Disclaimer near keywords */}
-            <div className="p-4 bg-[#fff2e6]/80 border border-[#ffab85]/55 rounded-2xl space-y-2.5 text-left">
-              <p className="text-[11px] text-[#331301] leading-relaxed font-semibold">
-                🛡️ <strong>Academic Integrity Statement:</strong> University-Tutors provides ethical academic mentorship, tutoring, and editing consultation. We do not write essays, complete assignments, or take exams on behalf of students. All support is designed to help students learn and produce their own original work.
-              </p>
-              <p className="text-[10px] text-[#542104] leading-normal italic font-medium">
-                All services provided by universitytutors.com are meant to serve as references, explanatory outline models, or tutoring study guides. We do not condone, recommend, or support any form of plagiarism, exam cheating, academic dishonesty, ghostwriting, or contract cheating under university-mandated Honor Codes.
-              </p>
-              <p className="text-[10px] text-[#542104]/95 leading-normal font-sans font-medium">
-                💬 <strong>Quotation & Transparency Note:</strong> All pricing is negotiated on a case‑by‑case basis between the student and the tutor. University-Tutors.com does not set standard rates. You will always see the final price before making any payment. Price is finalized only after you and your tutor agree on the scope – no hidden fees. Any enquiries can be sent directly to <a href="mailto:support@universitytutors.com" className="underline font-bold text-orange-700 hover:text-orange-850">support@universitytutors.com</a>.
-              </p>
+                {/* Compact Google OAuth & Support Row */}
+                <div className="pt-2.5 border-t border-cream-300 flex flex-wrap items-center justify-between gap-2 text-[11px] text-stone-600">
+                  <span>
+                    Enquiries:{' '}
+                    <a
+                      href="mailto:support@universitytutors.com"
+                      className="font-semibold text-terracotta-700 hover:underline"
+                    >
+                      support@universitytutors.com
+                    </a>
+                    {onOpenBecomeTutor && (
+                      <>
+                        {' · '}
+                        <button
+                          type="button"
+                          onClick={onOpenBecomeTutor}
+                          className="font-semibold text-terracotta-700 hover:underline cursor-pointer"
+                        >
+                          Become a Tutor
+                        </button>
+                      </>
+                    )}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => handleButtonNav('google-disclosure')}
+                    className="font-semibold text-terracotta-700 hover:text-terracotta-800 hover:underline cursor-pointer"
+                  >
+                    View Google OAuth Disclosure &rarr;
+                  </button>
+                </div>
+              </div>
             </div>
-            </>
-            )}
           </div>
-        </div>
+        </section>
 
-        {/* Bottom copyright details & Legal Links */}
-        <div className="mt-10 pt-6 border-t border-[#ffab85]/40 flex flex-col md:flex-row items-center justify-between text-[11px] text-[#542104]/90 gap-4 text-center md:text-left">
-          <p className="font-medium max-w-xl">
-            © 2026 universitytutors.com. All Rights Reserved. Created under educational technology guidelines for UK, US, CA, AU, NZ &amp; IE local curriculum support.
+        {/* Divider */}
+        <div className="border-t border-cream-400" />
+
+        {/* 4. CENTERED COMPACT BOTTOM BAR */}
+        <div className="flex flex-col items-center justify-center text-center gap-2.5 sm:gap-3 pt-0.5 sm:pt-1">
+          {/* Centered Copyright & Regional Curriculum Notice */}
+          <p className="text-[11px] sm:text-xs text-stone-600 leading-snug sm:leading-relaxed max-w-2xl mx-auto text-center">
+            &copy; 2026 universitytutors.com. All Rights Reserved. Created under educational technology guidelines for UK, US, CA, AU, NZ &amp; IE local curriculum support.
           </p>
-          <div className="flex flex-wrap items-center justify-center md:justify-end gap-1.5 sm:gap-x-2 md:gap-x-3 text-xs font-bold w-full md:w-auto">
-            <button 
-              id="footer-cc-priv" 
-              onClick={() => { onNavigate('privacy'); window.scrollTo({ top: 0, behavior: 'smooth' }); }} 
-              className="inline-flex items-center min-h-[32px] hover:underline hover:text-orange-800 hover:bg-[#ffd9be]/50 text-[#542104] transition-all cursor-pointer py-1.5 px-2.5 rounded-md active:scale-95 text-xs font-semibold"
+
+          {/* Centered Inline Navigation Links */}
+          <nav
+            aria-label="Footer Legal and Portal Links"
+            className="flex flex-wrap items-center justify-center gap-x-3.5 gap-y-1.5 sm:gap-x-5 sm:gap-y-2 text-[11px] sm:text-xs font-semibold text-stone-700 text-center"
+          >
+            <a
+              id="footer-cc-priv"
+              href="/privacy"
+              onClick={(e) => handleLinkClick(e, 'privacy')}
+              className="hover:text-terracotta-700 transition-colors cursor-pointer"
             >
               Privacy Policy
-            </button>
-            <span className="text-[#ffab85] select-none text-[10px] hidden sm:inline" aria-hidden="true">•</span>
-            <button 
-              id="footer-cc-terms" 
-              onClick={() => { onNavigate('terms'); window.scrollTo({ top: 0, behavior: 'smooth' }); }} 
-              className="inline-flex items-center min-h-[32px] hover:underline hover:text-orange-800 hover:bg-[#ffd9be]/50 text-[#542104] transition-all cursor-pointer py-1.5 px-2.5 rounded-md active:scale-95 text-xs font-semibold"
+            </a>
+            <a
+              id="footer-cc-terms"
+              href="/terms"
+              onClick={(e) => handleLinkClick(e, 'terms')}
+              className="hover:text-terracotta-700 transition-colors cursor-pointer"
             >
               Terms of Service
-            </button>
-            <span className="text-[#ffab85] select-none text-[10px] hidden sm:inline" aria-hidden="true">•</span>
-            <button 
-              id="footer-cc-disclosure" 
-              onClick={() => { onNavigate('google-disclosure'); window.scrollTo({ top: 0, behavior: 'smooth' }); }} 
-              className="inline-flex items-center min-h-[32px] hover:underline hover:text-orange-800 hover:bg-[#ffd9be]/50 text-[#542104] transition-all cursor-pointer py-1.5 px-2.5 rounded-md active:scale-95 text-xs font-semibold"
+            </a>
+            <a
+              id="footer-cc-disclosure"
+              href="/google-disclosure"
+              onClick={(e) => handleLinkClick(e, 'google-disclosure')}
+              className="hover:text-terracotta-700 transition-colors cursor-pointer"
             >
               Google Disclosure
-            </button>
-            <span className="text-[#ffab85] select-none text-[10px] hidden sm:inline" aria-hidden="true">•</span>
-            <button 
-              id="footer-cc-contact" 
-              onClick={() => { onNavigate('contact'); window.scrollTo({ top: 0, behavior: 'smooth' }); }} 
-              className="inline-flex items-center min-h-[32px] hover:underline hover:text-orange-800 hover:bg-[#ffd9be]/50 text-[#542104] transition-all cursor-pointer py-1.5 px-2.5 rounded-md active:scale-95 text-xs font-semibold"
+            </a>
+            <a
+              id="footer-cc-contact"
+              href="/contact"
+              onClick={(e) => handleLinkClick(e, 'contact')}
+              className="hover:text-terracotta-700 transition-colors cursor-pointer"
             >
               Contact Us
-            </button>
-            <span className="text-[#ffab85] select-none text-[10px] hidden sm:inline" aria-hidden="true">•</span>
-            <button 
-              id="footer-cc-sop" 
-              onClick={() => { onNavigate('sop'); }} 
-              className="inline-flex items-center min-h-[32px] hover:underline hover:text-orange-800 hover:bg-[#ffd9be]/50 text-[#542104] transition-all cursor-pointer py-1.5 px-2.5 rounded-md active:scale-95 text-xs font-semibold"
+            </a>
+            <a
+              id="footer-cc-sop"
+              href="/sop"
+              onClick={(e) => handleLinkClick(e, 'sop')}
+              className="hover:text-terracotta-700 transition-colors cursor-pointer"
             >
               System SOP
-            </button>
-            <span className="text-[#ffab85] select-none text-[10px] hidden sm:inline" aria-hidden="true">•</span>
-            <button 
-              id="footer-cc-admin" 
-              onClick={() => { onNavigate('admin-login'); window.scrollTo({ top: 0, behavior: 'smooth' }); }} 
-              className="inline-flex items-center min-h-[32px] hover:underline hover:text-orange-800 hover:bg-[#ffd9be]/50 text-[#542104] transition-all cursor-pointer py-1.5 px-2.5 rounded-md active:scale-95 text-xs font-semibold"
+            </a>
+            <a
+              id="footer-cc-admin"
+              href="/admin-login"
+              onClick={(e) => handleLinkClick(e, 'admin-login')}
+              className="hover:text-terracotta-700 transition-colors cursor-pointer"
             >
               Admin Portal
-            </button>
-          </div>
+            </a>
+          </nav>
         </div>
-
       </div>
     </footer>
   );
