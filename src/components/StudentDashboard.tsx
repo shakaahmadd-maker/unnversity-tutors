@@ -286,7 +286,6 @@ export default function StudentDashboard({
   const [channelSearchFilter, setChannelSearchFilter] = useState('');
   const [chatListFilter, setChatListFilter] = useState<'all' | 'unread' | 'tutors' | 'support'>('all');
   const [isChatExpanded, setIsChatExpanded] = useState(false);
-  const [showAllParticipants, setShowAllParticipants] = useState(false);
   const [isQuoteDrawerOpen, setIsQuoteDrawerOpen] = useState(false);
   const [chatAttachedFileName, setChatAttachedFileName] = useState('');
   const [showSafetyBanner, setShowSafetyBanner] = useState(true);
@@ -1127,12 +1126,22 @@ export default function StudentDashboard({
   };
 
   const handleOpenPrimaryTutorChat = () => {
-    const assignedAssign = studentAssignments.find(a => a.tutorId);
-    const tutorIdToChat = assignedAssign?.tutorId || tutors[0]?.id || 'tutor_clara';
-    const tutorObj = getTutor(tutorIdToChat);
+    const isAdminId = (id?: string) =>
+      !id || id === 'admin_emily' || id === 'admin_shaka' || id.startsWith('admin_');
+    const assignedAssign = studentAssignments.find((a) => a.tutorId && !isAdminId(a.tutorId));
+    const existingTutorChat = studentChats.find((c) => c.tutorId && !isAdminId(c.tutorId));
+    const tutorIdToChat = assignedAssign?.tutorId || existingTutorChat?.tutorId;
+    if (tutorIdToChat) {
+      const tutorObj = getTutor(tutorIdToChat);
+      openWorkspaceChat(
+        tutorIdToChat,
+        `Hi ${tutorObj?.name || 'Tutor'}, I would like to consult with you about my academic assignments.`
+      );
+      return;
+    }
     openWorkspaceChat(
-      tutorIdToChat,
-      `Hi ${tutorObj?.name || 'Tutor'}, I would like to consult with you about my academic assignments.`
+      'admin_shaka',
+      'Hi Academic Support, I would like to get matched with a specialist tutor for my request.'
     );
   };
 
@@ -3037,8 +3046,37 @@ export default function StudentDashboard({
                 .filter((id): id is string => Boolean(id) && !isAdminParticipant(id))
             );
 
+            const studentAssignmentIdSet = new Set<string>(studentAssignments.map((a) => a.id));
+            const quotedChatIdSet = new Set<string>(
+              (quotes || [])
+                .filter((q) => Boolean(q?.chatId))
+                .map((q) => q.chatId)
+            );
+            const systemMatchedTutorIdSet = new Set<string>(assignedTutorIdSet);
+            studentChats.forEach((chat) => {
+              if (
+                chat.tutorId &&
+                !isAdminParticipant(chat.tutorId) &&
+                (quotedChatIdSet.has(chat.id) ||
+                  (chat.orderId && studentAssignmentIdSet.has(chat.orderId)) ||
+                  (chat.order?.tutorId && chat.order.tutorId === chat.tutorId))
+              ) {
+                systemMatchedTutorIdSet.add(chat.tutorId);
+              }
+            });
+
             // Build enriched chat thread items sorted by latest activity descending
+            // Only keep Support/Admin chats and chats with assigned or system-selected tutors
             const chatItems = studentChats
+              .filter((chat) => {
+                if (isAdminParticipant(chat.tutorId)) return true;
+                if (systemMatchedTutorIdSet.has(chat.tutorId)) return true;
+                if (quotedChatIdSet.has(chat.id)) return true;
+                if (chat.orderId && studentAssignmentIdSet.has(chat.orderId)) return true;
+                if (chat.order?.tutorId && chat.order.tutorId === chat.tutorId) return true;
+                if (chat.id === localSelectedChatId) return true;
+                return false;
+              })
               .map((chat) => {
                 const threadMsgs = messages
                   .filter((m) => m.chatId === chat.id)
@@ -3083,7 +3121,7 @@ export default function StudentDashboard({
                 return b.lastTimeMs - a.lastTimeMs;
               });
 
-            const existingParticipantIds = new Set(studentChats.map((c) => c.tutorId));
+            const existingParticipantIds = new Set(chatItems.map((item) => item.chat.tutorId));
             const totalUnreadMessages = chatItems.reduce((sum, item) => sum + item.unreadCount, 0);
 
             const normalizedChatSearch = channelSearchFilter.trim().toLowerCase();
@@ -3117,9 +3155,16 @@ export default function StudentDashboard({
                 return `${p.name} ${p.roleLabel}`.toLowerCase().includes(normalizedChatSearch);
               });
 
-            // All academic tutor participants (assigned tutors first, then full directory) not yet in an open chat
+            // Only show assigned or system-selected tutors not yet in an open chat (never the full directory)
             const availableTutorParticipants = tutors
-              .filter((t) => t && t.id && t.id !== currentUser.id && !existingParticipantIds.has(t.id))
+              .filter(
+                (t) =>
+                  t &&
+                  t.id &&
+                  t.id !== currentUser.id &&
+                  systemMatchedTutorIdSet.has(t.id) &&
+                  !existingParticipantIds.has(t.id)
+              )
               .sort((a, b) => {
                 const aAssigned = assignedTutorIdSet.has(a.id) ? 1 : 0;
                 const bAssigned = assignedTutorIdSet.has(b.id) ? 1 : 0;
@@ -3133,10 +3178,10 @@ export default function StudentDashboard({
                 return t.name.toLowerCase().includes(normalizedChatSearch) || subjText.includes(normalizedChatSearch);
               });
 
-            const visibleTutorParticipants =
-              normalizedChatSearch || showAllParticipants
-                ? availableTutorParticipants
-                : availableTutorParticipants.slice(0, 30);
+            const assignedTutorCount = new Set([
+              ...Array.from(systemMatchedTutorIdSet),
+              ...chatItems.filter((item) => !item.isSupport).map((item) => item.chat.tutorId),
+            ]).size;
 
             const selectedChatPeer = selectedChat
               ? isAdminParticipant(selectedChat.tutorId)
@@ -3186,7 +3231,7 @@ export default function StudentDashboard({
                         <div className="min-w-0">
                           <h2 className="text-base font-bold text-slate-900 leading-tight truncate">Chats</h2>
                           <p className="text-[11px] text-slate-500 tabular-nums truncate">
-                            {chatItems.length} conversations · {tutors.length + supportParticipantIds.length} participants
+                            {chatItems.length} {chatItems.length === 1 ? 'conversation' : 'conversations'} · {assignedTutorCount} assigned {assignedTutorCount === 1 ? 'tutor' : 'tutors'}
                           </p>
                         </div>
                       </div>
@@ -3385,18 +3430,18 @@ export default function StudentDashboard({
                       </div>
                     )}
 
-                    {/* Section 3: All Participants (Assigned & Available Academic Tutors) */}
-                    {visibleTutorParticipants.length > 0 && (
+                    {/* Section 3: Assigned & System-Matched Tutors */}
+                    {availableTutorParticipants.length > 0 && (
                       <div>
                         <div className="px-4 py-2 bg-slate-50/80 text-[10.5px] font-semibold text-slate-500 uppercase tracking-wider flex items-center justify-between">
                           <span className="flex items-center gap-1.5">
                             <Users className="w-3.5 h-3.5 text-slate-400" />
-                            <span>All Participants</span>
+                            <span>Assigned &amp; Matched Tutors</span>
                           </span>
                           <span className="tabular-nums">{availableTutorParticipants.length}</span>
                         </div>
                         <div className="divide-y divide-slate-100">
-                          {visibleTutorParticipants.map((tutor) => {
+                          {availableTutorParticipants.map((tutor) => {
                             const isAssigned = assignedTutorIdSet.has(tutor.id);
                             const expertise =
                               tutor.primarySubject ||
@@ -3430,51 +3475,55 @@ export default function StudentDashboard({
                                     </span>
                                   </div>
                                   <p className="text-xs text-slate-500 truncate mt-0.5">
-                                    {isAssigned ? `Assigned · ${expertise}` : `${expertise} · ★ ${tutor.rating || 4.9}`}
+                                    {isAssigned ? `Assigned Tutor · ${expertise}` : `System Matched · ${expertise}`}
                                   </p>
                                 </div>
                               </button>
                             );
                           })}
                         </div>
-                        {!normalizedChatSearch &&
-                          !showAllParticipants &&
-                          availableTutorParticipants.length > 30 && (
-                            <div className="p-3 text-center bg-slate-50/50">
-                              <button
-                                type="button"
-                                onClick={() => setShowAllParticipants(true)}
-                                className="px-4 py-2 text-xs font-semibold text-[#F97316] hover:bg-orange-50 rounded-xl border border-orange-200 transition-colors cursor-pointer"
-                              >
-                                Show all {availableTutorParticipants.length} participants
-                              </button>
-                            </div>
-                          )}
                       </div>
                     )}
 
                     {filteredActiveChats.length === 0 &&
                       availableSupportParticipants.length === 0 &&
-                      visibleTutorParticipants.length === 0 && (
-                        <div className="p-8 text-center space-y-2">
-                          <p className="text-sm font-semibold text-slate-800">No matching chats or participants</p>
+                      availableTutorParticipants.length === 0 && (
+                        <div className="p-8 text-center space-y-2.5">
+                          <p className="text-sm font-semibold text-slate-800">
+                            {chatListFilter === 'tutors' && !channelSearchFilter
+                              ? 'No assigned tutors yet'
+                              : 'No matching chats or assigned tutors'}
+                          </p>
                           <p className="text-xs text-slate-500">
                             {chatListFilter === 'unread'
                               ? 'All messages have been read.'
+                              : chatListFilter === 'tutors' && !channelSearchFilter
+                              ? 'Submit a request to get matched with an assigned tutor automatically.'
                               : 'Try clearing your search or switching back to All.'}
                           </p>
-                          {(channelSearchFilter || chatListFilter !== 'all') && (
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setChannelSearchFilter('');
-                                setChatListFilter('all');
-                              }}
-                              className="mt-2 px-3.5 py-1.5 rounded-xl bg-orange-50 text-[#F97316] text-xs font-semibold cursor-pointer"
-                            >
-                              Reset Filters
-                            </button>
-                          )}
+                          <div className="flex items-center justify-center gap-2 pt-1 flex-wrap">
+                            {chatListFilter === 'tutors' && !channelSearchFilter && (
+                              <button
+                                type="button"
+                                onClick={() => openStepByStepRequestWizard()}
+                                className="px-3.5 py-1.5 rounded-xl bg-[#F97316] hover:bg-[#ea580c] text-white text-xs font-semibold cursor-pointer transition-colors"
+                              >
+                                Create Request
+                              </button>
+                            )}
+                            {(channelSearchFilter || chatListFilter !== 'all') && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setChannelSearchFilter('');
+                                  setChatListFilter('all');
+                                }}
+                                className="px-3.5 py-1.5 rounded-xl bg-orange-50 text-[#F97316] text-xs font-semibold cursor-pointer"
+                              >
+                                Reset Filters
+                              </button>
+                            )}
+                          </div>
                         </div>
                       )}
                   </div>

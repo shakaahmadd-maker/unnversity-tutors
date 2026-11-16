@@ -73,7 +73,7 @@ export async function loadDashboardTabData(
     };
 
     if (role === 'student') {
-      if (['dashboard', 'assignments', 'submit', 'progress', 'deadlines', 'files', 'reports', 'results'].includes(tab)) {
+      if (['dashboard', 'assignments', 'submit', 'new_request', 'chat', 'progress', 'deadlines', 'files', 'reports', 'results'].includes(tab)) {
         tasks.push(
           safeGet(`/api/orders?page=${page}&limit=${limit}${searchQ}`, (oData) => {
             if (Array.isArray(oData.orders)) {
@@ -105,7 +105,7 @@ export async function loadDashboardTabData(
           })
         );
       }
-      if (['dashboard', 'tutors', 'submit', 'chat'].includes(tab) && (!store.fullDirectoryLoaded || options?.force)) {
+      if (['dashboard', 'tutors', 'submit', 'new_request', 'chat'].includes(tab) && (!store.fullDirectoryLoaded || options?.force)) {
         tasks.push(
           safeGet(`/api/users?role=tutor&page=1&limit=2500`, (uData) => {
             if (Array.isArray(uData.users)) {
