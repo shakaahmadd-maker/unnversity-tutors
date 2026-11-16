@@ -51,6 +51,22 @@ async function ensurePerformanceTablesAndIndexes(): Promise<void> {
     `CREATE INDEX IF NOT EXISTS "idx_quotes_tutor_id" ON "quotes" ("tutor_id");`,
     `CREATE INDEX IF NOT EXISTS "idx_quotes_created_at" ON "quotes" ("created_at");`,
     `CREATE INDEX IF NOT EXISTS "idx_user_sessions_expires_at" ON "user_sessions" ("expires_at");`,
+    `ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "permissions" text;`,
+    `ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "is_active" boolean NOT NULL DEFAULT true;`,
+    `ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "role_label" text;`,
+    `UPDATE "users" SET "is_active" = true WHERE "is_active" IS NULL;`,
+    `CREATE INDEX IF NOT EXISTS "idx_users_is_active" ON "users" ("is_active");`,
+    `ALTER TABLE "blogs" ADD COLUMN IF NOT EXISTS "slug" text;`,
+    `ALTER TABLE "blogs" ADD COLUMN IF NOT EXISTS "excerpt" text;`,
+    `ALTER TABLE "blogs" ADD COLUMN IF NOT EXISTS "author" text;`,
+    `ALTER TABLE "blogs" ADD COLUMN IF NOT EXISTS "alt_text" text;`,
+    `ALTER TABLE "blogs" ADD COLUMN IF NOT EXISTS "read_time" text;`,
+    `ALTER TABLE "blogs" ADD COLUMN IF NOT EXISTS "featured" boolean DEFAULT false;`,
+    `ALTER TABLE "blogs" ADD COLUMN IF NOT EXISTS "meta_description" text;`,
+    `ALTER TABLE "blogs" ADD COLUMN IF NOT EXISTS "focus_keyword" text;`,
+    `ALTER TABLE "blogs" ADD COLUMN IF NOT EXISTS "long_tail_keywords" text;`,
+    `ALTER TABLE "blogs" ADD COLUMN IF NOT EXISTS "lsi_keywords" text;`,
+    `CREATE INDEX IF NOT EXISTS "idx_blogs_slug" ON "blogs" ("slug");`,
   ];
 
   for (const sql of statements) {

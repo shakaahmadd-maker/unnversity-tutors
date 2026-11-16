@@ -1,3 +1,6 @@
+import type { AdminPermissionKey } from './lib/adminPermissions';
+export type { AdminPermissionKey };
+
 export enum UserRole {
   STUDENT = 'student',
   TUTOR = 'tutor',
@@ -21,6 +24,9 @@ export interface User {
   avatarUrl: string;
   createdAt: string;
   suspended?: boolean;
+  isActive?: boolean;
+  permissions?: AdminPermissionKey[];
+  roleLabel?: string | null;
   verified?: boolean;
   password?: string;
   resetToken?: string;
@@ -181,10 +187,15 @@ export interface Blog {
   author?: string;
   image: string;
   imageUrl?: string;
+  altText?: string;
   category: string;
   tags: string[];
   readTime?: string;
   featured?: boolean;
+  metaDescription?: string;
+  focusKeyword?: string;
+  longTailKeywords?: string;
+  lsiKeywords?: string;
   publishedAt: string;
 }
 

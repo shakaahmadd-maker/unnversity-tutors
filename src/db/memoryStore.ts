@@ -8,6 +8,7 @@ export interface BlogRecord {
   content: string;
   image: string;
   imageUrl?: string;
+  altText?: string | null;
   slug?: string;
   excerpt?: string;
   author?: string;
@@ -15,6 +16,10 @@ export interface BlogRecord {
   tags: string[];
   readTime?: string;
   featured?: boolean;
+  metaDescription?: string | null;
+  focusKeyword?: string | null;
+  longTailKeywords?: string | null;
+  lsiKeywords?: string | null;
   publishedAt: string;
   createdAt: string;
   updatedAt?: string | null;
@@ -29,6 +34,9 @@ export interface UserRecord {
   avatarUrl?: string | null;
   createdAt: string;
   suspended?: boolean;
+  isActive?: boolean;
+  permissions?: string[] | string | null;
+  roleLabel?: string | null;
   verified?: boolean;
   bio?: string | null;
   hourlyRate?: number | null;
@@ -247,6 +255,9 @@ export class MemoryStore {
       createdAt: new Date().toISOString(),
       verified: true,
       suspended: false,
+      isActive: true,
+      roleLabel: 'Super Admin',
+      permissions: ['blog', 'chats', 'orders', 'tutors', 'payments', 'settings'],
       bio: 'Platform Owner and Superior Administrator.',
       country: 'US',
       isApproved: true,

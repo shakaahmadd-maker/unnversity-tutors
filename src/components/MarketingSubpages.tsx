@@ -36,6 +36,7 @@ import {
 } from '../data/dedicatedServiceRoutes';
 import { getBlogCanonicalSlug, matchesBlogSlugOrId } from '../utils/blogSlug';
 import { apiFetch } from '../lib/apiClient';
+import { renderBlogStudioMarkdown } from './AdminBlogStudio';
 
 const DedicatedServicePages = React.lazy(() => import('./DedicatedServicePages'));
 
@@ -358,49 +359,7 @@ export default function MarketingSubpages({
   };
 
   const renderBlogContent = (content: string) => {
-    return content.split('\n').map((line, idx) => {
-      const trimmed = line.trim();
-      if (!trimmed) return <div key={idx} className="h-4" />;
-
-      if (trimmed.startsWith('###')) {
-        const headerText = trimmed.replace(/^###\s*/, '');
-        return (
-          <h2
-            key={idx}
-            className="text-lg md:text-xl font-bold text-gray-950 font-sans tracking-tight mt-6 mb-3 border-b border-gray-100 pb-1"
-          >
-            {headerText}
-          </h2>
-        );
-      }
-
-      if (trimmed.startsWith('*') || trimmed.startsWith('-')) {
-        const listText = trimmed.replace(/^[*+-]\s*/, '');
-        return (
-          <div key={idx} className="flex gap-2.5 items-start pl-4 py-1.5">
-            <span className="text-orange-650 font-bold mt-1 text-sm">•</span>
-            <p className="text-xs md:text-sm text-gray-700 leading-relaxed font-sans">{listText}</p>
-          </div>
-        );
-      }
-
-      if (trimmed.startsWith('Step ') || /^\d+\./.test(trimmed)) {
-        return (
-          <h3
-            key={idx}
-            className="text-xs md:text-sm uppercase tracking-wider font-extrabold text-orange-700 font-sans mt-5 mb-2"
-          >
-            {trimmed}
-          </h3>
-        );
-      }
-
-      return (
-        <p key={idx} className="text-xs md:text-sm text-gray-700 leading-relaxed font-sans mb-4">
-          {trimmed}
-        </p>
-      );
-    });
+    return renderBlogStudioMarkdown(content);
   };
 
   const consolidatedFaqs: FAQ[] = [...faqs];
@@ -1429,7 +1388,7 @@ export default function MarketingSubpages({
                       </span>
                       <span className="text-xs text-gray-600 font-medium flex items-center gap-1">
                         <Clock className="w-3.5 h-3.5" />
-                        5 min read
+                        {selectedBlog.readTime || '5 min read'}
                       </span>
                     </div>
 
@@ -1460,7 +1419,7 @@ export default function MarketingSubpages({
                   <div className="relative group overflow-hidden rounded-3xl border border-gray-200 shadow-lg">
                     <ResponsivePicture
                       src={selectedBlog.imageUrl || selectedBlog.image}
-                      alt={selectedBlog.title}
+                      alt={selectedBlog.altText || selectedBlog.title}
                       width={800}
                       height={400}
                       loading="eager"

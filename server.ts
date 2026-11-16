@@ -40,6 +40,13 @@ import {
   matchesTutorSlugOrId,
   withAssignedTutorSlugs,
 } from './src/utils/tutorSlug';
+import {
+  AdminPermissionKey,
+  isSuperAdminUser,
+  isStaffUser,
+  parsePermissions,
+  hasModulePermission,
+} from './src/lib/adminPermissions';
 
 // Bundler-safe runtime environment reader: reads strictly from process['env'] at runtime (zero hardcoded fallbacks)
 export function readRuntimeEnv(key: string): string {
@@ -430,14 +437,36 @@ export function revokeSessionToken(token: string | undefined): void {
   }
 }
 
+export function serializeSafeUser(rawUser: any) {
+  if (!rawUser) return null;
+  const { passwordHash: _ph, ...rest } = rawUser;
+  const normalizedPermissions = parsePermissions(rawUser.permissions);
+  const normalizedIsActive = rawUser.isActive !== false && rawUser.suspended !== true;
+  return {
+    ...rest,
+    permissions: normalizedPermissions,
+    isActive: normalizedIsActive,
+    roleLabel: rawUser.roleLabel || null,
+  };
+}
+
 // Secure Session Token using HMAC-SHA256 with unique session ID (jti)
-export function createSessionToken(payload: { id: string; email: string; role: string }): string {
+export function createSessionToken(payload: {
+  id: string;
+  email: string;
+  role: string;
+  permissions?: string[];
+  isActive?: boolean;
+  roleLabel?: string | null;
+}): string {
   const secret = getSessionSecret();
   const jti = crypto.randomBytes(16).toString('hex');
   const header = Buffer.from(JSON.stringify({ alg: 'HS256', typ: 'JWT' })).toString('base64url');
   const data = Buffer.from(
     JSON.stringify({
       ...payload,
+      permissions: payload.permissions ? parsePermissions(payload.permissions) : [],
+      isActive: payload.isActive !== false,
       jti,
       iat: Date.now(),
       exp: Date.now() + 7 * 24 * 60 * 60 * 1000,
@@ -447,7 +476,15 @@ export function createSessionToken(payload: { id: string; email: string; role: s
   return `${header}.${data}.${signature}`;
 }
 
-export function verifySessionToken(token: string): { id: string; email: string; role: string; jti?: string } | null {
+export function verifySessionToken(token: string): {
+  id: string;
+  email: string;
+  role: string;
+  permissions?: AdminPermissionKey[];
+  isActive?: boolean;
+  roleLabel?: string | null;
+  jti?: string;
+} | null {
   try {
     const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
     if (revokedSessionRegistry.has(`tok:${tokenHash}`)) {
@@ -1051,12 +1088,15 @@ export async function createApp(options: CreateAppOptions = {}) {
             8000,
             'Session user lookup'
           ).catch(() => null);
-          if (authoritativeUser && !authoritativeUser.suspended) {
+          if (authoritativeUser && !authoritativeUser.suspended && authoritativeUser.isActive !== false && authoritativeUser.deleted !== true) {
             (req as any).user = {
               id: authoritativeUser.id,
               email: authoritativeUser.email,
               role: authoritativeUser.role,
               name: authoritativeUser.name,
+              permissions: parsePermissions(authoritativeUser.permissions),
+              isActive: true,
+              roleLabel: authoritativeUser.roleLabel || null,
             };
           }
         }
@@ -1103,9 +1143,64 @@ export async function createApp(options: CreateAppOptions = {}) {
     };
   };
 
+  // Super Admin authorization requirement helper
+  const requireSuperAdmin = (req: express.Request, res: express.Response, next: express.NextFunction) => {
+    const user = (req as any).user;
+    if (!user) {
+      return res.status(401).json({
+        error: 'Unauthorized: Authentication required. Please log in.',
+        code: 'UNAUTHORIZED',
+        status: 401,
+      });
+    }
+    if (!user.isActive || user.suspended || !isSuperAdminUser(user)) {
+      return res.status(403).json({
+        error: 'Forbidden: Super Administrator privileges required.',
+        code: 'FORBIDDEN_SUPER_ADMIN',
+        status: 403,
+      });
+    }
+    next();
+  };
+
+  // Granular Sub-Admin module permission middleware
+  const requirePermission = (...requiredModules: AdminPermissionKey[]) => {
+    return (req: express.Request, res: express.Response, next: express.NextFunction) => {
+      const user = (req as any).user;
+      if (!user) {
+        return res.status(401).json({
+          error: 'Unauthorized: Authentication required. Please log in.',
+          code: 'UNAUTHORIZED',
+          status: 401,
+        });
+      }
+      if (user.isActive === false || user.suspended === true) {
+        return res.status(403).json({
+          error: 'Forbidden: Account access has been suspended or revoked.',
+          code: 'ACCOUNT_SUSPENDED',
+          status: 403,
+        });
+      }
+      if (!isSuperAdminUser(user) && !requiredModules.some((mod) => hasModulePermission(user, mod))) {
+        return res.status(403).json({
+          error: `Forbidden: Missing required module permission (${requiredModules.join(' or ')}).`,
+          code: 'FORBIDDEN_MODULE_PERMISSION',
+          requiredModules,
+          status: 403,
+        });
+      }
+      next();
+    };
+  };
+
   // Helper to check chat room access authorization
-  const canUserAccessRoom = async (userId: string, userRole: string, roomId: string): Promise<boolean> => {
-    if (userRole === 'admin' || userRole === 'subadmin') return true;
+  const canUserAccessRoom = async (userOrId: any, userRole: string, roomId: string): Promise<boolean> => {
+    const userObj = typeof userOrId === 'object' && userOrId !== null ? userOrId : null;
+    const userId = userObj ? userObj.id : String(userOrId || '');
+    const canAdministerChats = userObj
+      ? hasModulePermission(userObj, 'chats')
+      : userRole === 'admin';
+    if (canAdministerChats) return true;
     if (isDbConnected() && db) {
       try {
         const memberRows = await db.select().from(chatRoomMembers).where(
@@ -1116,7 +1211,7 @@ export async function createApp(options: CreateAppOptions = {}) {
         console.warn('[API] Notice checking room membership in DB:', dbErr.message);
       }
     }
-    return memoryStore.isRoomMember(roomId, userId, userRole === 'admin' || userRole === 'subadmin');
+    return memoryStore.isRoomMember(roomId, userId, canAdministerChats);
   };
 
   // Helper to find an order in DB or memoryStore
@@ -1175,8 +1270,8 @@ export async function createApp(options: CreateAppOptions = {}) {
     let isAuthorized = false;
     let denyReason = 'You do not have permission to access or download this document.';
 
-    // Admin & Subadmin supervisory oversight
-    if (userRole === 'admin' || userRole === 'subadmin') {
+    // Admin & Subadmin supervisory oversight (must have chats or orders permission if subadmin)
+    if (isSuperAdminUser(currentUser) || hasModulePermission(currentUser, 'orders') || hasModulePermission(currentUser, 'chats')) {
       isAuthorized = true;
     }
 
@@ -1199,7 +1294,7 @@ export async function createApp(options: CreateAppOptions = {}) {
 
     // Chat room member check
     if (!isAuthorized && fileRecord && fileRecord.roomId) {
-      const isMember = await canUserAccessRoom(userId, userRole, fileRecord.roomId);
+      const isMember = await canUserAccessRoom(currentUser, userRole, fileRecord.roomId);
       if (isMember) {
         isAuthorized = true;
       } else {
@@ -1574,7 +1669,14 @@ export async function createApp(options: CreateAppOptions = {}) {
       // 9. Session token generation & database session record
       let sessionToken: string;
       try {
-        sessionToken = createSessionToken({ id: newUserId, email: cleanEmail, role: userRole });
+        sessionToken = createSessionToken({
+          id: newUserId,
+          email: cleanEmail,
+          role: userRole,
+          permissions: [],
+          isActive: true,
+          roleLabel: null,
+        });
       } catch (sessionErr: any) {
         console.error('[AUTH] Session token failure:', sessionErr.message);
         return res.status(500).json({ error: 'Session creation failed.' });
@@ -1688,10 +1790,9 @@ export async function createApp(options: CreateAppOptions = {}) {
       await logAudit('USER_REGISTER', `User registered: ${cleanEmail} (student)`, newUserId, cleanName, userRole, req);
 
       // Return HTTP 201 with safe user data only (never return passwordHash)
-      const { passwordHash: _, ...safeUser } = newUserRecord;
       return res.status(201).json({
         success: true,
-        user: safeUser,
+        user: serializeSafeUser(newUserRecord),
         token: sessionToken,
         redirectUrl: '/student/dashboard',
         verificationRequired: true,
@@ -1762,8 +1863,8 @@ export async function createApp(options: CreateAppOptions = {}) {
         return res.status(401).json({ error: 'Invalid email or password.' });
       }
 
-      if (foundUser.suspended) {
-        return res.status(403).json({ error: 'This account has been suspended by an administrator.' });
+      if (foundUser.suspended || foundUser.isActive === false || foundUser.deleted === true) {
+        return res.status(403).json({ error: 'This account has been suspended or revoked by a Super Administrator.' });
       }
 
       // If Superior Admin has no stored passwordHash yet and runtime ADMIN_INITIAL_PASSWORD/ADMIN_PASSWORD is set, initialize it once
@@ -1782,7 +1883,7 @@ export async function createApp(options: CreateAppOptions = {}) {
 
       // Accounts without passwordHash must NEVER allow arbitrary or blank passwords
       if (!activePasswordHash || typeof activePasswordHash !== 'string') {
-        if (foundUser.role === 'admin' || foundUser.role === 'subadmin') {
+        if (isStaffUser(foundUser)) {
           return res.status(401).json({
             code: 'PASSWORD_NOT_SET',
             error: 'Administrator password is not configured yet. Sign in with Google, set a password via Password Reset, or configure ADMIN_INITIAL_PASSWORD in server environment variables.'
@@ -1799,11 +1900,19 @@ export async function createApp(options: CreateAppOptions = {}) {
         return res.status(401).json({ error: 'Invalid email or password.' });
       }
 
-      const token = createSessionToken({ id: foundUser.id, email: foundUser.email, role: foundUser.role });
+      const userPermissions = parsePermissions(foundUser.permissions);
+      const token = createSessionToken({
+        id: foundUser.id,
+        email: foundUser.email,
+        role: foundUser.role,
+        permissions: userPermissions,
+        isActive: true,
+        roleLabel: foundUser.roleLabel || null,
+      });
       setSecureSessionCookie(req, res, token);
 
       let redirectUrl = '/student/dashboard';
-      if (foundUser.role === 'admin' || foundUser.role === 'subadmin') {
+      if (isStaffUser(foundUser)) {
         redirectUrl = '/admin';
       } else if (foundUser.role === 'tutor') {
         redirectUrl = '/tutor/dashboard';
@@ -1811,8 +1920,7 @@ export async function createApp(options: CreateAppOptions = {}) {
 
       await logAudit('USER_LOGIN', `User logged in: ${cleanEmail} (${foundUser.role})`, foundUser.id, foundUser.name, foundUser.role, req);
 
-      const { passwordHash: _, ...safeUser } = foundUser;
-      return res.status(200).json({ success: true, user: safeUser, token, redirectUrl });
+      return res.status(200).json({ success: true, user: serializeSafeUser(foundUser), token, redirectUrl });
     } catch (error: any) {
       console.error('[AUTH] Login error:', error.message);
       return res.status(500).json({ error: 'Authentication failed' });
@@ -1848,13 +1956,12 @@ export async function createApp(options: CreateAppOptions = {}) {
       }
 
       const foundUser = await resolveAuthoritativeUserById(session.id);
-      if (!foundUser || foundUser.suspended) {
+      if (!foundUser || foundUser.suspended || foundUser.isActive === false || foundUser.deleted === true) {
         clearSecureSessionCookie(req, res);
         return res.status(401).json({ user: null });
       }
 
-      const { passwordHash: _, ...safeUser } = foundUser;
-      return res.status(200).json({ user: safeUser });
+      return res.status(200).json({ user: serializeSafeUser(foundUser) });
     } catch {
       return res.status(500).json({ error: 'Failed to load user session' });
     }
@@ -2361,23 +2468,29 @@ export async function createApp(options: CreateAppOptions = {}) {
 
       logSafeAuthEvent('password successfully changed', { userId: foundUser.id });
 
-      const sessionToken = createSessionToken({ id: foundUser.id, email: foundUser.email, role: foundUser.role });
+      const sessionToken = createSessionToken({
+        id: foundUser.id,
+        email: foundUser.email,
+        role: foundUser.role,
+        permissions: parsePermissions(foundUser.permissions),
+        isActive: foundUser.isActive !== false && !foundUser.suspended,
+        roleLabel: foundUser.roleLabel || null,
+      });
       setSecureSessionCookie(req, res, sessionToken);
 
       await logAudit('USER_PASSWORD_RESET', `Password updated via recovery token for: ${cleanEmail}`, foundUser.id, foundUser.name, foundUser.role, req);
 
       let redirectUrl = '/student/dashboard';
-      if (foundUser.role === 'admin' || foundUser.role === 'subadmin') {
+      if (isStaffUser(foundUser)) {
         redirectUrl = '/admin';
       } else if (foundUser.role === 'tutor') {
         redirectUrl = '/tutor/dashboard';
       }
 
-      const { passwordHash: _, ...safeUser } = { ...foundUser, passwordHash: newHash };
       return res.status(200).json({
         success: true,
         message: 'Password updated successfully.',
-        user: safeUser,
+        user: serializeSafeUser({ ...foundUser, passwordHash: newHash }),
         token: sessionToken,
         redirectUrl
       });
@@ -3175,7 +3288,7 @@ export async function createApp(options: CreateAppOptions = {}) {
       );
     }
 
-    if (targetUser.suspended) {
+    if (targetUser.suspended || targetUser.isActive === false || targetUser.deleted === true) {
       return sendOAuthErrorResponse(
         req,
         res,
@@ -3193,12 +3306,15 @@ export async function createApp(options: CreateAppOptions = {}) {
       id: targetUser.id,
       email: targetUser.email,
       role: targetUser.role,
+      permissions: parsePermissions(targetUser.permissions),
+      isActive: targetUser.isActive !== false && !targetUser.suspended,
+      roleLabel: targetUser.roleLabel || null,
     });
     const isHttps = isSecureCookieRequest(req);
     setSecureSessionCookie(req, res, sessionToken);
 
     let targetRedirectUrl = '/student/dashboard';
-    if (targetUser.role === 'admin' || targetUser.role === 'subadmin') {
+    if (isStaffUser(targetUser)) {
       targetRedirectUrl = '/admin';
     } else if (targetUser.role === 'tutor') {
       targetRedirectUrl = '/tutor/dashboard';
@@ -3884,12 +4000,287 @@ export async function createApp(options: CreateAppOptions = {}) {
     return res.status(200).json({ success: true, message: 'Tutor dashboard authorized', user: (req as any).user });
   });
 
-  app.get('/api/admin/dashboard', requireRole('admin', 'subadmin'), (req, res) => {
-    return res.status(200).json({ success: true, message: 'Admin dashboard authorized', user: (req as any).user });
+  app.get('/api/admin/dashboard', (req, res) => {
+    const user = (req as any).user;
+    if (!user) {
+      return res.status(401).json({ error: 'Unauthorized: Authentication required.', code: 'UNAUTHORIZED', status: 401 });
+    }
+    if (!isStaffUser(user)) {
+      return res.status(403).json({ error: 'Forbidden: Staff administrator access required.', code: 'FORBIDDEN', status: 403 });
+    }
+    return res.status(200).json({
+      success: true,
+      message: 'Admin dashboard authorized',
+      user,
+      allowedModules: isSuperAdminUser(user) ? 'ALL' : parsePermissions(user.permissions),
+    });
+  });
+
+  // =========================================================================
+  // SUPER ADMIN RBAC: SUB-ADMINS & PERMISSION MANAGEMENT
+  // =========================================================================
+
+  app.get('/api/admin/subadmins', requireSuperAdmin, async (_req, res) => {
+    try {
+      const merged = new Map<string, any>();
+
+      for (const u of memoryStore.getAllUsers()) {
+        if (u && (u.role === 'subadmin' || u.role === 'SUB_ADMIN' || u.role === 'admin' || u.role === 'SUPER_ADMIN')) {
+          merged.set(u.id, u);
+        }
+      }
+
+      const persistedMap = getPersistedUserUpdates();
+      for (const [uid, rec] of Object.entries(persistedMap)) {
+        if (!rec) continue;
+        const base = merged.get(uid) || {};
+        const combined = { ...base, ...rec, id: uid };
+        if (combined.role === 'subadmin' || combined.role === 'SUB_ADMIN' || combined.role === 'admin' || combined.role === 'SUPER_ADMIN') {
+          merged.set(uid, combined);
+        }
+      }
+
+      if (isDbConnected() && db) {
+        try {
+          const rows = await withDbTimeout(
+            db.select().from(users).where(inArray(users.role, ['admin', 'subadmin', 'SUPER_ADMIN', 'SUB_ADMIN'])),
+            8000,
+            'Select subadmin accounts'
+          );
+          for (const row of rows) {
+            merged.set(row.id, { ...(merged.get(row.id) || {}), ...row });
+          }
+        } catch (dbErr: any) {
+          console.warn('[RBAC] Notice fetching subadmins from DB:', dbErr.message);
+        }
+      }
+
+      const list = Array.from(merged.values())
+        .filter((u) => u && u.deleted !== true && u.status !== 'deleted')
+        .map((u) => serializeSafeUser(u))
+        .sort((a, b) => {
+          const aSuper = isSuperAdminUser({ ...a, isActive: true, suspended: false }) ? 0 : 1;
+          const bSuper = isSuperAdminUser({ ...b, isActive: true, suspended: false }) ? 0 : 1;
+          if (aSuper !== bSuper) return aSuper - bSuper;
+          return new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime();
+        });
+
+      return res.status(200).json({ success: true, subadmins: list });
+    } catch (err: any) {
+      return res.status(500).json({ error: err?.message || 'Failed to load sub-admins.' });
+    }
+  });
+
+  app.post('/api/admin/subadmins', requireSuperAdmin, async (req, res) => {
+    try {
+      const caller = (req as any).user;
+      const { name, email, password, roleLabel, permissions, isActive } = req.body || {};
+
+      if (!name || typeof name !== 'string' || !name.trim()) {
+        return res.status(400).json({ error: 'Full name is required.' });
+      }
+      if (!email || typeof email !== 'string' || !email.trim()) {
+        return res.status(400).json({ error: 'Valid email address is required.' });
+      }
+      if (!password || typeof password !== 'string' || password.length < 8) {
+        return res.status(400).json({ error: 'Password must be at least 8 characters long.' });
+      }
+
+      const cleanEmail = email.toLowerCase().trim();
+      const existing = await resolveAuthoritativeUserByEmail(cleanEmail);
+      if (existing && existing.deleted !== true && existing.status !== 'deleted') {
+        return res.status(409).json({ error: 'An account with this email already exists.' });
+      }
+
+      const parsedPerms = parsePermissions(permissions);
+      const activeFlag = isActive !== false;
+      const cleanLabel = typeof roleLabel === 'string' && roleLabel.trim() ? roleLabel.trim().slice(0, 80) : 'Sub-Administrator';
+      const now = new Date().toISOString();
+      const newId = 'subadmin_' + crypto.randomBytes(10).toString('hex');
+      const pHash = hashPassword(password);
+
+      const newRecord: any = {
+        id: newId,
+        role: 'subadmin',
+        name: name.trim(),
+        email: cleanEmail,
+        passwordHash: pHash,
+        avatarUrl: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=150&auto=format&fit=crop&q=80',
+        createdAt: now,
+        verified: true,
+        suspended: !activeFlag,
+        isActive: activeFlag,
+        permissions: JSON.stringify(parsedPerms),
+        roleLabel: cleanLabel,
+        bio: `${cleanLabel} at University Tutors.`,
+        country: 'US',
+        isApproved: true,
+        status: activeFlag ? 'approved' : 'suspended',
+      };
+
+      memoryStore.setUser(newRecord);
+      savePersistedUserUpdate(newId, newRecord);
+
+      if (isDbConnected() && db) {
+        try {
+          await db.insert(users).values(newRecord);
+        } catch (dbErr: any) {
+          console.warn('[RBAC] Notice inserting subadmin into DB:', dbErr.message);
+        }
+      }
+
+      await logAudit(
+        'SUBADMIN_CREATE',
+        `Created sub-admin ${cleanEmail} (${cleanLabel}) with modules: [${parsedPerms.join(', ')}]`,
+        caller.id,
+        caller.name,
+        caller.role,
+        req
+      );
+
+      return res.status(201).json({ success: true, subadmin: serializeSafeUser(newRecord) });
+    } catch (err: any) {
+      return res.status(500).json({ error: err?.message || 'Failed to create sub-admin.' });
+    }
+  });
+
+  app.put('/api/admin/subadmins/:id', requireSuperAdmin, async (req, res) => {
+    try {
+      const caller = (req as any).user;
+      const { id } = req.params;
+      const existing = await resolveAuthoritativeUserById(id);
+      if (!existing || existing.deleted === true) {
+        return res.status(404).json({ error: 'Staff account not found.' });
+      }
+      if (id === 'admin_shaka' || (isSuperAdminUser({ ...existing, isActive: true, suspended: false }) && req.body?.isActive === false)) {
+        return res.status(403).json({ error: 'Super Administrator status cannot be deactivated.' });
+      }
+
+      const { name, roleLabel, permissions, isActive, password } = req.body || {};
+      const updates: Record<string, any> = {};
+      let shouldRevokeSessions = false;
+
+      if (typeof name === 'string' && name.trim()) {
+        updates.name = name.trim();
+      }
+      if (typeof roleLabel === 'string') {
+        updates.roleLabel = roleLabel.trim().slice(0, 80) || 'Sub-Administrator';
+      }
+      if (permissions !== undefined) {
+        const nextPerms = parsePermissions(permissions);
+        const prevPerms = parsePermissions(existing.permissions);
+        updates.permissions = JSON.stringify(nextPerms);
+        if (JSON.stringify(nextPerms) !== JSON.stringify(prevPerms)) {
+          shouldRevokeSessions = true;
+        }
+      }
+      if (isActive !== undefined) {
+        const activeFlag = Boolean(isActive);
+        updates.isActive = activeFlag;
+        updates.suspended = !activeFlag;
+        updates.status = activeFlag ? 'approved' : 'suspended';
+        if (!activeFlag) {
+          shouldRevokeSessions = true;
+        }
+      }
+      if (typeof password === 'string' && password.trim().length > 0) {
+        if (password.trim().length < 8) {
+          return res.status(400).json({ error: 'Password must be at least 8 characters long.' });
+        }
+        updates.passwordHash = hashPassword(password.trim());
+        shouldRevokeSessions = true;
+      }
+
+      const updatedRecord = { ...existing, ...updates, id };
+      memoryStore.setUser(updatedRecord);
+      savePersistedUserUpdate(id, updates);
+
+      if (isDbConnected() && db) {
+        try {
+          const dbUpdates: Record<string, any> = {};
+          for (const key of ['name', 'roleLabel', 'permissions', 'isActive', 'suspended', 'status', 'passwordHash']) {
+            if (updates[key] !== undefined) dbUpdates[key] = updates[key];
+          }
+          if (Object.keys(dbUpdates).length > 0) {
+            await db.update(users).set(dbUpdates).where(eq(users.id, id));
+          }
+        } catch (dbErr: any) {
+          console.warn('[RBAC] Notice updating subadmin in DB:', dbErr.message);
+        }
+      }
+
+      if (shouldRevokeSessions) {
+        revokeAllSessionsForUser(id);
+      }
+
+      await logAudit(
+        'SUBADMIN_UPDATE',
+        `Updated sub-admin ${existing.email} (active=${updatedRecord.isActive !== false}, modules=[${parsePermissions(updatedRecord.permissions).join(', ')}])`,
+        caller.id,
+        caller.name,
+        caller.role,
+        req
+      );
+
+      return res.status(200).json({ success: true, subadmin: serializeSafeUser(updatedRecord) });
+    } catch (err: any) {
+      return res.status(500).json({ error: err?.message || 'Failed to update sub-admin.' });
+    }
+  });
+
+  app.delete('/api/admin/subadmins/:id', requireSuperAdmin, async (req, res) => {
+    try {
+      const caller = (req as any).user;
+      const { id } = req.params;
+      if (caller.id === id) {
+        return res.status(400).json({ error: 'Cannot delete your own Super Administrator account.' });
+      }
+      const existing = await resolveAuthoritativeUserById(id);
+      if (!existing) {
+        return res.status(404).json({ error: 'Sub-admin account not found.' });
+      }
+      if (isSuperAdminUser({ ...existing, isActive: true, suspended: false }) || id === 'admin_shaka') {
+        return res.status(403).json({ error: 'Super Administrator accounts cannot be deleted.' });
+      }
+
+      revokeAllSessionsForUser(id);
+
+      const tombstone = {
+        deleted: true,
+        isActive: false,
+        suspended: true,
+        status: 'deleted',
+        permissions: JSON.stringify([]),
+      };
+      memoryStore.updateUser(id, tombstone as any);
+      savePersistedUserUpdate(id, tombstone);
+
+      if (isDbConnected() && db) {
+        try {
+          await db.delete(users).where(eq(users.id, id));
+        } catch {
+          try {
+            await db.update(users).set({
+              isActive: false,
+              suspended: true,
+              status: 'deleted',
+              permissions: JSON.stringify([]),
+            }).where(eq(users.id, id));
+          } catch (dbErr: any) {
+            console.warn('[RBAC] Notice revoking deleted subadmin in DB:', dbErr.message);
+          }
+        }
+      }
+
+      await logAudit('SUBADMIN_DELETE', `Removed sub-admin access for ${existing.email}`, caller.id, caller.name, caller.role, req);
+      return res.status(200).json({ success: true, deletedId: id });
+    } catch (err: any) {
+      return res.status(500).json({ error: err?.message || 'Failed to remove sub-admin.' });
+    }
   });
 
   // Protected Admin Performance Diagnostics Endpoint (non-sensitive route timing metrics only)
-  app.get('/api/admin/diagnostics/performance', requireRole('admin', 'subadmin'), (_req, res) => {
+  app.get('/api/admin/diagnostics/performance', requirePermission('settings'), (_req, res) => {
     const byRoute = new Map<string, { route: string; method: string; count: number; totalMs: number; maxMs: number; slowCount: number; verySlowCount: number; failedCount: number }>();
     for (const m of apiMetricsRing) {
       const key = `${m.method} ${m.route}`;
@@ -4049,7 +4440,15 @@ export async function createApp(options: CreateAppOptions = {}) {
   app.get('/api/users', async (req, res) => {
     try {
       const caller = (req as any).user;
-      const isAdmin = Boolean(caller && (caller.role === 'admin' || caller.role === 'subadmin'));
+      const isAdmin = Boolean(
+        caller &&
+        (isSuperAdminUser(caller) ||
+          hasModulePermission(caller, 'tutors') ||
+          hasModulePermission(caller, 'orders') ||
+          hasModulePermission(caller, 'chats') ||
+          hasModulePermission(caller, 'payments') ||
+          hasModulePermission(caller, 'settings'))
+      );
       const roleFilter = (req.query.role as string || '').toLowerCase().trim();
       const searchFilter = (req.query.search as string || req.query.q as string || '').toLowerCase().trim();
       const hasExplicitLimit = Boolean(req.query.limit);
@@ -4070,6 +4469,9 @@ export async function createApp(options: CreateAppOptions = {}) {
               avatarUrl: users.avatarUrl,
               createdAt: users.createdAt,
               suspended: users.suspended,
+              isActive: users.isActive,
+              permissions: users.permissions,
+              roleLabel: users.roleLabel,
               verified: users.verified,
               bio: users.bio,
               hourlyRate: users.hourlyRate,
@@ -4185,7 +4587,7 @@ export async function createApp(options: CreateAppOptions = {}) {
       let resultUsers = Array.from(userMap.values())
         .filter((u) => u && u.deleted !== true && u.status !== 'deleted')
         .map((u) => {
-          const { passwordHash: _, ...safeU } = u;
+          const safeU = serializeSafeUser(u) || u;
           const parsedExpertise = parseSubjectsListServer(
             safeU.subjectExpertise || safeU.subjects,
             safeU.primarySubject
@@ -4624,15 +5026,15 @@ export async function createApp(options: CreateAppOptions = {}) {
   app.post('/api/admin/tutors/upload-avatar', (req, res) => {
     console.log('[UPLOAD] upload request received');
 
-    // Security requirement 1 & 2: Require authentication & admin or subadmin authorization
+    // Security requirement 1 & 2: Require authentication & tutors module authorization
     const currentUser = (req as any).user;
     if (!currentUser) {
       console.log('[UPLOAD] response sent');
       return res.status(401).json({ error: 'Unauthorized: Authentication required. Please log in as an administrator.' });
     }
-    if (currentUser.role !== 'admin' && currentUser.role !== 'subadmin') {
+    if (!hasModulePermission(currentUser, 'tutors')) {
       console.log('[UPLOAD] response sent');
-      return res.status(403).json({ error: 'Forbidden: Administrator privileges required to upload tutor avatars.' });
+      return res.status(403).json({ error: 'Forbidden: Tutors Management permission required to upload tutor avatars.' });
     }
 
     avatarMulterUpload.single('image')(req, res, async (err: any) => {
@@ -4802,7 +5204,7 @@ export async function createApp(options: CreateAppOptions = {}) {
 
   // POST /api/admin/tutors
   // Protected Admin/Subadmin Tutor Profile Creation with deduplication guarantee
-  app.post('/api/admin/tutors', requireRole('admin', 'subadmin'), (req, res, next) => {
+  app.post('/api/admin/tutors', requirePermission('tutors'), (req, res, next) => {
     if (req.is('multipart/form-data')) {
       avatarMulterUpload.single('profileImage')(req, res, (err) => {
         if (err) return res.status(400).json({ error: err.message });
@@ -5022,13 +5424,13 @@ export async function createApp(options: CreateAppOptions = {}) {
   // PUT /api/admin/tutors/:id
   // Update tutor attributes, handle image replacement with cache-busting (?v=timestamp)
   app.put('/api/admin/tutors/:id', (req, res, next) => {
-    // 10. Protect endpoint with authentication and admin/subadmin role
+    // Protect endpoint with authentication and tutors module permission
     const currentUser = (req as any).user;
     if (!currentUser) {
       return res.status(401).json({ error: 'Unauthorized: Authentication required. Please log in as an administrator.' });
     }
-    if (currentUser.role !== 'admin' && currentUser.role !== 'subadmin') {
-      return res.status(403).json({ error: 'Forbidden: Administrator privileges required to update tutor profiles.' });
+    if (!hasModulePermission(currentUser, 'tutors')) {
+      return res.status(403).json({ error: 'Forbidden: Tutors Management permission required to update tutor profiles.' });
     }
 
     if (req.is('multipart/form-data')) {
@@ -5282,7 +5684,7 @@ export async function createApp(options: CreateAppOptions = {}) {
         : 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=300&auto=format&fit=crop&q=80';
 
       const caller = (req as any).user;
-      const isCallerAdmin = caller && (caller.role === 'admin' || caller.role === 'subadmin');
+      const isCallerAdmin = Boolean(caller && hasModulePermission(caller, 'tutors'));
       const isApp = isCallerAdmin ? (isApproved !== undefined ? Boolean(isApproved) : true) : false;
       const stat = isCallerAdmin ? (status || (isApp ? 'approved' : 'pending')) : 'pending';
       const rate = hourlyRate ? Math.round(Number(hourlyRate)) : 45;
@@ -5401,8 +5803,8 @@ export async function createApp(options: CreateAppOptions = {}) {
   });
 
   // POST /api/create-privileged-user
-  // Strictly restricted to authenticated Administrators; requires explicit password (no hardcoded fallback)
-  app.post('/api/create-privileged-user', requireRole('admin'), async (req, res) => {
+  // Strictly restricted to authenticated Super Administrators; requires explicit password
+  app.post('/api/create-privileged-user', requireSuperAdmin, async (req, res) => {
     try {
       const { name, email, role, password, extra } = req.body || {};
 
@@ -5503,13 +5905,14 @@ export async function createApp(options: CreateAppOptions = {}) {
   });
 
   // PUT /api/users/:id
-  // Protected: requires authentication; users can only update their own non-privileged profile fields unless admin/subadmin
+  // Protected: requires authentication; users can only update their own non-privileged profile fields unless Super Admin or permitted staff
   app.put('/api/users/:id', requireAuth, async (req, res) => {
     try {
       const { id } = req.params;
       const caller = (req as any).user;
-      const isAdminCaller = caller.role === 'admin' || caller.role === 'subadmin';
-      if (!isAdminCaller && caller.id !== id) {
+      const callerIsSuperAdmin = isSuperAdminUser(caller);
+      const canManageUsers = callerIsSuperAdmin || hasModulePermission(caller, 'tutors') || hasModulePermission(caller, 'settings');
+      if (!canManageUsers && caller.id !== id) {
         return res.status(403).json({ error: 'Forbidden: You do not have permission to modify another user profile.' });
       }
 
@@ -5518,15 +5921,38 @@ export async function createApp(options: CreateAppOptions = {}) {
       delete updates.passwordHash;
       delete updates.password;
 
-      // Prevent privilege escalation: non-admins cannot alter role, approval, verification, or suspension flags
-      if (!isAdminCaller) {
+      // Prevent privilege escalation: non-Super-Admins cannot alter role, permissions, active state, approval, verification, or suspension flags
+      if (!canManageUsers) {
         delete updates.role;
+        delete updates.permissions;
+        delete updates.isActive;
+        delete updates.roleLabel;
         delete updates.suspended;
         delete updates.isApproved;
         delete updates.status;
         delete updates.verified;
-      } else if (updates.role === 'admin' && caller.role !== 'admin') {
+      } else if (!callerIsSuperAdmin) {
         delete updates.role;
+        delete updates.permissions;
+        delete updates.isActive;
+        delete updates.roleLabel;
+        if (updates.suspended !== undefined) {
+          // Staff without Super Admin cannot suspend staff accounts
+          const targetCheck = await resolveAuthoritativeUserById(id);
+          if (targetCheck && isStaffUser(targetCheck)) {
+            delete updates.suspended;
+          }
+        }
+      }
+
+      if (updates.permissions !== undefined) {
+        updates.permissions = JSON.stringify(parsePermissions(updates.permissions));
+      }
+      if (updates.isActive !== undefined) {
+        updates.isActive = Boolean(updates.isActive);
+        updates.suspended = !updates.isActive;
+      } else if (updates.suspended !== undefined) {
+        updates.isActive = !Boolean(updates.suspended);
       }
 
       if (updates.subjects && Array.isArray(updates.subjects)) {
@@ -5625,7 +6051,8 @@ export async function createApp(options: CreateAppOptions = {}) {
             'rating', 'reviewCount', 'subjects', 'country', 'location',
             'phoneNumber', 'education', 'experience', 'subjectExpertise',
             'availability', 'canMeet', 'hobbies', 'isApproved', 'status',
-            'availableSlots', 'verified', 'suspended', 'createdAt'
+            'availableSlots', 'verified', 'suspended', 'isActive', 'permissions',
+            'roleLabel', 'createdAt'
           ]);
 
           const dbUpdates: Record<string, any> = {};
@@ -5668,26 +6095,35 @@ export async function createApp(options: CreateAppOptions = {}) {
         }
       }
 
+      if (updates.suspended || updates.isActive === false || updates.permissions !== undefined) {
+        revokeAllSessionsForUser(id);
+      }
+
       await logAudit('USER_UPDATE', `Updated user ${id} (image/profile update)`, id, undefined, undefined, req);
       if (mergedUser.role === 'tutor' || String(id).startsWith('tutor')) {
         invalidateSitemapCache();
         void notifyTutorProfileIndexNow(id, 'tutor_user_profile_updated');
       }
 
-      return res.status(200).json({ success: true, user: mergedUser });
+      return res.status(200).json({ success: true, user: serializeSafeUser(mergedUser) });
     } catch (err: any) {
       return res.status(500).json({ error: err.message });
     }
   });
 
-  // DELETE /api/users/:id - Admin/Subadmin soft+DB removal for user/tutor profiles
-  app.delete('/api/users/:id', requireRole('admin', 'subadmin'), async (req, res) => {
+  // DELETE /api/users/:id - Tutors Management or Super Admin soft+DB removal for user/tutor profiles
+  app.delete('/api/users/:id', requirePermission('tutors'), async (req, res) => {
     try {
       const { id } = req.params;
       const caller = (req as any).user;
       if (caller && caller.id === id) {
         return res.status(400).json({ error: 'Cannot delete your own active administrator account.' });
       }
+      const targetUser = await resolveAuthoritativeUserById(id);
+      if (targetUser && isStaffUser(targetUser) && !isSuperAdminUser(caller)) {
+        return res.status(403).json({ error: 'Forbidden: Only a Super Administrator may delete staff accounts.' });
+      }
+      revokeAllSessionsForUser(id);
 
       savePersistedUserUpdate(id, {
         deleted: true,
@@ -5731,7 +6167,7 @@ export async function createApp(options: CreateAppOptions = {}) {
 
       // Security rule: Only administrators can update avatars for other users
       if (req.body.userId && typeof req.body.userId === 'string' && req.body.userId !== currentUser.id) {
-        if (currentUser.role === 'admin' || currentUser.role === 'subadmin') {
+        if (hasModulePermission(currentUser, 'tutors') || hasModulePermission(currentUser, 'settings')) {
           targetUserId = req.body.userId;
         } else {
           // Non-admins can only update their own avatar
@@ -5805,14 +6241,14 @@ export async function createApp(options: CreateAppOptions = {}) {
       // If associated with an order, verify the authenticated user has permission for that order
       if (orderId && typeof orderId === 'string') {
         const order = await findOrderById(orderId);
-        if (order && uploaderRole !== 'admin' && uploaderRole !== 'subadmin' && order.studentId !== uploaderId && order.tutorId !== uploaderId) {
+        if (order && !hasModulePermission(currentUser, 'orders') && !hasModulePermission(currentUser, 'chats') && order.studentId !== uploaderId && order.tutorId !== uploaderId) {
           return res.status(403).json({ error: 'Forbidden: You are not authorized to attach documents to this order.' });
         }
       }
 
       // If associated with a chat room, verify the authenticated user is an active member
       if (roomId && typeof roomId === 'string') {
-        const isMember = await canUserAccessRoom(uploaderId, uploaderRole, roomId);
+        const isMember = await canUserAccessRoom(currentUser, uploaderRole, roomId);
         if (!isMember) {
           return res.status(403).json({ error: 'Forbidden: You are not authorized to attach files to this chat room.' });
         }
@@ -5893,9 +6329,9 @@ export async function createApp(options: CreateAppOptions = {}) {
         return res.status(400).json({ error: 'file (data URI or base64) is required' });
       }
 
-      // Restrict public blog uploads strictly to administrators
-      if (folder === 'blogs' && currentUser.role !== 'admin' && currentUser.role !== 'subadmin') {
-        return res.status(403).json({ error: 'Forbidden: Only administrators can upload blog media.' });
+      // Restrict public blog uploads strictly to staff with Blog Manager permission
+      if (folder === 'blogs' && !hasModulePermission(currentUser, 'blog')) {
+        return res.status(403).json({ error: 'Forbidden: Blog Manager permission required to upload blog media.' });
       }
 
       // Prevent private documents from being routed through general public endpoint
@@ -5986,7 +6422,7 @@ export async function createApp(options: CreateAppOptions = {}) {
   app.get('/api/orders', requireAuth, async (req, res) => {
     try {
       const caller = (req as any).user;
-      const isAdmin = caller.role === 'admin' || caller.role === 'subadmin';
+      const isAdmin = hasModulePermission(caller, 'orders') || hasModulePermission(caller, 'payments') || hasModulePermission(caller, 'chats');
       const page = Math.max(1, parseInt((req.query.page as string) || '1', 10) || 1);
       const limit = Math.min(200, Math.max(1, parseInt((req.query.limit as string) || '50', 10) || 50));
       const offset = (page - 1) * limit;
@@ -6092,7 +6528,7 @@ export async function createApp(options: CreateAppOptions = {}) {
   app.post('/api/orders', requireAuth, async (req, res) => {
     try {
       const caller = (req as any).user;
-      const isAdmin = caller.role === 'admin' || caller.role === 'subadmin';
+      const isAdmin = hasModulePermission(caller, 'orders');
       const data = req.body || {};
       const orderId = data.id || 'ord_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6);
       const effectiveStudentId = isAdmin && data.studentId ? String(data.studentId) : caller.id;
@@ -6163,7 +6599,7 @@ export async function createApp(options: CreateAppOptions = {}) {
   app.put('/api/orders/:id', requireAuth, async (req, res) => {
     try {
       const caller = (req as any).user;
-      const isAdmin = caller.role === 'admin' || caller.role === 'subadmin';
+      const isAdmin = hasModulePermission(caller, 'orders');
       const { id } = req.params;
 
       const existing = await findOrderById(id);
@@ -6230,7 +6666,7 @@ export async function createApp(options: CreateAppOptions = {}) {
   app.delete('/api/orders/:id', requireAuth, async (req, res) => {
     try {
       const caller = (req as any).user;
-      const isAdmin = caller.role === 'admin' || caller.role === 'subadmin';
+      const isAdmin = hasModulePermission(caller, 'orders');
       const { id } = req.params;
 
       const existing = await findOrderById(id);
@@ -6260,8 +6696,8 @@ export async function createApp(options: CreateAppOptions = {}) {
   // INQUIRIES (Quotes & WhatsApp Submissions)
   // ==========================================
 
-  // GET /api/inquiries (Admin/Subadmin only, paginated)
-  app.get('/api/inquiries', requireRole('admin', 'subadmin'), async (req, res) => {
+  // GET /api/inquiries (Orders & Assignments module only, paginated)
+  app.get('/api/inquiries', requirePermission('orders'), async (req, res) => {
     try {
       const page = Math.max(1, parseInt((req.query.page as string) || '1', 10) || 1);
       const limit = Math.min(200, Math.max(1, parseInt((req.query.limit as string) || '50', 10) || 50));
@@ -6426,7 +6862,7 @@ export async function createApp(options: CreateAppOptions = {}) {
   app.get('/api/chat-rooms', requireAuth, async (req, res) => {
     try {
       const currentUser = (req as any).user;
-      const isAdmin = currentUser.role === 'admin' || currentUser.role === 'subadmin';
+      const isAdmin = hasModulePermission(currentUser, 'chats');
       const page = Math.max(1, parseInt((req.query.page as string) || '1', 10) || 1);
       const limit = Math.min(200, Math.max(1, parseInt((req.query.limit as string) || '50', 10) || 50));
       const offset = (page - 1) * limit;
@@ -6637,8 +7073,8 @@ export async function createApp(options: CreateAppOptions = {}) {
         return res.status(400).json({ error: 'userId is required.' });
       }
 
-      // Check authorization: caller must be a member or admin
-      const hasAccess = await canUserAccessRoom(currentUser.id, currentUser.role, roomId);
+      // Check authorization: caller must be a member or staff with chats permission
+      const hasAccess = await canUserAccessRoom(currentUser, currentUser.role, roomId);
       if (!hasAccess) {
         return res.status(403).json({ error: 'Forbidden: You are not authorized to add members to this chat room.' });
       }
@@ -6675,9 +7111,9 @@ export async function createApp(options: CreateAppOptions = {}) {
       const roomId = req.params.id;
       const targetUserId = req.params.userId;
 
-      // Caller can remove self, or must be an admin
+      // Caller can remove self, or must have Chats permission
       const isSelf = currentUser.id === targetUserId;
-      const isAdmin = currentUser.role === 'admin' || currentUser.role === 'subadmin';
+      const isAdmin = hasModulePermission(currentUser, 'chats');
 
       if (!isSelf && !isAdmin) {
         return res.status(403).json({ error: 'Forbidden: You cannot remove other members from this room.' });
@@ -6712,7 +7148,7 @@ export async function createApp(options: CreateAppOptions = {}) {
       const limit = Math.min(500, Math.max(1, parseInt((req.query.limit as string) || '200', 10) || 200));
 
       // Enforce room membership check (403 for unauthorized users)
-      const hasAccess = await canUserAccessRoom(currentUser.id, currentUser.role, roomId);
+      const hasAccess = await canUserAccessRoom(currentUser, currentUser.role, roomId);
       if (!hasAccess) {
         return res.status(403).json({ error: 'Forbidden: You are not authorized to view messages in this chat room.', code: 'FORBIDDEN', status: 403 });
       }
@@ -6758,7 +7194,7 @@ export async function createApp(options: CreateAppOptions = {}) {
       const roomId = req.params.id;
 
       // Enforce room membership check (403 for non-members)
-      const hasAccess = await canUserAccessRoom(currentUser.id, currentUser.role, roomId);
+      const hasAccess = await canUserAccessRoom(currentUser, currentUser.role, roomId);
       if (!hasAccess) {
         return res.status(403).json({ error: 'Forbidden: You are not a member of this chat room.', code: 'FORBIDDEN', status: 403 });
       }
@@ -6775,7 +7211,7 @@ export async function createApp(options: CreateAppOptions = {}) {
         return res.status(400).json({ error: 'Message length exceeds the 5,000 character limit.', code: 'VALIDATION_ERROR', status: 400 });
       }
 
-      const isAdmin = currentUser.role === 'admin' || currentUser.role === 'subadmin';
+      const isAdmin = hasModulePermission(currentUser, 'chats');
       let senderId = currentUser.id;
       if (isAdmin && (req.body.sendAsTutorId || req.body.senderId)) {
         senderId = req.body.sendAsTutorId || req.body.senderId;
@@ -6827,7 +7263,7 @@ export async function createApp(options: CreateAppOptions = {}) {
 
       // If chatId is provided, enforce access check
       if (chatId) {
-        const hasAccess = await canUserAccessRoom(currentUser.id, currentUser.role, String(chatId));
+        const hasAccess = await canUserAccessRoom(currentUser, currentUser.role, String(chatId));
         if (!hasAccess) {
           return res.status(403).json({ error: 'Forbidden: You do not have access to this conversation.', code: 'FORBIDDEN', status: 403 });
         }
@@ -6852,7 +7288,7 @@ export async function createApp(options: CreateAppOptions = {}) {
             );
             return res.status(200).json({ success: true, messages: rows.slice(offset, offset + limit), total: rows.length, page, limit });
           }
-          if (currentUser.role === 'admin' || currentUser.role === 'subadmin') {
+          if (hasModulePermission(currentUser, 'chats')) {
             const rows = await withDbTimeout(
               db.select().from(messages).orderBy(desc(messages.createdAt)).limit(limit).offset(offset),
               10000,
@@ -6905,7 +7341,7 @@ export async function createApp(options: CreateAppOptions = {}) {
         return res.status(400).json({ error: 'Missing required parameters (chatId/roomId, content).', code: 'VALIDATION_ERROR', status: 400 });
       }
 
-      const hasAccess = await canUserAccessRoom(currentUser.id, currentUser.role, targetRoomId);
+      const hasAccess = await canUserAccessRoom(currentUser, currentUser.role, targetRoomId);
       if (!hasAccess) {
         return res.status(403).json({ error: 'Forbidden: You are not authorized to post to this conversation.', code: 'FORBIDDEN', status: 403 });
       }
@@ -6918,7 +7354,7 @@ export async function createApp(options: CreateAppOptions = {}) {
         return res.status(400).json({ error: 'Message length exceeds the 5,000 character limit.', code: 'VALIDATION_ERROR', status: 400 });
       }
 
-      const isAdmin = currentUser.role === 'admin' || currentUser.role === 'subadmin';
+      const isAdmin = hasModulePermission(currentUser, 'chats');
       let senderId = currentUser.id;
       if (isAdmin && (data.sendAsTutorId || data.senderId)) {
         senderId = data.sendAsTutorId || data.senderId;
@@ -6966,7 +7402,7 @@ export async function createApp(options: CreateAppOptions = {}) {
   app.get('/api/quotes', requireAuth, async (req, res) => {
     try {
       const caller = (req as any).user;
-      const isAdmin = caller.role === 'admin' || caller.role === 'subadmin';
+      const isAdmin = hasModulePermission(caller, 'orders') || hasModulePermission(caller, 'chats') || hasModulePermission(caller, 'payments');
       const { chatId, orderId } = req.query;
       const page = Math.max(1, parseInt((req.query.page as string) || '1', 10) || 1);
       const limit = Math.min(200, Math.max(1, parseInt((req.query.limit as string) || '50', 10) || 50));
@@ -7093,7 +7529,7 @@ export async function createApp(options: CreateAppOptions = {}) {
   // ==========================================
 
   // GET /api/audit-logs
-  app.get('/api/audit-logs', requireRole('admin', 'subadmin'), async (req, res) => {
+  app.get('/api/audit-logs', requirePermission('settings'), async (req, res) => {
     try {
       const page = Math.max(1, parseInt((req.query.page as string) || '1', 10) || 1);
       const limit = Math.min(200, Math.max(1, parseInt((req.query.limit as string) || '50', 10) || 50));
@@ -7148,7 +7584,7 @@ export async function createApp(options: CreateAppOptions = {}) {
   app.get('/api/notifications', requireAuth, async (req, res) => {
     try {
       const caller = (req as any).user;
-      const isAdmin = caller.role === 'admin' || caller.role === 'subadmin';
+      const isAdmin = hasModulePermission(caller, 'settings') || hasModulePermission(caller, 'orders') || hasModulePermission(caller, 'payments') || hasModulePermission(caller, 'tutors');
       const page = Math.max(1, parseInt((req.query.page as string) || '1', 10) || 1);
       const limit = Math.min(200, Math.max(1, parseInt((req.query.limit as string) || '50', 10) || 50));
       const offset = (page - 1) * limit;
@@ -7199,7 +7635,7 @@ export async function createApp(options: CreateAppOptions = {}) {
   app.post('/api/notifications', requireAuth, async (req, res) => {
     try {
       const caller = (req as any).user;
-      const isAdmin = caller.role === 'admin' || caller.role === 'subadmin';
+      const isAdmin = hasModulePermission(caller, 'settings') || hasModulePermission(caller, 'orders') || hasModulePermission(caller, 'payments') || hasModulePermission(caller, 'tutors');
       const { userId, title, message, type, sentBy } = req.body || {};
       if (!userId || !title || !message) {
         return res.status(400).json({ error: 'Missing required notification fields', code: 'VALIDATION_ERROR', status: 400 });
@@ -7243,7 +7679,7 @@ export async function createApp(options: CreateAppOptions = {}) {
 
       if (isDbConnected() && db) {
         try {
-          const isAdmin = caller.role === 'admin' || caller.role === 'subadmin';
+          const isAdmin = hasModulePermission(caller, 'settings');
           if (isAdmin) {
             await withDbTimeout(db.update(notifications).set({ read: true }).where(eq(notifications.id, id)), 8000, 'Mark notification read');
           } else {
@@ -7267,7 +7703,7 @@ export async function createApp(options: CreateAppOptions = {}) {
   app.post('/api/notifications/mark-all-read', requireAuth, async (req, res) => {
     try {
       const caller = (req as any).user;
-      const isAdmin = caller.role === 'admin' || caller.role === 'subadmin';
+      const isAdmin = hasModulePermission(caller, 'settings');
       const targetUserId = isAdmin && req.body?.userId ? String(req.body.userId) : caller.id;
       memoryStore.markAllNotificationsRead(targetUserId);
 
@@ -7296,7 +7732,7 @@ export async function createApp(options: CreateAppOptions = {}) {
   app.get('/api/payments', requireAuth, async (req, res) => {
     try {
       const caller = (req as any).user;
-      const isAdmin = caller.role === 'admin' || caller.role === 'subadmin';
+      const isAdmin = hasModulePermission(caller, 'payments');
       const { studentId, assignmentId } = req.query;
       const page = Math.max(1, parseInt((req.query.page as string) || '1', 10) || 1);
       const limit = Math.min(200, Math.max(1, parseInt((req.query.limit as string) || '50', 10) || 50));
@@ -7327,7 +7763,7 @@ export async function createApp(options: CreateAppOptions = {}) {
   app.post('/api/payments', requireAuth, async (req, res) => {
     try {
       const caller = (req as any).user;
-      const isAdmin = caller.role === 'admin' || caller.role === 'subadmin';
+      const isAdmin = hasModulePermission(caller, 'payments');
       const { assignmentId, studentId, amount, status, type, notes } = req.body || {};
       if (!assignmentId || amount === undefined) {
         return res.status(400).json({ error: 'Missing required assignmentId or amount.', code: 'VALIDATION_ERROR', status: 400 });
@@ -7366,7 +7802,7 @@ export async function createApp(options: CreateAppOptions = {}) {
   });
 
   // PUT /api/payments/:id
-  app.put('/api/payments/:id', requireRole('admin', 'subadmin'), async (req, res) => {
+  app.put('/api/payments/:id', requirePermission('payments'), async (req, res) => {
     try {
       const { id } = req.params;
       const updates = { ...req.body };
@@ -7386,7 +7822,7 @@ export async function createApp(options: CreateAppOptions = {}) {
   app.get('/api/invoices', requireAuth, async (req, res) => {
     try {
       const caller = (req as any).user;
-      const isAdmin = caller.role === 'admin' || caller.role === 'subadmin';
+      const isAdmin = hasModulePermission(caller, 'payments');
       const page = Math.max(1, parseInt((req.query.page as string) || '1', 10) || 1);
       const limit = Math.min(200, Math.max(1, parseInt((req.query.limit as string) || '50', 10) || 50));
       const offset = (page - 1) * limit;
@@ -7407,7 +7843,7 @@ export async function createApp(options: CreateAppOptions = {}) {
   });
 
   // POST /api/invoices
-  app.post('/api/invoices', requireRole('admin', 'subadmin'), async (req, res) => {
+  app.post('/api/invoices', requirePermission('payments'), async (req, res) => {
     try {
       const data = req.body || {};
       const invoiceId = data.id || 'inv_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6);
@@ -7436,7 +7872,7 @@ export async function createApp(options: CreateAppOptions = {}) {
   });
 
   // PUT /api/invoices/:id
-  app.put('/api/invoices/:id', requireRole('admin', 'subadmin'), async (req, res) => {
+  app.put('/api/invoices/:id', requirePermission('payments'), async (req, res) => {
     try {
       const { id } = req.params;
       const updates = { ...req.body };
@@ -7496,18 +7932,25 @@ export async function createApp(options: CreateAppOptions = {}) {
           }
 
           if (rows.length > 0) {
-            for (const r of rows) {
-              memoryStore.setBlog({
+            const normalizedRows = rows.map((r) => {
+              let parsedTags: string[] = [];
+              if (Array.isArray(r.tags)) parsedTags = r.tags;
+              else if (typeof r.tags === 'string') {
+                try { parsedTags = JSON.parse(r.tags); } catch { parsedTags = r.tags.split(',').map((t: string) => t.trim()).filter(Boolean); }
+              }
+              const normalized = {
                 ...r,
                 image: r.image,
                 imageUrl: r.image,
-                tags: typeof r.tags === 'string' ? JSON.parse(r.tags) : (r.tags || []),
-              });
-            }
+                tags: parsedTags,
+              };
+              memoryStore.setBlog(normalized);
+              return normalized;
+            });
             return res.status(200).json({
               success: true,
-              blogs: rows.slice(offset, offset + limit),
-              total: rows.length,
+              blogs: normalizedRows.slice(offset, offset + limit),
+              total: normalizedRows.length,
               page,
               limit,
             });
@@ -7549,7 +7992,14 @@ export async function createApp(options: CreateAppOptions = {}) {
             'Query single blog by id'
           );
           if (rows.length > 0) {
-            return res.status(200).json({ blog: rows[0] });
+            const row = rows[0];
+            return res.status(200).json({
+              blog: {
+                ...row,
+                imageUrl: row.image,
+                tags: typeof row.tags === 'string' ? JSON.parse(row.tags) : (row.tags || []),
+              },
+            });
           }
           const allDbBlogs = await withDbTimeout(
             db.select().from(blogs).orderBy(desc(blogs.publishedAt)),
@@ -7558,7 +8008,13 @@ export async function createApp(options: CreateAppOptions = {}) {
           );
           const slugMatched = allDbBlogs.find((b) => matchesBlogSlugOrId(b, target));
           if (slugMatched) {
-            return res.status(200).json({ blog: slugMatched });
+            return res.status(200).json({
+              blog: {
+                ...slugMatched,
+                imageUrl: slugMatched.image,
+                tags: typeof slugMatched.tags === 'string' ? JSON.parse(slugMatched.tags) : (slugMatched.tags || []),
+              },
+            });
           }
         } catch (dbErr: any) {
           console.warn('[API] DB error finding blog:', dbErr.message);
@@ -7579,18 +8035,38 @@ export async function createApp(options: CreateAppOptions = {}) {
     }
   });
 
-  // POST /api/blogs (Admin create)
-  app.post('/api/blogs', requireRole('admin', 'subadmin'), async (req, res) => {
+  // POST /api/blogs (Blog Manager create)
+  app.post('/api/blogs', requirePermission('blog'), async (req, res) => {
     try {
       const user = (req as any).user;
 
-      const { title, excerpt, content, category, readTime, imageUrl, image, tags, featured } = req.body;
+      const {
+        title,
+        slug: rawSlug,
+        excerpt,
+        content,
+        author,
+        category,
+        readTime,
+        imageUrl,
+        image,
+        altText,
+        tags,
+        featured,
+        metaDescription,
+        focusKeyword,
+        longTailKeywords,
+        lsiKeywords,
+        publishedAt: rawPublishedAt,
+      } = req.body;
       if (!title || !content || !category) {
         return res.status(400).json({ error: 'Missing required fields: title, content, category' });
       }
 
       const now = new Date().toISOString();
-      const slug = (title as string).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || `post-${Date.now()}`;
+      const slug = (typeof rawSlug === 'string' && rawSlug.trim())
+        ? rawSlug.trim().toLowerCase().replace(/[^a-z0-9-]+/g, '-').replace(/^-+|-+$/g, '')
+        : ((title as string).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || `post-${Date.now()}`);
       const imgUrl = (imageUrl || image || 'https://images.unsplash.com/photo-1434030216411-0b793f4b4173?w=800&auto=format&fit=crop&q=80').trim();
       const tagsArray: string[] = Array.isArray(tags) ? tags : (typeof tags === 'string' ? tags.split(',').map((t: string) => t.trim()).filter(Boolean) : [category]);
 
@@ -7601,14 +8077,19 @@ export async function createApp(options: CreateAppOptions = {}) {
         slug,
         excerpt: excerpt?.trim() || title.trim(),
         content: content.trim(),
-        author: user.name || 'Editorial Team',
+        author: (typeof author === 'string' && author.trim()) ? author.trim() : (user.name || 'Editorial Team'),
         image: imgUrl,
         imageUrl: imgUrl,
+        altText: typeof altText === 'string' ? altText.trim() : title.trim(),
         category: category.trim(),
-        publishedAt: now,
+        publishedAt: (typeof rawPublishedAt === 'string' && rawPublishedAt.trim()) ? rawPublishedAt.trim() : now,
         readTime: readTime?.trim() || '5 min read',
         tags: tagsArray,
         featured: !!featured,
+        metaDescription: typeof metaDescription === 'string' ? metaDescription.trim() : (excerpt?.trim() || title.trim()),
+        focusKeyword: typeof focusKeyword === 'string' ? focusKeyword.trim() : '',
+        longTailKeywords: typeof longTailKeywords === 'string' ? longTailKeywords.trim() : '',
+        lsiKeywords: typeof lsiKeywords === 'string' ? lsiKeywords.trim() : '',
         createdAt: now,
         updatedAt: now,
       };
@@ -7621,10 +8102,20 @@ export async function createApp(options: CreateAppOptions = {}) {
             id: newBlog.id,
             adminId: newBlog.adminId,
             title: newBlog.title,
+            slug: newBlog.slug,
+            excerpt: newBlog.excerpt,
             content: newBlog.content,
+            author: newBlog.author,
             image: newBlog.image,
+            altText: newBlog.altText,
             category: newBlog.category,
+            readTime: newBlog.readTime,
             tags: JSON.stringify(newBlog.tags),
+            featured: newBlog.featured,
+            metaDescription: newBlog.metaDescription,
+            focusKeyword: newBlog.focusKeyword,
+            longTailKeywords: newBlog.longTailKeywords,
+            lsiKeywords: newBlog.lsiKeywords,
             publishedAt: newBlog.publishedAt,
             createdAt: newBlog.createdAt,
             updatedAt: newBlog.updatedAt,
@@ -7647,35 +8138,59 @@ export async function createApp(options: CreateAppOptions = {}) {
     }
   });
 
-  // PUT /api/blogs/:id (Admin update)
-  app.put('/api/blogs/:id', requireRole('admin', 'subadmin'), async (req, res) => {
+  // PUT /api/blogs/:id (Blog Manager update)
+  app.put('/api/blogs/:id', requirePermission('blog'), async (req, res) => {
     try {
       const user = (req as any).user;
 
       const { id } = req.params;
-      const updates = { ...req.body };
-      delete updates.id;
-      updates.updatedAt = new Date().toISOString();
+      const body = { ...req.body };
+      delete body.id;
+      const now = new Date().toISOString();
 
-      if (updates.tags && Array.isArray(updates.tags)) {
-        updates.tags = JSON.stringify(updates.tags);
+      const parsedTags: string[] | undefined = Array.isArray(body.tags)
+        ? body.tags
+        : (typeof body.tags === 'string'
+          ? body.tags.split(',').map((t: string) => t.trim()).filter(Boolean)
+          : undefined);
+
+      const resolvedImage = body.imageUrl || body.image;
+      const memUpdates: Record<string, any> = {
+        ...body,
+        updatedAt: now,
+      };
+      if (parsedTags !== undefined) memUpdates.tags = parsedTags;
+      if (resolvedImage) {
+        memUpdates.image = resolvedImage;
+        memUpdates.imageUrl = resolvedImage;
       }
 
-      const updated = memoryStore.updateBlog(id, updates);
+      const updated = memoryStore.updateBlog(id, memUpdates);
 
       if (isDbConnected() && db) {
         try {
-          await db.update(blogs).set(updates).where(eq(blogs.id, id));
+          const dbCols: Record<string, any> = { updatedAt: now };
+          const allowedBlogCols = [
+            'title', 'slug', 'excerpt', 'content', 'author', 'altText', 'category',
+            'readTime', 'featured', 'metaDescription', 'focusKeyword',
+            'longTailKeywords', 'lsiKeywords', 'publishedAt'
+          ];
+          for (const col of allowedBlogCols) {
+            if (body[col] !== undefined) dbCols[col] = body[col];
+          }
+          if (resolvedImage) dbCols.image = resolvedImage;
+          if (parsedTags !== undefined) dbCols.tags = JSON.stringify(parsedTags);
+          await db.update(blogs).set(dbCols).where(eq(blogs.id, id));
         } catch (dbErr: any) {
           console.warn('[API] Notice updating blog in DB:', dbErr.message);
         }
       }
 
-      await logAudit('BLOG_UPDATE', `Updated blog ${id}: "${updates.title || 'updated'}"`, user.id, user.name, user.role, req);
+      await logAudit('BLOG_UPDATE', `Updated blog ${id}: "${body.title || 'updated'}"`, user.id, user.name, user.role, req);
       invalidateSitemapCache();
       const blogForSlug =
         updated ||
-        (updates.title ? { id, title: String(updates.title), slug: updates.slug || null } : null);
+        (body.title ? { id, title: String(body.title), slug: body.slug || null } : null);
       if (blogForSlug && blogForSlug.title) {
         queueIndexNowSubmission(
           [`/blog/${encodeURIComponent(getBlogCanonicalSlug(blogForSlug))}`, '/blog'],
@@ -7689,8 +8204,8 @@ export async function createApp(options: CreateAppOptions = {}) {
     }
   });
 
-  // DELETE /api/blogs/:id (Admin delete)
-  app.delete('/api/blogs/:id', requireRole('admin', 'subadmin'), async (req, res) => {
+  // DELETE /api/blogs/:id (Blog Manager delete)
+  app.delete('/api/blogs/:id', requirePermission('blog'), async (req, res) => {
     try {
       const user = (req as any).user;
 
@@ -7714,8 +8229,8 @@ export async function createApp(options: CreateAppOptions = {}) {
     }
   });
 
-  // POST /api/blogs/sync-defaults (Admin reset/sync all 20 default educational blogs)
-  app.post('/api/blogs/sync-defaults', requireRole('admin', 'subadmin'), async (req, res) => {
+  // POST /api/blogs/sync-defaults (Blog Manager reset/sync all 20 default educational blogs)
+  app.post('/api/blogs/sync-defaults', requirePermission('blog'), async (req, res) => {
     try {
       const user = (req as any).user;
 
@@ -7870,7 +8385,7 @@ export async function createApp(options: CreateAppOptions = {}) {
   });
 
   // Admin & CI/CD IndexNow diagnostic & manual/bulk submission endpoints
-  app.get('/api/admin/indexnow', requireRole('admin', 'subadmin'), (_req, res) => {
+  app.get('/api/admin/indexnow', requirePermission('settings', 'blog'), (_req, res) => {
     return res.status(200).json({
       success: true,
       ...getIndexNowStatusSummary(),
@@ -7880,7 +8395,7 @@ export async function createApp(options: CreateAppOptions = {}) {
   app.post('/api/admin/indexnow', async (req, res) => {
     try {
       const caller = (req as any).user;
-      const isAdminCaller = Boolean(caller && (caller.role === 'admin' || caller.role === 'subadmin'));
+      const isAdminCaller = Boolean(caller && (isSuperAdminUser(caller) || hasModulePermission(caller, 'settings') || hasModulePermission(caller, 'blog')));
       const headerKey = String(req.headers['x-indexnow-key'] || '').trim();
       const bearerHeader = String(req.headers['authorization'] || '').trim();
       const bearerToken = bearerHeader.toLowerCase().startsWith('bearer ')

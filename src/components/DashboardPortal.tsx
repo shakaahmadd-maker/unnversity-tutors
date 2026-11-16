@@ -1,6 +1,7 @@
 import React, { useCallback, lazy } from 'react';
 import { store, TabLoadState } from '../lib/store';
 import { apiFetch } from '../lib/apiClient';
+import { isStaffUser, isSuperAdminUser } from '../lib/adminPermissions';
 import {
   User,
   UserRole,
@@ -69,6 +70,8 @@ interface DashboardPortalProps {
   onRequireAuth: () => void;
   onOpenWhatsApp?: () => void;
   onHideGlobalWhatsAppChange?: (hide: boolean) => void;
+  adminRoutePath?: string;
+  onAdminRouteChange?: (path: string) => void;
 }
 
 export default function DashboardPortal({
@@ -86,6 +89,8 @@ export default function DashboardPortal({
   onRequireAuth,
   onOpenWhatsApp,
   onHideGlobalWhatsAppChange,
+  adminRoutePath,
+  onAdminRouteChange,
 }: DashboardPortalProps) {
   const currentActiveUser = store.currentUser || storeState.currentUser;
   const sessionReady = store.isSessionInitialized || Boolean(storeState.isSessionInitialized);
@@ -156,10 +161,9 @@ export default function DashboardPortal({
 
   const handleChangeUserRole = useCallback(
     (userId: string, targetRole: UserRole) => {
-      const isSuperiorAdmin = currentActiveUser?.email?.toLowerCase().trim() === 'shaka.ahmadd@gmail.com';
-      if (!isSuperiorAdmin) {
-        console.error('Permission Denied: Only Superior Admin can change user roles.');
-        store.syncError = 'Permission Denied: Only Superior Admin can change user roles.';
+      if (!isSuperAdminUser(currentActiveUser)) {
+        console.error('Permission Denied: Only Super Admin can change user roles.');
+        store.syncError = 'Permission Denied: Only Super Admin can change user roles.';
         store.notify();
         return;
       }
@@ -170,9 +174,8 @@ export default function DashboardPortal({
 
   const handleGenerateProfile = useCallback(
     async (name: string, email: string, role: UserRole, extra?: any): Promise<boolean> => {
-      const isSuperiorAdmin = currentActiveUser?.email?.toLowerCase().trim() === 'shaka.ahmadd@gmail.com';
-      if (!isSuperiorAdmin) {
-        throw new Error('Permission Denied: Only Superior Admin is authorized to generate profiles.');
+      if (!isSuperAdminUser(currentActiveUser)) {
+        throw new Error('Permission Denied: Only Super Admin is authorized to generate profiles.');
       }
 
       try {
@@ -208,9 +211,12 @@ export default function DashboardPortal({
   );
 
   const handleAddBlog = useCallback(
-    (data: any) => {
+    async (data: any) => {
       if (currentActiveUser) {
-        void store.addBlog(data.title, data.content, data.image, data.category, data.tags, currentActiveUser.id);
+        await store.addBlog({
+          ...data,
+          adminId: data.adminId || currentActiveUser.id,
+        });
       }
     },
     [currentActiveUser]
@@ -221,8 +227,12 @@ export default function DashboardPortal({
   }, []);
 
   const handleUpdateBlog = useCallback(
-    (blogId: string, title: string, content: string, image: string, category: string, tags: string[]) => {
-      void store.updateBlog(blogId, title, content, image, category, tags);
+    async (blogId: string, titleOrData: any, content?: string, image?: string, category?: string, tags?: string[]) => {
+      if (typeof titleOrData === 'object' && titleOrData !== null) {
+        await store.updateBlog(blogId, titleOrData);
+      } else {
+        await store.updateBlog(blogId, titleOrData, content, image, category, tags);
+      }
     },
     []
   );
@@ -364,6 +374,24 @@ export default function DashboardPortal({
     );
   }
 
+  if (!isStaffUser(currentActiveUser)) {
+    return (
+      <div className="py-20 text-center bg-white m-8 rounded-3xl border border-slate-200 max-w-md mx-auto space-y-4 p-8">
+        <span className="text-4xl block">⛔</span>
+        <h3 className="font-sans font-bold text-lg text-slate-900">Access Denied</h3>
+        <p className="text-xs text-slate-500">
+          Your administrative access has been suspended or revoked. Contact your Super Administrator for assistance.
+        </p>
+        <button
+          onClick={onLogout}
+          className="bg-orange-500 hover:bg-orange-600 text-white font-semibold text-xs px-6 py-2.5 rounded-xl cursor-pointer"
+        >
+          Sign Out
+        </button>
+      </div>
+    );
+  }
+
   return (
     <AdminDashboard
       currentUser={currentActiveUser}
@@ -423,6 +451,8 @@ export default function DashboardPortal({
       connectionStatus={storeState.connectionStatus}
       lastSyncTime={storeState.lastSyncTime}
       syncError={storeState.syncError}
+      adminRoutePath={adminRoutePath}
+      onAdminRouteChange={onAdminRouteChange}
     />
   );
 }

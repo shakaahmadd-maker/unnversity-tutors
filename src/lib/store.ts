@@ -26,6 +26,11 @@ import {
   SESSION_EXPIRED_EVENT,
 } from './apiClient';
 import { assignUniqueTutorSlugs, getTutorCanonicalSlug } from '../utils/tutorSlug';
+import {
+  isStaffUser,
+  hasModulePermission,
+  parsePermissions,
+} from './adminPermissions';
 
 const TODAY_ISO = new Date().toISOString().split('T')[0];
 const TOMORROW_ISO = new Date(Date.now() + 86400000).toISOString().split('T')[0];
@@ -558,7 +563,12 @@ export class AppStore {
       if (res.ok) {
         const data = await res.json();
         if (data?.user?.id) {
-          this.currentUser = data.user;
+          this.currentUser = {
+            ...data.user,
+            permissions: parsePermissions(data.user.permissions),
+            isActive: data.user.isActive !== false && !data.user.suspended,
+            roleLabel: data.user.roleLabel || undefined,
+          };
           this.sessionExpiredMessage = null;
           this.isSessionInitialized = true;
           try {
@@ -571,7 +581,7 @@ export class AppStore {
           if (triggerFetch) {
             this.fetchData(true).catch(() => {});
           }
-          return data.user;
+          return this.currentUser;
         }
       }
       this.currentUser = null;
@@ -655,6 +665,9 @@ export class AppStore {
       return {
         ...u,
         role: u.role || UserRole.TUTOR,
+        permissions: parsePermissions(u.permissions),
+        isActive: u.isActive !== false && !u.suspended,
+        roleLabel: u.roleLabel || undefined,
         subjects: parsedSubjects.length > 0 ? parsedSubjects : parsedExpertise,
         subjectExpertise: parsedExpertise.length > 0 ? parsedExpertise : parsedSubjects,
         reviewCount: u.reviewCount ?? u.reviewsCount,
@@ -864,11 +877,8 @@ export class AppStore {
           return;
         }
 
-        const isStaff =
-          this.currentUser.role === UserRole.ADMIN ||
-          this.currentUser.role === UserRole.SUBADMIN ||
-          (this.currentUser.role as string) === 'admin' ||
-          (this.currentUser.role as string) === 'subadmin';
+        const cu = this.currentUser;
+        const isStaff = isStaffUser(cu);
 
         const safePrivateFetch = async (url: string, handler: (data: any) => void) => {
           try {
@@ -889,51 +899,73 @@ export class AppStore {
           }
         };
 
-        const privateTasks: Promise<void>[] = [
-          safePrivateFetch('/api/orders?page=1&limit=50', (oData) => {
-            if (Array.isArray(oData.orders)) {
-              this.applyOrdersData(oData.orders);
-            }
-          }),
-          safePrivateFetch('/api/chat-rooms?page=1&limit=50', (rData) => {
-            if (Array.isArray(rData.rooms)) {
-              this.applyRoomsData(rData.rooms);
-            }
-          }),
-          safePrivateFetch('/api/messages?page=1&limit=100', (mData) => {
-            if (Array.isArray(mData.messages)) {
-              this.messages = mData.messages.map((m: any) => ({
-                ...m,
-                timestamp: m.createdAt,
-              }));
-            }
-          }),
-          safePrivateFetch('/api/quotes?page=1&limit=50', (qData) => {
-            if (Array.isArray(qData.quotes)) {
-              this.quotes = qData.quotes;
-            }
-          }),
-          safePrivateFetch('/api/payments?page=1&limit=50', (pData) => {
-            if (Array.isArray(pData.payments)) {
-              this.payments = pData.payments;
-            }
-          }),
-          safePrivateFetch('/api/invoices?page=1&limit=50', (iData) => {
-            if (Array.isArray(iData.invoices)) {
-              this.invoices = iData.invoices;
-            }
-          }),
+        const privateTasks: Promise<void>[] = [];
+
+        if (!isStaff || hasModulePermission(cu, 'orders') || hasModulePermission(cu, 'payments') || hasModulePermission(cu, 'chats')) {
+          privateTasks.push(
+            safePrivateFetch('/api/orders?page=1&limit=50', (oData) => {
+              if (Array.isArray(oData.orders)) {
+                this.applyOrdersData(oData.orders);
+              }
+            })
+          );
+        }
+
+        if (!isStaff || hasModulePermission(cu, 'chats')) {
+          privateTasks.push(
+            safePrivateFetch('/api/chat-rooms?page=1&limit=50', (rData) => {
+              if (Array.isArray(rData.rooms)) {
+                this.applyRoomsData(rData.rooms);
+              }
+            }),
+            safePrivateFetch('/api/messages?page=1&limit=100', (mData) => {
+              if (Array.isArray(mData.messages)) {
+                this.messages = mData.messages.map((m: any) => ({
+                  ...m,
+                  timestamp: m.createdAt,
+                }));
+              }
+            })
+          );
+        }
+
+        if (!isStaff || hasModulePermission(cu, 'orders') || hasModulePermission(cu, 'chats') || hasModulePermission(cu, 'payments')) {
+          privateTasks.push(
+            safePrivateFetch('/api/quotes?page=1&limit=50', (qData) => {
+              if (Array.isArray(qData.quotes)) {
+                this.quotes = qData.quotes;
+              }
+            })
+          );
+        }
+
+        if (!isStaff || hasModulePermission(cu, 'payments')) {
+          privateTasks.push(
+            safePrivateFetch('/api/payments?page=1&limit=50', (pData) => {
+              if (Array.isArray(pData.payments)) {
+                this.payments = pData.payments;
+              }
+            }),
+            safePrivateFetch('/api/invoices?page=1&limit=50', (iData) => {
+              if (Array.isArray(iData.invoices)) {
+                this.invoices = iData.invoices;
+              }
+            })
+          );
+        }
+
+        privateTasks.push(
           safePrivateFetch(
-            `/api/notifications?userId=${encodeURIComponent(this.currentUser.id)}&page=1&limit=50`,
+            `/api/notifications?userId=${encodeURIComponent(cu.id)}&page=1&limit=50`,
             (nData) => {
               if (Array.isArray(nData.notifications)) {
                 this.appNotifications = nData.notifications;
               }
             }
-          ),
-        ];
+          )
+        );
 
-        if (isStaff) {
+        if (isStaff && hasModulePermission(cu, 'settings')) {
           privateTasks.push(
             safePrivateFetch('/api/audit-logs?page=1&limit=50', (lData) => {
               if (Array.isArray(lData.logs)) {

@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { Mail, Phone, MapPin } from 'lucide-react';
 import { isModifiedAnchorClick } from '../data/dedicatedServiceRoutes';
 
 const FooterToolDirectories = React.lazy(() => import('./FooterToolDirectories'));
@@ -130,9 +131,266 @@ export default function Footer({ onNavigate, onOpenBecomeTutor }: FooterProps) {
   return (
     <footer
       id="main-footer"
-      className="bg-cream-100 border-t border-cream-400 text-stone-800 selection:bg-amber-200 selection:text-terracotta-900 font-sans print:hidden"
+      className="bg-[#ffeedd] border-t border-[#f3cbb0] text-stone-800 selection:bg-amber-200 selection:text-terracotta-900 font-sans print:hidden"
     >
-      <div className="max-w-7xl mx-auto px-3.5 sm:px-6 lg:px-8 py-5 sm:pt-10 sm:pb-8 space-y-4 sm:space-y-9">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-10 sm:pt-12 pb-8 space-y-6 sm:space-y-9">
+        {/* 0. RESTORED BRAND DIRECTORY, ACADEMIC PORTALS, POLICY & TRUST LINKS & SECURE CUSTOM ESCROW */}
+        <section
+          aria-label="Footer Directory and Escrow Guarantee"
+          className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-8 lg:gap-10 text-left items-start"
+        >
+          {/* Column 1: Brand Identity & Contact Details */}
+          <div className="lg:col-span-3 space-y-4">
+            <button
+              type="button"
+              onClick={() => handleButtonNav('home')}
+              className="inline-flex items-center cursor-pointer group text-left"
+              aria-label="University Tutors Home"
+            >
+              <picture className="shrink-0">
+                <source type="image/avif" srcSet="/logo-440.avif" />
+                <source
+                  type="image/webp"
+                  srcSet="/logo-220.webp 220w, /logo-440.webp 440w"
+                  sizes="180px"
+                />
+                <img
+                  src="/logo.webp"
+                  alt="University Tutors"
+                  width={220}
+                  height={84}
+                  loading="lazy"
+                  className="h-10 w-auto object-contain transition-transform group-hover:scale-102"
+                />
+              </picture>
+            </button>
+
+            <p className="text-xs leading-relaxed text-stone-700">
+              Your Global Partner for Academic Success. Connecting premium degree-seeking students with native certified subject experts across major English-speaking networks.
+            </p>
+
+            <div className="space-y-2.5 pt-1 text-xs text-stone-700 font-medium">
+              <a
+                href="mailto:support@universitytutors.com"
+                className="flex items-center gap-2.5 hover:text-terracotta-700 transition-colors"
+              >
+                <Mail className="w-4 h-4 text-orange-600 shrink-0" />
+                <span>support@universitytutors.com</span>
+              </a>
+              <a
+                href="tel:+18001238886"
+                className="flex items-center gap-2.5 hover:text-terracotta-700 transition-colors"
+              >
+                <Phone className="w-4 h-4 text-orange-600 shrink-0" />
+                <span>+1 (800) 123-TUTOR</span>
+              </a>
+              <div className="flex items-center gap-2.5 text-stone-700">
+                <MapPin className="w-4 h-4 text-orange-600 shrink-0" />
+                <span>London &bull; New York &bull; Sydney</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Column 2: ACADEMIC PORTALS */}
+          <div className="lg:col-span-3">
+            <h3 className="text-xs font-bold tracking-wider uppercase text-stone-900 pb-2.5 mb-3.5 border-b border-[#f0be9d]">
+              ACADEMIC PORTALS
+            </h3>
+            <ul className="space-y-2.5 text-[13px] font-medium text-stone-800">
+              <li>
+                <a
+                  href="/services"
+                  onClick={(e) => handleLinkClick(e, 'services')}
+                  className="hover:text-terracotta-700 transition-colors cursor-pointer"
+                >
+                  All Tutoring Services Hub
+                </a>
+              </li>
+              <li>
+                <a
+                  href="/services/1-on-1-live-tutoring"
+                  onClick={(e) => handleLinkClick(e, 'service-1on1')}
+                  className="hover:text-terracotta-700 transition-colors cursor-pointer"
+                >
+                  1-on-1 Live Tutoring
+                </a>
+              </li>
+              <li>
+                <a
+                  href="/services/assignment-guidance"
+                  onClick={(e) => handleLinkClick(e, 'service-assignment')}
+                  className="hover:text-terracotta-700 transition-colors cursor-pointer"
+                >
+                  Assignment Guidance
+                </a>
+              </li>
+              <li>
+                <a
+                  href="/services/coursework-track"
+                  onClick={(e) => handleLinkClick(e, 'service-coursework')}
+                  className="hover:text-terracotta-700 transition-colors cursor-pointer"
+                >
+                  Coursework Track
+                </a>
+              </li>
+              <li>
+                <a
+                  href="/services/essay-reference-checks"
+                  onClick={(e) => handleLinkClick(e, 'service-essay')}
+                  className="hover:text-terracotta-700 transition-colors cursor-pointer"
+                >
+                  Essay &amp; Reference Checks
+                </a>
+              </li>
+              <li>
+                <a
+                  href="/whatsapp"
+                  onClick={(e) => handleLinkClick(e, 'whatsapp')}
+                  className="hover:text-terracotta-700 transition-colors cursor-pointer"
+                >
+                  WhatsApp Academic Hotline
+                </a>
+              </li>
+              <li>
+                <button
+                  type="button"
+                  onClick={() => (onOpenBecomeTutor ? onOpenBecomeTutor() : handleButtonNav('auth'))}
+                  className="hover:text-terracotta-700 transition-colors cursor-pointer text-left"
+                >
+                  Become a Tutor (Apply Now)
+                </button>
+              </li>
+              <li>
+                <a
+                  href="/about-us"
+                  onClick={(e) => handleLinkClick(e, 'about')}
+                  className="hover:text-terracotta-700 transition-colors cursor-pointer"
+                >
+                  About Founding Team
+                </a>
+              </li>
+              <li>
+                <a
+                  href="/our-blog"
+                  onClick={(e) => handleLinkClick(e, 'blog')}
+                  className="hover:text-terracotta-700 transition-colors cursor-pointer"
+                >
+                  Knowledge Center (Blog)
+                </a>
+              </li>
+            </ul>
+          </div>
+
+          {/* Column 3: POLICY & TRUST LINKS */}
+          <div className="lg:col-span-3">
+            <h3 className="text-xs font-bold tracking-wider uppercase text-stone-900 pb-2.5 mb-3.5 border-b border-[#f0be9d]">
+              POLICY &amp; TRUST LINKS
+            </h3>
+            <ul className="space-y-2.5 text-[13px] font-medium text-stone-800">
+              <li>
+                <a
+                  href="/sop"
+                  onClick={(e) => handleLinkClick(e, 'sop')}
+                  className="hover:text-terracotta-700 transition-colors cursor-pointer"
+                >
+                  Standard Operating Procedures (SOP)
+                </a>
+              </li>
+              <li>
+                <a
+                  href="/terms"
+                  onClick={(e) => handleLinkClick(e, 'terms')}
+                  className="hover:text-terracotta-700 transition-colors cursor-pointer"
+                >
+                  Payments Escrow Guarantee
+                </a>
+              </li>
+              <li>
+                <a
+                  href="/privacy"
+                  onClick={(e) => handleLinkClick(e, 'privacy')}
+                  className="hover:text-terracotta-700 transition-colors cursor-pointer"
+                >
+                  Privacy Policy &amp; GDPR Disclosure
+                </a>
+              </li>
+              <li>
+                <a
+                  href="/data-deletion"
+                  onClick={(e) => handleLinkClick(e, 'data-deletion')}
+                  className="hover:text-terracotta-700 transition-colors cursor-pointer"
+                >
+                  User Data Deletion Instructions
+                </a>
+              </li>
+              <li>
+                <a
+                  href="/terms"
+                  onClick={(e) => handleLinkClick(e, 'terms')}
+                  className="hover:text-terracotta-700 transition-colors cursor-pointer"
+                >
+                  Terms of Service &amp; Escrow Agreement
+                </a>
+              </li>
+              <li>
+                <a
+                  href="/google-disclosure"
+                  onClick={(e) => handleLinkClick(e, 'google-disclosure')}
+                  className="hover:text-terracotta-700 transition-colors cursor-pointer"
+                >
+                  Google OAuth Disclosure
+                </a>
+              </li>
+              <li>
+                <a
+                  href="/faqs"
+                  onClick={(e) => handleLinkClick(e, 'faqs')}
+                  className="hover:text-terracotta-700 transition-colors cursor-pointer"
+                >
+                  Frequently Asked Questions (FAQs)
+                </a>
+              </li>
+              <li>
+                <a
+                  href="/contact"
+                  onClick={(e) => handleLinkClick(e, 'contact')}
+                  className="hover:text-terracotta-700 transition-colors cursor-pointer"
+                >
+                  Contact 24/7 Human Advising
+                </a>
+              </li>
+            </ul>
+          </div>
+
+          {/* Column 4: SECURE CUSTOM ESCROW Card */}
+          <div className="lg:col-span-3">
+            <div className="bg-[#fffaf5] rounded-2xl border border-[#f1d4be] p-6 shadow-xs space-y-4">
+              <div className="flex items-center gap-2">
+                <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 shrink-0" aria-hidden="true" />
+                <h3 className="text-xs font-bold tracking-wider uppercase text-stone-900">
+                  SECURE CUSTOM ESCROW
+                </h3>
+              </div>
+
+              <p className="text-xs leading-relaxed text-stone-700">
+                We leverage safe, administrator-monitored holding escrow to lock tuition fees securely. Tutors are only paid after successful deliverables are finalized and authorized by students.
+              </p>
+
+              <div className="flex flex-wrap items-center gap-2.5 pt-2">
+                <span className="px-2.5 py-1 rounded-md bg-orange-50 border border-orange-200 text-orange-700 font-mono text-[10.5px] font-medium">
+                  Manual Checks
+                </span>
+                <span className="px-2.5 py-1 rounded-md bg-emerald-50 border border-emerald-200 text-emerald-700 font-mono text-[10.5px] font-medium">
+                  SSL Encrypted
+                </span>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* Divider */}
+        <div className="border-t border-[#f0be9d]/70" />
+
         {/* 1. TOP INTERACTIVE TOOL SUITES SECTION (Compact on Mobile, 2-Col on Desktop) */}
         <section
           aria-label="Browser-Local Academic Tool Suites"

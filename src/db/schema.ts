@@ -31,11 +31,15 @@ export const users = pgTable('users', {
   status: text('status').default('active'),
   availableSlots: text('available_slots'), // JSON stringified array
   searchableKeywords: text('searchable_keywords'),
+  permissions: text('permissions'), // JSON stringified array e.g. ["blog","chats"]
+  isActive: boolean('is_active').notNull().default(true),
+  roleLabel: text('role_label'),
 }, (table) => [
   index('idx_users_role').on(table.role),
   index('idx_users_created_at').on(table.createdAt),
   index('idx_users_country').on(table.country),
   index('idx_users_status').on(table.status),
+  index('idx_users_is_active').on(table.isActive),
 ]);
 
 // 2. Orders Table (Assignments & Tutoring Requests)
@@ -186,16 +190,27 @@ export const blogs = pgTable('blogs', {
   id: text('id').primaryKey(),
   adminId: text('admin_id').notNull(),
   title: text('title').notNull(),
+  slug: text('slug'),
+  excerpt: text('excerpt'),
   content: text('content').notNull(),
+  author: text('author'),
   image: text('image').notNull(),
+  altText: text('alt_text'),
   category: text('category').notNull(),
   tags: text('tags').notNull(), // JSON stringified array of tags
+  readTime: text('read_time'),
+  featured: boolean('featured').default(false),
+  metaDescription: text('meta_description'),
+  focusKeyword: text('focus_keyword'),
+  longTailKeywords: text('long_tail_keywords'),
+  lsiKeywords: text('lsi_keywords'),
   publishedAt: text('published_at').notNull(),
   createdAt: text('created_at').notNull(),
   updatedAt: text('updated_at'),
 }, (table) => [
   index('idx_blogs_published_at').on(table.publishedAt),
   index('idx_blogs_category').on(table.category),
+  index('idx_blogs_slug').on(table.slug),
 ]);
 
 // 8. Tutors Table (Comprehensive Tutor Directory with Searchable Keywords and Zero Duplicates)

@@ -16,11 +16,13 @@ import { updatePageSeo } from './utils/seo';
 import { getBlogCanonicalSlug, matchesBlogSlugOrId } from './utils/blogSlug';
 import { assignUniqueTutorSlugs, getTutorCanonicalSlug, matchesTutorSlugOrId } from './utils/tutorSlug';
 import { store } from './lib/store';
+import { hasModulePermission, isStaffUser } from './lib/adminPermissions';
 import { UserRole, Chat, User } from './types';
 import { AlertCircle, X } from 'lucide-react';
 
 // Route-based code splitting so non-initial routes & widgets never bloat initial homepage JS
 const Footer = lazy(() => import('./components/Footer'));
+const FooterLocationsSubjects = lazy(() => import('./components/FooterLocationsSubjects'));
 const CookieBanner = lazy(() => import('./components/CookieBanner'));
 const FloatingWhatsAppButton = lazy(() => import('./components/FloatingWhatsAppButton'));
 const SopModal = lazy(() => import('./components/SopModal'));
@@ -112,7 +114,12 @@ function resolveInitialViewFromWindow(): string {
   ) {
     return 'dashboard';
   }
-  if (decodedPath === '/admin' || hash === '#admin') {
+  if (
+    decodedPath === '/admin' ||
+    decodedPath.startsWith('/admin/') ||
+    hash === '#admin' ||
+    hash.startsWith('#admin/')
+  ) {
     const cookieStr = typeof document !== 'undefined' ? document.cookie || '' : '';
     const hasCookieHint = /(?:^|;\s*)ut_session_active=1(?:;|$)/.test(cookieStr);
     let hasStoredHint = false;
@@ -187,6 +194,13 @@ export default function App() {
   });
 
   const [activeView, setActiveView] = useState<string>(() => resolveInitialViewFromWindow());
+  const [adminRoutePath, setAdminRoutePath] = useState<string>(() => {
+    if (typeof window === 'undefined') return '/admin';
+    const raw = window.location.pathname;
+    if (raw.toLowerCase().startsWith('/admin')) return raw;
+    if (window.location.hash.toLowerCase().startsWith('#admin')) return window.location.hash.replace(/^#/, '/');
+    return '/admin';
+  });
   const [activeCountryTutoringSlug, setActiveCountryTutoringSlug] = useState<string>('usa');
   const [activeSpecializedServiceSlug, setActiveSpecializedServiceSlug] = useState<string>('assignment-guidance');
   const [locationFilter, setLocationFilter] = useState<string>('');
@@ -981,12 +995,20 @@ export default function App() {
       } else {
         view = 'dashboard';
       }
-    } else if (view === 'admin') {
-      path = '/admin';
+    } else if (view === 'admin' || view.startsWith('admin/') || view.startsWith('/admin')) {
+      const normalizedAdminPath =
+        view === 'admin' || view === '/admin'
+          ? '/admin'
+          : view.startsWith('/')
+            ? view
+            : `/${view}`;
+      path = normalizedAdminPath;
       if (!activeUser) {
         view = 'admin-login';
-      } else if (activeUser.role === UserRole.ADMIN || activeUser.role === UserRole.SUBADMIN) {
+        setAdminRoutePath(normalizedAdminPath);
+      } else if (isStaffUser(activeUser)) {
         view = 'dashboard';
+        setAdminRoutePath(normalizedAdminPath);
       } else if (activeUser.role === UserRole.TUTOR) {
         view = 'dashboard';
         path = '/tutor/dashboard';
@@ -1000,8 +1022,8 @@ export default function App() {
           path = '/student/dashboard';
         } else if (activeUser.role === UserRole.TUTOR) {
           path = '/tutor/dashboard';
-        } else if (activeUser.role === UserRole.ADMIN || activeUser.role === UserRole.SUBADMIN) {
-          path = '/admin';
+        } else if (isStaffUser(activeUser)) {
+          path = adminRoutePath && adminRoutePath.startsWith('/admin') ? adminRoutePath : '/admin';
         }
       } else {
         path = '/auth';
@@ -1105,7 +1127,8 @@ export default function App() {
         } else if (store.currentUser.role === UserRole.TUTOR) {
           setActiveView('dashboard');
           window.history.replaceState(null, '', '/tutor/dashboard');
-        } else if (store.currentUser.role === UserRole.ADMIN || store.currentUser.role === UserRole.SUBADMIN) {
+        } else if (isStaffUser(store.currentUser)) {
+          setAdminRoutePath('/admin');
           setActiveView('dashboard');
           window.history.replaceState(null, '', '/admin');
         }
@@ -1126,15 +1149,25 @@ export default function App() {
         } else if (store.currentUser.role === UserRole.STUDENT) {
           setActiveView('dashboard');
           window.history.replaceState(null, '', '/student/dashboard');
-        } else if (store.currentUser.role === UserRole.ADMIN || store.currentUser.role === UserRole.SUBADMIN) {
+        } else if (isStaffUser(store.currentUser)) {
+          setAdminRoutePath('/admin');
           setActiveView('dashboard');
           window.history.replaceState(null, '', '/admin');
         }
-      } else if (decodedPath === '/admin' || hash === '#admin') {
+      } else if (
+        decodedPath === '/admin' ||
+        decodedPath.startsWith('/admin/') ||
+        hash === '#admin' ||
+        hash.startsWith('#admin/')
+      ) {
         if (!store.isSessionInitialized) {
           await store.sessionReadyPromise;
         }
-        if (store.currentUser && (store.currentUser.role === UserRole.ADMIN || store.currentUser.role === UserRole.SUBADMIN)) {
+        const targetAdminPath = decodedPath.startsWith('/admin')
+          ? rawPath.replace(/\/+$/, '') || '/admin'
+          : hash.replace(/^#/, '/').replace(/\/+$/, '') || '/admin';
+        if (isStaffUser(store.currentUser)) {
+          setAdminRoutePath(targetAdminPath);
           setActiveView('dashboard');
         } else if (store.currentUser && store.currentUser.role === UserRole.STUDENT) {
           setActiveView('dashboard');
@@ -1143,6 +1176,7 @@ export default function App() {
           setActiveView('dashboard');
           window.history.replaceState(null, '', '/tutor/dashboard');
         } else {
+          setAdminRoutePath(targetAdminPath);
           setActiveView('admin-login');
         }
       } else if (
@@ -1249,9 +1283,13 @@ export default function App() {
         if (!store.isSessionInitialized) {
           await store.sessionReadyPromise;
         }
-        if (!store.currentUser || (store.currentUser.role !== UserRole.ADMIN && store.currentUser.role !== UserRole.SUBADMIN)) {
+        if (!store.currentUser || !isStaffUser(store.currentUser)) {
           setActiveView('admin-login');
           window.history.replaceState(null, '', '/admin');
+        } else if (!hasModulePermission(store.currentUser, 'tutors')) {
+          setAdminRoutePath('/admin/user-data');
+          setActiveView('dashboard');
+          window.history.replaceState(null, '', '/admin/user-data');
         } else {
           setSelectedTutorProfile(null);
           setActiveView('user-data');
@@ -1506,12 +1544,20 @@ export default function App() {
     if (success) {
       const user = store.currentUser;
       setStoreState((prev) => ({ ...prev, currentUser: user, users: store.users }));
+      const currentPathname = typeof window !== 'undefined' ? window.location.pathname : '';
+      const preservedAdminPath =
+        isStaffUser(user) && currentPathname.toLowerCase().startsWith('/admin/')
+          ? currentPathname
+          : '/admin';
       const rolePath =
         user?.role === UserRole.TUTOR
           ? '/tutor/dashboard'
-          : user?.role === UserRole.ADMIN || user?.role === UserRole.SUBADMIN
-            ? '/admin'
+          : isStaffUser(user)
+            ? preservedAdminPath
             : '/student/dashboard';
+      if (isStaffUser(user)) {
+        setAdminRoutePath(preservedAdminPath);
+      }
       window.history.pushState(null, '', rolePath);
       setActiveView('dashboard');
     }
@@ -1820,6 +1866,14 @@ export default function App() {
                 onRequireAuth={() => setActiveView('auth')}
                 onOpenWhatsApp={() => setIsWhatsAppModalOpen(true)}
                 onHideGlobalWhatsAppChange={setHideGlobalWhatsAppForStudentUi}
+                adminRoutePath={adminRoutePath}
+                onAdminRouteChange={(nextPath) => {
+                  const cleanPath = nextPath.startsWith('/admin') ? nextPath : '/admin';
+                  setAdminRoutePath(cleanPath);
+                  if (typeof window !== 'undefined' && window.location.pathname !== cleanPath) {
+                    window.history.pushState(null, '', cleanPath);
+                  }
+                }}
               />
             ) : activeView === 'get-a-quote' ? (
               <GetQuotePage
@@ -1992,6 +2046,12 @@ export default function App() {
                   />
                 }
               >
+                <FooterLocationsSubjects
+                  onNavigateLocation={(loc) => handleNavigate(`location:${loc}`)}
+                  onNavigateSubject={(subj) => handleNavigate(`subject:${subj}`)}
+                  onNavigateCountry={(slug) => handleNavigate(`country-tutoring:${slug}`)}
+                  onNavigateService={(serviceSlug) => handleNavigate(serviceSlug)}
+                />
                 <Footer onNavigate={handleNavigate} onOpenBecomeTutor={handleOpenBecomeTutor} />
               </Suspense>
             ) : (

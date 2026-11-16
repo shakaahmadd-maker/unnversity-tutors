@@ -49,6 +49,18 @@ import StudentProfilesAdmin from './StudentProfilesAdmin';
 import AssignmentLedgerView from './AssignmentLedgerView';
 import UserDataPage from './UserDataPage';
 import OperationalChatDesk from './OperationalChatDesk';
+import AdminSubAdminsPanel from './AdminSubAdminsPanel';
+import AdminBlogStudio, { BlogStudioSavePayload } from './AdminBlogStudio';
+import {
+  ADMIN_MODULE_DEFINITIONS,
+  ADMIN_TAB_TO_ROUTE_PATH,
+  canAccessAdminTab,
+  getFirstPermittedAdminTab,
+  hasModulePermission,
+  isSuperAdminUser,
+  parsePermissions,
+  resolveAdminTabFromPath,
+} from '../lib/adminPermissions';
 import { store, TabLoadState } from '../lib/store';
 import {
   apiFetch,
@@ -125,9 +137,9 @@ interface AdminDashboardProps {
   emails?: TriggeredEmail[];
   onToggleUserStatus: (userId: string) => void;
   onChangeUserRole: (userId: string, targetRole: UserRole) => void;
-  onAddBlog: (b: Omit<Blog, 'id' | 'publishedAt'>) => void;
+  onAddBlog: (b: Partial<Blog> & { title: string; content: string }) => Promise<void> | void;
   onDeleteBlog: (blogId: string) => void;
-  onUpdateBlog?: (blogId: string, title: string, content: string, image: string, category: string, tags: string[]) => void;
+  onUpdateBlog?: (blogId: string, titleOrData: any, content?: string, image?: string, category?: string, tags?: string[]) => Promise<void> | void;
   onSyncDefaultBlogs?: () => Promise<boolean>;
   onAddFaq: (f: Omit<FAQ, 'id'>) => void;
   onDeleteFaq: (faqId: string) => void;
@@ -166,7 +178,31 @@ interface AdminDashboardProps {
   tabStates?: Record<string, TabLoadState>;
   isLoadingMessages?: boolean;
   chatError?: string | null;
+  adminRoutePath?: string;
+  onAdminRouteChange?: (path: string) => void;
 }
+
+type AdminTab =
+  | 'subadmins'
+  | 'student_profiles'
+  | 'tutors_list'
+  | 'user_data'
+  | 'users'
+  | 'chats'
+  | 'disputes'
+  | 'faqs'
+  | 'blogs'
+  | 'subjects'
+  | 'assignments'
+  | 'payments_ledger'
+  | 'create_invoice'
+  | 'activity_log'
+  | 'notifications'
+  | 'feedback'
+  | 'sops'
+  | 'reports'
+  | 'agreements'
+  | 'trigger_emails';
 
 export default function AdminDashboard({
   currentUser,
@@ -228,9 +264,13 @@ export default function AdminDashboard({
   tabStates = {},
   isLoadingMessages = false,
   chatError = null,
+  adminRoutePath = '/admin',
+  onAdminRouteChange,
 }: AdminDashboardProps) {
 
-  const isSuperiorAdmin = currentUser.email.toLowerCase().trim() === 'shaka.ahmadd@gmail.com';
+  const isSuperAdmin = useMemo(() => isSuperAdminUser(currentUser), [currentUser]);
+  const isSuperiorAdmin = isSuperAdmin;
+  const userPermissions = useMemo(() => parsePermissions(currentUser.permissions), [currentUser]);
 
   // DIAGNOSTICS & SYNC STATUS STATES
   const [dbUsers, setDbUsers] = useState<User[]>([]);
@@ -297,12 +337,14 @@ export default function AdminDashboard({
   };
 
   useEffect(() => {
-    runUsersSyncAudit();
+    if (hasModulePermission(currentUser, 'tutors')) {
+      runUsersSyncAudit();
+    }
     return () => {
       auditAbortRef.current?.abort();
       testChatAbortRef.current?.abort();
     };
-  }, []);
+  }, [currentUser]);
 
   const handleTestChatConnection = async (chatId: string) => {
     testChatAbortRef.current?.abort();
@@ -345,11 +387,55 @@ export default function AdminDashboard({
     }
   };
 
-  const [activeTab, setActiveTab] = useState<
-    'student_profiles' | 'tutors_list' | 'user_data' | 'users' | 'chats' | 'disputes' | 'faqs' | 'blogs' | 'subjects' |
-    'assignments' | 'payments_ledger' | 'create_invoice' | 'activity_log' |
-    'notifications' | 'feedback' | 'sops' | 'reports' | 'agreements' | 'trigger_emails'
-  >('tutors_list');
+  const resolveInitialAdminRouteState = (): { tab: AdminTab; deniedRoute: string | null } => {
+    const requestedFromPath = adminRoutePath ? resolveAdminTabFromPath(adminRoutePath) : null;
+    if (requestedFromPath) {
+      if (requestedFromPath === '__unknown__' || !canAccessAdminTab(currentUser, requestedFromPath)) {
+        const fallback = (getFirstPermittedAdminTab(currentUser) || 'blogs') as AdminTab;
+        return { tab: fallback, deniedRoute: adminRoutePath };
+      }
+      return { tab: requestedFromPath as AdminTab, deniedRoute: null };
+    }
+    const firstPermitted = (getFirstPermittedAdminTab(currentUser) || 'tutors_list') as AdminTab;
+    return { tab: firstPermitted, deniedRoute: null };
+  };
+
+  const [activeTab, setActiveTabState] = useState<AdminTab>(() => resolveInitialAdminRouteState().tab);
+  const [deniedRouteAttempt, setDeniedRouteAttempt] = useState<string | null>(() => resolveInitialAdminRouteState().deniedRoute);
+
+  const setActiveTab = (nextTab: AdminTab) => {
+    if (!canAccessAdminTab(currentUser, nextTab)) {
+      setDeniedRouteAttempt(ADMIN_TAB_TO_ROUTE_PATH[nextTab] || `/admin/${nextTab}`);
+      return;
+    }
+    setDeniedRouteAttempt(null);
+    setActiveTabState(nextTab);
+    const targetRoute = ADMIN_TAB_TO_ROUTE_PATH[nextTab] || '/admin';
+    onAdminRouteChange?.(targetRoute);
+  };
+
+  useEffect(() => {
+    if (!adminRoutePath) return;
+    const resolved = resolveAdminTabFromPath(adminRoutePath);
+    if (!resolved) {
+      setDeniedRouteAttempt(null);
+      if (!canAccessAdminTab(currentUser, activeTab)) {
+        const firstPermitted = getFirstPermittedAdminTab(currentUser);
+        if (firstPermitted) {
+          setActiveTabState(firstPermitted as AdminTab);
+        }
+      }
+      return;
+    }
+    if (resolved === '__unknown__' || !canAccessAdminTab(currentUser, resolved)) {
+      setDeniedRouteAttempt(adminRoutePath);
+      return;
+    }
+    setDeniedRouteAttempt(null);
+    if (resolved !== activeTab) {
+      setActiveTabState(resolved as AdminTab);
+    }
+  }, [adminRoutePath, currentUser]);
 
   // Performance diagnostics states (client + server)
   const [clientDiagnostics, setClientDiagnostics] = useState<ApiDiagnosticsSnapshot>(() => getApiDiagnostics());
@@ -365,6 +451,7 @@ export default function AdminDashboard({
   }, []);
 
   const fetchServerDiagnostics = async () => {
+    if (!hasModulePermission(currentUser, 'settings')) return;
     setIsLoadingServerPerf(true);
     setServerPerfError(null);
     try {
@@ -382,13 +469,15 @@ export default function AdminDashboard({
   };
 
   useEffect(() => {
-    if (onLoadTab) {
+    if (deniedRouteAttempt) return;
+    if (!canAccessAdminTab(currentUser, activeTab)) return;
+    if (onLoadTab && activeTab !== 'subadmins') {
       onLoadTab(activeTab);
     }
-    if (activeTab === 'activity_log') {
+    if (activeTab === 'activity_log' && hasModulePermission(currentUser, 'settings')) {
       fetchServerDiagnostics();
     }
-  }, [activeTab, onLoadTab]);
+  }, [activeTab, deniedRouteAttempt, currentUser, onLoadTab]);
 
   // Student directory deep-link selection
   const [adminStudentDirectorySearch, setAdminStudentDirectorySearch] = useState<string>('');
@@ -613,42 +702,7 @@ export default function AdminDashboard({
     }
   };
 
-  // DEDICATED SUB-ADMIN CREATOR STATE
-  const [subAdminName, setSubAdminName] = useState('');
-  const [subAdminEmail, setSubAdminEmail] = useState('');
-  const [subAdminError, setSubAdminError] = useState<string | null>(null);
-
-  const handleCreateSubAdminSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setSubAdminError(null);
-    if (!isSuperiorAdmin) {
-      setSubAdminError('Security Violation: Only the Superior Admin is authorized to create sub-admin profiles.');
-      return;
-    }
-    if (!subAdminName.trim() || !subAdminEmail.trim()) {
-      setSubAdminError('Full Name and Email address are required fields.');
-      return;
-    }
-
-    if (onGenerateProfile) {
-      const extra = { verified: true };
-      try {
-        const success = await onGenerateProfile(subAdminName.trim(), subAdminEmail.trim().toLowerCase(), UserRole.ADMIN, extra);
-        if (success) {
-          setSelectedActionSuccess(`Sub-Admin successfully created for ${subAdminName} (${subAdminEmail})!`);
-          setSubAdminName('');
-          setSubAdminEmail('');
-          setTimeout(() => {
-            setSelectedActionSuccess(null);
-          }, 5000);
-        } else {
-          setSubAdminError('This email is already registered inside our database ledger.');
-        }
-      } catch (err: any) {
-        setSubAdminError(err.message || 'Secure backend failed to create sub-admin.');
-      }
-    }
-  };
+  // Sub-Admin management is handled via AdminSubAdminsPanel (/api/admin/subadmins)
 
   // NOTIFICATION & TRIGGER EMAIL COMPOSER STATES
   const [trEmailTo, setTrEmailTo] = useState('');
@@ -740,148 +794,14 @@ export default function AdminDashboard({
     }
   };
 
-  // BLOG FORM STATE
-  const [blogTitle, setBlogTitle] = useState('');
-  const [blogImg, setBlogImg] = useState('https://images.unsplash.com/photo-1511629091441-ee46146481b6?w=400');
-  const [blogCat, setBlogCat] = useState('University Survival');
-  const [blogContent, setBlogContent] = useState('');
-  const [blogTags, setBlogTags] = useState('oxford, referencing, mla');
-  const [editingBlogId, setEditingBlogId] = useState<string | null>(null);
-  const [isBlogModalOpen, setIsBlogModalOpen] = useState(false);
+  // BLOG STUDIO & ARTICLES DIRECTORY STATE
   const [blogSearchQuery, setBlogSearchQuery] = useState('');
   const [blogCategoryFilter, setBlogCategoryFilter] = useState('All');
   const [blogViewMode, setBlogViewMode] = useState<'table' | 'cards'>('table');
-  const [editorActiveTab, setEditorActiveTab] = useState<'write' | 'preview'>('write');
-  const [selectedTemplate, setSelectedTemplate] = useState('none');
-
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
-
-  const BLOG_TEMPLATES: Record<string, { title: string; tags: string; category: string; content: string }> = {
-    apa_guide: {
-      title: 'APA 7th Edition Referencing: Style Guide & Quick Citation Formulas',
-      tags: 'apa, referencing, citations, bibliography',
-      category: 'APA Guidelines',
-      content: `# Ultimate APA 7th Edition Referencing Style Guide\n\nMastering the American Psychological Association (APA) style is crucial for scientific integrity. Here is a definitive quick-reference formula sheet.\n\n## 1. Core Citation Formulas\n\n### Journal Article (with DOI)\n> **Formula:** Author, A. A., & Author, B. B. (Year). Title of the journal article. *Title of Periodical*, *Volume*(Issue), Page range. https://doi.org/xxxx\n* **Example:** Kennedy, L. (2025). Cognitive load models in calculus instruction. *Journal of Educational Science*, *42*(2), 115-132. https://doi.org/10.1016/j.jeduc.2025.01.004\n\n### Print Book\n> **Formula:** Author, A. A. (Year). *Title of the book*. Publisher.\n* **Example:** Kennedy, L., & Smith, M. (2024). *Advanced Analytical Calculus*. Oxford University Press.\n\n---\n\n## 2. In-Text Citations Rules\n- **Parenthetical Citation:** (Kennedy, 2025)\n- **Narrative Citation:** Kennedy (2025) argued that...\n- **Three or More Authors:** Use *et al.* from the first citation. (e.g., Kennedy *et al.*, 2024)\n\n## 3. Formatting the Reference Page\n- Label the page **References** (bold, centered).\n- Order entries alphabetically by the author's last name.\n- Apply a **hanging indent** of 0.5 inches.`
-    },
-    exam_prep: {
-      title: 'Scientific Exam Preparation: Cognitive Intervals & Active Recall Strategies',
-      tags: 'exams, memory, active-recall, spaced-repetition',
-      category: 'University Survival',
-      content: `# Scientific Exam Prep: Intervals & Active Recall\n\nA guide to maximizing academic retention.\n\n## 1. The Active Recall Framework\nInstead of passively reading and highlighting textbooks, practice retrieval.\n* **Flashcards:** Create quiz questions for formulas.\n* **Feynman Technique:** Teach complex topics to an imaginary student.\n\n## 2. Spaced Repetition Schedule\nTo combat the *Ebbinghaus Forgetting Curve*, review materials at scheduled intervals:\n1. **Interval 1:** 24 hours after initial study.\n2. **Interval 2:** 3 days later.\n3. **Interval 3:** 7 days later.\n4. **Interval 4:** 14 days later.\n\n## 3. Recommended Exam Day Routine\n- Ensure 7.5 hours of rapid eye movement sleep.\n- Eat slow-release complex carbohydrates (oatmeal, nuts).\n- Hydrate systematically with electrolytes.`
-    },
-    dissertation: {
-      title: 'Structuring a Master\'s Dissertation: Chapter-by-Chapter Thesis Framework',
-      tags: 'dissertation, research, thesis, methodology',
-      category: 'University Survival',
-      content: `# Master's Dissertation Chapter-by-Chapter Framework\n\nA structured outline template for writing highly rated university theses.\n\n## Chapter 1: Introduction (10% of total length)\n- **Background:** Set up the research problem space.\n- **Problem Statement:** Clear expression of the issue.\n- **Research Objectives:** What the dissertation plans to achieve.\n\n## Chapter 2: Literature Review (30% of total length)\n- **Synthesis Matrix:** Group peer-reviewed papers by themes rather than listing them one by one.\n- **Identify Gaps:** Highlight what existing literature has missed.\n\n## Chapter 3: Methodology (15% of total length)\n- **Research Philosophy:** Positivist vs. Interpretivist approach.\n- **Data Collection:** Surveys, interviews, or simulated numeric sets.\n- **Ethical Approval:** Verify human-subject consent parameters.`
-    }
-  };
-
-  const handleTemplateSelect = (templateKey: string) => {
-    setSelectedTemplate(templateKey);
-    if (templateKey === 'none') return;
-    
-    const t = BLOG_TEMPLATES[templateKey];
-    if (t) {
-      setBlogTitle(t.title);
-      setBlogTags(t.tags);
-      setBlogCat(t.category);
-      setBlogContent(t.content);
-    }
-  };
-
-  const handleToolbarClick = (syntax: string, placeholderText: string = '') => {
-    const textarea = textareaRef.current;
-    if (!textarea) return;
-
-    const startPos = textarea.selectionStart;
-    const endPos = textarea.selectionEnd;
-    const text = textarea.value;
-    const selectedText = text.substring(startPos, endPos);
-
-    let replacement = '';
-    if (syntax === 'bold') {
-      replacement = `**${selectedText || placeholderText || 'bold text'}**`;
-    } else if (syntax === 'italic') {
-      replacement = `*${selectedText || placeholderText || 'italic text'}*`;
-    } else if (syntax === 'h2') {
-      replacement = `\n## ${selectedText || placeholderText || 'Heading 2'}\n`;
-    } else if (syntax === 'h3') {
-      replacement = `\n### ${selectedText || placeholderText || 'Heading 3'}\n`;
-    } else if (syntax === 'bullet') {
-      replacement = `\n- ${selectedText || placeholderText || 'List item'}\n`;
-    } else if (syntax === 'number') {
-      replacement = `\n1. ${selectedText || placeholderText || 'List item'}\n`;
-    } else if (syntax === 'code') {
-      replacement = `\n\`\`\`\n${selectedText || placeholderText || 'code here'}\n\`\`\`\n`;
-    } else if (syntax === 'link') {
-      replacement = `[${selectedText || placeholderText || 'Link Title'}](https://example.com)`;
-    } else if (syntax === 'quote') {
-      replacement = `\n> ${selectedText || placeholderText || 'Blockquote'}\n`;
-    } else if (syntax === 'hr') {
-      replacement = `\n---\n`;
-    }
-
-    const newValue = text.substring(0, startPos) + replacement + text.substring(endPos);
-    setBlogContent(newValue);
-
-    // Refocus and place cursor
-    setTimeout(() => {
-      textarea.focus();
-      const newCursorPos = startPos + replacement.length;
-      textarea.setSelectionRange(newCursorPos, newCursorPos);
-    }, 50);
-  };
-
-  const parseMarkdownToHtml = (markdown: string): string => {
-    if (!markdown) return "<p class='text-gray-400 italic text-xs'>No content composed yet. Start typing or choose a template to see preview!</p>";
-    
-    let html = markdown
-      .replace(/&/g, "&amp;")
-      .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;");
-
-    // Headings
-    html = html.replace(/^### (.*?)$/gm, "<h4 class='text-sm font-bold text-gray-950 mt-4 mb-2 font-sans'>$1</h4>");
-    html = html.replace(/^## (.*?)$/gm, "<h3 class='text-base font-bold text-gray-950 mt-5 mb-2.5 font-sans border-b pb-1'>$1</h3>");
-    html = html.replace(/^# (.*?)$/gm, "<h2 class='text-lg font-bold text-gray-950 mt-6 mb-3 font-sans'>$1</h2>");
-
-    // Bold & Italic
-    html = html.replace(/\*\*(.*?)\*\*/g, "<strong class='font-bold text-gray-900'>$1</strong>");
-    html = html.replace(/\*(.*?)\*/g, "<em class='italic text-gray-800'>$1</em>");
-
-    // Code Blocks
-    html = html.replace(/```([\s\S]*?)```/g, "<pre class='bg-gray-900 text-gray-100 font-mono text-[11px] p-3 rounded-xl overflow-x-auto my-3 border border-gray-800'><code>$1</code></pre>");
-    html = html.replace(/`([^`]+)`/g, "<code class='bg-gray-100 text-rose-600 px-1.5 py-0.5 rounded font-mono text-[10.5px] border border-gray-200'>$1</code>");
-
-    // Blockquotes
-    html = html.replace(/^&gt; (.*?)$/gm, "<blockquote class='border-l-4 border-orange-500 pl-4 py-1 italic my-3 text-gray-600 bg-orange-50/40 rounded-r-lg'>$1</blockquote>");
-
-    // Horizontal Rules
-    html = html.replace(/^---$/gm, "<hr class='my-5 border-gray-200' />");
-
-    // Bullet Lists
-    html = html.replace(/^\- (.*?)$/gm, "<li class='list-disc ml-5 mb-1 text-xs text-gray-750'>$1</li>");
-
-    // Numbered Lists
-    html = html.replace(/^\d+\.\s(.*)$/gm, "<li class='list-decimal ml-5 mb-1 text-xs text-gray-750'>$1</li>");
-
-    // Links
-    html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, "<a href='$2' target='_blank' rel='noopener noreferrer' class='text-orange-600 hover:underline font-semibold'>$1</a>");
-
-    // Line breaks / Paragraphs
-    const lines = html.split('\n');
-    const processedLines = lines.map(line => {
-      const trimmed = line.trim();
-      if (trimmed === '') return '<br/>';
-      if (line.startsWith('<h') || line.startsWith('<pre') || line.startsWith('<blockquote') || line.startsWith('<li') || line.startsWith('<hr') || line.startsWith('<code') || line.startsWith('<br')) {
-        return line;
-      }
-      return `<p class='text-xs text-gray-700 leading-relaxed mb-2.5'>${line}</p>`;
-    });
-
-    return processedLines.join('\n');
-  };
+  const [editingStudioBlog, setEditingStudioBlog] = useState<Blog | 'new' | null>(null);
+  const [confirmDeleteBlog, setConfirmDeleteBlog] = useState<Blog | null>(null);
+  const [confirmSyncDefaultBlogs, setConfirmSyncDefaultBlogs] = useState(false);
+  const [isSyncingDefaultBlogs, setIsSyncingDefaultBlogs] = useState(false);
 
   // FAQ FORM STATE
   const [faqQuestion, setFaqQuestion] = useState('');
@@ -891,41 +811,20 @@ export default function AdminDashboard({
   // TOPIC SUBJECT STATE
   const [subjectTopic, setSubjectTopic] = useState('');
 
-  const handleBlogSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!blogTitle || !blogContent) return;
-
-    if (editingBlogId) {
+  const handleSaveStudioBlog = async (payload: BlogStudioSavePayload) => {
+    if (editingStudioBlog && editingStudioBlog !== 'new') {
       if (onUpdateBlog) {
-        onUpdateBlog(
-          editingBlogId,
-          blogTitle,
-          blogContent,
-          blogImg,
-          blogCat,
-          blogTags.split(',').map(t => t.trim())
-        );
+        await onUpdateBlog(editingStudioBlog.id, payload);
       }
-      setEditingBlogId(null);
-      setSelectedActionSuccess('Successfully updated blog article in database!');
+      setSelectedActionSuccess(`Updated "${payload.title}" in Blog Studio.`);
     } else {
-      onAddBlog({
+      await onAddBlog({
+        ...payload,
         adminId: currentUser.id,
-        title: blogTitle,
-        image: blogImg,
-        category: blogCat,
-        content: blogContent,
-        tags: blogTags.split(',').map(t => t.trim())
       });
-      setSelectedActionSuccess('Successfully written blog article to database!');
+      setSelectedActionSuccess(`Published "${payload.title}" from Blog Studio.`);
     }
-
-    setBlogTitle('');
-    setBlogContent('');
-    setBlogImg('https://images.unsplash.com/photo-1511629091441-ee46146481b6?w=400');
-    setBlogTags('oxford, referencing, mla');
-    setIsBlogModalOpen(false);
-
+    setEditingStudioBlog(null);
     setTimeout(() => {
       setSelectedActionSuccess(null);
     }, 4000);
@@ -951,7 +850,8 @@ export default function AdminDashboard({
   const [selectedActionSuccess, setSelectedActionSuccess] = useState<string | null>(null);
   const [isPageExpanded, setIsPageExpanded] = useState(false);
 
-  const ADMIN_TAB_META: { id: string; group: string; label: string }[] = [
+  const ADMIN_TAB_META: { id: AdminTab; group: string; label: string }[] = [
+    { id: 'subadmins', group: 'Access Control', label: 'Sub-Admins & Permissions' },
     { id: 'student_profiles', group: 'Academics & Tutors', label: 'Student Profiles Directory' },
     { id: 'tutors_list', group: 'Academics & Tutors', label: 'Tutors List' },
     { id: 'user_data', group: 'Academics & Tutors', label: 'User Data Directory' },
@@ -972,6 +872,11 @@ export default function AdminDashboard({
     { id: 'faqs', group: 'Reference & Platform', label: 'QA Helpdesk Center' },
     { id: 'subjects', group: 'Reference & Platform', label: 'Syllabus Subjects' },
   ];
+
+  const permittedAdminTabMeta = useMemo(
+    () => ADMIN_TAB_META.filter((t) => canAccessAdminTab(currentUser, t.id)),
+    [currentUser]
+  );
 
   const activeTabInfo = ADMIN_TAB_META.find(t => t.id === activeTab) || {
     id: activeTab,
@@ -1040,7 +945,7 @@ export default function AdminDashboard({
               onChange={(e) => setActiveTab(e.target.value as any)}
               className="px-3 py-2 rounded-xl text-xs font-semibold bg-slate-50 border border-slate-200 text-slate-700 focus:outline-none focus:border-orange-500 cursor-pointer"
             >
-              {ADMIN_TAB_META.map((opt) => (
+              {permittedAdminTabMeta.map((opt) => (
                 <option key={opt.id} value={opt.id}>
                   {opt.label}
                 </option>
@@ -1105,19 +1010,51 @@ export default function AdminDashboard({
                 )}
               </div>
             </div>
-            <h2 className="text-2xl md:text-3xl font-bold tracking-tight text-white font-sans mt-2">Console Access: {currentUser.name} ⚖️</h2>
-            <p className="text-xs text-gray-400 mt-1">Authorized root privileges. Audit user accounts, write education blogs, and resolve escrow dispute holds.</p>
+            <div className="flex flex-wrap items-center gap-2 mt-2">
+              <h2 className="text-2xl md:text-3xl font-bold tracking-tight text-white font-sans">
+                {isSuperAdmin ? `Console Access: ${currentUser.name}` : `Staff Desk: ${currentUser.name}`}
+              </h2>
+              <span
+                className={`px-2.5 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider border ${
+                  isSuperAdmin
+                    ? 'bg-orange-500/20 text-orange-300 border-orange-500/40'
+                    : 'bg-white/10 text-slate-200 border-white/15'
+                }`}
+              >
+                {isSuperAdmin ? 'Super Admin' : currentUser.roleLabel || 'Sub-Admin'}
+              </span>
+            </div>
+            <p className="text-xs text-gray-400 mt-1">
+              {isSuperAdmin
+                ? 'Authorized root privileges. Manage sub-admin permissions, user accounts, Blog Studio articles, and escrow disputes.'
+                : `Assigned modules (${userPermissions.length}): ${
+                    userPermissions.length > 0
+                      ? userPermissions
+                          .map((k) => ADMIN_MODULE_DEFINITIONS.find((m) => m.key === k)?.shortLabel || k)
+                          .join(' · ')
+                      : 'No active modules assigned'
+                  }`}
+            </p>
           </div>
           
           <div className="flex flex-wrap items-center gap-3">
-            <div className="text-center px-3.5 bg-white/5 border border-white/10 p-2.5 rounded-2xl tabular-nums">
-              <span className="text-lg font-mono font-bold text-orange-400 block">{users.length}</span>
-              <span className="text-[9px] text-gray-400 font-bold block uppercase">active users</span>
-            </div>
-            <div className="text-center px-3.5 bg-white/5 border border-white/10 p-2.5 rounded-2xl tabular-nums">
-              <span className="text-lg font-mono font-bold text-emerald-400 block">{payments.filter(p => p.status === 'escrow').length}</span>
-              <span className="text-[9px] text-gray-400 font-bold block uppercase">escrows busy</span>
-            </div>
+            {isSuperAdmin || hasModulePermission(currentUser, 'tutors') ? (
+              <div className="text-center px-3.5 bg-white/5 border border-white/10 p-2.5 rounded-2xl tabular-nums">
+                <span className="text-lg font-mono font-bold text-orange-400 block">{users.length}</span>
+                <span className="text-[9px] text-gray-400 font-bold block uppercase">active users</span>
+              </div>
+            ) : (
+              <div className="text-center px-3.5 bg-white/5 border border-white/10 p-2.5 rounded-2xl tabular-nums">
+                <span className="text-lg font-mono font-bold text-orange-400 block">{userPermissions.length}</span>
+                <span className="text-[9px] text-gray-400 font-bold block uppercase">assigned modules</span>
+              </div>
+            )}
+            {(isSuperAdmin || hasModulePermission(currentUser, 'payments')) && (
+              <div className="text-center px-3.5 bg-white/5 border border-white/10 p-2.5 rounded-2xl tabular-nums">
+                <span className="text-lg font-mono font-bold text-emerald-400 block">{payments.filter(p => p.status === 'escrow').length}</span>
+                <span className="text-[9px] text-gray-400 font-bold block uppercase">escrows busy</span>
+              </div>
+            )}
             <button
               type="button"
               onClick={() => setIsPageExpanded(true)}
@@ -1154,148 +1091,145 @@ export default function AdminDashboard({
         }
       >
         
-        {/* Left Sticky Admin Sidebar Navigation Panel */}
+        {/* Left Sticky Admin Sidebar Navigation Panel (RBAC Dynamically Filtered) */}
         {!isPageExpanded && (
           <aside 
             id="admin-dashboard-sidebar"
             aria-label="Admin Navigation Panel"
             className="lg:col-span-1 lg:sticky lg:top-24 space-y-4 max-h-[calc(100vh-7rem)] overflow-y-auto overscroll-contain pr-1.5 [scrollbar-width:thin] [scrollbar-color:#e2e8f0_transparent] z-20"
           >
-          <div className="bg-white rounded-2xl border border-gray-150 p-4 space-y-1 shadow-xs">
-            <span className="text-[9px] font-bold text-gray-400 uppercase px-3 pb-1 block tracking-wider">Academics & Tutors</span>
-            {[
-              { id: 'student_profiles', label: 'Student Profiles Directory', icon: <GraduationCap className="w-4 h-4 text-orange-400" /> },
-              { id: 'tutors_list', label: 'Tutors List', icon: <UserCheck className="w-4 h-4" /> },
-              { id: 'user_data', label: 'User Data Directory', icon: <UsersIcon className="w-4 h-4 text-orange-500" /> },
-              { id: 'users', label: 'User Ledger List', icon: <UsersIcon className="w-4 h-4" /> },
-              { id: 'assignments', label: 'New Assignment Ledger', icon: <BookOpen className="w-4 h-4" /> },
-              { id: 'reports', label: 'Assignment Reports Desk', icon: <Settings className="w-4 h-4" /> },
-              { id: 'agreements', label: 'Student Agreements', icon: <ShieldAlert className="w-4 h-4" /> },
-            ].map(tab => (
-              <button
-                key={tab.id}
-                id={`admin-tab-${tab.id}`}
-                onClick={() => setActiveTab(tab.id as any)}
-                className={`flex w-full items-center gap-3 p-3 text-xs font-bold uppercase tracking-wider rounded-xl transition-all text-left ${
-                  activeTab === tab.id 
-                    ? 'bg-orange-500 text-white shadow-sm' 
-                    : 'text-gray-700 hover:bg-gray-100'
-                }`}
-              >
-                {tab.icon}
-                <span>{tab.label}</span>
-                {tab.id === 'assignments' && assignments.length > 0 && (
-                  <span
-                    className={`ml-auto px-2 py-0.5 rounded-full text-[10px] font-bold tabular-nums ${
-                      activeTab === tab.id ? 'bg-white/25 text-white' : 'bg-orange-100 text-orange-700'
-                    }`}
-                  >
-                    {assignments.length}
-                  </span>
-                )}
-              </button>
-            ))}
+          <div className="bg-white rounded-2xl border border-slate-200 p-4 space-y-1 shadow-xs">
+            {(() => {
+              const academicsTabs = [
+                { id: 'student_profiles' as AdminTab, label: 'Student Profiles Directory', icon: <GraduationCap className="w-4 h-4 text-orange-400" /> },
+                { id: 'tutors_list' as AdminTab, label: 'Tutors List', icon: <UserCheck className="w-4 h-4" /> },
+                { id: 'user_data' as AdminTab, label: 'User Data Directory', icon: <UsersIcon className="w-4 h-4 text-orange-500" /> },
+                { id: 'users' as AdminTab, label: 'User Ledger List', icon: <UsersIcon className="w-4 h-4" /> },
+                { id: 'assignments' as AdminTab, label: 'New Assignment Ledger', icon: <BookOpen className="w-4 h-4" /> },
+                { id: 'reports' as AdminTab, label: 'Assignment Reports Desk', icon: <Settings className="w-4 h-4" /> },
+                { id: 'agreements' as AdminTab, label: 'Student Agreements', icon: <ShieldAlert className="w-4 h-4" /> },
+              ].filter((tab) => canAccessAdminTab(currentUser, tab.id));
 
-            <a
-              href="/user-data"
-              id="admin-link-user-data-page"
-              className="flex w-full items-center justify-between p-2.5 px-3 text-xs font-bold text-orange-700 bg-orange-50 hover:bg-orange-100 rounded-xl transition-all border border-orange-200 shadow-2xs mt-1.5 mb-1 group"
-              title="Open full standalone User Data page (/user-data)"
-            >
-              <div className="flex items-center gap-2">
-                <UsersIcon className="w-3.5 h-3.5 text-orange-600" />
-                <span className="uppercase tracking-wider text-[11px]">User Data Page</span>
-              </div>
-              <ExternalLink className="w-3.5 h-3.5 text-orange-500 group-hover:translate-x-0.5 transition-transform" />
-            </a>
+              const accountingTabs = [
+                { id: 'payments_ledger' as AdminTab, label: 'Payments Dashboard', icon: <AlertTriangle className="w-4 h-4" /> },
+                { id: 'create_invoice' as AdminTab, label: 'Create Invoice Form', icon: <Plus className="w-4 h-4" /> },
+                { id: 'disputes' as AdminTab, label: 'Disputes & Escrow Desk', icon: <ShieldAlert className="w-4 h-4" /> },
+              ].filter((tab) => canAccessAdminTab(currentUser, tab.id));
 
-            <div className="h-px bg-gray-100 my-2" />
-            <span className="text-[9px] font-bold text-gray-400 uppercase px-3 pb-1 block tracking-wider">Accounting Center</span>
-            {[
-              { id: 'payments_ledger', label: 'Payments Dashboard', icon: <AlertTriangle className="w-4 h-4" /> },
-              { id: 'create_invoice', label: 'Create Invoice Form', icon: <Plus className="w-4 h-4" /> },
-              { id: 'disputes', label: 'Disputes & Escrow Desk', icon: <ShieldAlert className="w-4 h-4" /> },
-            ].map(tab => (
-              <button
-                key={tab.id}
-                id={`admin-tab-${tab.id}`}
-                onClick={() => setActiveTab(tab.id as any)}
-                className={`flex w-full items-center gap-3 p-3 text-xs font-bold uppercase tracking-wider rounded-xl transition-all text-left ${
-                  activeTab === tab.id 
-                    ? 'bg-orange-500 text-white shadow-sm' 
-                    : 'text-gray-700 hover:bg-gray-100'
-                }`}
-              >
-                {tab.icon}
-                <span>{tab.label}</span>
-              </button>
-            ))}
+              const presenceTabs = [
+                { id: 'chats' as AdminTab, label: 'Operational Chats Room', icon: <MessageSquare className="w-4 h-4" /> },
+                { id: 'notifications' as AdminTab, label: 'Broadcast Notifications', icon: <Send className="w-4 h-4" /> },
+                { id: 'feedback' as AdminTab, label: 'Tutor Feedback Ledger', icon: <UserCheck className="w-4 h-4" /> },
+              ].filter((tab) => canAccessAdminTab(currentUser, tab.id));
 
-            <div className="h-px bg-gray-100 my-2" />
-            <span className="text-[9px] font-bold text-gray-400 uppercase px-3 pb-1 block tracking-wider">Presence & Feed</span>
-            {[
-              { id: 'chats', label: 'Operational Chats Room', icon: <MessageSquare className="w-4 h-4" /> },
-              { id: 'notifications', label: 'Broadcast Notifications', icon: <Send className="w-4 h-4" /> },
-              { id: 'feedback', label: 'Tutor Feedback Ledger', icon: <UserCheck className="w-4 h-4" /> },
-            ].map(tab => (
-              <button
-                key={tab.id}
-                id={`admin-tab-${tab.id}`}
-                onClick={() => setActiveTab(tab.id as any)}
-                className={`flex w-full items-center gap-3 p-3 text-xs font-bold uppercase tracking-wider rounded-xl transition-all text-left ${
-                  activeTab === tab.id 
-                    ? 'bg-orange-500 text-white shadow-sm' 
-                    : 'text-gray-700 hover:bg-gray-100'
-                }`}
-              >
-                {tab.icon}
-                <span>{tab.label}</span>
-              </button>
-            ))}
+              const cloudTabs = [
+                { id: 'trigger_emails' as AdminTab, label: 'Trigger Email Console', icon: <Mail className="w-4 h-4" /> },
+              ].filter((tab) => canAccessAdminTab(currentUser, tab.id));
 
-            <div className="h-px bg-gray-100 my-2" />
-            <span className="text-[9px] font-bold text-gray-400 uppercase px-3 pb-1 block tracking-wider">Cloud Extensions</span>
-            {[
-              { id: 'trigger_emails', label: 'Trigger Email Console', icon: <Mail className="w-4 h-4" /> },
-            ].map(tab => (
-              <button
-                key={tab.id}
-                id={`admin-tab-${tab.id}`}
-                onClick={() => setActiveTab(tab.id as any)}
-                className={`flex w-full items-center gap-3 p-3 text-xs font-bold uppercase tracking-wider rounded-xl transition-all text-left ${
-                  activeTab === tab.id 
-                    ? 'bg-orange-500 text-white shadow-sm' 
-                    : 'text-gray-700 hover:bg-gray-100'
-                }`}
-              >
-                {tab.icon}
-                <span>{tab.label}</span>
-              </button>
-            ))}
+              const platformTabs = [
+                { id: 'sops' as AdminTab, label: 'Standard SOPs Matrix', icon: <Settings className="w-4 h-4" /> },
+                { id: 'activity_log' as AdminTab, label: 'Live Audit Log Tracker', icon: <TrendingDown className="w-4 h-4" /> },
+                { id: 'blogs' as AdminTab, label: 'Blog Manager', icon: <BookOpen className="w-4 h-4" /> },
+                { id: 'faqs' as AdminTab, label: 'QA Helpdesk Center', icon: <HelpCircle className="w-4 h-4" /> },
+                { id: 'subjects' as AdminTab, label: 'Syllabus Subjects', icon: <Settings className="w-4 h-4" /> },
+              ].filter((tab) => canAccessAdminTab(currentUser, tab.id));
 
-            <div className="h-px bg-gray-100 my-2" />
-            <span className="text-[9px] font-bold text-gray-400 uppercase px-3 pb-1 block tracking-wider">Reference & Platform</span>
-            {[
-              { id: 'sops', label: 'Standard SOPs Matrix', icon: <Settings className="w-4 h-4" /> },
-              { id: 'activity_log', label: 'Live Audit Log Tracker', icon: <TrendingDown className="w-4 h-4" /> },
-              { id: 'blogs', label: 'Blog Manager', icon: <BookOpen className="w-4 h-4" /> },
-              { id: 'faqs', label: 'QA Helpdesk Center', icon: <HelpCircle className="w-4 h-4" /> },
-              { id: 'subjects', label: 'Syllabus Subjects', icon: <Settings className="w-4 h-4" /> }
-            ].map(tab => (
-              <button
-                key={tab.id}
-                id={`admin-tab-${tab.id}`}
-                onClick={() => setActiveTab(tab.id as any)}
-                className={`flex w-full items-center gap-3 p-3 text-xs font-bold uppercase tracking-wider rounded-xl transition-all text-left ${
-                  activeTab === tab.id 
-                    ? 'bg-orange-500 text-white shadow-sm' 
-                    : 'text-gray-700 hover:bg-gray-100'
-                }`}
-              >
-                {tab.icon}
-                <span>{tab.label}</span>
-              </button>
-            ))}
+              const sections = [
+                {
+                  key: 'academics',
+                  heading: 'Academics & Tutors',
+                  tabs: academicsTabs,
+                  extraAfter: hasModulePermission(currentUser, 'tutors') ? (
+                    <a
+                      href="/user-data"
+                      id="admin-link-user-data-page"
+                      className="flex w-full items-center justify-between p-2.5 px-3 text-xs font-bold text-orange-700 bg-orange-50 hover:bg-orange-100 rounded-xl transition-all border border-orange-200 shadow-2xs mt-1.5 mb-1 group"
+                      title="Open full standalone User Data page (/user-data)"
+                    >
+                      <div className="flex items-center gap-2">
+                        <UsersIcon className="w-3.5 h-3.5 text-orange-600" />
+                        <span className="uppercase tracking-wider text-[11px]">User Data Page</span>
+                      </div>
+                      <ExternalLink className="w-3.5 h-3.5 text-orange-500 group-hover:translate-x-0.5 transition-transform" />
+                    </a>
+                  ) : null,
+                },
+                { key: 'accounting', heading: 'Accounting Center', tabs: accountingTabs, extraAfter: null },
+                { key: 'presence', heading: 'Presence & Feed', tabs: presenceTabs, extraAfter: null },
+                { key: 'cloud', heading: 'Cloud Extensions', tabs: cloudTabs, extraAfter: null },
+                { key: 'platform', heading: 'Reference & Platform', tabs: platformTabs, extraAfter: null },
+              ].filter((sec) => sec.tabs.length > 0);
+
+              return (
+                <>
+                  {isSuperAdmin && (
+                    <>
+                      <span className="text-[9px] font-bold text-orange-600 uppercase px-3 pb-1 block tracking-wider">
+                        Access Control
+                      </span>
+                      <button
+                        id="admin-tab-subadmins"
+                        onClick={() => setActiveTab('subadmins')}
+                        className={`flex w-full items-center gap-3 p-3 text-xs font-bold uppercase tracking-wider rounded-xl transition-all text-left cursor-pointer ${
+                          activeTab === 'subadmins' && !deniedRouteAttempt
+                            ? 'bg-orange-500 text-white shadow-sm'
+                            : 'text-gray-700 hover:bg-orange-50 hover:text-orange-700'
+                        }`}
+                      >
+                        <ShieldCheck className="w-4 h-4" />
+                        <span>Sub-Admins & Permissions</span>
+                      </button>
+                      {sections.length > 0 && <div className="h-px bg-gray-100 my-2" />}
+                    </>
+                  )}
+
+                  {sections.length === 0 && !isSuperAdmin ? (
+                    <div className="p-4 text-center rounded-xl bg-amber-50 border border-amber-200 text-xs text-amber-900">
+                      <p className="font-bold">No Modules Assigned</p>
+                      <p className="text-[11px] text-amber-800 mt-1">
+                        Ask your Super Admin to assign permissions to your account.
+                      </p>
+                    </div>
+                  ) : (
+                    sections.map((section, idx) => (
+                      <React.Fragment key={section.key}>
+                        {idx > 0 && <div className="h-px bg-gray-100 my-2" />}
+                        <span className="text-[9px] font-bold text-gray-400 uppercase px-3 pb-1 block tracking-wider">
+                          {section.heading}
+                        </span>
+                        {section.tabs.map((tab) => (
+                          <button
+                            key={tab.id}
+                            id={`admin-tab-${tab.id}`}
+                            onClick={() => setActiveTab(tab.id)}
+                            className={`flex w-full items-center gap-3 p-3 text-xs font-bold uppercase tracking-wider rounded-xl transition-all text-left cursor-pointer ${
+                              activeTab === tab.id && !deniedRouteAttempt
+                                ? 'bg-orange-500 text-white shadow-sm'
+                                : 'text-gray-700 hover:bg-gray-100'
+                            }`}
+                          >
+                            {tab.icon}
+                            <span>{tab.label}</span>
+                            {tab.id === 'assignments' && assignments.length > 0 && (
+                              <span
+                                className={`ml-auto px-2 py-0.5 rounded-full text-[10px] font-bold tabular-nums ${
+                                  activeTab === tab.id && !deniedRouteAttempt
+                                    ? 'bg-white/25 text-white'
+                                    : 'bg-orange-100 text-orange-700'
+                                }`}
+                              >
+                                {assignments.length}
+                              </span>
+                            )}
+                          </button>
+                        ))}
+                        {section.extraAfter}
+                      </React.Fragment>
+                    ))
+                  )}
+                </>
+              );
+            })()}
           </div>
           </aside>
         )}
@@ -1310,50 +1244,101 @@ export default function AdminDashboard({
               : 'lg:col-span-3 space-y-6 min-w-0'
           }
         >
-          {/* Consistent Per-Page Expand Bar for all non-chat / non-ledger tabs in standard mode */}
-          {!isPageExpanded && activeTab !== 'chats' && activeTab !== 'assignments' && (
-            <div className="bg-white rounded-2xl border border-slate-200/80 px-4 py-3 flex flex-wrap items-center justify-between gap-3 shadow-2xs">
-              <div className="min-w-0 text-left">
-                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block leading-none">
-                  {activeTabInfo.group}
+          {deniedRouteAttempt || !canAccessAdminTab(currentUser, activeTab) ? (
+            <div
+              id="admin-access-denied"
+              className="bg-white rounded-3xl border border-rose-200 p-8 md:p-12 text-center shadow-xs space-y-4"
+            >
+              <div className="w-14 h-14 rounded-2xl bg-rose-50 border border-rose-200 flex items-center justify-center mx-auto text-rose-600">
+                <ShieldAlert className="w-7 h-7" />
+              </div>
+              <div className="space-y-1.5 max-w-md mx-auto">
+                <span className="text-[10px] font-mono font-bold uppercase tracking-widest text-rose-600">
+                  403 · Module Restricted
                 </span>
-                <h3 className="text-sm sm:text-base font-bold text-slate-900 truncate mt-1">
-                  {activeTabInfo.label}
-                </h3>
+                <h3 className="text-xl font-bold text-slate-900">Access Denied</h3>
+                <p className="text-xs text-slate-600 leading-relaxed">
+                  You do not have permission to view{' '}
+                  <span className="font-mono font-semibold text-slate-800">
+                    {deniedRouteAttempt || ADMIN_TAB_TO_ROUTE_PATH[activeTab] || activeTab}
+                  </span>
+                  . Only modules assigned by the Super Admin are accessible for your staff profile.
+                </p>
               </div>
-              <button
-                type="button"
-                onClick={() => setIsPageExpanded(true)}
-                className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-semibold bg-slate-900 hover:bg-slate-800 text-white shadow-2xs transition active:scale-95 cursor-pointer whitespace-nowrap shrink-0"
-              >
-                <Maximize2 className="w-3.5 h-3.5 text-orange-400" />
-                <span>Expand Full Page</span>
-              </button>
+              {(() => {
+                const firstPermitted = getFirstPermittedAdminTab(currentUser) as AdminTab | null;
+                if (!firstPermitted) return null;
+                const firstMeta = ADMIN_TAB_META.find((m) => m.id === firstPermitted);
+                return (
+                  <button
+                    type="button"
+                    id="admin-access-denied-redirect-btn"
+                    onClick={() => {
+                      setDeniedRouteAttempt(null);
+                      setActiveTab(firstPermitted);
+                    }}
+                    className="inline-flex items-center gap-2 bg-orange-500 hover:bg-orange-600 text-white text-xs font-bold px-5 py-2.5 rounded-xl transition cursor-pointer"
+                  >
+                    <span>Go to {firstMeta?.label || 'Permitted Workspace'}</span>
+                    <ArrowUpRight className="w-4 h-4" />
+                  </button>
+                );
+              })()}
             </div>
-          )}
+          ) : (
+            <>
+              {/* Consistent Per-Page Expand Bar for all non-chat / non-ledger tabs in standard mode */}
+              {!isPageExpanded && activeTab !== 'chats' && activeTab !== 'assignments' && activeTab !== 'subadmins' && !(activeTab === 'blogs' && editingStudioBlog !== null) && (
+                <div className="bg-white rounded-2xl border border-slate-200/80 px-4 py-3 flex flex-wrap items-center justify-between gap-3 shadow-2xs">
+                  <div className="min-w-0 text-left">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block leading-none">
+                      {activeTabInfo.group}
+                    </span>
+                    <h3 className="text-sm sm:text-base font-bold text-slate-900 truncate mt-1">
+                      {activeTabInfo.label}
+                    </h3>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setIsPageExpanded(true)}
+                    className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-semibold bg-slate-900 hover:bg-slate-800 text-white shadow-2xs transition active:scale-95 cursor-pointer whitespace-nowrap shrink-0"
+                  >
+                    <Maximize2 className="w-3.5 h-3.5 text-orange-400" />
+                    <span>Expand Full Page</span>
+                  </button>
+                </div>
+              )}
 
-          <ErrorBoundary compact resetKey={activeTab} onReset={() => onLoadTab?.(activeTab, true)}>
-            {tabStates[`admin:${activeTab}`]?.error && (
-              <ErrorStatePanel
-                title="Unable to load tab data"
-                message={tabStates[`admin:${activeTab}`]?.error || 'Request failed or timed out after 30 seconds.'}
-                onRetry={() => onLoadTab?.(activeTab, true)}
-              />
-            )}
+              <ErrorBoundary compact resetKey={activeTab} onReset={() => onLoadTab?.(activeTab, true)}>
+                {tabStates[`admin:${activeTab}`]?.error && (
+                  <ErrorStatePanel
+                    title="Unable to load tab data"
+                    message={tabStates[`admin:${activeTab}`]?.error || 'Request failed or timed out after 30 seconds.'}
+                    onRetry={() => onLoadTab?.(activeTab, true)}
+                  />
+                )}
 
-            {tabStates[`admin:${activeTab}`]?.loading &&
-              !tabStates[`admin:${activeTab}`]?.loadedAt &&
-              ((activeTab === 'assignments' && assignments.length === 0) ||
-                (activeTab === 'payments' && payments.length === 0) ||
-                (activeTab === 'chats' && chats.length === 0) ||
-                (['users', 'tutors_list', 'user_data', 'student_profiles'].includes(activeTab) && users.length === 0)) && (
-              <div className="mb-4">
-                <TabLoadingSkeleton rows={4} />
-              </div>
-            )}
-          
-          {/* STUDENT PROFILES DIRECTORY */}
-          {activeTab === 'student_profiles' && (
+                {tabStates[`admin:${activeTab}`]?.loading &&
+                  !tabStates[`admin:${activeTab}`]?.loadedAt &&
+                  ((activeTab === 'assignments' && assignments.length === 0) ||
+                    (activeTab === 'payments_ledger' && payments.length === 0) ||
+                    (activeTab === 'chats' && chats.length === 0) ||
+                    (['users', 'tutors_list', 'user_data', 'student_profiles'].includes(activeTab) && users.length === 0)) && (
+                  <div className="mb-4">
+                    <TabLoadingSkeleton rows={4} />
+                  </div>
+                )}
+
+                {/* SUB-ADMINS & PERMISSIONS RBAC MATRIX (SUPER ADMIN ONLY) */}
+                {activeTab === 'subadmins' && isSuperAdmin && (
+                  <AdminSubAdminsPanel
+                    currentUser={currentUser}
+                    onRefreshStore={() => onLoadTab?.('users', true)}
+                  />
+                )}
+              
+                {/* STUDENT PROFILES DIRECTORY */}
+                {activeTab === 'student_profiles' && (
             <StudentProfilesAdmin
               users={users}
               assignments={assignments}
@@ -1546,74 +1531,29 @@ export default function AdminDashboard({
                 )}
               </div>
 
-              {/* SPECIAL FEATURE: DEDICATED SUB-ADMIN CREATOR */}
-              <div className="bg-slate-900 text-white rounded-3xl border border-slate-800 p-6 shadow-xl animate-fade-in" id="dedicated-sub-admin-creator">
-                <div className="flex items-center gap-2.5">
-                  <div className="p-1.5 bg-orange-500 rounded-xl">
-                    <ShieldAlert className="w-5 h-5 text-white" />
-                  </div>
-                  <div>
-                    <h3 className="font-bold text-base text-white font-sans tracking-tight">Create Sub-Admin Administrator</h3>
-                    <p className="text-xs text-slate-300 mt-1 font-medium">Provision new administrative team members with full capability to manage tutor profiles, issue invoices, broadcast notifications, and safely respond to chats.</p>
-                  </div>
-                </div>
-
-                {!isSuperiorAdmin ? (
-                  <div className="mt-5 p-4 bg-slate-800/60 border border-slate-700/50 text-slate-100 text-xs rounded-2xl flex items-start gap-3">
-                    <span className="text-lg">🔒</span>
+              {/* SUB-ADMIN RBAC MANAGEMENT SHORTCUT (SUPER ADMIN) */}
+              {isSuperAdmin && (
+                <div className="bg-slate-900 text-white rounded-3xl border border-slate-800 p-6 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4" id="dedicated-sub-admin-creator">
+                  <div className="flex items-start gap-3">
+                    <div className="p-2 bg-orange-500 rounded-xl shrink-0">
+                      <ShieldCheck className="w-5 h-5 text-white" />
+                    </div>
                     <div>
-                      <p className="font-bold font-sans text-orange-400">Restricted to Superior Admin Only</p>
-                      <p className="text-[11px] text-slate-300/90 mt-0.5 leading-normal">Sub-admin registration keys can only be provisioned by the Superior Admin (<span className="font-semibold text-orange-400 font-mono">shaka.ahmadd@gmail.com</span>).</p>
+                      <h3 className="font-bold text-base text-white font-sans tracking-tight">Sub-Admins &amp; Granular Permissions</h3>
+                      <p className="text-xs text-slate-300 mt-1">
+                        Create sub-admin staff accounts, assign module-level permissions (Blog Studio, Chats, Orders, Tutors, Payments, Settings), or suspend access immediately.
+                      </p>
                     </div>
                   </div>
-                ) : (
-                  <form onSubmit={handleCreateSubAdminSubmit} className="mt-5 space-y-4">
-                    {subAdminError && (
-                      <div className="bg-red-500/10 text-red-300 p-3 rounded-xl text-xs font-semibold border border-red-500/20">
-                        {subAdminError}
-                      </div>
-                    )}
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div>
-                        <label className="text-[10px] uppercase tracking-wider font-bold text-slate-300 block mb-1.5">Sub-Admin Name</label>
-                        <input 
-                          type="text"
-                          placeholder="e.g. Inspector Arthur Pendelton"
-                          value={subAdminName}
-                          onChange={(e) => setSubAdminName(e.target.value)}
-                          className="w-full bg-slate-800 border border-slate-700 text-white py-2 px-3.5 rounded-xl text-xs focus:outline-hidden focus:border-orange-500 focus:bg-slate-800"
-                          required
-                        />
-                      </div>
-
-                      <div>
-                        <label className="text-[10px] uppercase tracking-wider font-bold text-slate-300 block mb-1.5">Operational Email Address</label>
-                        <input 
-                          type="email"
-                          placeholder="e.g. arthur.admin@universitytutors.com"
-                          value={subAdminEmail}
-                          onChange={(e) => setSubAdminEmail(e.target.value)}
-                          className="w-full bg-slate-800 border border-slate-700 text-white py-2 px-3.5 rounded-xl text-xs focus:outline-hidden focus:border-orange-500 focus:bg-slate-800"
-                          required
-                        />
-                      </div>
-                    </div>
-
-                    <div className="flex flex-col sm:flex-row gap-3 justify-between items-start sm:items-center pt-2">
-                      <div className="text-[11px] text-slate-400 font-medium">
-                        🔒 Sub-Admins are verified and granted structural privileges immediately upon creation.
-                      </div>
-                      <button
-                        type="submit"
-                        className="bg-orange-500 hover:bg-orange-600 active:scale-97 text-white font-bold text-xs py-2.5 px-6 rounded-xl transition-all shadow-md shadow-orange-500/10 cursor-pointer"
-                      >
-                        Create Sub-Admin Account
-                      </button>
-                    </div>
-                  </form>
-                )}
-              </div>
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab('subadmins')}
+                    className="bg-orange-500 hover:bg-orange-600 text-white font-bold text-xs px-5 py-2.5 rounded-xl transition cursor-pointer whitespace-nowrap shrink-0"
+                  >
+                    Open Sub-Admins Matrix
+                  </button>
+                </div>
+              )}
 
 
 
@@ -1883,6 +1823,7 @@ export default function AdminDashboard({
                                     >
                                       <option value={UserRole.STUDENT}>STUDENT</option>
                                       <option value={UserRole.TUTOR}>TUTOR</option>
+                                      <option value={UserRole.SUBADMIN}>SUB-ADMIN</option>
                                       <option value={UserRole.ADMIN}>ADMIN</option>
                                     </select>
                                   )}
@@ -3633,28 +3574,29 @@ export default function AdminDashboard({
             </div>
           )}
 
-          {/* CONTENT MANAGER (BLOGS) */}
+          {/* CONTENT MANAGER (BLOGS / BLOG STUDIO) */}
           {activeTab === 'blogs' && (
+            editingStudioBlog !== null ? (
+              <AdminBlogStudio
+                initialBlog={editingStudioBlog === 'new' ? null : editingStudioBlog}
+                currentUserName={currentUser.name}
+                onBack={() => setEditingStudioBlog(null)}
+                onSaveBlog={handleSaveStudioBlog}
+              />
+            ) : (
             <div className="space-y-6" id="admin-blogs-content-manager">
               {/* Blog Manager Header */}
-              <div className="bg-white rounded-3xl border border-gray-150 p-6 shadow-xs text-left animate-fade-in">
+              <div className="bg-white rounded-3xl border border-slate-200 p-6 shadow-xs text-left">
                 <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                   <div>
-                    <h3 className="font-bold text-base text-gray-950 font-sans tracking-tight">University Blog Manager Desk</h3>
-                    <p className="text-xs text-gray-400 mt-1 font-medium">Audit, compose, edit, or delete student-facing blogs and educational articles directly within PostgreSQL.</p>
+                    <h3 className="font-bold text-base text-slate-900 font-sans tracking-tight">University Blog Studio &amp; Articles Directory</h3>
+                    <p className="text-xs text-slate-500 mt-1 font-medium">Compose, audit, optimize SEO metadata, and publish student-facing educational articles.</p>
                   </div>
                   
                   {/* Action Controls Panel */}
                   <div className="flex flex-wrap items-center gap-3 shrink-0">
                     <button
-                      onClick={() => {
-                        setEditingBlogId(null);
-                        setBlogTitle('');
-                        setBlogContent('');
-                        setBlogImg('https://images.unsplash.com/photo-1511629091441-ee46146481b6?w=400');
-                        setBlogTags('oxford, referencing, mla');
-                        setIsBlogModalOpen(true);
-                      }}
+                      onClick={() => setEditingStudioBlog('new')}
                       id="admin-create-blog-modal-btn"
                       className="flex items-center gap-2 bg-orange-500 hover:bg-orange-600 text-white text-xs font-bold px-4 py-2.5 rounded-xl transition-all shadow-sm cursor-pointer shadow-orange-500/10"
                     >
@@ -3663,45 +3605,71 @@ export default function AdminDashboard({
                     </button>
 
                     <button
-                      onClick={async () => {
-                        if (confirm("Are you sure you want to restore and overwrite the 20 default educational blogs? This will ensure all default blog posts are updated in the database.")) {
-                          if (onSyncDefaultBlogs) {
-                            const ok = await onSyncDefaultBlogs();
-                            if (ok) {
-                              alert("All 20 default blogs have been successfully synchronized and updated in PostgreSQL!");
-                            } else {
-                              alert("Failed to synchronize blogs with the database.");
-                            }
-                          }
-                        }
-                      }}
+                      onClick={() => setConfirmSyncDefaultBlogs(true)}
                       id="admin-sync-blogs-btn"
-                      className="flex items-center gap-2 bg-gray-55 hover:bg-gray-100 text-gray-700 text-xs font-bold px-4 py-2.5 rounded-xl transition-all cursor-pointer border border-gray-200"
+                      className="flex items-center gap-2 bg-slate-50 hover:bg-slate-100 text-slate-700 text-xs font-bold px-4 py-2.5 rounded-xl transition-all cursor-pointer border border-slate-200"
                     >
-                      <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 1121.21 7.89M9 11l3-3 3 3m-3-3v12" />
-                      </svg>
+                      <RefreshCw className={`w-3.5 h-3.5 text-slate-600 ${isSyncingDefaultBlogs ? 'animate-spin' : ''}`} />
                       <span>Sync 20 Default Blogs</span>
                     </button>
                   </div>
                 </div>
 
+                {confirmSyncDefaultBlogs && (
+                  <div className="mt-4 p-4 rounded-2xl bg-orange-50 border border-orange-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div className="text-xs text-orange-950">
+                      <p className="font-bold">Restore 20 Default Educational Articles?</p>
+                      <p className="text-[11px] text-orange-800 mt-0.5">This updates and restores all 20 default articles in the database.</p>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => setConfirmSyncDefaultBlogs(false)}
+                        className="px-3 py-1.5 rounded-lg border border-orange-200 bg-white text-slate-700 text-xs font-semibold hover:bg-slate-50 cursor-pointer"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="button"
+                        disabled={isSyncingDefaultBlogs}
+                        onClick={async () => {
+                          if (!onSyncDefaultBlogs) return;
+                          setIsSyncingDefaultBlogs(true);
+                          try {
+                            const ok = await onSyncDefaultBlogs();
+                            setConfirmSyncDefaultBlogs(false);
+                            setSelectedActionSuccess(
+                              ok ? 'All 20 default blogs synchronized cleanly!' : 'Failed to synchronize default blogs.'
+                            );
+                            setTimeout(() => setSelectedActionSuccess(null), 4000);
+                          } finally {
+                            setIsSyncingDefaultBlogs(false);
+                          }
+                        }}
+                        className="px-3.5 py-1.5 rounded-lg bg-orange-500 hover:bg-orange-600 text-white text-xs font-bold cursor-pointer disabled:opacity-50"
+                      >
+                        {isSyncingDefaultBlogs ? 'Syncing...' : 'Confirm Sync'}
+                      </button>
+                    </div>
+                  </div>
+                )}
+
                 {/* Dashboard Stats */}
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-6 border-t pt-6 border-dashed border-gray-150">
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-6 border-t pt-6 border-dashed border-slate-200 tabular-nums">
                   <div className="bg-orange-50 border border-orange-100 p-4 rounded-2xl">
-                    <span className="text-xs text-orange-600 block font-bold uppercase tracking-wider">Total Articles</span>
+                    <span className="text-xs text-orange-700 block font-bold uppercase tracking-wider">Total Articles</span>
                     <span className="text-2xl font-bold font-mono text-orange-950 block mt-1">{blogs.length}</span>
                   </div>
                   <div className="bg-blue-50 border border-blue-100 p-4 rounded-2xl">
-                    <span className="text-xs text-blue-600 block font-bold uppercase tracking-wider">Survival Guides</span>
+                    <span className="text-xs text-blue-700 block font-bold uppercase tracking-wider">Survival Guides</span>
                     <span className="text-2xl font-bold font-mono text-blue-950 block mt-1">{blogs.filter(b => b.category === 'University Survival').length}</span>
                   </div>
                   <div className="bg-emerald-50 border border-emerald-100 p-4 rounded-2xl">
-                    <span className="text-xs text-emerald-600 block font-bold uppercase tracking-wider">APA Formats</span>
+                    <span className="text-xs text-emerald-700 block font-bold uppercase tracking-wider">APA Formats</span>
                     <span className="text-2xl font-bold font-mono text-emerald-950 block mt-1">{blogs.filter(b => b.category === 'APA Guidelines').length}</span>
                   </div>
                   <div className="bg-purple-50 border border-purple-100 p-4 rounded-2xl">
-                    <span className="text-xs text-purple-600 block font-bold uppercase tracking-wider">Other Topics</span>
+                    <span className="text-xs text-purple-700 block font-bold uppercase tracking-wider">Other Topics</span>
                     <span className="text-2xl font-bold font-mono text-purple-950 block mt-1">{blogs.filter(b => b.category !== 'University Survival' && b.category !== 'APA Guidelines').length}</span>
                   </div>
                 </div>
@@ -3723,9 +3691,9 @@ export default function AdminDashboard({
                 });
 
                 return (
-                  <div className="bg-white rounded-3xl border border-gray-150 overflow-hidden shadow-xs p-6 md:p-8 space-y-6">
+                  <div className="bg-white rounded-3xl border border-slate-200 overflow-hidden shadow-xs p-6 md:p-8 space-y-6">
                     {/* Filter & View Mode Controls Toolbar */}
-                    <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-5 border-b border-gray-100">
+                    <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-5 border-b border-slate-100">
                       <div className="flex flex-col sm:flex-row sm:items-center gap-3 w-full lg:max-w-2xl">
                         {/* Search Input */}
                         <div className="relative flex-1">
@@ -3740,7 +3708,7 @@ export default function AdminDashboard({
                         </div>
 
                         {/* Category Dropdown */}
-                        <div className="w-full sm:w-48">
+                        <div className="w-full sm:w-56">
                           <select
                             value={blogCategoryFilter}
                             onChange={(e) => setBlogCategoryFilter(e.target.value)}
@@ -3751,6 +3719,10 @@ export default function AdminDashboard({
                             <option value="APA Guidelines">APA Guidelines</option>
                             <option value="Mathematics Tricks">Mathematics Tricks</option>
                             <option value="Legal Disclaimers">Legal Disclaimers</option>
+                            <option value="Academic Mentorship">Academic Mentorship</option>
+                            <option value="Exam Preparation">Exam Preparation</option>
+                            <option value="Research & Dissertations">Research &amp; Dissertations</option>
+                            <option value="Essay Writing & Referencing">Essay Writing &amp; Referencing</option>
                           </select>
                         </div>
                       </div>
@@ -3786,9 +3758,39 @@ export default function AdminDashboard({
                       </div>
                     </div>
 
+                    {confirmDeleteBlog && (
+                      <div className="p-4 rounded-2xl bg-rose-50 border border-rose-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                        <div className="text-xs text-rose-950">
+                          <p className="font-bold">Delete Article &ldquo;{confirmDeleteBlog.title}&rdquo;?</p>
+                          <p className="text-[11px] text-rose-800 mt-0.5">This permanently removes the article from the blog directory.</p>
+                        </div>
+                        <div className="flex items-center gap-2 shrink-0">
+                          <button
+                            type="button"
+                            onClick={() => setConfirmDeleteBlog(null)}
+                            className="px-3 py-1.5 rounded-lg border border-rose-200 bg-white text-slate-700 text-xs font-semibold hover:bg-slate-50 cursor-pointer"
+                          >
+                            Cancel
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              onDeleteBlog(confirmDeleteBlog.id);
+                              setSelectedActionSuccess(`Deleted "${confirmDeleteBlog.title}".`);
+                              setConfirmDeleteBlog(null);
+                              setTimeout(() => setSelectedActionSuccess(null), 4000);
+                            }}
+                            className="px-3.5 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold cursor-pointer"
+                          >
+                            Delete Permanently
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
                     {/* Results Count Summary */}
                     <div className="flex justify-between items-center text-xs text-gray-500">
-                      <span>Showing <strong>{filteredBlogs.length}</strong> of {blogs.length} published articles</span>
+                      <span>Showing <strong className="tabular-nums">{filteredBlogs.length}</strong> of {blogs.length} published articles</span>
                       {blogCategoryFilter !== 'All' && (
                         <span className="bg-orange-50 text-orange-700 px-2 py-0.5 rounded-md font-medium text-[10px]">
                           Category: {blogCategoryFilter}
@@ -3817,7 +3819,6 @@ export default function AdminDashboard({
                           </thead>
                           <tbody className="divide-y divide-gray-100">
                             {filteredBlogs.map(b => {
-                              // Define beautiful pastel badges for categories
                               let catBadgeClass = "bg-gray-50 text-gray-700 border-gray-200";
                               if (b.category === "University Survival") {
                                 catBadgeClass = "bg-blue-50 text-blue-700 border-blue-100";
@@ -3834,19 +3835,19 @@ export default function AdminDashboard({
                                   <td className="py-4 px-4 max-w-sm">
                                     <div className="flex items-start gap-3">
                                       <ResponsiveAvatar
-                                        src={b.image || 'https://images.unsplash.com/photo-1511629091441-ee46146481b6?w=120'}
-                                        alt={b.title}
+                                        src={b.image || b.imageUrl || 'https://images.unsplash.com/photo-1511629091441-ee46146481b6?w=120'}
+                                        alt={b.altText || b.title}
                                         sizePx={48}
                                         className="w-12 h-12 rounded-xl object-cover border border-gray-150 shrink-0 shadow-xs"
                                       />
                                       <div className="space-y-0.5">
                                         <h4 className="font-bold text-gray-950 group-hover:text-orange-600 transition-colors line-clamp-1">{b.title}</h4>
-                                        <p className="text-gray-500 text-[11px] leading-normal line-clamp-2">{b.content}</p>
+                                        <p className="text-gray-500 text-[11px] leading-normal line-clamp-2">{b.excerpt || b.content}</p>
                                       </div>
                                     </div>
                                   </td>
                                   <td className="py-4 px-4 whitespace-nowrap">
-                                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${catBadgeClass}`}>
+                                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-md text-[10px] font-bold border ${catBadgeClass}`}>
                                       {b.category}
                                     </span>
                                   </td>
@@ -3866,27 +3867,15 @@ export default function AdminDashboard({
                                     <div className="flex items-center justify-end gap-1.5">
                                       <button
                                         id={`admin-table-edit-blog-${b.id}`}
-                                        onClick={() => {
-                                          setEditingBlogId(b.id);
-                                          setBlogTitle(b.title);
-                                          setBlogImg(b.image);
-                                          setBlogCat(b.category);
-                                          setBlogContent(b.content);
-                                          setBlogTags(b.tags.join(', '));
-                                          setIsBlogModalOpen(true);
-                                        }}
+                                        onClick={() => setEditingStudioBlog(b)}
                                         className="text-blue-600 bg-blue-50 hover:bg-blue-100 font-bold p-2 rounded-xl transition-all cursor-pointer"
-                                        title="Edit Article parameters"
+                                        title="Open in Blog Studio"
                                       >
                                         <Edit3 className="w-3.5 h-3.5" />
                                       </button>
                                       <button
                                         id={`admin-table-delete-blog-${b.id}`}
-                                        onClick={() => {
-                                          if (confirm(`Are you absolutely sure you want to permanently delete blog "${b.title}"?`)) {
-                                            onDeleteBlog(b.id);
-                                          }
-                                        }}
+                                        onClick={() => setConfirmDeleteBlog(b)}
                                         className="text-rose-600 bg-rose-50 hover:bg-rose-100 font-bold p-2 rounded-xl transition-all cursor-pointer"
                                         title="Delete Article permanently"
                                       >
@@ -3909,8 +3898,8 @@ export default function AdminDashboard({
                               {/* Card Header Thumbnail & Tag */}
                               <div className="relative h-44 w-full bg-gray-100 overflow-hidden">
                                 <ResponsivePicture
-                                  src={b.image}
-                                  alt={b.title}
+                                  src={b.image || b.imageUrl}
+                                  alt={b.altText || b.title}
                                   width={480}
                                   height={176}
                                   loading="lazy"
@@ -3926,7 +3915,7 @@ export default function AdminDashboard({
                               {/* Card Body */}
                               <div className="p-5 text-left space-y-2">
                                 <h4 className="font-bold text-gray-900 text-sm tracking-tight line-clamp-1">{b.title}</h4>
-                                <p className="text-gray-500 text-xs leading-relaxed line-clamp-2">{b.content}</p>
+                                <p className="text-gray-500 text-xs leading-relaxed line-clamp-2">{b.excerpt || b.content}</p>
                                 
                                 {/* Tags */}
                                 <div className="flex flex-wrap gap-1 pt-1">
@@ -3945,28 +3934,16 @@ export default function AdminDashboard({
                               <div className="flex items-center gap-1.5">
                                 <button
                                   id={`admin-edit-blog-${b.id}`}
-                                  onClick={() => {
-                                    setEditingBlogId(b.id);
-                                    setBlogTitle(b.title);
-                                    setBlogImg(b.image);
-                                    setBlogCat(b.category);
-                                    setBlogContent(b.content);
-                                    setBlogTags(b.tags.join(', '));
-                                    setIsBlogModalOpen(true);
-                                  }}
+                                  onClick={() => setEditingStudioBlog(b)}
                                   className="flex items-center gap-1 text-blue-600 bg-blue-50 hover:bg-blue-100 font-bold px-3 py-1.5 rounded-lg text-[10.5px] transition-all cursor-pointer"
-                                  title="Edit article parameters"
+                                  title="Open in Blog Studio"
                                 >
                                   <Edit3 className="w-3 h-3" />
                                   <span>Edit</span>
                                 </button>
                                 <button
                                   id={`admin-delete-blog-${b.id}`}
-                                  onClick={() => {
-                                    if (confirm(`Are you absolutely sure you want to permanently delete blog "${b.title}"?`)) {
-                                      onDeleteBlog(b.id);
-                                    }
-                                  }}
+                                  onClick={() => setConfirmDeleteBlog(b)}
                                   className="flex items-center gap-1 text-rose-600 bg-rose-50 hover:bg-rose-100 font-bold px-3 py-1.5 rounded-lg text-[10.5px] transition-all cursor-pointer"
                                   title="Delete article permanently"
                                 >
@@ -3982,302 +3959,8 @@ export default function AdminDashboard({
                   </div>
                 );
               })()}
-
-              {/* INTERACTIVE PREMIUM BLOG FORM MODAL */}
-              {isBlogModalOpen && (
-                <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fade-in" id="admin-blog-modal-backdrop">
-                  <div className="bg-white rounded-3xl max-w-4xl w-full p-6 md:p-8 relative border border-gray-100 shadow-2xl overflow-y-auto max-h-[92vh] text-left animate-slide-up" id="admin-blog-modal-container">
-                    {/* Modal Close Button */}
-                    <button
-                      id="admin-blog-modal-close"
-                      onClick={() => {
-                        setIsBlogModalOpen(false);
-                        setEditingBlogId(null);
-                        setBlogTitle('');
-                        setBlogContent('');
-                        setBlogImg('https://images.unsplash.com/photo-1511629091441-ee46146481b6?w=400');
-                        setBlogTags('oxford, referencing, mla');
-                        setSelectedTemplate('none');
-                        setEditorActiveTab('write');
-                      }}
-                      className="absolute top-5 right-5 text-gray-400 hover:text-gray-600 p-1.5 hover:bg-gray-100 rounded-full transition-all cursor-pointer"
-                    >
-                      <X className="w-5 h-5" />
-                    </button>
-                    
-                    {/* Modal Header */}
-                    <div className="mb-6">
-                      <span className="text-[10px] font-mono tracking-widest text-orange-500 font-bold block uppercase mb-1">
-                        {editingBlogId ? 'Database Entry Editor' : 'Create Database Entry'}
-                      </span>
-                      <h3 className="font-bold text-lg text-gray-950 font-sans tracking-tight">
-                        {editingBlogId ? 'Update Educational Blog' : 'Write New Blog Article'}
-                      </h3>
-                      <p className="text-xs text-gray-450 mt-1 font-medium leading-relaxed">
-                        Fill out the metadata, inject pre-built academic outlines, and write formatted educational material inside our premium Markdown workspace.
-                      </p>
-                    </div>
-
-                    {/* Pre-made Templates Selection Row */}
-                    <div className="bg-orange-50/50 rounded-2xl border border-orange-100/70 p-4 mb-6 flex flex-col md:flex-row items-start md:items-center justify-between gap-3">
-                      <div>
-                        <h4 className="text-xs font-bold text-orange-950 flex items-center gap-1.5">
-                          <Sparkles className="w-3.5 h-3.5 text-orange-500" />
-                          <span>Academic Outlines & Templates</span>
-                        </h4>
-                        <p className="text-[10.5px] text-gray-500 mt-0.5">Quickly seed the editor workspace with structured templates.</p>
-                      </div>
-                      <div className="w-full md:w-64 shrink-0">
-                        <select
-                          value={selectedTemplate}
-                          onChange={(e) => handleTemplateSelect(e.target.value)}
-                          className="w-full bg-white border border-orange-200 focus:border-orange-500 py-1.5 px-3 rounded-lg text-xs font-semibold focus:outline-hidden"
-                        >
-                          <option value="none">-- Select Template Outline --</option>
-                          <option value="apa_guide">APA 7th Citation Style Guide</option>
-                          <option value="exam_prep">Scientific Study Interval Sheet</option>
-                          <option value="dissertation">Thesis Framework Structure</option>
-                        </select>
-                      </div>
-                    </div>
-                    
-                    {/* Modal Form */}
-                    <form onSubmit={handleBlogSubmit} className="space-y-4">
-                      {/* Meta Inputs Grid */}
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs text-left">
-                        <div>
-                          <label htmlFor="admin-blog-input-title" className="text-[10px] font-bold text-gray-700 block mb-1 font-sans uppercase tracking-wider">Article Title *</label>
-                          <input 
-                            type="text" 
-                            required 
-                            id="admin-blog-input-title"
-                            value={blogTitle} 
-                            onChange={(e) => setBlogTitle(e.target.value)}
-                            placeholder="e.g. MLA Formats Survival Guide" 
-                            className="w-full bg-gray-50 border border-gray-200 focus:bg-white focus:border-orange-500 py-2.5 px-3.5 rounded-xl text-xs font-semibold focus:outline-hidden transition-all" 
-                          />
-                        </div>
-                        <div>
-                          <label htmlFor="admin-blog-input-img" className="text-[10px] font-bold text-gray-700 block mb-1 font-sans uppercase tracking-wider">Image Theme URL *</label>
-                          <input 
-                            type="text" 
-                            required 
-                            id="admin-blog-input-img"
-                            value={blogImg} 
-                            onChange={(e) => setBlogImg(e.target.value)}
-                            className="w-full bg-gray-50 border border-gray-200 focus:bg-white focus:border-orange-500 py-2.5 px-3.5 rounded-xl text-xs font-semibold focus:outline-hidden transition-all" 
-                          />
-                        </div>
-                      </div>
-
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs text-left">
-                        <div>
-                          <label htmlFor="admin-blog-select-category" className="text-[10px] font-bold text-gray-700 block mb-1 font-sans uppercase tracking-wider">Blog Category Focus *</label>
-                          <select 
-                            id="admin-blog-select-category"
-                            value={blogCat} 
-                            onChange={(e) => setBlogCat(e.target.value)}
-                            className="w-full bg-gray-55 border border-gray-200 py-2.5 px-3.5 rounded-xl text-xs font-semibold font-sans focus:outline-hidden focus:border-orange-500"
-                          >
-                            <option value="University Survival">University Survival</option>
-                            <option value="APA Guidelines">APA Guidelines</option>
-                            <option value="Mathematics Tricks">Mathematics Tricks</option>
-                            <option value="Legal Disclaimers">Legal Disclaimers</option>
-                          </select>
-                        </div>
-                        <div>
-                          <label htmlFor="admin-blog-input-tags" className="text-[10px] font-bold text-gray-700 block mb-1 font-sans uppercase tracking-wider">Comma Separated Tags *</label>
-                          <input 
-                            type="text" 
-                            required 
-                            id="admin-blog-input-tags"
-                            value={blogTags} 
-                            onChange={(e) => setBlogTags(e.target.value)}
-                            placeholder="referencing, chicago, oxford" 
-                            className="w-full bg-gray-50 border border-gray-200 focus:bg-white focus:border-orange-500 py-2.5 px-3.5 rounded-xl text-xs font-semibold focus:outline-hidden transition-all" 
-                          />
-                        </div>
-                      </div>
-
-                      {/* PREMIUM WORKSPACE TABBED EDITOR & TOOLBAR */}
-                      <div className="border border-gray-200 rounded-2xl overflow-hidden mt-2 bg-gray-50/20">
-                        {/* Tab Toggle Header */}
-                        <div className="bg-gray-50/80 px-4 py-2 border-b border-gray-200 flex flex-wrap items-center justify-between gap-3">
-                          <div className="flex items-center gap-1.5 bg-gray-200 p-0.5 rounded-lg">
-                            <button
-                              type="button"
-                              onClick={() => setEditorActiveTab('write')}
-                              className={`px-3 py-1 rounded-md text-[10.5px] font-bold cursor-pointer transition-all ${
-                                editorActiveTab === 'write' ? 'bg-white text-gray-950 shadow-xs' : 'text-gray-500 hover:text-gray-850'
-                              }`}
-                            >
-                              Compose Text
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => setEditorActiveTab('preview')}
-                              className={`px-3 py-1 rounded-md text-[10.5px] font-bold cursor-pointer transition-all ${
-                                editorActiveTab === 'preview' ? 'bg-white text-gray-950 shadow-xs' : 'text-gray-500 hover:text-gray-850'
-                              }`}
-                            >
-                              Live Markdown Preview
-                            </button>
-                          </div>
-
-                          {/* Character & Word counter */}
-                          <div className="text-[10px] font-mono text-gray-400 font-bold">
-                            {blogContent.trim() === '' ? 0 : blogContent.trim().split(/\s+/).length} Words | {blogContent.length} Characters
-                          </div>
-                        </div>
-
-                        {/* Compose Workspace */}
-                        {editorActiveTab === 'write' ? (
-                          <div className="space-y-0.5">
-                            {/* Formatting Markdown Toolbar */}
-                            <div className="px-3 py-1.5 bg-gray-50/50 border-b border-gray-200 flex flex-wrap items-center gap-1">
-                              <button
-                                type="button"
-                                onClick={() => handleToolbarClick('bold')}
-                                className="px-2 py-1 rounded hover:bg-gray-200 text-xs font-bold text-gray-800 transition-all cursor-pointer"
-                                title="Bold (**bold**)"
-                              >
-                                B
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => handleToolbarClick('italic')}
-                                className="px-2 py-1 rounded hover:bg-gray-200 text-xs italic text-gray-800 transition-all cursor-pointer"
-                                title="Italic (*italic*)"
-                              >
-                                I
-                              </button>
-                              <div className="h-4 w-px bg-gray-200 mx-1"></div>
-                              <button
-                                type="button"
-                                onClick={() => handleToolbarClick('h2')}
-                                className="px-2 py-1 rounded hover:bg-gray-200 text-xs font-extrabold text-gray-800 transition-all cursor-pointer"
-                                title="Heading 2 (## Title)"
-                              >
-                                H2
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => handleToolbarClick('h3')}
-                                className="px-2 py-1 rounded hover:bg-gray-200 text-xs font-extrabold text-gray-800 transition-all cursor-pointer"
-                                title="Heading 3 (### Subtitle)"
-                              >
-                                H3
-                              </button>
-                              <div className="h-4 w-px bg-gray-200 mx-1"></div>
-                              <button
-                                type="button"
-                                onClick={() => handleToolbarClick('bullet')}
-                                className="px-2 py-1 rounded hover:bg-gray-200 text-xs font-bold text-gray-800 transition-all cursor-pointer"
-                                title="Bullet List (- item)"
-                              >
-                                • List
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => handleToolbarClick('number')}
-                                className="px-2 py-1 rounded hover:bg-gray-200 text-xs font-bold text-gray-800 transition-all cursor-pointer"
-                                title="Numbered List (1. item)"
-                              >
-                                1. List
-                              </button>
-                              <div className="h-4 w-px bg-gray-200 mx-1"></div>
-                              <button
-                                type="button"
-                                onClick={() => handleToolbarClick('code')}
-                                className="px-2 py-1 rounded hover:bg-gray-200 text-[10px] font-mono text-rose-600 font-bold transition-all cursor-pointer"
-                                title="Code Block (```)"
-                              >
-                                &lt;/&gt; Code
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => handleToolbarClick('quote')}
-                                className="px-2 py-1 rounded hover:bg-gray-200 text-xs font-bold text-gray-850 transition-all cursor-pointer"
-                                title="Blockquote (&gt; text)"
-                              >
-                                “ Quote
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => handleToolbarClick('link')}
-                                className="px-2 py-1 rounded hover:bg-gray-200 text-xs font-bold text-orange-600 transition-all cursor-pointer"
-                                title="Insert Link ([text](url))"
-                              >
-                                🔗 Link
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => handleToolbarClick('hr')}
-                                className="px-2 py-1 rounded hover:bg-gray-200 text-xs font-bold text-gray-500 transition-all cursor-pointer"
-                                title="Horizontal rule (---)"
-                              >
-                                — Rule
-                              </button>
-                            </div>
-
-                            <textarea 
-                              required 
-                              ref={textareaRef}
-                              id="admin-blog-textarea-content"
-                              rows={10} 
-                              value={blogContent} 
-                              onChange={(e) => setBlogContent(e.target.value)}
-                              placeholder="Write beautiful educational details here. Markdown syntax is fully supported..." 
-                              className="w-full bg-white px-4 py-3.5 text-xs font-semibold focus:outline-hidden font-sans border-0 resize-y min-h-[220px]" 
-                            />
-                          </div>
-                        ) : (
-                          /* LIVE PREVIEW CANVAS PANEL */
-                          <div className="bg-white p-5 min-h-[280px] overflow-y-auto max-h-[400px]">
-                            <div className="text-xs text-gray-400 font-mono font-bold uppercase tracking-wider pb-2 border-b border-gray-100 mb-4 flex justify-between items-center">
-                              <span>Article Preview Screen</span>
-                              <span className="bg-orange-50 text-orange-600 text-[8.5px] px-1.5 py-0.5 rounded-sm">Processed HTML</span>
-                            </div>
-                            <div 
-                              className="text-left select-text markdown-body"
-                              dangerouslySetInnerHTML={{ __html: parseMarkdownToHtml(blogContent) }}
-                            />
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Modal Footer Controls */}
-                      <div className="flex gap-2.5 justify-end pt-4 border-t border-gray-100 mt-6">
-                        <button
-                          type="button"
-                          id="admin-blog-modal-cancel"
-                          onClick={() => {
-                            setIsBlogModalOpen(false);
-                            setEditingBlogId(null);
-                            setBlogTitle('');
-                            setBlogContent('');
-                            setBlogImg('https://images.unsplash.com/photo-1511629091441-ee46146481b6?w=400');
-                            setBlogTags('oxford, referencing, mla');
-                            setSelectedTemplate('none');
-                            setEditorActiveTab('write');
-                          }}
-                          className="bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold text-xs px-5 py-2.5 rounded-xl cursor-pointer transition-all"
-                        >
-                          Cancel
-                        </button>
-                        <button
-                          type="submit"
-                          id="admin-blog-modal-submit"
-                          className="bg-orange-500 hover:bg-orange-600 text-white font-bold text-xs px-5 py-2.5 rounded-xl shadow-lg shadow-orange-500/10 cursor-pointer transition-all"
-                        >
-                          {editingBlogId ? 'Save Article Changes' : 'Publish Article Post'}
-                        </button>
-                      </div>
-                    </form>
-                  </div>
-                </div>
-              )}
             </div>
+            )
           )}
 
           {/* SANDBOX FAQs MANAGEMENT */}
@@ -4647,6 +4330,8 @@ export default function AdminDashboard({
           )}
 
           </ErrorBoundary>
+            </>
+          )}
         </div>
 
       </div>

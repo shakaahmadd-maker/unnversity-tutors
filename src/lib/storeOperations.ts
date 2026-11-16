@@ -23,6 +23,12 @@ import {
   clearTabDiagnosticError,
 } from './apiClient';
 import type { AppStore } from './store';
+import {
+  canAccessAdminTab,
+  hasModulePermission,
+  isStaffUser,
+  parsePermissions,
+} from './adminPermissions';
 
 export async function loadDashboardTabData(
   store: AppStore,
@@ -31,6 +37,9 @@ export async function loadDashboardTabData(
   options?: { force?: boolean; page?: number; limit?: number; search?: string }
 ): Promise<void> {
   if (!store.currentUser) return;
+  if (role === 'admin' && !canAccessAdminTab(store.currentUser, tab)) {
+    return;
+  }
 
   const key = `${role}:${tab}`;
   const existingState = store.tabStates[key];
@@ -53,11 +62,7 @@ export async function loadDashboardTabData(
   const limit = options?.limit ?? 50;
   const searchQ = options?.search ? `&search=${encodeURIComponent(options.search.trim())}` : '';
 
-  const isStaff =
-    store.currentUser.role === UserRole.ADMIN ||
-    store.currentUser.role === UserRole.SUBADMIN ||
-    (store.currentUser.role as string) === 'admin' ||
-    (store.currentUser.role as string) === 'subadmin';
+  const isStaff = isStaffUser(store.currentUser);
 
   try {
     const tasks: Promise<void>[] = [];
@@ -153,7 +158,7 @@ export async function loadDashboardTabData(
         );
       }
     } else if (role === 'admin' && isStaff) {
-      if (['tutors_list', 'users', 'user_data', 'student_profiles'].includes(tab)) {
+      if (['tutors_list', 'users', 'user_data', 'student_profiles'].includes(tab) && hasModulePermission(store.currentUser, 'tutors')) {
         tasks.push(
           safeGet(`/api/users?page=1&limit=2500${searchQ}`, (uData) => {
             if (Array.isArray(uData.users)) {
@@ -162,7 +167,7 @@ export async function loadDashboardTabData(
             }
           })
         );
-      } else if (tab === 'assignments') {
+      } else if (tab === 'assignments' && hasModulePermission(store.currentUser, 'orders')) {
         tasks.push(
           safeGet(
             store.fullDirectoryLoaded ? '/api/users?role=student&page=1&limit=500' : '/api/users?page=1&limit=2500',
@@ -175,7 +180,7 @@ export async function loadDashboardTabData(
           )
         );
       }
-      if (['assignments', 'student_profiles', 'disputes', 'reports'].includes(tab)) {
+      if (['assignments', 'student_profiles', 'disputes', 'reports'].includes(tab) && (hasModulePermission(store.currentUser, 'orders') || hasModulePermission(store.currentUser, 'payments') || hasModulePermission(store.currentUser, 'tutors'))) {
         const ordersLimit = Math.max(limit, 100);
         tasks.push(
           safeGet(`/api/orders?page=${page}&limit=${ordersLimit}`, (oData) => {
@@ -185,14 +190,14 @@ export async function loadDashboardTabData(
           })
         );
       }
-      if (['chats'].includes(tab)) {
+      if (['chats'].includes(tab) && hasModulePermission(store.currentUser, 'chats')) {
         tasks.push(
           safeGet(`/api/chat-rooms?page=${page}&limit=${limit}`, (rData) => {
             if (Array.isArray(rData.rooms)) store.applyRoomsData(rData.rooms);
           })
         );
       }
-      if (['payments_ledger', 'create_invoice', 'disputes', 'student_profiles'].includes(tab)) {
+      if (['payments_ledger', 'create_invoice', 'disputes', 'student_profiles'].includes(tab) && (hasModulePermission(store.currentUser, 'payments') || hasModulePermission(store.currentUser, 'tutors'))) {
         tasks.push(
           safeGet(`/api/payments?page=${page}&limit=${limit}`, (pData) => {
             if (Array.isArray(pData.payments)) store.payments = pData.payments;
@@ -202,7 +207,7 @@ export async function loadDashboardTabData(
           })
         );
       }
-      if (['activity_log'].includes(tab)) {
+      if (['activity_log'].includes(tab) && hasModulePermission(store.currentUser, 'settings')) {
         tasks.push(
           safeGet(`/api/audit-logs?page=${page}&limit=${limit}`, (lData) => {
             if (Array.isArray(lData.logs)) {
@@ -219,7 +224,7 @@ export async function loadDashboardTabData(
           })
         );
       }
-      if (['notifications'].includes(tab)) {
+      if (['notifications'].includes(tab) && hasModulePermission(store.currentUser, 'settings')) {
         tasks.push(
           safeGet(`/api/notifications?page=${page}&limit=${limit}`, (nData) => {
             if (Array.isArray(nData.notifications)) store.appNotifications = nData.notifications;
@@ -352,7 +357,12 @@ export async function login(store: AppStore, email: string, password?: string): 
       throw new Error('Backend session could not be established.');
     }
 
-    store.currentUser = data.user;
+    store.currentUser = {
+      ...data.user,
+      permissions: parsePermissions(data.user.permissions),
+      isActive: data.user.isActive !== false && !data.user.suspended,
+      roleLabel: data.user.roleLabel || undefined,
+    };
     store.sessionExpiredMessage = null;
     store.isSessionInitialized = true;
     try {
@@ -1421,7 +1431,11 @@ export async function updateBlog(
   const blog = store.blogs.find((b) => b.id === blogId);
   let updates: any = {};
   if (typeof titleOrData === 'object') {
-    updates = { ...titleOrData };
+    updates = {
+      ...titleOrData,
+      imageUrl: titleOrData.imageUrl || titleOrData.image,
+      image: titleOrData.image || titleOrData.imageUrl,
+    };
   } else {
     if (titleOrData) updates.title = titleOrData;
     if (content) updates.content = content;
@@ -1441,13 +1455,29 @@ export async function updateBlog(
   }
 
   try {
-    await apiFetch(`/api/blogs/${encodeURIComponent(blogId)}`, {
+    const res = await apiFetch(`/api/blogs/${encodeURIComponent(blogId)}`, {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify(updates),
     });
+    if (res.ok) {
+      const data = await res.json();
+      if (data?.blog) {
+        const index = store.blogs.findIndex((b) => b.id === blogId);
+        if (index !== -1) {
+          store.blogs[index] = {
+            ...store.blogs[index],
+            ...data.blog,
+            image: data.blog.imageUrl || data.blog.image,
+            imageUrl: data.blog.imageUrl || data.blog.image,
+            tags: typeof data.blog.tags === 'string' ? JSON.parse(data.blog.tags) : (data.blog.tags || store.blogs[index].tags),
+          };
+          store.notify();
+        }
+      }
+    }
   } catch (e) {
     console.warn('[STORE] Network notice updating blog on server:', e);
   }
