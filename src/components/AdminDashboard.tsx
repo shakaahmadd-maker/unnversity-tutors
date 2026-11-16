@@ -1332,7 +1332,12 @@ export default function AdminDashboard({
               />
             )}
 
-            {tabStates[`admin:${activeTab}`]?.loading && !tabStates[`admin:${activeTab}`]?.loadedAt && (
+            {tabStates[`admin:${activeTab}`]?.loading &&
+              !tabStates[`admin:${activeTab}`]?.loadedAt &&
+              ((activeTab === 'assignments' && assignments.length === 0) ||
+                (activeTab === 'payments' && payments.length === 0) ||
+                (activeTab === 'chats' && chats.length === 0) ||
+                (['users', 'tutors_list', 'user_data', 'student_profiles'].includes(activeTab) && users.length === 0)) && (
               <div className="mb-4">
                 <TabLoadingSkeleton rows={4} />
               </div>

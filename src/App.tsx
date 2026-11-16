@@ -97,6 +97,32 @@ function resolveInitialViewFromWindow(): string {
     return 'google-disclosure';
   }
   if (decodedPath === '/auth' || hash === '#auth') return 'auth';
+  if (
+    decodedPath === '/student' ||
+    decodedPath === '/student/dashboard' ||
+    decodedPath === '/student/chat' ||
+    decodedPath === '/chat' ||
+    decodedPath === '/chats' ||
+    decodedPath === '/tutor/dashboard' ||
+    hash === '#student' ||
+    hash === '#student/dashboard' ||
+    hash === '#student/chat' ||
+    hash === '#chat' ||
+    hash === '#tutor/dashboard'
+  ) {
+    return 'dashboard';
+  }
+  if (decodedPath === '/admin' || hash === '#admin') {
+    const cookieStr = typeof document !== 'undefined' ? document.cookie || '' : '';
+    const hasCookieHint = /(?:^|;\s*)ut_session_active=1(?:;|$)/.test(cookieStr);
+    let hasStoredHint = false;
+    try {
+      hasStoredHint = Boolean(localStorage.getItem('ut_current_user') || localStorage.getItem('auth_token'));
+    } catch {
+      hasStoredHint = false;
+    }
+    return hasCookieHint || hasStoredHint ? 'dashboard' : 'admin-login';
+  }
   if (decodedPath.startsWith('/online-tutoring-') || hash.startsWith('#online-tutoring-')) return 'country-online-tutoring';
   if (isSpecializedServiceSlug(decodedPath) || isSpecializedServiceSlug(hash)) return 'specialized-service';
   if (
@@ -157,6 +183,7 @@ export default function App() {
     tabStates: store.tabStates || {},
     isLoadingMessages: store.isLoadingMessages || false,
     chatError: store.chatError || null,
+    isSessionInitialized: store.isSessionInitialized,
   });
 
   const [activeView, setActiveView] = useState<string>(() => resolveInitialViewFromWindow());
@@ -511,6 +538,7 @@ export default function App() {
         tabStates: store.tabStates || {},
         isLoadingMessages: store.isLoadingMessages || false,
         chatError: store.chatError || null,
+        isSessionInitialized: store.isSessionInitialized,
       });
     });
     return () => unsubscribe();
@@ -922,6 +950,21 @@ export default function App() {
       path = '/auth';
     } else if (view === 'admin-login') {
       path = '/admin';
+    } else if (
+      view === 'student/chat' ||
+      view === '/student/chat' ||
+      view === 'chat' ||
+      view === '/chat' ||
+      view === 'chats' ||
+      view === '/chats'
+    ) {
+      path = '/student/chat';
+      if (!activeUser) {
+        view = 'auth';
+        path = '/auth';
+      } else {
+        view = 'dashboard';
+      }
     } else if (view === 'student/dashboard' || view === 'student') {
       path = '/student/dashboard';
       if (!activeUser) {
@@ -1043,7 +1086,13 @@ export default function App() {
         decodedPath === '/student' ||
         hash === '#student' ||
         decodedPath === '/student/dashboard' ||
-        hash === '#student/dashboard'
+        hash === '#student/dashboard' ||
+        decodedPath === '/student/chat' ||
+        hash === '#student/chat' ||
+        decodedPath === '/chat' ||
+        hash === '#chat' ||
+        decodedPath === '/chats' ||
+        hash === '#chats'
       ) {
         if (!store.isSessionInitialized) {
           await store.sessionReadyPromise;
@@ -1497,8 +1546,9 @@ export default function App() {
     console.log('Quick switcher is disabled to protect real secure user accounts.');
   };
 
-  const handleOpenChat = (tutorId: string, initialMessage?: string): Chat | undefined => {
-    if (!storeState.currentUser) {
+  const handleOpenChat = (tutorId: string, initialMessage?: string, openFloatingModal = true): Chat | undefined => {
+    const activeUser = store.currentUser || storeState.currentUser;
+    if (!activeUser) {
       setActiveView('auth');
       if (typeof window !== 'undefined') {
         window.history.pushState(null, '', '/auth');
@@ -1506,11 +1556,13 @@ export default function App() {
       }
       return undefined;
     }
-    const chat = store.getOrCreateChat(storeState.currentUser.id, tutorId, 'Direct Consultation');
+    const chat = store.getOrCreateChat(activeUser.id, tutorId, 'Direct Consultation');
     if (initialMessage) {
-      void store.sendMessage(chat.id, storeState.currentUser.id, initialMessage);
+      void store.sendMessage(chat.id, activeUser.id, initialMessage);
     }
-    setActiveChat(chat);
+    if (openFloatingModal) {
+      setActiveChat(chat);
+    }
     return chat;
   };
 
@@ -1760,6 +1812,7 @@ export default function App() {
                 onOpenChat={handleOpenChat}
                 onSelectChat={handleSelectChat}
                 onSendMessage={handleSendMessage}
+                onMarkMessagesAsRead={handleMarkMessagesAsRead}
                 onAcceptQuote={handleAcceptQuote}
                 onLogout={handleLogout}
                 onNavigate={handleNavigate}

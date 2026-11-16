@@ -125,8 +125,8 @@ export default function TutorsDirectoryPage({
       ? window.matchMedia('(min-width: 640px)').matches
       : true
   );
-  const [masterTutors, setMasterTutors] = useState<User[]>([]);
-  const [isLoadingDirectory, setIsLoadingDirectory] = useState<boolean>(true);
+  const [masterTutors, setMasterTutors] = useState<User[]>(() => (allStoreTutors.length > 0 ? allStoreTutors : []));
+  const [isLoadingDirectory, setIsLoadingDirectory] = useState<boolean>(() => allStoreTutors.length === 0);
   const [directoryError, setDirectoryError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -139,7 +139,9 @@ export default function TutorsDirectoryPage({
   }, []);
 
   const loadDirectoryData = async () => {
-    setIsLoadingDirectory(true);
+    if (masterTutors.length === 0) {
+      setIsLoadingDirectory(true);
+    }
     setDirectoryError(null);
     try {
       const [apiRes, fallbackList] = await Promise.all([
@@ -176,7 +178,9 @@ export default function TutorsDirectoryPage({
 
   useEffect(() => {
     let active = true;
-    setIsLoadingDirectory(true);
+    if (allStoreTutors.length === 0) {
+      setIsLoadingDirectory(true);
+    }
     setDirectoryError(null);
 
     Promise.all([

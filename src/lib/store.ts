@@ -223,6 +223,7 @@ export class AppStore {
   public chatAbortController: AbortController | null = null;
   private fetchDataAbortController: AbortController | null = null;
   private inFlightFetchData: Promise<void> | null = null;
+  private pendingRoomCreates = new Map<string, Promise<void>>();
   private trendingTutorsLoaded = false;
   public fullDirectoryLoaded = false;
   private inFlightDirectoryLoad: Promise<void> | null = null;
@@ -567,7 +568,7 @@ export class AppStore {
           this.ensureBackgroundTimersStarted();
           this.notify();
           if (triggerFetch) {
-            this.fetchData().catch(() => {});
+            this.fetchData(true).catch(() => {});
           }
           return data.user;
         }
@@ -684,11 +685,8 @@ export class AppStore {
   public applyRoomsData(rooms: any[]) {
     if (!Array.isArray(rooms)) return;
     this.chatRooms = rooms;
-    if (rooms.length === 0) {
-      this.chats = [];
-      return;
-    }
-    this.chats = rooms.map((r: any) => {
+
+    const mappedRooms: Chat[] = rooms.map((r: any) => {
       const members = r.members || [];
       const memberIds = members.map((m: any) => m.userId);
       const studentMember = members.find((m: any) => m.role === 'student' || m.user?.role === 'student');
@@ -708,6 +706,18 @@ export class AppStore {
         r.order?.tutorId ||
         'tutor_clara';
 
+      if (r.latestMessage && r.latestMessage.id) {
+        const msgId = r.latestMessage.id;
+        if (!this.messages.some((m) => m.id === msgId)) {
+          this.messages.push({
+            ...r.latestMessage,
+            chatId: r.latestMessage.chatId || r.id,
+            roomId: r.latestMessage.roomId || r.id,
+            timestamp: r.latestMessage.createdAt || r.latestMessage.timestamp || r.updatedAt || r.createdAt,
+          });
+        }
+      }
+
       return {
         id: r.id,
         studentId,
@@ -721,16 +731,26 @@ export class AppStore {
         order: r.order || null,
       };
     });
+
+    const serverRoomIds = new Set(mappedRooms.map((c) => c.id));
+    const pendingOptimistic = this.chats.filter(
+      (c) => !serverRoomIds.has(c.id) && this.pendingRoomCreates.has(c.id)
+    );
+    this.chats = [...pendingOptimistic, ...mappedRooms];
   }
 
-  public async fetchData() {
+  public async fetchData(force = false) {
     if (this.inFlightFetchData) {
-      return this.inFlightFetchData;
+      if (!force) {
+        return this.inFlightFetchData;
+      }
+      if (this.fetchDataAbortController) {
+        this.fetchDataAbortController.abort();
+        this.fetchDataAbortController = null;
+      }
+      this.inFlightFetchData = null;
     }
 
-    if (this.fetchDataAbortController) {
-      this.fetchDataAbortController.abort();
-    }
     const controller = new AbortController();
     this.fetchDataAbortController = controller;
     const { signal } = controller;
@@ -742,12 +762,13 @@ export class AppStore {
         const pathname = typeof window !== 'undefined' ? window.location.pathname.toLowerCase() : '/';
         const needsFullDirectoryImmediately =
           Boolean(this.currentUser) ||
-          /\/(tutors|tutors-directory|find-a-tutor|user-data|get-a-quote|online-tutoring|services|our-blog|blog|admin|student|tutor)/.test(
+          /\/(tutors|tutors-directory|find-a-tutor|user-data|get-a-quote|online-tutoring|services|our-blog|blog|admin|student|tutor|chat)/.test(
             pathname
           );
         if (needsFullDirectoryImmediately) {
           await this.ensureCatalogDataLoaded();
         }
+        const shouldSkipDirectoryFetch = !force && this.fullDirectoryLoaded && this.users.length > 20;
         const usersUrl = needsFullDirectoryImmediately
           ? '/api/users?page=1&limit=2500'
           : '/api/users?role=tutor&page=1&limit=12';
@@ -755,21 +776,23 @@ export class AppStore {
           ? '/api/blogs?page=1&limit=30'
           : '/api/blogs?page=1&limit=12';
 
-        const usersPromise = apiFetch(usersUrl, { signal })
-          .then(async (res) => {
-            if (res.ok) {
-              const uData = await res.json();
-              if (Array.isArray(uData.users)) {
-                this.mergeServerUsers(uData.users);
-                if (needsFullDirectoryImmediately) {
-                  this.fullDirectoryLoaded = true;
+        const usersPromise = shouldSkipDirectoryFetch
+          ? Promise.resolve()
+          : apiFetch(usersUrl, { signal })
+              .then(async (res) => {
+                if (res.ok) {
+                  const uData = await res.json();
+                  if (Array.isArray(uData.users)) {
+                    this.mergeServerUsers(uData.users);
+                    if (needsFullDirectoryImmediately) {
+                      this.fullDirectoryLoaded = true;
+                    }
+                  }
+                } else {
+                  hadError = true;
+                  latestErrMsg = `Failed to sync directory (${res.status})`;
                 }
-              }
-            } else {
-              hadError = true;
-              latestErrMsg = `Failed to sync directory (${res.status})`;
-            }
-          })
+              })
           .catch((err) => {
             if (!isAbortError(err)) {
               hadError = true;
@@ -901,16 +924,23 @@ export class AppStore {
         this.connectionStatus = hadError ? 'error' : 'connected';
         this.lastSyncTime = new Date().toLocaleTimeString();
         this.syncError = hadError ? latestErrMsg : null;
+        if (!hadError && Object.keys(this.tabStates).length > 0) {
+          const cleared: Record<string, TabLoadState> = {};
+          for (const [k, st] of Object.entries(this.tabStates)) {
+            cleared[k] = { ...st, error: null, loading: false };
+          }
+          this.tabStates = cleared;
+        }
       } catch (err: any) {
         if (isAbortError(err)) return;
         this.connectionStatus = 'offline';
         this.syncError = getFriendlyErrorMessage(err, 'Unable to reach server.');
       } finally {
-        this.inFlightFetchData = null;
         if (this.fetchDataAbortController === controller) {
+          this.inFlightFetchData = null;
           this.fetchDataAbortController = null;
+          this.notify();
         }
-        this.notify();
       }
     })();
 
@@ -948,6 +978,13 @@ export class AppStore {
   // SYNCHRONOUS CHAT STATE HELPERS
   // ==========================================
 
+  public async waitForPendingRoomCreate(chatId: string): Promise<void> {
+    const pending = this.pendingRoomCreates.get(chatId);
+    if (pending) {
+      await pending.catch(() => {});
+    }
+  }
+
   getOrCreateChat(studentId: string, tutorId: string, subject: string = 'Academic Mentorship'): Chat {
     const existing = this.chats.find(
       (c) =>
@@ -964,10 +1001,10 @@ export class AppStore {
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
-    this.chats.push(newChat);
+    this.chats.unshift(newChat);
     this.notify();
 
-    apiFetch('/api/chat-rooms', {
+    const createPromise = apiFetch('/api/chat-rooms', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -976,7 +1013,16 @@ export class AppStore {
         type: 'direct',
         memberIds: [studentId, tutorId],
       }),
-    }).catch((err) => console.warn('[STORE] Notice registering room on backend:', err));
+    })
+      .then(() => undefined)
+      .catch((err) => {
+        console.warn('[STORE] Notice registering room on backend:', err);
+      })
+      .finally(() => {
+        this.pendingRoomCreates.delete(newChat.id);
+      });
+
+    this.pendingRoomCreates.set(newChat.id, createPromise);
 
     return newChat;
   }
@@ -988,12 +1034,16 @@ export class AppStore {
   }
 
   markMessagesAsRead(chatId: string, currentUserId: string) {
+    let changed = false;
     this.messages.forEach((m) => {
-      if (m.chatId === chatId && m.senderId !== currentUserId) {
+      if (m.chatId === chatId && m.senderId !== currentUserId && !m.read) {
         m.read = true;
+        changed = true;
       }
     });
-    this.notify();
+    if (changed) {
+      this.notify();
+    }
   }
 
   setTypingStatus(chatId: string, userId: string, isTyping: boolean) {

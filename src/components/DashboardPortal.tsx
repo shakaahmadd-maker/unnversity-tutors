@@ -51,15 +51,17 @@ export interface DashboardStoreSnapshot {
   tabStates: Record<string, TabLoadState>;
   isLoadingMessages: boolean;
   chatError: string | null;
+  isSessionInitialized?: boolean;
 }
 
 interface DashboardPortalProps {
   storeState: DashboardStoreSnapshot;
   mentorsList: User[];
   studentsList: User[];
-  onOpenChat: (tutorId: string, initialMessage?: string) => Chat | undefined;
+  onOpenChat: (tutorId: string, initialMessage?: string, openFloatingModal?: boolean) => Chat | undefined;
   onSelectChat: (chat: Chat) => void;
   onSendMessage: (chatId: string, senderId: string, content: string, fileUrl?: string, fileName?: string) => Promise<any>;
+  onMarkMessagesAsRead?: (chatId: string, userId: string) => void;
   onAcceptQuote: (quoteId: string) => void;
   onLogout: () => void;
   onNavigate: (view: string) => void;
@@ -76,6 +78,7 @@ export default function DashboardPortal({
   onOpenChat,
   onSelectChat,
   onSendMessage,
+  onMarkMessagesAsRead,
   onAcceptQuote,
   onLogout,
   onNavigate,
@@ -85,6 +88,14 @@ export default function DashboardPortal({
   onHideGlobalWhatsAppChange,
 }: DashboardPortalProps) {
   const currentActiveUser = store.currentUser || storeState.currentUser;
+  const sessionReady = store.isSessionInitialized || Boolean(storeState.isSessionInitialized);
+
+  const handleOpenInlineStudentChat = useCallback(
+    (tutorId: string, initialMessage?: string) => {
+      return onOpenChat(tutorId, initialMessage, false);
+    },
+    [onOpenChat]
+  );
 
   const handleSubscribeToChatDetails = useCallback((chatId: string) => {
     return store.subscribeToChatDetails(chatId);
@@ -259,6 +270,15 @@ export default function DashboardPortal({
     store.deleteChat(chatId);
   }, []);
 
+  if (!currentActiveUser && !sessionReady) {
+    return (
+      <div className="min-h-[80vh] flex flex-col items-center justify-center py-24 gap-3 text-orange-600">
+        <div className="w-8 h-8 border-3 border-orange-500 border-t-transparent rounded-full animate-spin" />
+        <span className="text-xs font-semibold text-slate-500">Restoring your workspace...</span>
+      </div>
+    );
+  }
+
   if (!currentActiveUser) {
     return (
       <div className="py-20 text-center bg-white m-8 rounded-3xl border shadow-xs max-w-sm mx-auto space-y-4">
@@ -289,9 +309,10 @@ export default function DashboardPortal({
         onSubmitAssignment={async (data) => {
           await store.submitAssignment(data);
         }}
-        onOpenChat={onOpenChat}
+        onOpenChat={handleOpenInlineStudentChat}
         onSelectChat={onSelectChat}
         onSendMessage={onSendMessage}
+        onMarkMessagesAsRead={onMarkMessagesAsRead}
         onSubscribeToChatDetails={handleSubscribeToChatDetails}
         onApproveWork={handleApproveWork}
         onRaiseRevision={handleRaiseRevision}

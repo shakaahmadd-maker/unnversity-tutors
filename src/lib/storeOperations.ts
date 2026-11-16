@@ -73,7 +73,7 @@ export async function loadDashboardTabData(
     };
 
     if (role === 'student') {
-      if (['dashboard', 'assignments', 'submit', 'progress', 'deadlines', 'files'].includes(tab)) {
+      if (['dashboard', 'assignments', 'submit', 'progress', 'deadlines', 'files', 'reports', 'results'].includes(tab)) {
         tasks.push(
           safeGet(`/api/orders?page=${page}&limit=${limit}${searchQ}`, (oData) => {
             if (Array.isArray(oData.orders)) {
@@ -96,10 +96,21 @@ export async function loadDashboardTabData(
         tasks.push(
           safeGet(`/api/chat-rooms?page=${page}&limit=${limit}`, (rData) => {
             if (Array.isArray(rData.rooms)) store.applyRoomsData(rData.rooms);
+          }),
+          safeGet(`/api/messages?page=${page}&limit=100`, (mData) => {
+            if (Array.isArray(mData.messages)) {
+              const incomingIds = new Set(mData.messages.map((m: any) => m.id));
+              const preserved = store.messages.filter((m) => !incomingIds.has(m.id));
+              const normalized = mData.messages.map((m: any) => ({
+                ...m,
+                timestamp: m.createdAt || m.timestamp,
+              }));
+              store.messages = [...preserved, ...normalized];
+            }
           })
         );
       }
-      if (['dashboard', 'tutors', 'submit'].includes(tab)) {
+      if (['dashboard', 'tutors', 'submit', 'chat'].includes(tab) && (!store.fullDirectoryLoaded || options?.force)) {
         tasks.push(
           safeGet(`/api/users?role=tutor&page=1&limit=2500`, (uData) => {
             if (Array.isArray(uData.users)) {
@@ -281,6 +292,9 @@ export async function subscribeToChatDetails(store: AppStore, chatId: string) {
   store.chatError = null;
   store.notify();
   try {
+    await store.waitForPendingRoomCreate(chatId);
+    if (signal.aborted) return;
+
     let res = await apiFetch(`/api/chat-rooms/${encodeURIComponent(chatId)}/messages?limit=100`, { signal });
     if (!res.ok && res.status !== 401 && res.status !== 403) {
       res = await apiFetch(`/api/messages?chatId=${encodeURIComponent(chatId)}&limit=100`, { signal });
@@ -289,8 +303,16 @@ export async function subscribeToChatDetails(store: AppStore, chatId: string) {
     if (res.ok) {
       const data = await res.json();
       if (Array.isArray(data.messages)) {
-        const otherMsgs = store.messages.filter((m) => m.chatId !== chatId && m.roomId !== chatId);
-        const newMsgs = data.messages.map((m: any) => ({ ...m, timestamp: m.createdAt }));
+        const incomingIds = new Set(data.messages.map((m: any) => m.id));
+        const otherMsgs = store.messages.filter(
+          (m) => (m.chatId !== chatId && m.roomId !== chatId) || !incomingIds.has(m.id)
+        );
+        const newMsgs = data.messages.map((m: any) => ({
+          ...m,
+          chatId: m.chatId || chatId,
+          roomId: m.roomId || chatId,
+          timestamp: m.createdAt || m.timestamp,
+        }));
         store.messages = [...otherMsgs, ...newMsgs];
         store.chatError = null;
       }
@@ -304,9 +326,9 @@ export async function subscribeToChatDetails(store: AppStore, chatId: string) {
   } finally {
     if (store.chatAbortController === controller) {
       store.chatAbortController = null;
+      store.isLoadingMessages = false;
+      store.notify();
     }
-    store.isLoadingMessages = false;
-    store.notify();
   }
 }
 
@@ -343,7 +365,7 @@ export async function login(store: AppStore, email: string, password?: string): 
       // ignore cookie write errors
     }
     store.ensureBackgroundTimersStarted();
-    store.fetchData().catch(() => {});
+    store.fetchData(true).catch(() => {});
     store.notify();
     return true;
   } catch (err: any) {
@@ -409,6 +431,7 @@ export async function register(
       // ignore cookie write errors
     }
     store.ensureBackgroundTimersStarted();
+    store.fetchData(true).catch(() => {});
     store.notify();
     return true;
   } catch (err: any) {
@@ -626,6 +649,7 @@ export async function addMessage(
   store.notify();
 
   try {
+    await store.waitForPendingRoomCreate(chatId);
     const res = await apiFetch(`/api/chat-rooms/${encodeURIComponent(chatId)}/messages`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },

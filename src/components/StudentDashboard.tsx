@@ -60,7 +60,11 @@ import {
   Code2,
   FlaskConical,
   Target,
-  FileCheck2
+  FileCheck2,
+  ArrowLeft,
+  Maximize2,
+  Minimize2,
+  Users
 } from 'lucide-react';
 import { apiFetch } from '../lib/apiClient';
 import type { TabLoadState } from '../lib/store';
@@ -197,6 +201,7 @@ interface StudentDashboardProps {
   onOpenChat: (tutorId: string, initialMessage?: string) => Chat | void;
   onSelectChat: (chat: Chat) => void;
   onSendMessage?: (chatId: string, senderId: string, content: string, fileUrl?: string, fileName?: string) => void;
+  onMarkMessagesAsRead?: (chatId: string, userId: string) => void;
   onSubscribeToChatDetails?: (chatId: string) => void;
   onApproveWork: (assignId: string, rating: number, comment: string) => void;
   onRaiseRevision: (assignId: string, details: string) => void;
@@ -237,6 +242,7 @@ export default function StudentDashboard({
   onOpenChat,
   onSelectChat,
   onSendMessage,
+  onMarkMessagesAsRead,
   onSubscribeToChatDetails,
   onApproveWork,
   onRaiseRevision,
@@ -264,11 +270,23 @@ export default function StudentDashboard({
   onHideGlobalWhatsAppChange
 }: StudentDashboardProps) {
 
-  // Dynamic Viewport Navigation State matching Sidebar
-  const [activeTab, setActiveTab] = useState<string>('dashboard');
+  // Dynamic Viewport Navigation State matching Sidebar (auto-opens Chat on /chat or /student/chat)
+  const [activeTab, setActiveTab] = useState<string>(() => {
+    if (typeof window === 'undefined') return 'dashboard';
+    const p = decodeURIComponent(window.location.pathname).toLowerCase().replace(/\/+$/, '');
+    const h = window.location.hash.toLowerCase();
+    const qTab = new URLSearchParams(window.location.search).get('tab')?.toLowerCase();
+    if (p === '/chat' || p === '/chats' || p === '/student/chat' || h === '#chat' || h === '#student/chat' || qTab === 'chat') {
+      return 'chat';
+    }
+    return 'dashboard';
+  });
   const [localSelectedChatId, setLocalSelectedChatId] = useState<string | null>(null);
   const [studentReply, setStudentReply] = useState('');
   const [channelSearchFilter, setChannelSearchFilter] = useState('');
+  const [chatListFilter, setChatListFilter] = useState<'all' | 'unread' | 'tutors' | 'support'>('all');
+  const [isChatExpanded, setIsChatExpanded] = useState(false);
+  const [showAllParticipants, setShowAllParticipants] = useState(false);
   const [isQuoteDrawerOpen, setIsQuoteDrawerOpen] = useState(false);
   const [chatAttachedFileName, setChatAttachedFileName] = useState('');
   const [showSafetyBanner, setShowSafetyBanner] = useState(true);
@@ -312,6 +330,40 @@ export default function StudentDashboard({
     }
   };
 
+  const handleSelectConversation = (chatId: string) => {
+    setLocalSelectedChatId(chatId);
+    setIsMobileChannelsOpen(false);
+    setIsQuoteDrawerOpen(false);
+    onMarkMessagesAsRead?.(chatId, currentUser.id);
+    if (onSubscribeToChatDetails) {
+      lastSubscribedChatIdRef.current = chatId;
+      onSubscribeToChatDetails(chatId);
+    }
+  };
+
+  const handleCloseConversation = () => {
+    setLocalSelectedChatId(null);
+    setIsChatExpanded(false);
+    setIsQuoteDrawerOpen(false);
+    lastSubscribedChatIdRef.current = null;
+  };
+
+  const openWorkspaceChat = (tutorId: string, initialMessage?: string) => {
+    const chatRes = onOpenChat(tutorId, initialMessage);
+    if (chatRes && typeof chatRes === 'object' && 'id' in chatRes) {
+      const targetId = (chatRes as Chat).id;
+      setLocalSelectedChatId(targetId);
+      setIsMobileChannelsOpen(false);
+      setIsQuoteDrawerOpen(false);
+      onMarkMessagesAsRead?.(targetId, currentUser.id);
+      if (onSubscribeToChatDetails) {
+        lastSubscribedChatIdRef.current = targetId;
+        onSubscribeToChatDetails(targetId);
+      }
+    }
+    setActiveTab('chat');
+  };
+
   useEffect(() => {
     return () => {
       if (toastTimeoutRef.current) {
@@ -345,18 +397,15 @@ export default function StudentDashboard({
   }, [activeTab, isMobileViewport, onHideGlobalWhatsAppChange]);
 
   useEffect(() => {
-    if (activeTab === 'chat' && chats.length > 0) {
-      const myChats = chats.filter(c => c.studentId === currentUser.id || c.tutorId === currentUser.id);
-      if (myChats.length > 0) {
-        if (!localSelectedChatId || !myChats.some(c => c.id === localSelectedChatId)) {
-          // Prefer assigned tutor chat first, otherwise support, otherwise first chat
-          const tutorChat = myChats.find(c => !c.tutorId.startsWith('admin_') && c.tutorId !== 'admin_emily');
-          const target = tutorChat || myChats[0];
-          setLocalSelectedChatId(target.id);
-        }
+    if (activeTab !== 'chat' || !localSelectedChatId) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && !isQuoteDrawerOpen) {
+        handleCloseConversation();
       }
-    }
-  }, [chats, activeTab, currentUser.id, localSelectedChatId]);
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [activeTab, localSelectedChatId, isQuoteDrawerOpen]);
 
   useEffect(() => {
     if (localSelectedChatId && onSubscribeToChatDetails && lastSubscribedChatIdRef.current !== localSelectedChatId) {
@@ -371,6 +420,12 @@ export default function StudentDashboard({
     .slice()
     .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
   const lastActiveChatMessageId = activeChatMessages.length > 0 ? activeChatMessages[activeChatMessages.length - 1].id : '';
+
+  useEffect(() => {
+    if (activeTab === 'chat' && localSelectedChatId && onMarkMessagesAsRead) {
+      onMarkMessagesAsRead(localSelectedChatId, currentUser.id);
+    }
+  }, [activeTab, localSelectedChatId, activeChatMessages.length, currentUser.id, onMarkMessagesAsRead]);
 
   const chatScrollContainerRef = useRef<HTMLDivElement>(null);
   const chatMessagesEndRef = useRef<HTMLDivElement>(null);
@@ -1045,11 +1100,9 @@ export default function StudentDashboard({
       const chatRes = onOpenChat(tutorIdToChat, welcomeMsg);
       if (chatRes && typeof chatRes === 'object' && 'id' in chatRes) {
         const newChatId = (chatRes as { id: string }).id;
-        setLocalSelectedChatId(newChatId);
-        onSubscribeToChatDetails?.(newChatId);
+        handleSelectConversation(newChatId);
       } else if (existingChatWithTutor) {
-        setLocalSelectedChatId(existingChatWithTutor.id);
-        onSubscribeToChatDetails?.(existingChatWithTutor.id);
+        handleSelectConversation(existingChatWithTutor.id);
       }
 
       setIsQuickRequestModalOpen(false);
@@ -1068,9 +1121,9 @@ export default function StudentDashboard({
 
   const handleOpenPrimaryTutorChat = () => {
     const assignedAssign = studentAssignments.find(a => a.tutorId);
-    const tutorIdToChat = assignedAssign?.tutorId || 'tutor_clara';
+    const tutorIdToChat = assignedAssign?.tutorId || tutors[0]?.id || 'tutor_clara';
     const tutorObj = getTutor(tutorIdToChat);
-    onOpenChat(
+    openWorkspaceChat(
       tutorIdToChat,
       `Hi ${tutorObj?.name || 'Tutor'}, I would like to consult with you about my academic assignments.`
     );
@@ -1127,7 +1180,7 @@ export default function StudentDashboard({
       icon: <Headset className="w-5 h-5" />,
       circleColor: 'bg-blue-50 text-blue-600',
       hoverBorder: 'hover:border-blue-300',
-      onClick: () => onOpenChat('admin_shaka'),
+      onClick: () => openWorkspaceChat('admin_shaka'),
     },
     {
       label: 'Reports',
@@ -1178,7 +1231,7 @@ export default function StudentDashboard({
   const recentDashboardRequests = (normalizedDashQuery ? searchedAssignments : studentAssignments).slice(0, 5);
   const ongoingCount = studentAssignments.filter(a => a.status !== AssignmentStatus.COMPLETED).length;
   const completedCount = studentAssignments.filter(a => a.status === AssignmentStatus.COMPLETED).length;
-  const showMobileChrome = activeTab !== 'new_request';
+  const showMobileChrome = activeTab !== 'new_request' && !(activeTab === 'chat' && Boolean(selectedChat));
   const showFloatingMobileWidgets = activeTab !== 'chat' && activeTab !== 'new_request';
 
   return (
@@ -1513,7 +1566,7 @@ export default function StudentDashboard({
             </button>
             <button
               type="button"
-              onClick={() => onOpenChat('admin_shaka')}
+              onClick={() => openWorkspaceChat('admin_shaka')}
               className="compact-pill-btn shrink-0 flex items-center gap-1.5 px-3.5 py-2 rounded-full bg-white border border-slate-200 text-xs font-semibold text-slate-700 active:scale-95 transition cursor-pointer"
             >
               <MessageSquare className="w-3.5 h-3.5 text-slate-600" />
@@ -1571,7 +1624,7 @@ export default function StudentDashboard({
 
             <button
               type="button"
-              onClick={() => onOpenChat('admin_shaka')}
+              onClick={() => openWorkspaceChat('admin_shaka')}
               className="inline-flex items-center justify-center gap-1.5 border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 px-3.5 py-2 rounded-2xl text-[12px] font-bold shadow-3xs cursor-pointer transition-all"
               id="header-csr-consult"
               title="Consult with Platform Support Desk (CSR)"
@@ -1751,7 +1804,7 @@ export default function StudentDashboard({
 
                     <button
                       type="button"
-                      onClick={() => onOpenChat('admin_shaka')}
+                      onClick={() => openWorkspaceChat('admin_shaka')}
                       className="flex items-center justify-center py-2 md:py-3 px-3 md:px-6 rounded-xl md:rounded-2xl bg-white/10 hover:bg-white/15 border border-white/15 text-white font-semibold md:font-bold text-xs md:text-[13px] active:scale-95 transition cursor-pointer"
                       id="hero-consult-btn"
                     >
@@ -1956,7 +2009,7 @@ export default function StudentDashboard({
                               <button
                                 type="button"
                                 onClick={() =>
-                                  onOpenChat(
+                                  openWorkspaceChat(
                                     tutorObj.id,
                                     `Hi ${tutorObj.name}, I would like to check in on my assignment: "${a.title}".`
                                   )
@@ -1970,7 +2023,7 @@ export default function StudentDashboard({
                               <button
                                 type="button"
                                 onClick={() =>
-                                  onOpenChat(
+                                  openWorkspaceChat(
                                     'admin_shaka',
                                     `Hi CSR desk, could you please give me an update on matching for assignment: "${a.title}"?`
                                   )
@@ -1984,7 +2037,7 @@ export default function StudentDashboard({
 
                             <button
                               type="button"
-                              onClick={() => onOpenChat('admin_shaka')}
+                              onClick={() => openWorkspaceChat('admin_shaka')}
                               className="inline-flex items-center gap-1 px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-semibold cursor-pointer transition-colors"
                               title="Platform Support CSR"
                             >
@@ -2132,7 +2185,7 @@ export default function StudentDashboard({
                               {tutor ? (
                                 <button
                                   type="button"
-                                  onClick={() => onOpenChat(tutor.id, `Hi ${tutor.name}, let's coordinate on assignment "${a.title}".`)}
+                                  onClick={() => openWorkspaceChat(tutor.id, `Hi ${tutor.name}, let's coordinate on assignment "${a.title}".`)}
                                   className="inline-flex items-center gap-1 px-2.5 py-1.5 bg-[#FF7A00] hover:bg-[#E86E00] text-white rounded-xl text-[11px] font-bold cursor-pointer"
                                 >
                                   <MessageCircle className="w-3 h-3" />
@@ -2141,7 +2194,7 @@ export default function StudentDashboard({
                               ) : null}
                               <button
                                 type="button"
-                                onClick={() => onOpenChat('admin_shaka', `Hi CSR desk, update on "${a.title}" please.`)}
+                                onClick={() => openWorkspaceChat('admin_shaka', `Hi CSR desk, update on "${a.title}" please.`)}
                                 className="inline-flex items-center gap-1 px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-[11px] font-semibold cursor-pointer"
                               >
                                 <Headset className="w-3 h-3 text-slate-500" />
@@ -2220,7 +2273,7 @@ export default function StudentDashboard({
                                     <div className="flex items-center gap-1.5">
                                       <button
                                         type="button"
-                                        onClick={() => onOpenChat(tutor.id, `Hi ${tutor.name}, let's coordinate on assignment "${a.title}".`)}
+                                        onClick={() => openWorkspaceChat(tutor.id, `Hi ${tutor.name}, let's coordinate on assignment "${a.title}".`)}
                                         className="inline-flex items-center gap-1 px-2.5 py-1 bg-[#FF7A00] hover:bg-[#E86E00] text-white rounded-lg text-[10.5px] font-bold transition-all shadow-3xs cursor-pointer"
                                         title={`Open direct Tutor Chat with ${tutor.name}`}
                                       >
@@ -2229,7 +2282,7 @@ export default function StudentDashboard({
                                       </button>
                                       <button
                                         type="button"
-                                        onClick={() => onOpenChat('admin_shaka')}
+                                        onClick={() => openWorkspaceChat('admin_shaka')}
                                         className="inline-flex items-center gap-1 px-2 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-[10.5px] font-semibold transition-all cursor-pointer"
                                         title="Consult with CSR support desk"
                                       >
@@ -2243,7 +2296,7 @@ export default function StudentDashboard({
                                     <span className="text-slate-400 italic block text-[11px]">Matching candidate...</span>
                                     <button
                                       type="button"
-                                      onClick={() => onOpenChat('admin_shaka', `Hi CSR desk, please update me on matching for: "${a.title}".`)}
+                                      onClick={() => openWorkspaceChat('admin_shaka', `Hi CSR desk, please update me on matching for: "${a.title}".`)}
                                       className="inline-flex items-center gap-1 px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-[10.5px] font-semibold transition-all cursor-pointer"
                                     >
                                       <Headset className="w-3 h-3 text-slate-500" />
@@ -2600,10 +2653,10 @@ export default function StudentDashboard({
                               onClick={() => {
                                 const matchedChat = studentChats.find(c => c.subject.includes(row.subject) || c.subject.includes(row.title));
                                 if (matchedChat) {
-                                  setLocalSelectedChatId(matchedChat.id);
+                                  handleSelectConversation(matchedChat.id);
                                   setActiveTab('chat');
                                 } else {
-                                  onOpenChat('admin_shaka', `Regarding billing for Assignment #${row.id} ("${row.title}").`);
+                                  openWorkspaceChat('admin_shaka', `Regarding billing for Assignment #${row.id} ("${row.title}").`);
                                 }
                               }}
                               className="px-2.5 py-1.5 text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-xl text-xs font-semibold flex items-center gap-1 cursor-pointer"
@@ -2741,10 +2794,10 @@ export default function StudentDashboard({
                                     onClick={() => {
                                       const matchedChat = studentChats.find(c => c.subject.includes(row.subject) || c.subject.includes(row.title));
                                       if (matchedChat) {
-                                        setLocalSelectedChatId(matchedChat.id);
+                                        handleSelectConversation(matchedChat.id);
                                         setActiveTab('chat');
                                       } else {
-                                        onOpenChat('admin_shaka', `Regarding billing for Assignment #${row.id} ("${row.title}").`);
+                                        openWorkspaceChat('admin_shaka', `Regarding billing for Assignment #${row.id} ("${row.title}").`);
                                       }
                                     }}
                                     className="p-1.5 text-slate-500 hover:text-slate-900 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
@@ -2931,367 +2984,603 @@ export default function StudentDashboard({
           {/* REMOVED HARDCODED DUMMY TUTORS DIRECTORY VIEW */}
 
           {/* ================================== */}
-          {/* TAB 6: CHAT INTERFACE MESSENGER   */}
+          {/* TAB 6: WHATSAPP-STYLE CHAT WORKSPACE */}
           {/* ================================== */}
-          {activeTab === 'chat' && (
-            <div className="bg-white border border-slate-200/80 rounded-2xl md:rounded-3xl flex flex-col flex-1 min-h-0 overflow-hidden shadow-sm text-left relative animate-fade-in">
-              
-              {/* Discussion Channels + Center Chat Workspace */}
-              <div className="flex-1 min-h-0 flex overflow-hidden w-full relative">
+          {activeTab === 'chat' && (() => {
+            const supportParticipantIds = ['admin_shaka', 'admin_emily'];
+            const isAdminParticipant = (id: string) =>
+              id === 'admin_emily' || id === 'admin_shaka' || id.startsWith('admin_');
 
-                {/* LEFT SIDEBAR: DISCUSSION CHANNELS */}
-                <aside className={`bg-white border-r border-slate-200/80 flex flex-col shrink-0 shadow-xs overflow-hidden transition-all duration-200 ${
-                  isMobileChannelsOpen 
-                    ? 'fixed inset-0 z-50 w-full h-full' 
-                    : 'hidden md:flex w-72 md:w-80 lg:w-88'
-                }`}>
-                  
-                  {/* Sidebar Title Header */}
-                  <div className="p-4 border-b border-slate-100">
-                    <div className="flex items-center justify-between mb-3">
-                      <h2 className="text-xs font-bold text-slate-900 flex items-center gap-2 tracking-wide uppercase">
-                        <MessageSquare className="w-4 h-4 text-orange-500" />
-                        <span>Discussion Channels</span>
-                      </h2>
-                      <div className="flex items-center gap-2">
-                        <span className="text-[11px] font-semibold bg-orange-50 text-orange-600 px-2.5 py-0.5 rounded-full border border-orange-200/50">
-                          {studentChats.length || 1} Active
-                        </span>
-                        {isMobileChannelsOpen && (
-                          <button 
-                            type="button" 
-                            onClick={() => setIsMobileChannelsOpen(false)}
-                            className="md:hidden p-1 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 cursor-pointer"
-                            title="Close channels"
-                          >
-                            <X className="w-5 h-5" />
-                          </button>
-                        )}
+            const formatChatListTime = (iso?: string) => {
+              if (!iso) return '';
+              const d = new Date(iso);
+              if (Number.isNaN(d.getTime())) return '';
+              const now = new Date();
+              const sameDay = d.toDateString() === now.toDateString();
+              if (sameDay) {
+                return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+              }
+              const yesterday = new Date(now);
+              yesterday.setDate(now.getDate() - 1);
+              if (d.toDateString() === yesterday.toDateString()) {
+                return 'Yesterday';
+              }
+              return d.toLocaleDateString([], { month: 'short', day: 'numeric' });
+            };
+
+            const formatDateSeparator = (iso: string) => {
+              const d = new Date(iso);
+              if (Number.isNaN(d.getTime())) return '';
+              const now = new Date();
+              if (d.toDateString() === now.toDateString()) return 'Today';
+              const yesterday = new Date(now);
+              yesterday.setDate(now.getDate() - 1);
+              if (d.toDateString() === yesterday.toDateString()) return 'Yesterday';
+              return d.toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' });
+            };
+
+            const assignedTutorIdSet = new Set<string>(
+              studentAssignments
+                .map((a) => a.tutorId)
+                .filter((id): id is string => Boolean(id) && !isAdminParticipant(id))
+            );
+
+            // Build enriched chat thread items sorted by latest activity descending
+            const chatItems = studentChats
+              .map((chat) => {
+                const threadMsgs = messages
+                  .filter((m) => m.chatId === chat.id)
+                  .slice()
+                  .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+                const lastMsg = threadMsgs[threadMsgs.length - 1];
+                const unreadCount = threadMsgs.filter(
+                  (m) => m.senderId !== currentUser.id && !m.read
+                ).length;
+                const isSupport = isAdminParticipant(chat.tutorId);
+                const participantUser = getTutor(chat.tutorId) || chat.pairedTutor;
+                const displayName = isSupport
+                  ? chat.tutorId === 'admin_shaka'
+                    ? 'Shaka Ahmad · Support Admin'
+                    : 'Platform Support Desk'
+                  : participantUser?.name || 'Academic Tutor';
+                const primarySubj = isSupport
+                  ? '24/7 Student Support Desk'
+                  : participantUser?.primarySubject ||
+                    participantUser?.subjects?.[0] ||
+                    chat.subject ||
+                    'Academic Consultation';
+                const lastTimeIso = lastMsg?.timestamp || chat.updatedAt || chat.createdAt;
+                const lastTimeMs = lastTimeIso ? new Date(lastTimeIso).getTime() : 0;
+
+                return {
+                  chat,
+                  isSupport,
+                  isAssigned: assignedTutorIdSet.has(chat.tutorId),
+                  participantUser,
+                  displayName,
+                  primarySubj,
+                  lastMsg,
+                  unreadCount,
+                  lastTimeIso,
+                  lastTimeMs: Number.isNaN(lastTimeMs) ? 0 : lastTimeMs,
+                };
+              })
+              .sort((a, b) => {
+                if (a.unreadCount > 0 && b.unreadCount === 0) return -1;
+                if (b.unreadCount > 0 && a.unreadCount === 0) return 1;
+                return b.lastTimeMs - a.lastTimeMs;
+              });
+
+            const existingParticipantIds = new Set(studentChats.map((c) => c.tutorId));
+            const totalUnreadMessages = chatItems.reduce((sum, item) => sum + item.unreadCount, 0);
+
+            const normalizedChatSearch = channelSearchFilter.trim().toLowerCase();
+
+            const filteredActiveChats = chatItems.filter((item) => {
+              if (chatListFilter === 'unread' && item.unreadCount === 0) return false;
+              if (chatListFilter === 'tutors' && item.isSupport) return false;
+              if (chatListFilter === 'support' && !item.isSupport) return false;
+              if (!normalizedChatSearch) return true;
+              const haystack = `${item.displayName} ${item.primarySubj} ${item.chat.subject || ''} ${item.lastMsg?.content || ''}`.toLowerCase();
+              return haystack.includes(normalizedChatSearch);
+            });
+
+            // Quick-start Support participants not yet in an open chat
+            const availableSupportParticipants = supportParticipantIds
+              .filter((id) => !existingParticipantIds.has(id))
+              .map((id) => ({
+                id,
+                name: id === 'admin_shaka' ? 'Shaka Ahmad · Support Admin' : 'Platform Support Desk (Emily)',
+                roleLabel: 'Support Desk · 24/7 Available',
+                avatarUrl:
+                  id === 'admin_shaka'
+                    ? 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&auto=format&fit=crop&q=80'
+                    : 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150&auto=format&fit=crop&q=80',
+                isSupport: true,
+                isAssigned: false,
+              }))
+              .filter((p) => {
+                if (chatListFilter === 'unread' || chatListFilter === 'tutors') return false;
+                if (!normalizedChatSearch) return true;
+                return `${p.name} ${p.roleLabel}`.toLowerCase().includes(normalizedChatSearch);
+              });
+
+            // All academic tutor participants (assigned tutors first, then full directory) not yet in an open chat
+            const availableTutorParticipants = tutors
+              .filter((t) => t && t.id && t.id !== currentUser.id && !existingParticipantIds.has(t.id))
+              .sort((a, b) => {
+                const aAssigned = assignedTutorIdSet.has(a.id) ? 1 : 0;
+                const bAssigned = assignedTutorIdSet.has(b.id) ? 1 : 0;
+                if (aAssigned !== bAssigned) return bAssigned - aAssigned;
+                return Number(b.rating || 4.8) - Number(a.rating || 4.8);
+              })
+              .filter((t) => {
+                if (chatListFilter === 'unread' || chatListFilter === 'support') return false;
+                if (!normalizedChatSearch) return true;
+                const subjText = [t.primarySubject || '', ...(t.subjects || []), t.bio || '', t.country || ''].join(' ').toLowerCase();
+                return t.name.toLowerCase().includes(normalizedChatSearch) || subjText.includes(normalizedChatSearch);
+              });
+
+            const visibleTutorParticipants =
+              normalizedChatSearch || showAllParticipants
+                ? availableTutorParticipants
+                : availableTutorParticipants.slice(0, 30);
+
+            const selectedChatPeer = selectedChat
+              ? isAdminParticipant(selectedChat.tutorId)
+                ? {
+                    name: selectedChat.tutorId === 'admin_shaka' ? 'Shaka Ahmad · Support Admin' : 'Platform Support Desk',
+                    subtitle: '24/7 Academic Support Desk',
+                    avatarUrl:
+                      selectedChat.tutorId === 'admin_shaka'
+                        ? 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&auto=format&fit=crop&q=80'
+                        : 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150&auto=format&fit=crop&q=80',
+                  }
+                : {
+                    name: getTutor(selectedChat.tutorId)?.name || selectedChat.pairedTutor?.name || 'Academic Tutor',
+                    subtitle: selectedChat.subject || getTutor(selectedChat.tutorId)?.primarySubject || 'Direct Consultation',
+                    avatarUrl: getTutor(selectedChat.tutorId)?.avatarUrl || selectedChat.pairedTutor?.avatarUrl,
+                  }
+              : null;
+
+            return (
+              <div
+                className="bg-white border border-slate-200/80 rounded-2xl md:rounded-3xl flex flex-1 min-h-0 overflow-hidden shadow-sm text-left relative animate-fade-in"
+                id="whatsapp-chat-workspace"
+              >
+                {/* LEFT PANE: WHATSAPP-STYLE ALL CHATS & PARTICIPANTS LIST */}
+                <aside
+                  className={`bg-white border-r border-slate-200/80 flex-col min-h-0 shrink-0 transition-all duration-150 ${
+                    selectedChat
+                      ? isChatExpanded
+                        ? 'hidden'
+                        : 'hidden md:flex md:w-80 lg:w-[360px]'
+                      : 'flex w-full md:w-80 lg:w-[360px]'
+                  }`}
+                  id="whatsapp-chat-list-pane"
+                >
+                  {/* WhatsApp List Header */}
+                  <div className="px-4 py-3.5 border-b border-slate-200/70 bg-white shrink-0 space-y-3">
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <ResponsiveAvatar
+                          src={currentUser.avatarUrl}
+                          alt={currentUser.name}
+                          sizePx={36}
+                          width={36}
+                          height={36}
+                          className="w-9 h-9 rounded-full object-cover border border-slate-200 shrink-0"
+                        />
+                        <div className="min-w-0">
+                          <h2 className="text-base font-bold text-slate-900 leading-tight truncate">Chats</h2>
+                          <p className="text-[11px] text-slate-500 tabular-nums truncate">
+                            {chatItems.length} conversations · {tutors.length + supportParticipantIds.length} participants
+                          </p>
+                        </div>
                       </div>
+                      {totalUnreadMessages > 0 && (
+                        <span className="px-2 py-0.5 text-[11px] font-bold bg-[#F97316] text-white rounded-full tabular-nums shrink-0">
+                          {totalUnreadMessages} unread
+                        </span>
+                      )}
                     </div>
 
-                    {/* Channel Search */}
+                    {/* Search Chats or Participants */}
                     <div className="relative">
-                      <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                      <input 
-                        type="text" 
+                      <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                      <input
+                        type="text"
                         value={channelSearchFilter}
                         onChange={(e) => setChannelSearchFilter(e.target.value)}
-                        placeholder="Filter conversations..." 
-                        className="w-full pl-8 pr-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:bg-white focus:border-orange-500 focus:ring-1 focus:ring-orange-500 outline-none transition-all"
+                        placeholder="Search chats or start new chat..."
+                        className="w-full pl-9 pr-8 py-2 bg-slate-100/80 border border-slate-200/70 rounded-xl text-xs text-slate-900 placeholder-slate-500 focus:bg-white focus:border-[#F97316] focus:ring-2 focus:ring-orange-500/15 outline-none transition-all"
+                        id="whatsapp-chat-search"
                       />
+                      {channelSearchFilter && (
+                        <button
+                          type="button"
+                          onClick={() => setChannelSearchFilter('')}
+                          className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 cursor-pointer"
+                          aria-label="Clear search"
+                        >
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                    </div>
+
+                    {/* Interactive Filter Segmented Tabs */}
+                    <div className="flex items-center gap-1 p-1 bg-slate-100 rounded-xl">
+                      {(
+                        [
+                          { id: 'all', label: 'All' },
+                          { id: 'unread', label: totalUnreadMessages > 0 ? `Unread (${totalUnreadMessages})` : 'Unread' },
+                          { id: 'tutors', label: 'Tutors' },
+                          { id: 'support', label: 'Support' },
+                        ] as const
+                      ).map((tab) => (
+                        <button
+                          key={tab.id}
+                          type="button"
+                          onClick={() => setChatListFilter(tab.id)}
+                          className={`flex-1 py-1.5 px-2 text-[11px] font-semibold rounded-lg transition-colors whitespace-nowrap cursor-pointer ${
+                            chatListFilter === tab.id
+                              ? 'bg-white text-slate-900 shadow-2xs'
+                              : 'text-slate-600 hover:text-slate-900'
+                          }`}
+                        >
+                          {tab.label}
+                        </button>
+                      ))}
                     </div>
                   </div>
 
-                  {/* Channels Scroll Area */}
-                  <div className="flex-1 overflow-y-auto p-3 space-y-5">
+                  {/* Scrollable Chats & Participants List */}
+                  <div className="flex-1 min-h-0 overflow-y-auto divide-y divide-slate-100">
+                    {/* Section 1: Recent / Active Chats */}
+                    {filteredActiveChats.length > 0 && (
+                      <div>
+                        <div className="px-4 py-2 bg-slate-50/80 text-[10.5px] font-semibold text-slate-500 uppercase tracking-wider flex items-center justify-between">
+                          <span>Active Conversations</span>
+                          <span className="tabular-nums">{filteredActiveChats.length}</span>
+                        </div>
+                        <div className="divide-y divide-slate-100">
+                          {filteredActiveChats.map((item) => {
+                            const isSelected = localSelectedChatId === item.chat.id;
+                            const isLastFromSelf = item.lastMsg?.senderId === currentUser.id;
+                            const previewText = item.chat.tutorIsTyping
+                              ? 'typing...'
+                              : item.lastMsg?.content
+                              ? `${isLastFromSelf ? 'You: ' : ''}${item.lastMsg.content}`
+                              : item.lastMsg?.fileName
+                              ? `Attachment: ${item.lastMsg.fileName}`
+                              : item.chat.subject || 'Tap to open chat';
 
-                    {(() => {
-                      const supportChat = studentChats.find(c => c.tutorId === 'admin_emily' || c.tutorId.startsWith('admin_'));
-                      
-                      // AUTOMATED TUTOR MATCHING LOGIC:
-                      // Display tutors assigned to student requests OR already present in student's tutor chats
-                      const assignedTutorIds = new Set<string>(
-                        studentAssignments
-                          .filter(a => a.tutorId && !a.tutorId.startsWith('admin_') && a.tutorId !== 'admin_emily' && a.tutorId !== 'admin_shaka')
-                          .map(a => a.tutorId as string)
-                      );
-
-                      const assignedTutorChats = studentChats.filter(c => 
-                        !c.tutorId.startsWith('admin_') && c.tutorId !== 'admin_emily' && c.tutorId !== 'admin_shaka'
-                      );
-
-                      const filteredTutorChats = assignedTutorChats.filter(c => {
-                        const tutor = getTutor(c.tutorId);
-                        const query = channelSearchFilter.toLowerCase();
-                        return !query || (tutor?.name.toLowerCase().includes(query)) || (c.subject.toLowerCase().includes(query));
-                      });
-
-                      // Assigned tutors that have an assignment matched but no chat thread instantiated yet
-                      const pendingAssignedTutorIds = Array.from(assignedTutorIds).filter(
-                        id => !assignedTutorChats.some(c => c.tutorId === id)
-                      );
-
-                      return (
-                        <>
-                          {/* SECTION 1: SUPPORT CHANNELS */}
-                          <div>
-                            <div className="px-2 mb-2 flex items-center justify-between">
-                              <span className="text-[10px] font-bold text-slate-400 tracking-wider uppercase">Support Channel</span>
-                              <span className="text-[10px] text-emerald-600 font-semibold flex items-center gap-1">
-                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span> 24/7 Available
-                              </span>
-                            </div>
-
-                            {supportChat ? (
-                              <div 
-                                onClick={() => {
-                                  setLocalSelectedChatId(supportChat.id);
-                                  setIsMobileChannelsOpen(false);
-                                  if (onSubscribeToChatDetails) onSubscribeToChatDetails(supportChat.id);
-                                }} 
-                                className={`p-3 rounded-xl cursor-pointer transition-all border flex items-start gap-3 relative group ${
-                                  localSelectedChatId === supportChat.id
-                                    ? 'border-orange-200 bg-orange-50/50 shadow-xs'
-                                    : 'border-transparent hover:bg-slate-50'
+                            return (
+                              <button
+                                key={item.chat.id}
+                                type="button"
+                                onClick={() => handleSelectConversation(item.chat.id)}
+                                className={`w-full px-4 py-3 flex items-center gap-3 text-left transition-colors cursor-pointer ${
+                                  isSelected
+                                    ? 'bg-[#FFF5EB]'
+                                    : 'bg-white hover:bg-slate-50'
                                 }`}
                               >
                                 <div className="relative shrink-0">
-                                  <div className="w-10 h-10 rounded-xl bg-orange-500 text-white flex items-center justify-center font-bold shadow-md shadow-orange-500/20">
-                                    <Headset className="w-5 h-5" />
-                                  </div>
-                                  <span className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 bg-emerald-500 border-2 border-white rounded-full"></span>
+                                  {item.isSupport ? (
+                                    <div className="w-11 h-11 rounded-full bg-[#F97316] text-white flex items-center justify-center font-bold shadow-2xs">
+                                      <Headset className="w-5 h-5" />
+                                    </div>
+                                  ) : (
+                                    <ResponsiveAvatar
+                                      src={item.participantUser?.avatarUrl}
+                                      alt={item.displayName}
+                                      sizePx={48}
+                                      width={44}
+                                      height={44}
+                                      className="w-11 h-11 rounded-full object-cover border border-slate-200"
+                                    />
+                                  )}
+                                  <span className="absolute bottom-0 right-0 w-3 h-3 rounded-full bg-emerald-500 border-2 border-white" />
                                 </div>
+
                                 <div className="flex-1 min-w-0">
-                                  <div className="flex items-center justify-between mb-0.5">
-                                    <h4 className="text-xs font-bold text-slate-900 group-hover:text-orange-600 transition-colors truncate">Chat with Support/Admin</h4>
-                                    <span className="text-[10px] font-medium text-slate-400">Online</span>
+                                  <div className="flex items-center justify-between gap-2">
+                                    <span className="text-[13.5px] font-bold text-slate-900 truncate">
+                                      {item.displayName}
+                                    </span>
+                                    <span
+                                      className={`text-[11px] tabular-nums shrink-0 ${
+                                        item.unreadCount > 0 ? 'font-bold text-[#F97316]' : 'text-slate-400'
+                                      }`}
+                                    >
+                                      {formatChatListTime(item.lastTimeIso)}
+                                    </span>
                                   </div>
-                                  <p className="text-xs text-slate-500 truncate">
-                                    {messages.filter(m => m.chatId === supportChat.id).slice(-1)[0]?.content || "24/7 Support Desk Active"}
-                                  </p>
+
+                                  <div className="text-[11px] text-slate-500 truncate mt-0.5">
+                                    {item.isSupport
+                                      ? 'Support · 24/7 Desk'
+                                      : item.isAssigned
+                                      ? `Assigned Tutor · ${item.primarySubj}`
+                                      : `Tutor · ${item.primarySubj}`}
+                                  </div>
+
+                                  <div className="flex items-center justify-between gap-2 mt-0.5">
+                                    <p
+                                      className={`text-xs truncate flex items-center gap-1 ${
+                                        item.chat.tutorIsTyping
+                                          ? 'text-emerald-600 font-semibold'
+                                          : item.unreadCount > 0
+                                          ? 'text-slate-800 font-semibold'
+                                          : 'text-slate-500'
+                                      }`}
+                                    >
+                                      {isLastFromSelf && !item.chat.tutorIsTyping && item.lastMsg && (
+                                        <CheckCheck
+                                          className={`w-3.5 h-3.5 shrink-0 ${
+                                            item.lastMsg.read ? 'text-sky-500' : 'text-slate-400'
+                                          }`}
+                                        />
+                                      )}
+                                      <span className="truncate">{previewText}</span>
+                                    </p>
+
+                                    {item.unreadCount > 0 && (
+                                      <span className="min-w-[20px] h-5 px-1.5 rounded-full bg-[#F97316] text-white text-[10.5px] font-bold flex items-center justify-center tabular-nums shrink-0">
+                                        {item.unreadCount}
+                                      </span>
+                                    )}
+                                  </div>
                                 </div>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Section 2: Support Quick-Start (when no room opened yet) */}
+                    {availableSupportParticipants.length > 0 && (
+                      <div>
+                        <div className="px-4 py-2 bg-slate-50/80 text-[10.5px] font-semibold text-slate-500 uppercase tracking-wider">
+                          Support &amp; Admin Desk
+                        </div>
+                        <div className="divide-y divide-slate-100">
+                          {availableSupportParticipants.map((p) => (
+                            <button
+                              key={p.id}
+                              type="button"
+                              onClick={() => openWorkspaceChat(p.id)}
+                              className="w-full px-4 py-3 flex items-center gap-3 text-left bg-white hover:bg-slate-50 transition-colors cursor-pointer"
+                            >
+                              <div className="relative shrink-0">
+                                <div className="w-11 h-11 rounded-full bg-orange-50 text-[#F97316] border border-orange-200 flex items-center justify-center">
+                                  <Headset className="w-5 h-5" />
+                                </div>
+                                <span className="absolute bottom-0 right-0 w-3 h-3 rounded-full bg-emerald-500 border-2 border-white" />
                               </div>
-                            ) : (
-                              <div 
-                                onClick={() => {
-                                  onOpenChat('admin_shaka');
-                                  setIsMobileChannelsOpen(false);
-                                }}
-                                className="p-3 rounded-xl cursor-pointer transition-all border border-dashed border-orange-200 bg-orange-50/30 hover:bg-orange-50/60 flex items-start gap-3 relative group"
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center justify-between gap-2">
+                                  <span className="text-[13.5px] font-bold text-slate-900 truncate">{p.name}</span>
+                                  <span className="text-[11px] font-semibold text-[#F97316] shrink-0">Open</span>
+                                </div>
+                                <p className="text-xs text-slate-500 truncate mt-0.5">{p.roleLabel}</p>
+                              </div>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Section 3: All Participants (Assigned & Available Academic Tutors) */}
+                    {visibleTutorParticipants.length > 0 && (
+                      <div>
+                        <div className="px-4 py-2 bg-slate-50/80 text-[10.5px] font-semibold text-slate-500 uppercase tracking-wider flex items-center justify-between">
+                          <span className="flex items-center gap-1.5">
+                            <Users className="w-3.5 h-3.5 text-slate-400" />
+                            <span>All Participants</span>
+                          </span>
+                          <span className="tabular-nums">{availableTutorParticipants.length}</span>
+                        </div>
+                        <div className="divide-y divide-slate-100">
+                          {visibleTutorParticipants.map((tutor) => {
+                            const isAssigned = assignedTutorIdSet.has(tutor.id);
+                            const expertise =
+                              tutor.primarySubject ||
+                              tutor.subjects?.[0] ||
+                              'Academic Specialist';
+                            return (
+                              <button
+                                key={tutor.id}
+                                type="button"
+                                onClick={() => openWorkspaceChat(tutor.id)}
+                                className="w-full px-4 py-3 flex items-center gap-3 text-left bg-white hover:bg-slate-50 transition-colors cursor-pointer"
                               >
                                 <div className="relative shrink-0">
-                                  <div className="w-10 h-10 rounded-xl bg-orange-500 text-white flex items-center justify-center font-bold shadow-md shadow-orange-500/20 animate-pulse">
-                                    <Headset className="w-5 h-5" />
-                                  </div>
-                                  <span className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 bg-emerald-500 border-2 border-white rounded-full"></span>
+                                  <ResponsiveAvatar
+                                    src={tutor.avatarUrl}
+                                    alt={tutor.name}
+                                    sizePx={48}
+                                    width={44}
+                                    height={44}
+                                    className="w-11 h-11 rounded-full object-cover border border-slate-200"
+                                  />
+                                  <span className="absolute bottom-0 right-0 w-3 h-3 rounded-full bg-emerald-500 border-2 border-white" />
                                 </div>
                                 <div className="flex-1 min-w-0">
-                                  <div className="flex items-center justify-between mb-0.5">
-                                    <h4 className="text-xs font-bold text-slate-900 truncate">Chat with Support/Admin</h4>
-                                    <span className="text-[10px] font-bold text-orange-600">24/7</span>
+                                  <div className="flex items-center justify-between gap-2">
+                                    <span className="text-[13.5px] font-bold text-slate-900 truncate">
+                                      {tutor.name}
+                                    </span>
+                                    <span className="text-[11px] font-semibold text-[#F97316] shrink-0">
+                                      Chat
+                                    </span>
                                   </div>
-                                  <p className="text-xs text-orange-600 font-semibold truncate">Click to message 24/7 Support Desk</p>
+                                  <p className="text-xs text-slate-500 truncate mt-0.5">
+                                    {isAssigned ? `Assigned · ${expertise}` : `${expertise} · ★ ${tutor.rating || 4.9}`}
+                                  </p>
                                 </div>
-                              </div>
-                            )}
-                          </div>
-
-                          {/* SECTION 2: AUTOMATICALLY ASSIGNED TUTORS ONLY */}
-                          <div>
-                            <div className="px-2 mb-2 flex items-center justify-between">
-                              <span className="text-[10px] font-bold text-slate-400 tracking-wider uppercase">Assigned Academic Tutors</span>
-                              <span className="text-[10px] font-semibold text-emerald-600 flex items-center gap-1">
-                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
-                                {assignedTutorChats.length + pendingAssignedTutorIds.length} Matched
-                              </span>
+                              </button>
+                            );
+                          })}
+                        </div>
+                        {!normalizedChatSearch &&
+                          !showAllParticipants &&
+                          availableTutorParticipants.length > 30 && (
+                            <div className="p-3 text-center bg-slate-50/50">
+                              <button
+                                type="button"
+                                onClick={() => setShowAllParticipants(true)}
+                                className="px-4 py-2 text-xs font-semibold text-[#F97316] hover:bg-orange-50 rounded-xl border border-orange-200 transition-colors cursor-pointer"
+                              >
+                                Show all {availableTutorParticipants.length} participants
+                              </button>
                             </div>
+                          )}
+                      </div>
+                    )}
 
-                            <div className="space-y-1.5">
-                              {filteredTutorChats.map((c) => {
-                                const tutor = getTutor(c.tutorId);
-                                const lastMsg = messages.filter(m => m.chatId === c.id).slice(-1)[0];
-                                const isSelected = localSelectedChatId === c.id;
-                                const linkedAssign = studentAssignments.find(a => a.tutorId === c.tutorId);
-                                return (
-                                  <div 
-                                    key={c.id} 
-                                    onClick={() => {
-                                      setLocalSelectedChatId(c.id);
-                                      setIsMobileChannelsOpen(false);
-                                      if (onSubscribeToChatDetails) onSubscribeToChatDetails(c.id);
-                                    }} 
-                                    className={`p-3 rounded-xl cursor-pointer transition-all border flex items-start gap-3 relative group ${
-                                      isSelected
-                                        ? 'border-orange-200 bg-orange-50/50 shadow-xs'
-                                        : 'border-transparent hover:bg-slate-50'
-                                    }`}
-                                  >
-                                    <div className="relative shrink-0">
-                                      <ResponsiveAvatar
-                                        src={tutor?.avatarUrl}
-                                        alt=""
-                                        sizePx={48}
-                                        width={40}
-                                        height={40}
-                                        fallbackSrc="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=96&h=96&fit=crop&auto=format&q=75"
-                                        className="w-10 h-10 rounded-xl object-cover ring-2 ring-slate-100"
-                                      />
-                                      <span className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 bg-emerald-500 border-2 border-white rounded-full"></span>
-                                    </div>
-                                    <div className="flex-1 min-w-0">
-                                      <div className="flex items-center justify-between mb-0.5">
-                                        <div className="flex items-center gap-1.5 truncate">
-                                          <h4 className="text-xs font-bold text-slate-900 truncate">{tutor?.name || 'Assigned Tutor'}</h4>
-                                          <span className="text-[9px] font-bold bg-emerald-50 text-emerald-700 px-1.5 py-0.2 rounded border border-emerald-200/60 shrink-0">
-                                            Matched
-                                          </span>
-                                        </div>
-                                        <span className="text-[10px] font-medium text-slate-400 shrink-0">
-                                          {lastMsg ? new Date(lastMsg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}
-                                        </span>
-                                      </div>
-                                      <p className="text-[11px] text-slate-500 truncate">{c.subject || linkedAssign?.title || 'Academic Consultation'}</p>
-                                      {lastMsg && (
-                                        <p className="text-[11px] text-slate-400 truncate italic mt-0.5">{lastMsg.content}</p>
-                                      )}
-                                    </div>
-                                  </div>
-                                );
-                              })}
-
-                              {/* Pending assigned tutors with an active assignment */}
-                              {pendingAssignedTutorIds.map((tutorId) => {
-                                const tutor = getTutor(tutorId);
-                                const linkedAssign = studentAssignments.find(a => a.tutorId === tutorId);
-                                return (
-                                  <div
-                                    key={tutorId}
-                                    onClick={() => {
-                                      const tutorName = tutor?.name || 'Academic Tutor';
-                                      const msg = `Hi ${tutorName}, I am reaching out regarding my matched assignment: "${linkedAssign?.title || 'Coursework'}". Let's coordinate!`;
-                                      onOpenChat(tutorId, msg);
-                                      setIsMobileChannelsOpen(false);
-                                    }}
-                                    className="p-3 rounded-xl cursor-pointer transition-all border border-orange-100 bg-orange-50/20 hover:bg-orange-50/60 flex items-start gap-3 relative group"
-                                  >
-                                    <div className="relative shrink-0">
-                                      <ResponsiveAvatar
-                                        src={tutor?.avatarUrl}
-                                        alt=""
-                                        sizePx={48}
-                                        width={40}
-                                        height={40}
-                                        fallbackSrc="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=96&h=96&fit=crop&auto=format&q=75"
-                                        className="w-10 h-10 rounded-xl object-cover ring-2 ring-orange-200"
-                                      />
-                                      <span className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 bg-emerald-500 border-2 border-white rounded-full"></span>
-                                    </div>
-                                    <div className="flex-1 min-w-0">
-                                      <div className="flex items-center justify-between mb-0.5">
-                                        <div className="flex items-center gap-1.5 truncate">
-                                          <h4 className="text-xs font-bold text-slate-900 truncate">{tutor?.name || 'Assigned Tutor'}</h4>
-                                          <span className="text-[9px] font-bold bg-orange-100 text-orange-800 px-1.5 py-0.2 rounded border border-orange-200 shrink-0">
-                                            Start Chat
-                                          </span>
-                                        </div>
-                                      </div>
-                                      <p className="text-[11px] text-orange-700 font-semibold truncate">
-                                        Assigned for: {linkedAssign?.title || 'Academic Assignment'}
-                                      </p>
-                                    </div>
-                                  </div>
-                                );
-                              })}
-
-                              {assignedTutorChats.length === 0 && pendingAssignedTutorIds.length === 0 && (
-                                <div className="p-4 text-center text-[11px] text-slate-400 bg-slate-50 border border-dashed rounded-xl leading-relaxed">
-                                  No automated tutor matches active yet. Submit an assignment request to be automatically paired with a certified scholar!
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                        </>
-                      );
-                    })()}
-
+                    {filteredActiveChats.length === 0 &&
+                      availableSupportParticipants.length === 0 &&
+                      visibleTutorParticipants.length === 0 && (
+                        <div className="p-8 text-center space-y-2">
+                          <p className="text-sm font-semibold text-slate-800">No matching chats or participants</p>
+                          <p className="text-xs text-slate-500">
+                            {chatListFilter === 'unread'
+                              ? 'All messages have been read.'
+                              : 'Try clearing your search or switching back to All.'}
+                          </p>
+                          {(channelSearchFilter || chatListFilter !== 'all') && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setChannelSearchFilter('');
+                                setChatListFilter('all');
+                              }}
+                              className="mt-2 px-3.5 py-1.5 rounded-xl bg-orange-50 text-[#F97316] text-xs font-semibold cursor-pointer"
+                            >
+                              Reset Filters
+                            </button>
+                          )}
+                        </div>
+                      )}
                   </div>
 
-                  {/* Footer: Security Status Badge */}
-                  <div className="p-3 bg-slate-50 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500">
+                  {/* Footer: Security Status */}
+                  <div className="px-4 py-2.5 bg-slate-50 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500 shrink-0">
                     <span className="flex items-center gap-1.5 font-medium">
-                      <ShieldCheck className="w-4 h-4 text-emerald-600" />
-                      Encrypted Workspace
+                      <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0" />
+                      <span>End-to-end Workspace Encryption</span>
                     </span>
-                    <span className="text-emerald-700 bg-emerald-100/70 font-semibold px-2 py-0.5 rounded text-[10px]">Secure</span>
                   </div>
                 </aside>
 
-                {/* CENTER CHAT DISPLAY WORKSPACE */}
-                <main className="flex-1 min-w-0 min-h-0 bg-white flex flex-col shadow-xs overflow-hidden relative">
-                  {selectedChat ? (
+                {/* RIGHT PANE: EXPANDED WHATSAPP CONVERSATION VIEW */}
+                <main
+                  className={`flex-1 min-w-0 min-h-0 bg-[#FAF6F0] flex-col overflow-hidden relative ${
+                    selectedChat ? 'flex' : 'hidden md:flex'
+                  }`}
+                  id="whatsapp-chat-conversation-pane"
+                >
+                  {selectedChat && selectedChatPeer ? (
                     <>
-                      {/* CHAT HEADER */}
-                      <div className="px-3.5 sm:px-5 py-3 border-b border-slate-100 bg-white flex items-center justify-between gap-2 shrink-0 z-10 min-w-0">
-                        {/* Active User Details */}
+                      {/* WHATSAPP CONVERSATION HEADER */}
+                      <div className="px-3 sm:px-5 py-3 border-b border-slate-200/80 bg-white flex items-center justify-between gap-2 shrink-0 z-10 min-w-0">
                         <div className="flex items-center gap-2.5 sm:gap-3 min-w-0 flex-1">
-                          <button 
-                            type="button" 
-                            onClick={() => setIsMobileChannelsOpen(true)}
-                            className="md:hidden p-2 rounded-xl bg-orange-50 hover:bg-orange-100 text-orange-700 border border-orange-200 transition-all cursor-pointer shrink-0"
-                            title="Open Channels Directory"
+                          <button
+                            type="button"
+                            onClick={handleCloseConversation}
+                            className="p-2 -ml-1 rounded-xl text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition-colors cursor-pointer shrink-0 flex items-center gap-1"
+                            title="Close chat and return to list"
+                            aria-label="Close chat and return to list"
+                            id="whatsapp-back-to-list-btn"
                           >
-                            <MessageSquare className="w-4 h-4 text-orange-600" />
+                            <ArrowLeft className="w-4 h-4" />
+                            <span className="hidden sm:inline md:hidden text-xs font-semibold">Chats</span>
                           </button>
+
                           <div className="relative shrink-0">
                             <ResponsiveAvatar
-                              src={selectedChat.tutorId.startsWith('admin_')
-                                ? 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=96&h=96&fit=crop&auto=format&q=75'
-                                : getTutor(selectedChat.tutorId)?.avatarUrl}
-                              alt="Tutor"
-                              sizePx={48}
-                              width={44}
-                              height={44}
-                              fallbackSrc="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=96&h=96&fit=crop&auto=format&q=75"
-                              className="w-10 h-10 sm:w-11 sm:h-11 rounded-xl object-cover ring-2 ring-slate-100"
+                              src={selectedChatPeer.avatarUrl}
+                              alt={selectedChatPeer.name}
+                              sizePx={44}
+                              width={40}
+                              height={40}
+                              className="w-10 h-10 rounded-full object-cover border border-slate-200"
                             />
-                            <span className="w-3.5 h-3.5 bg-emerald-500 border-2 border-white rounded-full absolute -bottom-0.5 -right-0.5"></span>
+                            <span className="w-3 h-3 bg-emerald-500 border-2 border-white rounded-full absolute bottom-0 right-0" />
                           </div>
+
                           <div className="min-w-0 flex-1">
                             <div className="flex items-center gap-2 min-w-0">
-                              <h3 className="font-bold text-slate-900 text-sm md:text-base leading-tight truncate">
-                                {selectedChat.tutorId.startsWith('admin_') || selectedChat.tutorId === 'admin_emily'
-                                  ? 'Official Support Desk (Emily Vance)'
-                                  : (getTutor(selectedChat.tutorId)?.name || 'Academic Tutor')}
+                              <h3 className="font-bold text-slate-900 text-sm sm:text-[15px] leading-tight truncate">
+                                {selectedChatPeer.name}
                               </h3>
-                              <span className="hidden sm:inline-block px-2 py-0.5 text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200/60 rounded-full shrink-0">
-                                Active Now
-                              </span>
                             </div>
-                            <p className="text-xs text-slate-500 font-medium truncate">
-                              Subject: {selectedChat.subject || 'Direct Consultation'}
+                            <p className="text-[11.5px] text-slate-500 truncate">
+                              {selectedChat.tutorIsTyping
+                                ? 'typing...'
+                                : `Online · ${selectedChatPeer.subtitle}`}
                             </p>
                           </div>
                         </div>
 
-                        {/* Right Quick Toolbar */}
-                        <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
-                          <button 
+                        {/* Conversation Toolbar: Quote & Files, Expand/Split, Close Chat */}
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          <button
                             type="button"
-                            onClick={() => setIsQuoteDrawerOpen(!isQuoteDrawerOpen)} 
-                            className="flex items-center gap-1.5 px-2.5 sm:px-3.5 py-2 bg-gradient-to-r from-orange-50 to-orange-100 hover:from-orange-100 hover:to-orange-200 text-orange-700 border border-orange-200 rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer whitespace-nowrap"
+                            onClick={() => setIsQuoteDrawerOpen(!isQuoteDrawerOpen)}
+                            className="flex items-center gap-1.5 px-2.5 sm:px-3 py-2 bg-orange-50 hover:bg-orange-100 text-[#EA580C] border border-orange-200 rounded-xl text-xs font-semibold transition-colors cursor-pointer whitespace-nowrap"
                           >
-                            <DollarSign className="w-4 h-4 text-orange-600 shrink-0" />
+                            <DollarSign className="w-4 h-4 shrink-0" />
                             <span className="hidden sm:inline">Quote &amp; Files</span>
                             <span className="sm:hidden">Quote</span>
                           </button>
 
-                          <div className="h-5 w-px bg-slate-200 mx-1 hidden md:block"></div>
+                          <button
+                            type="button"
+                            onClick={() => setIsChatExpanded((prev) => !prev)}
+                            className="hidden md:inline-flex items-center gap-1.5 px-2.5 py-2 text-slate-600 hover:text-slate-900 hover:bg-slate-100 border border-slate-200 rounded-xl text-xs font-semibold transition-colors cursor-pointer whitespace-nowrap"
+                            title={isChatExpanded ? 'Show chats sidebar' : 'Expand chat full width'}
+                            aria-label={isChatExpanded ? 'Show chats sidebar' : 'Expand chat full width'}
+                          >
+                            {isChatExpanded ? (
+                              <Minimize2 className="w-4 h-4" />
+                            ) : (
+                              <Maximize2 className="w-4 h-4" />
+                            )}
+                          </button>
 
-                          <button type="button" className="hidden md:inline-flex p-2 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors" title="Voice Call">
-                            <Phone className="w-4 h-4" />
-                          </button>
-                          <button type="button" className="hidden md:inline-flex p-2 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors" title="Video Consultation">
-                            <Video className="w-4 h-4" />
-                          </button>
-                          <button type="button" className="hidden sm:inline-flex p-2 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors" title="More options">
-                            <MoreVertical className="w-4 h-4" />
+                          <button
+                            type="button"
+                            onClick={handleCloseConversation}
+                            className="inline-flex items-center gap-1 px-2.5 py-2 text-slate-600 hover:text-rose-600 hover:bg-rose-50 border border-slate-200 rounded-xl text-xs font-semibold transition-colors cursor-pointer whitespace-nowrap"
+                            title="Close active chat"
+                            aria-label="Close active chat"
+                            id="whatsapp-close-chat-btn"
+                          >
+                            <X className="w-4 h-4" />
+                            <span className="hidden lg:inline">Close</span>
                           </button>
                         </div>
                       </div>
 
-                      {/* ACADEMIC SAFETY SHIELD PINNED BANNER */}
+                      {/* ACADEMIC SAFETY SHIELD BANNER */}
                       {showSafetyBanner && (
-                        <div className="bg-gradient-to-r from-amber-50/90 via-orange-50/50 to-amber-50/90 border-b border-amber-200/60 px-5 py-2.5 flex items-center justify-between text-xs text-amber-900 shrink-0">
-                          <div className="flex items-center gap-2.5">
-                            <div className="w-6 h-6 rounded-lg bg-amber-500/10 text-amber-600 flex items-center justify-center shrink-0">
-                              <ShieldCheck className="w-4 h-4" />
-                            </div>
-                            <span>
-                              <strong className="font-bold text-amber-950">Academic Safety Shield:</strong> All communications, instructions, and files are protected under strict platform security layers.
+                        <div className="bg-amber-50/90 border-b border-amber-200/70 px-4 py-2 flex items-center justify-between gap-2 text-[11.5px] text-amber-900 shrink-0">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <ShieldCheck className="w-4 h-4 text-amber-600 shrink-0" />
+                            <span className="truncate">
+                              <strong className="font-semibold">Encrypted Workspace:</strong> Messages, quotes, and files are protected inside your University-Tutors account.
                             </span>
                           </div>
-                          <button onClick={() => setShowSafetyBanner(false)} className="text-amber-700/60 hover:text-amber-900 p-1 rounded transition-colors">
+                          <button
+                            type="button"
+                            onClick={() => setShowSafetyBanner(false)}
+                            className="text-amber-700/70 hover:text-amber-900 p-1 rounded cursor-pointer shrink-0"
+                            aria-label="Dismiss banner"
+                          >
                             <X className="w-3.5 h-3.5" />
                           </button>
                         </div>
@@ -3300,167 +3589,203 @@ export default function StudentDashboard({
                       {/* MESSAGE STREAM CANVAS */}
                       <div
                         ref={chatScrollContainerRef}
-                        className="flex-1 min-h-0 overflow-y-auto overscroll-contain p-3.5 sm:p-5 space-y-3 bg-slate-50/40"
+                        className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-3.5 sm:px-6 py-4 space-y-2.5"
                       >
-                        <div className="flex items-center justify-center my-2">
-                          <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 bg-slate-200/70 border border-slate-300/40 px-3 py-0.5 rounded-full">
-                            Academic Security System • Active Thread
-                          </span>
-                        </div>
+                        {isLoadingMessages && activeChatMessages.length === 0 ? (
+                          <div className="space-y-3 py-4 animate-pulse" aria-busy="true" aria-label="Loading messages">
+                            <div className="flex justify-start">
+                              <div className="h-14 w-56 bg-white/90 rounded-2xl rounded-bl-xs border border-slate-200/60" />
+                            </div>
+                            <div className="flex justify-end">
+                              <div className="h-12 w-48 bg-orange-200/70 rounded-2xl rounded-br-xs" />
+                            </div>
+                            <div className="flex justify-start">
+                              <div className="h-16 w-64 bg-white/90 rounded-2xl rounded-bl-xs border border-slate-200/60" />
+                            </div>
+                          </div>
+                        ) : activeChatMessages.length === 0 ? (
+                          <div className="max-w-sm mx-auto my-8 bg-white/95 border border-slate-200/80 rounded-2xl p-5 text-center space-y-2 shadow-2xs">
+                            <div className="w-10 h-10 rounded-full bg-orange-50 text-[#F97316] flex items-center justify-center mx-auto">
+                              <MessageCircle className="w-5 h-5" />
+                            </div>
+                            <h4 className="text-sm font-bold text-slate-900">
+                              Start chatting with {selectedChatPeer.name}
+                            </h4>
+                            <p className="text-xs text-slate-500 leading-relaxed">
+                              Share your assignment details, ask questions, or request a formal quote below.
+                            </p>
+                          </div>
+                        ) : (
+                          activeChatMessages.map((m, idx) => {
+                            const prevMsg = idx > 0 ? activeChatMessages[idx - 1] : null;
+                            const curDateLabel = formatDateSeparator(m.timestamp);
+                            const prevDateLabel = prevMsg ? formatDateSeparator(prevMsg.timestamp) : '';
+                            const showDateChip = curDateLabel && curDateLabel !== prevDateLabel;
 
-                        <div className="max-w-xl mx-auto bg-amber-50/80 border border-amber-200 rounded-xl p-3.5 text-xs text-amber-800 flex items-start gap-3 shadow-xs">
-                          <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
-                          <p className="leading-relaxed">
-                            <strong className="font-bold text-amber-900">Connection established.</strong> Students can discuss assignment details or schedule 1-on-1 tutoring. All messages are encrypted.
-                          </p>
-                        </div>
+                            const isSelf = m.senderId === currentUser.id;
+                            const isSystem = m.senderId === 'system' || m.isSystem;
+                            const senderObj = isSelf ? currentUser : getTutor(m.senderId);
+                            const isStaffAdmin =
+                              !isSelf &&
+                              (m.senderId?.startsWith('admin_') ||
+                                m.senderId === 'admin_emily' ||
+                                m.senderId === 'admin_shaka' ||
+                                senderObj?.role === UserRole.ADMIN);
+                            const senderRoleLabel = isStaffAdmin ? 'Admin' : 'Tutor';
+                            const senderDisplayName = isSelf
+                              ? 'You'
+                              : senderObj?.name || (isStaffAdmin ? 'Platform Support Desk' : 'Academic Tutor');
 
-                        {activeChatMessages.map((m) => {
-                          const isSelf = m.senderId === currentUser.id;
-                          const isSystem = m.senderId === 'system' || m.isSystem;
-                          const senderObj = isSelf ? currentUser : getTutor(m.senderId);
-                          const isStaffAdmin = !isSelf && (m.senderId?.startsWith('admin_') || m.senderId === 'admin_emily' || senderObj?.role === UserRole.ADMIN);
-                          const senderRoleLabel = isStaffAdmin ? 'Admin' : 'Tutor';
-                          const senderDisplayName = isSelf
-                            ? 'You'
-                            : (senderObj?.name || (isStaffAdmin ? 'Platform Support Desk' : 'Academic Tutor'));
-
-                          if (isSystem) {
                             return (
-                              <div key={m.id} className="flex justify-center my-2">
-                                <span className="bg-amber-50/80 text-amber-900 border border-amber-200 px-4 py-2 rounded-2xl text-center text-xs font-semibold max-w-lg shadow-xs">
-                                  {m.content}
-                                </span>
-                              </div>
-                            );
-                          }
-
-                          return (
-                            <div
-                              key={m.id}
-                              className={`flex w-full ${isSelf ? 'justify-end' : 'justify-start'}`}
-                            >
-                              <div
-                                className={`flex items-end gap-2 max-w-[78%] sm:max-w-[75%] ${
-                                  isSelf ? 'ml-auto flex-row-reverse' : 'mr-auto'
-                                }`}
-                              >
-                                {!isSelf && (
-                                  <ResponsiveAvatar
-                                    src={senderObj?.avatarUrl}
-                                    alt={senderDisplayName}
-                                    sizePx={32}
-                                    width={28}
-                                    height={28}
-                                    fallbackSrc="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=64&h=64&fit=crop&auto=format&q=75"
-                                    className="w-7 h-7 rounded-full object-cover shrink-0 border border-slate-200"
-                                  />
+                              <React.Fragment key={m.id}>
+                                {showDateChip && (
+                                  <div className="flex justify-center my-2">
+                                    <span className="px-3 py-1 rounded-lg bg-white/90 border border-slate-200/80 text-[11px] font-semibold text-slate-600 shadow-2xs">
+                                      {curDateLabel}
+                                    </span>
+                                  </div>
                                 )}
 
-                                <div
-                                  className={`px-3.5 py-2.5 rounded-2xl text-xs sm:text-sm shadow-xs break-words ${
-                                    isSelf
-                                      ? 'bg-[#F97316] text-white rounded-br-sm'
-                                      : 'bg-[#F3F4F6] sm:bg-white border border-slate-200 text-slate-900 rounded-bl-sm'
-                                  }`}
-                                >
-                                  {!isSelf && (
-                                    <div className="flex items-center gap-1.5 mb-1">
-                                      <span className="text-[11px] font-bold text-orange-600 truncate">
-                                        {senderDisplayName}
-                                      </span>
-                                      <span className="text-[9px] font-bold uppercase text-slate-500">
-                                        • {senderRoleLabel}
-                                      </span>
-                                    </div>
-                                  )}
-
-                                  <p className="whitespace-pre-wrap leading-relaxed text-left">{m.content}</p>
-
-                                  {m.fileUrl && (
+                                {isSystem ? (
+                                  <div className="flex justify-center my-1.5">
+                                    <span className="bg-amber-50 text-amber-900 border border-amber-200 px-3.5 py-1.5 rounded-xl text-center text-xs font-medium max-w-md shadow-2xs">
+                                      {m.content}
+                                    </span>
+                                  </div>
+                                ) : (
+                                  <div className={`flex w-full ${isSelf ? 'justify-end' : 'justify-start'}`}>
                                     <div
-                                      className={`mt-2 p-2 rounded-xl border flex items-center justify-between text-xs ${
-                                        isSelf
-                                          ? 'bg-white/15 border-white/25 text-white'
-                                          : 'bg-white border-slate-200 text-slate-800'
+                                      className={`flex items-end gap-2 max-w-[80%] sm:max-w-[75%] ${
+                                        isSelf ? 'ml-auto flex-row-reverse' : 'mr-auto'
                                       }`}
                                     >
-                                      <div className="flex items-center gap-1.5 truncate">
-                                        <FileText className={`w-4 h-4 shrink-0 ${isSelf ? 'text-white' : 'text-orange-500'}`} />
-                                        <span className="truncate font-mono">{m.fileName || 'Attachment'}</span>
-                                      </div>
-                                      <a
-                                        href={m.fileUrl}
-                                        target="_blank"
-                                        rel="noreferrer"
-                                        className={`hover:underline font-bold shrink-0 ml-2 ${
-                                          isSelf ? 'text-white' : 'text-orange-600'
+                                      {!isSelf && (
+                                        <ResponsiveAvatar
+                                          src={senderObj?.avatarUrl}
+                                          alt={senderDisplayName}
+                                          sizePx={32}
+                                          width={28}
+                                          height={28}
+                                          className="w-7 h-7 rounded-full object-cover shrink-0 border border-slate-200"
+                                        />
+                                      )}
+
+                                      <div
+                                        className={`px-3.5 py-2 rounded-2xl text-xs sm:text-sm shadow-2xs break-words ${
+                                          isSelf
+                                            ? 'bg-[#F97316] text-white rounded-br-xs'
+                                            : 'bg-white border border-slate-200/90 text-slate-900 rounded-bl-xs'
                                         }`}
                                       >
-                                        Download
-                                      </a>
-                                    </div>
-                                  )}
+                                        {!isSelf && (
+                                          <div className="flex items-center gap-1.5 mb-0.5 text-[11px]">
+                                            <span className="font-bold text-[#EA580C] truncate">
+                                              {senderDisplayName}
+                                            </span>
+                                            <span className="text-slate-400">· {senderRoleLabel}</span>
+                                          </div>
+                                        )}
 
-                                  <div
-                                    className={`flex items-center gap-1 mt-1 text-[10px] font-medium ${
-                                      isSelf ? 'justify-end text-orange-100' : 'justify-start text-slate-400'
-                                    }`}
-                                  >
-                                    <span>
-                                      {new Date(m.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                                    </span>
-                                    {isSelf && (
-                                      <CheckCheck
-                                        className={`w-3.5 h-3.5 shrink-0 ${m.read ? 'text-white' : 'text-orange-100/80'}`}
-                                        aria-label={m.read ? 'Read' : 'Sent'}
-                                      />
-                                    )}
+                                        <p className="whitespace-pre-wrap leading-relaxed text-left">{m.content}</p>
+
+                                        {m.fileUrl && (
+                                          <div
+                                            className={`mt-2 p-2 rounded-xl border flex items-center justify-between text-xs ${
+                                              isSelf
+                                                ? 'bg-white/15 border-white/25 text-white'
+                                                : 'bg-slate-50 border-slate-200 text-slate-800'
+                                            }`}
+                                          >
+                                            <div className="flex items-center gap-1.5 truncate">
+                                              <FileText
+                                                className={`w-4 h-4 shrink-0 ${
+                                                  isSelf ? 'text-white' : 'text-[#F97316]'
+                                                }`}
+                                              />
+                                              <span className="truncate font-mono">{m.fileName || 'Attachment'}</span>
+                                            </div>
+                                            <a
+                                              href={m.fileUrl}
+                                              target="_blank"
+                                              rel="noreferrer"
+                                              className={`hover:underline font-bold shrink-0 ml-2 ${
+                                                isSelf ? 'text-white' : 'text-[#EA580C]'
+                                              }`}
+                                            >
+                                              Download
+                                            </a>
+                                          </div>
+                                        )}
+
+                                        <div
+                                          className={`flex items-center gap-1 mt-1 text-[10px] font-medium tabular-nums ${
+                                            isSelf ? 'justify-end text-orange-100' : 'justify-start text-slate-400'
+                                          }`}
+                                        >
+                                          <span>
+                                            {new Date(m.timestamp).toLocaleTimeString([], {
+                                              hour: '2-digit',
+                                              minute: '2-digit',
+                                            })}
+                                          </span>
+                                          {isSelf && (
+                                            <CheckCheck
+                                              className={`w-3.5 h-3.5 shrink-0 ${
+                                                m.read ? 'text-sky-200' : 'text-orange-100/80'
+                                              }`}
+                                              aria-label={m.read ? 'Read' : 'Sent'}
+                                            />
+                                          )}
+                                        </div>
+                                      </div>
+                                    </div>
                                   </div>
-                                </div>
-                              </div>
-                            </div>
-                          );
-                        })}
+                                )}
+                              </React.Fragment>
+                            );
+                          })
+                        )}
                         <div ref={chatMessagesEndRef} />
                       </div>
 
-                      {/* QUICK PROMPT SUGGESTION CHIPS */}
-                      <div className="px-3 sm:px-5 py-2 bg-slate-50 border-t border-slate-100 flex items-center gap-2 overflow-x-auto shrink-0">
-                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider shrink-0">Quick Actions:</span>
-                        <button 
+                      {/* PINNED QUICK ACTIONS BAR */}
+                      <div className="px-3 sm:px-5 py-2 bg-white border-t border-slate-200/70 flex items-center gap-2 overflow-x-auto shrink-0">
+                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider shrink-0">
+                          Quick Actions:
+                        </span>
+                        <button
                           type="button"
-                          onClick={() => setStudentReply('Can we review the assignment requirements?')} 
-                          className="px-2.5 py-1 bg-white hover:bg-orange-50 hover:text-orange-600 border border-slate-200 rounded-lg text-xs text-slate-600 whitespace-nowrap transition-colors cursor-pointer shrink-0"
+                          onClick={() => setStudentReply('Can we review the assignment requirements?')}
+                          className="px-2.5 py-1 bg-slate-50 hover:bg-orange-50 hover:text-[#EA580C] border border-slate-200 rounded-lg text-xs text-slate-700 whitespace-nowrap transition-colors cursor-pointer shrink-0"
                         >
-                          📋 Request assignment review
+                          Request assignment review
                         </button>
-                        <button 
+                        <button
                           type="button"
-                          onClick={() => setStudentReply('Please send over a formal price quote for this task.')} 
-                          className="px-2.5 py-1 bg-white hover:bg-orange-50 hover:text-orange-600 border border-slate-200 rounded-lg text-xs text-slate-600 whitespace-nowrap transition-colors cursor-pointer shrink-0"
+                          onClick={() => setStudentReply('Please send over a formal price quote for this task.')}
+                          className="px-2.5 py-1 bg-slate-50 hover:bg-orange-50 hover:text-[#EA580C] border border-slate-200 rounded-lg text-xs text-slate-700 whitespace-nowrap transition-colors cursor-pointer shrink-0"
                         >
-                          💰 Request formal quote
+                          Request formal quote
                         </button>
-                        <button 
+                        <button
                           type="button"
-                          onClick={() => setStudentReply('When are you available for a 1-on-1 tutoring session?')} 
-                          className="px-2.5 py-1 bg-white hover:bg-orange-50 hover:text-orange-600 border border-slate-200 rounded-lg text-xs text-slate-600 whitespace-nowrap transition-colors cursor-pointer shrink-0"
+                          onClick={() => setStudentReply('When are you available for a 1-on-1 tutoring session?')}
+                          className="px-2.5 py-1 bg-slate-50 hover:bg-orange-50 hover:text-[#EA580C] border border-slate-200 rounded-lg text-xs text-slate-700 whitespace-nowrap transition-colors cursor-pointer shrink-0"
                         >
-                          📅 Schedule 1-on-1 session
+                          Schedule 1-on-1 session
                         </button>
                       </div>
 
-                      {/* CHAT INPUT COMPONENT */}
-                      <div className="p-2.5 sm:p-4 bg-white border-t border-slate-200 shrink-0 z-20 shadow-xs w-full">
-                        <form 
+                      {/* PINNED WHATSAPP-STYLE INPUT BAR */}
+                      <div className="p-2.5 sm:p-3.5 bg-white border-t border-slate-200 shrink-0 z-20 w-full">
+                        <form
                           onSubmit={(e) => {
                             e.preventDefault();
                             if (!studentReply.trim() && !chatAttachedFileName) return;
                             if (onSendMessage) {
                               onSendMessage(
-                                selectedChat.id, 
-                                currentUser.id, 
+                                selectedChat.id,
+                                currentUser.id,
                                 studentReply.trim(),
                                 chatAttachedFileName ? `https://example.com/uploads/${chatAttachedFileName}` : undefined,
                                 chatAttachedFileName || undefined
@@ -3468,32 +3793,32 @@ export default function StudentDashboard({
                             }
                             setStudentReply('');
                             setChatAttachedFileName('');
-                          }} 
+                          }}
                           className="flex items-center gap-2 w-full min-w-0"
                         >
                           <label
-                            className="p-2 text-slate-500 hover:text-orange-600 rounded-xl hover:bg-slate-100 transition-colors cursor-pointer shrink-0 flex items-center justify-center"
+                            className="p-2.5 text-slate-500 hover:text-[#F97316] rounded-xl hover:bg-slate-100 transition-colors cursor-pointer shrink-0 flex items-center justify-center"
                             title="Attach file or coursework document"
                             aria-label="Attach file"
                           >
                             <Paperclip className="w-4 h-4" />
-                            <input 
-                              type="file" 
-                              className="hidden" 
+                            <input
+                              type="file"
+                              className="hidden"
                               onChange={(e) => {
                                 if (e.target.files && e.target.files[0]) {
                                   setChatAttachedFileName(e.target.files[0].name);
                                 }
-                              }} 
+                              }}
                             />
                           </label>
 
-                          <div className="flex-1 min-w-0 bg-slate-50 border border-slate-300 rounded-xl px-3 py-1.5 flex items-center gap-2 focus-within:bg-white focus-within:border-orange-500 focus-within:ring-2 focus-within:ring-orange-500/20 transition-all">
+                          <div className="flex-1 min-w-0 bg-slate-50 border border-slate-300 rounded-2xl px-3.5 py-1.5 flex items-center gap-2 focus-within:bg-white focus-within:border-[#F97316] focus-within:ring-2 focus-within:ring-orange-500/20 transition-all">
                             {chatAttachedFileName && (
-                              <span className="text-[10px] bg-orange-100 text-orange-800 px-2 py-0.5 rounded font-mono font-bold truncate max-w-[100px] flex items-center gap-1 shrink-0">
+                              <span className="text-[10px] bg-orange-100 text-orange-800 px-2 py-0.5 rounded font-mono font-bold truncate max-w-[110px] flex items-center gap-1 shrink-0">
                                 <span className="truncate">{chatAttachedFileName}</span>
-                                <button 
-                                  type="button" 
+                                <button
+                                  type="button"
                                   onClick={() => setChatAttachedFileName('')}
                                   className="text-orange-600 hover:text-red-600 font-bold ml-0.5 cursor-pointer shrink-0"
                                   title="Remove attachment"
@@ -3503,8 +3828,8 @@ export default function StudentDashboard({
                               </span>
                             )}
 
-                            <input 
-                              type="text" 
+                            <input
+                              type="text"
                               value={studentReply}
                               onChange={(e) => setStudentReply(e.target.value)}
                               onKeyDown={(e) => {
@@ -3514,22 +3839,18 @@ export default function StudentDashboard({
                                   if (form) form.requestSubmit();
                                 }
                               }}
-                              placeholder="Type your message..." 
-                              className="flex-1 min-w-0 w-full bg-transparent text-xs sm:text-sm text-slate-800 placeholder-slate-400 outline-none py-1"
+                              placeholder={`Message ${selectedChatPeer.name}...`}
+                              className="flex-1 min-w-0 w-full bg-transparent text-xs sm:text-sm text-slate-900 placeholder-slate-400 outline-none py-1"
                             />
-
-                            <button type="button" className="p-1.5 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-200/60 transition-colors hidden sm:block shrink-0" title="Emoji">
-                              <Smile className="w-4 h-4" />
-                            </button>
                           </div>
 
-                          <button 
-                            type="submit" 
+                          <button
+                            type="submit"
                             disabled={!studentReply.trim() && !chatAttachedFileName}
-                            className={`p-2.5 sm:px-3.5 sm:py-2.5 rounded-xl shadow-xs flex items-center justify-center gap-1.5 transition-all transform active:scale-95 cursor-pointer shrink-0 ${
-                              (!studentReply.trim() && !chatAttachedFileName)
+                            className={`p-2.5 sm:px-4 sm:py-2.5 rounded-xl shadow-xs flex items-center justify-center gap-1.5 transition-all active:scale-95 cursor-pointer shrink-0 ${
+                              !studentReply.trim() && !chatAttachedFileName
                                 ? 'bg-slate-200 text-slate-400 cursor-not-allowed opacity-70'
-                                : 'bg-[#F97316] hover:bg-[#EA580C] text-white shadow-orange-500/20'
+                                : 'bg-[#F97316] hover:bg-[#EA580C] text-white'
                             }`}
                             title="Send Message"
                             aria-label="Send message"
@@ -3541,51 +3862,68 @@ export default function StudentDashboard({
                       </div>
 
                       {/* SLIDE-OVER TUTOR QUOTE & DETAILS PANEL */}
-                      <div className={`absolute top-0 right-0 h-full w-80 md:w-96 bg-white border-l border-slate-200 shadow-xl transform transition-transform duration-300 ease-in-out z-30 flex flex-col ${
-                        isQuoteDrawerOpen ? 'translate-x-0' : 'translate-x-full'
-                      }`}>
+                      <div
+                        className={`absolute top-0 right-0 h-full w-80 md:w-96 bg-white border-l border-slate-200 shadow-xl transform transition-transform duration-300 ease-in-out z-30 flex flex-col ${
+                          isQuoteDrawerOpen ? 'translate-x-0' : 'translate-x-full'
+                        }`}
+                      >
                         <div className="p-4 border-b border-slate-100 flex items-center justify-between bg-slate-50">
                           <div className="flex items-center gap-2">
-                            <DollarSign className="w-4 h-4 text-orange-600" />
-                            <h3 className="font-bold text-slate-900 text-sm">Tutor Quote & Details</h3>
+                            <DollarSign className="w-4 h-4 text-[#F97316]" />
+                            <h3 className="font-bold text-slate-900 text-sm">Tutor Quote &amp; Details</h3>
                           </div>
-                          <button onClick={() => setIsQuoteDrawerOpen(false)} className="text-slate-400 hover:text-slate-600 p-1.5 rounded-lg hover:bg-slate-200/50 cursor-pointer">
+                          <button
+                            type="button"
+                            onClick={() => setIsQuoteDrawerOpen(false)}
+                            className="text-slate-400 hover:text-slate-600 p-1.5 rounded-lg hover:bg-slate-200/50 cursor-pointer"
+                          >
                             <X className="w-4 h-4" />
                           </button>
                         </div>
 
                         <div className="flex-1 overflow-y-auto p-4 space-y-4">
-                          {/* Active Assignment Summary */}
                           <div className="bg-slate-50 border border-slate-200 rounded-xl p-3.5">
-                            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Current Order</span>
-                            <h4 className="font-bold text-slate-900 text-sm mt-0.5">{selectedChat.subject || 'Direct Tutoring Consultation'}</h4>
+                            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                              Current Order
+                            </span>
+                            <h4 className="font-bold text-slate-900 text-sm mt-0.5">
+                              {selectedChat.subject || 'Direct Tutoring Consultation'}
+                            </h4>
                             <p className="text-xs text-slate-500 mt-1">
-                              Status: <span className="text-amber-600 font-semibold bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded">Active Discussion</span>
+                              Status:{' '}
+                              <span className="text-amber-600 font-semibold bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded">
+                                Active Discussion
+                              </span>
                             </p>
                           </div>
 
-                          {/* Pending Quote Card */}
                           {(() => {
-                            const pendingQuote = quotes.find(q => q.chatId === selectedChat.id && q.status === 'pending');
+                            const pendingQuote = quotes.find(
+                              (q) => q.chatId === selectedChat.id && q.status === 'pending'
+                            );
                             if (pendingQuote) {
                               return (
                                 <div className="border border-orange-200 bg-orange-50/40 rounded-xl p-4 space-y-3">
                                   <div className="flex items-center justify-between">
                                     <span className="text-xs font-bold text-slate-800">Binding Price Quote</span>
-                                    <span className="text-lg font-black text-orange-600">${pendingQuote.amount}.00</span>
+                                    <span className="text-lg font-black text-[#EA580C] tabular-nums">
+                                      ${pendingQuote.amount}.00
+                                    </span>
                                   </div>
                                   <p className="text-xs text-slate-600 leading-relaxed">
-                                    {pendingQuote.scopeOfWork || `Includes ${pendingQuote.estimatedHours} hours 1-on-1 coaching & step-by-step guidance.`}
+                                    {pendingQuote.scopeOfWork ||
+                                      `Includes ${pendingQuote.estimatedHours} hours 1-on-1 coaching & step-by-step guidance.`}
                                   </p>
                                   {onAcceptQuote && (
-                                    <button 
+                                    <button
+                                      type="button"
                                       onClick={() => {
                                         onAcceptQuote(pendingQuote.id);
                                         setIsQuoteDrawerOpen(false);
-                                      }} 
-                                      className="w-full py-2 bg-orange-500 hover:bg-orange-600 text-white font-bold text-xs rounded-lg shadow-xs transition-colors cursor-pointer"
+                                      }}
+                                      className="w-full py-2 bg-[#F97316] hover:bg-[#EA580C] text-white font-bold text-xs rounded-lg shadow-xs transition-colors cursor-pointer"
                                     >
-                                      Accept & Proceed to Escrow
+                                      Accept &amp; Proceed to Escrow
                                     </button>
                                   )}
                                 </div>
@@ -3594,35 +3932,50 @@ export default function StudentDashboard({
                             return (
                               <div className="border border-slate-200 bg-slate-50/50 rounded-xl p-4 text-center text-xs text-slate-500 space-y-1">
                                 <p className="font-bold text-slate-700">No Pending Quotes</p>
-                                <p className="text-[11px]">Request a price quote from the tutor using the quick action chip below.</p>
+                                <p className="text-[11px]">
+                                  Request a price quote from the tutor using the quick action bar below.
+                                </p>
                               </div>
                             );
                           })()}
 
-                          {/* Shared Files Vault */}
                           <div>
                             <h4 className="text-xs font-bold text-slate-800 mb-2.5 flex items-center justify-between">
                               <span>Shared Attachments</span>
-                              <span className="text-[10px] text-slate-400 font-normal">
-                                {activeChatMessages.filter(m => m.fileUrl).length} files
+                              <span className="text-[10px] text-slate-400 font-normal tabular-nums">
+                                {activeChatMessages.filter((m) => m.fileUrl).length} files
                               </span>
                             </h4>
                             <div className="space-y-2">
-                              {activeChatMessages.filter(m => m.fileUrl).map((m) => (
-                                <div key={m.id} className="p-2.5 border border-slate-200 rounded-lg flex items-center justify-between hover:bg-slate-50">
-                                  <div className="flex items-center gap-2.5 min-w-0">
-                                    <FileText className="w-5 h-5 text-orange-500 shrink-0" />
-                                    <div className="truncate">
-                                      <p className="text-xs font-semibold text-slate-800 truncate">{m.fileName || 'Attachment'}</p>
-                                      <p className="text-[10px] text-slate-400">{new Date(m.timestamp).toLocaleDateString()}</p>
+                              {activeChatMessages
+                                .filter((m) => m.fileUrl)
+                                .map((m) => (
+                                  <div
+                                    key={m.id}
+                                    className="p-2.5 border border-slate-200 rounded-lg flex items-center justify-between hover:bg-slate-50"
+                                  >
+                                    <div className="flex items-center gap-2.5 min-w-0">
+                                      <FileText className="w-5 h-5 text-[#F97316] shrink-0" />
+                                      <div className="truncate">
+                                        <p className="text-xs font-semibold text-slate-800 truncate">
+                                          {m.fileName || 'Attachment'}
+                                        </p>
+                                        <p className="text-[10px] text-slate-400">
+                                          {new Date(m.timestamp).toLocaleDateString()}
+                                        </p>
+                                      </div>
                                     </div>
+                                    <a
+                                      href={m.fileUrl}
+                                      target="_blank"
+                                      rel="noreferrer"
+                                      className="p-1.5 text-slate-400 hover:text-slate-700"
+                                    >
+                                      <Download className="w-3.5 h-3.5" />
+                                    </a>
                                   </div>
-                                  <a href={m.fileUrl} target="_blank" rel="noreferrer" className="p-1.5 text-slate-400 hover:text-slate-700">
-                                    <Download className="w-3.5 h-3.5" />
-                                  </a>
-                                </div>
-                              ))}
-                              {activeChatMessages.filter(m => m.fileUrl).length === 0 && (
+                                ))}
+                              {activeChatMessages.filter((m) => m.fileUrl).length === 0 && (
                                 <p className="text-xs text-slate-400 italic">No files attached in this chat yet.</p>
                               )}
                             </div>
@@ -3631,45 +3984,33 @@ export default function StudentDashboard({
                       </div>
                     </>
                   ) : (
-                    <div className="flex-1 flex flex-col items-center justify-center text-center p-8 text-slate-400">
-                      <div className="w-14 h-14 rounded-2xl bg-orange-50 border border-orange-200/60 flex items-center justify-center text-orange-500 mb-3.5 shadow-xs">
-                        <MessageSquare className="w-7 h-7" />
+                    /* DESKTOP EMPTY/READY STATE WHEN NO CHAT IS SELECTED OR AFTER CLOSING A CHAT */
+                    <div className="flex-1 flex flex-col items-center justify-center text-center p-8 text-slate-500 bg-[#FAF6F0]">
+                      <div className="w-16 h-16 rounded-full bg-white border border-orange-200 flex items-center justify-center text-[#F97316] mb-4 shadow-2xs">
+                        <MessageSquare className="w-8 h-8" />
                       </div>
-                      <h5 className="font-bold text-slate-900 text-sm md:text-base">Select a Discussion Channel</h5>
-                      <p className="text-xs text-slate-500 max-w-sm mt-1.5 leading-relaxed">
-                        Access your official 24/7 administrative support desk or chat with your automatically assigned academic tutor.
+                      <h5 className="font-bold text-slate-900 text-base sm:text-lg">
+                        University-Tutors Messaging
+                      </h5>
+                      <p className="text-xs sm:text-sm text-slate-500 max-w-md mt-1.5 leading-relaxed">
+                        Click any conversation or participant on the left to expand the chat, send messages or coursework files, and close it anytime to switch chats.
                       </p>
-                      <div className="mt-4 flex flex-wrap gap-2.5 justify-center">
+                      <div className="mt-5 flex flex-wrap gap-2.5 justify-center">
                         <button
                           type="button"
-                          onClick={() => {
-                            const support = studentChats.find(c => c.tutorId === 'admin_emily' || c.tutorId.startsWith('admin_'));
-                            if (support) {
-                              setLocalSelectedChatId(support.id);
-                            } else {
-                              onOpenChat('admin_shaka');
-                            }
-                          }}
-                          className="px-4 py-2 bg-orange-500 hover:bg-orange-600 text-white rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer flex items-center gap-1.5"
+                          onClick={() => openWorkspaceChat('admin_shaka')}
+                          className="px-4 py-2.5 bg-[#F97316] hover:bg-[#EA580C] text-white rounded-xl text-xs font-bold transition-colors shadow-xs cursor-pointer flex items-center gap-1.5"
                         >
                           <Headset className="w-4 h-4" />
-                          <span>Chat with Support</span>
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setIsMobileChannelsOpen(true)}
-                          className="md:hidden px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5"
-                        >
-                          <MessageSquare className="w-4 h-4 text-orange-600" />
-                          <span>View Channels</span>
+                          <span>Chat with Support Desk</span>
                         </button>
                       </div>
                     </div>
                   )}
                 </main>
               </div>
-            </div>
-          )}
+            );
+          })()}
 
           {/* ================================== */}
           {/* TAB 7: REPORTS / GPA PROJECTIONS   */}
@@ -4152,10 +4493,7 @@ export default function StudentDashboard({
 
             <button
               type="button"
-              onClick={() => {
-                setActiveTab('chat');
-                onOpenChat('admin_shaka');
-              }}
+              onClick={() => openWorkspaceChat('admin_shaka')}
               aria-label="In-System Chat"
               className="pointer-events-auto w-11 h-11 rounded-full bg-gradient-to-tr from-[#FF7A00] to-[#FF9900] hover:from-[#E86E00] hover:to-[#FF8A00] text-white shadow-lg shadow-orange-500/35 flex items-center justify-center active:scale-95 transition cursor-pointer"
             >
@@ -4234,8 +4572,7 @@ export default function StudentDashboard({
           <button
             type="button"
             onClick={() => {
-              setActiveTab('chat');
-              onOpenChat('admin_shaka');
+              openWorkspaceChat('admin_shaka');
             }}
             className="hidden lg:flex fixed bottom-6 right-6 bg-[#FF8A00] hover:bg-[#E05216] text-white p-4 rounded-full shadow-2xl z-40 transition-all cursor-pointer items-center justify-center gap-2 font-bold font-sans tracking-wide text-xs group"
             id="floating-live-chat"
