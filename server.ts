@@ -75,15 +75,29 @@ export function getRuntimeAppUrl(): string {
 }
 
 export function getConfiguredAdminInitialPassword(): string {
-  const raw = process.env.ADMIN_INITIAL_PASSWORD;
-  if (!raw || typeof raw !== 'string') return '';
-  return stripSurroundingQuotePair(raw);
+  const candidates = [
+    process.env.ADMIN_INITIAL_PASSWORD,
+    process.env.ADMIN_PASSWORD,
+    process.env.INITIAL_ADMIN_PASSWORD,
+  ];
+  for (const raw of candidates) {
+    if (raw && typeof raw === 'string') {
+      const cleaned = stripSurroundingQuotePair(raw);
+      if (cleaned) return cleaned;
+    }
+  }
+  return '';
 }
+
+const DEFAULT_INITIAL_ADMIN_EMAIL = 'shaka.ahmadd@gmail.com';
 
 export function getConfiguredAdminEmail(): string {
   const raw = process.env.ADMIN_EMAIL;
-  if (!raw || typeof raw !== 'string') return '';
-  return stripSurroundingQuotePair(raw).toLowerCase();
+  if (raw && typeof raw === 'string') {
+    const cleaned = stripSurroundingQuotePair(raw).toLowerCase();
+    if (cleaned) return cleaned;
+  }
+  return DEFAULT_INITIAL_ADMIN_EMAIL;
 }
 
 const BCRYPT_HASH_PATTERN = /^\$2[aby]\$\d{2}\$[./A-Za-z0-9]{53}$/;
@@ -97,6 +111,12 @@ export function hasValidPasswordHash(passwordHash: unknown): passwordHash is str
 export function isAdministratorRole(role: unknown): boolean {
   const normalized = typeof role === 'string' ? role.trim().toLowerCase() : '';
   return normalized === 'admin' || normalized === 'super_admin';
+}
+
+function isSyntheticTestAccountEmail(email: unknown): boolean {
+  if (!email || typeof email !== 'string') return false;
+  const clean = email.trim().toLowerCase();
+  return clean.endsWith('@universitytutors.test');
 }
 
 export const GOOGLE_OAUTH_CALLBACK_PATH = '/api/auth/callback/google';
@@ -115,6 +135,8 @@ const FORBIDDEN_LOG_KEYS = new Set([
   'password_hash',
   'admin_initial_password',
   'admininitialpassword',
+  'initial_admin_password',
+  'initialadminpassword',
   'admin_password',
   'smtp_password',
   'smtppassword',
@@ -1106,6 +1128,7 @@ export async function createApp(options: CreateAppOptions = {}) {
     const adminPasswordConfigured = Boolean(getConfiguredAdminInitialPassword());
     let adminRecords: Array<{
       id: string;
+      email?: unknown;
       role?: unknown;
       passwordHash?: unknown;
       isActive?: unknown;
@@ -1118,6 +1141,7 @@ export async function createApp(options: CreateAppOptions = {}) {
         const rows = await db
           .select({
             id: users.id,
+            email: users.email,
             role: users.role,
             passwordHash: users.passwordHash,
             isActive: users.isActive,
@@ -1125,23 +1149,31 @@ export async function createApp(options: CreateAppOptions = {}) {
           })
           .from(users)
           .where(sql`lower(trim(${users.role})) in ('admin', 'super_admin')`);
-        adminRecords = rows;
+        adminRecords = rows.filter((r) => !isSyntheticTestAccountEmail(r.email));
       } catch (dbErr: any) {
         console.warn('[AUTH] Notice inspecting administrator state in PostgreSQL:', dbErr.message);
       }
-    } else if (!hasDatabaseUrl) {
+    } else {
       const seenIds = new Set<string>();
       const persistedMap = getPersistedUserUpdates();
       for (const u of memoryStore.getAllUsers()) {
         const merged = persistedMap[u.id] ? { ...u, ...persistedMap[u.id] } : u;
         seenIds.add(u.id);
-        if (isAdministratorRole(merged.role) && merged.deleted !== true) {
+        if (
+          isAdministratorRole(merged.role) &&
+          merged.deleted !== true &&
+          !isSyntheticTestAccountEmail(merged.email)
+        ) {
           adminRecords.push(merged);
         }
       }
       for (const [uid, record] of Object.entries(persistedMap)) {
         if (seenIds.has(uid) || !record) continue;
-        if (isAdministratorRole(record.role) && record.deleted !== true) {
+        if (
+          isAdministratorRole(record.role) &&
+          record.deleted !== true &&
+          !isSyntheticTestAccountEmail(record.email)
+        ) {
           adminRecords.push({ ...record, id: uid });
         }
       }
@@ -1169,7 +1201,7 @@ export async function createApp(options: CreateAppOptions = {}) {
     );
   }
 
-  async function ensureInitialAdministratorBootstrap(): Promise<'exists' | 'created' | 'missing_config' | 'email_conflict'> {
+  async function ensureInitialAdministratorBootstrap(): Promise<'exists' | 'created' | 'missing_config'> {
     const currentState = await inspectAdministratorAuthState();
     // Never overwrite an existing administrator password during startup
     if (currentState.adminUserPresent) {
@@ -1182,25 +1214,62 @@ export async function createApp(options: CreateAppOptions = {}) {
       return 'missing_config';
     }
 
-    // Do not create duplicate accounts and do not change existing user roles
+    const nowIso = new Date().toISOString();
+    const allModules: AdminPermissionKey[] = ['blog', 'chats', 'orders', 'tutors', 'payments', 'settings'];
+    const adminAvatarUrl = 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150&auto=format&fit=crop&q=80';
+
+    // Check if the designated initial ADMIN_EMAIL already exists (e.g. created earlier via Google OAuth as student)
     const existingByEmail = await resolveAuthoritativeUserByEmail(configuredAdminEmail);
     if (existingByEmail) {
       if (isAdministratorRole(existingByEmail.role) && existingByEmail.deleted !== true) {
         return 'exists';
       }
-      logSafeAuthEvent('initial_admin_email_conflict', {
-        existingRole: typeof existingByEmail.role === 'string' ? existingByEmail.role : 'unknown',
-      });
-      return 'email_conflict';
+
+      const preservedOrInitialHash = hasValidPasswordHash(existingByEmail.passwordHash)
+        ? existingByEmail.passwordHash
+        : hashPassword(configuredAdminPass);
+
+      if (isDbConnected() && db) {
+        await db
+          .update(users)
+          .set({
+            role: 'admin',
+            roleLabel: 'Super Admin',
+            permissions: JSON.stringify(allModules),
+            passwordHash: preservedOrInitialHash,
+            isActive: true,
+            suspended: false,
+            verified: true,
+            isApproved: true,
+            status: 'approved',
+            updatedAt: nowIso,
+          })
+          .where(eq(users.id, existingByEmail.id));
+      } else {
+        const promotedRecord = {
+          ...existingByEmail,
+          role: 'admin' as const,
+          roleLabel: 'Super Admin',
+          permissions: allModules,
+          passwordHash: preservedOrInitialHash,
+          isActive: true,
+          suspended: false,
+          deleted: false,
+          verified: true,
+          isApproved: true,
+          status: 'approved',
+        };
+        memoryStore.setUser(promotedRecord);
+        savePersistedUserUpdate(existingByEmail.id, promotedRecord);
+      }
+
+      logSafeAuthEvent('initial_admin_created', { role: 'admin' });
+      return 'created';
     }
 
     const initialAdminHash = hashPassword(configuredAdminPass);
-    const nowIso = new Date().toISOString();
     const deterministicAdminId =
       'admin_' + crypto.createHash('sha256').update(configuredAdminEmail).digest('hex').slice(0, 16);
-    const allModules: AdminPermissionKey[] = ['blog', 'chats', 'orders', 'tutors', 'payments', 'settings'];
-
-    const adminAvatarUrl = 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150&auto=format&fit=crop&q=80';
 
     if (isDbConnected() && db) {
       await db
@@ -1250,34 +1319,30 @@ export async function createApp(options: CreateAppOptions = {}) {
       return 'created';
     }
 
-    if (!hasDatabaseUrl) {
-      const initialAdminRecord = {
-        id: deterministicAdminId,
-        role: 'admin' as const,
-        name: 'Administrator',
-        fullName: 'Administrator',
-        email: configuredAdminEmail,
-        passwordHash: initialAdminHash,
-        avatarUrl: adminAvatarUrl,
-        createdAt: nowIso,
-        verified: true,
-        suspended: false,
-        isActive: true,
-        deleted: false,
-        roleLabel: 'Super Admin',
-        permissions: allModules,
-        bio: 'Platform Administrator.',
-        country: 'US',
-        isApproved: true,
-        status: 'approved',
-      };
-      memoryStore.setUser(initialAdminRecord);
-      savePersistedUserUpdate(initialAdminRecord.id, initialAdminRecord);
-      logSafeAuthEvent('initial_admin_created', { role: 'admin' });
-      return 'created';
-    }
-
-    return 'missing_config';
+    const initialAdminRecord = {
+      id: deterministicAdminId,
+      role: 'admin' as const,
+      name: 'Administrator',
+      fullName: 'Administrator',
+      email: configuredAdminEmail,
+      passwordHash: initialAdminHash,
+      avatarUrl: adminAvatarUrl,
+      createdAt: nowIso,
+      verified: true,
+      suspended: false,
+      isActive: true,
+      deleted: false,
+      roleLabel: 'Super Admin',
+      permissions: allModules,
+      bio: 'Platform Administrator.',
+      country: 'US',
+      isApproved: true,
+      status: 'approved',
+    };
+    memoryStore.setUser(initialAdminRecord);
+    savePersistedUserUpdate(initialAdminRecord.id, initialAdminRecord);
+    logSafeAuthEvent('initial_admin_created', { role: 'admin' });
+    return 'created';
   }
 
   // Check database connectivity, run migrations, bootstrap initial admin if needed, and log safe startup diagnostics
