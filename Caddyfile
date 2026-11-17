@@ -7,9 +7,13 @@
     @static path /assets/*
     header @static Cache-Control "public, max-age=31536000, immutable"
 
-    # HTML files cache-control
-    @html path *.html /
-    header @html Cache-Control "no-cache, must-revalidate"
+    # Ensure HTML and all SPA routes (/admin, /, etc.) never serve stale cached JS bundle references
+    @nocache {
+        not path /assets/* *.avif *.webp *.jpg *.jpeg *.png *.svg *.ico *.woff *.woff2 *.json *.txt *.xml
+    }
+    header @nocache Cache-Control "no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0"
+    header @nocache Pragma "no-cache"
+    header @nocache Expires "0"
 
     # Single Page Application fallback routing
     try_files {path} /index.html

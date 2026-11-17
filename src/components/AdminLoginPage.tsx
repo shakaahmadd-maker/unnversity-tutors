@@ -15,7 +15,7 @@ import {
   Check,
 } from 'lucide-react';
 import { store } from '../lib/store';
-import { ApiError, apiFetch, getFriendlyErrorMessage, isAbortError } from '../lib/apiClient';
+import { ApiError, apiFetch, getFriendlyErrorMessage, isAbortError, resolveApiUrl } from '../lib/apiClient';
 
 interface AdminLoginPageProps {
   onLogin: (email: string, password?: string, options?: { adminPortal?: boolean }) => Promise<boolean>;
@@ -28,7 +28,9 @@ type AdminStatusState =
   | { kind: 'password_reset_required'; configured: false; adminUserPresent: true }
   | { kind: 'not_configured'; configured: false; adminUserPresent: false }
   | { kind: 'http_auth_error'; status: number }
-  | { kind: 'http_not_found'; status: 404 }
+  | { kind: 'http_not_found'; status: 404; endpoint: string }
+  | { kind: 'gateway_unavailable'; status: number; detail: string }
+  | { kind: 'certificate_error'; detail: string }
   | { kind: 'html_mismatch'; status: number }
   | { kind: 'proxy_or_network_error'; status: number; detail: string };
 
@@ -64,20 +66,25 @@ export default function AdminLoginPage({ onLogin, onNavigate }: AdminLoginPagePr
       }
     }
 
-    // Execute GET /api/auth/admin/status once per mount (no retry loops)
+    // Execute GET <API_BASE_URL>/auth/admin/status once per mount (no retry loops, no caching)
     if (hasRequestedStatusRef.current) {
       return;
     }
     hasRequestedStatusRef.current = true;
 
     let cancelled = false;
+    const statusEndpoint = resolveApiUrl('/api/auth/admin/status');
 
     (async () => {
       try {
-        const res = await apiFetch('/api/auth/admin/status', {
+        const res = await apiFetch(statusEndpoint, {
           method: 'GET',
           credentials: 'include',
           cache: 'no-store',
+          headers: {
+            'Cache-Control': 'no-store',
+            Pragma: 'no-cache',
+          },
           dedupe: false,
           skipAuthEvent: true,
           timeoutMs: 12_000,
@@ -103,7 +110,16 @@ export default function AdminLoginPage({ onLogin, onNavigate }: AdminLoginPagePr
         }
 
         if (res.status === 404) {
-          setStatusState({ kind: 'http_not_found', status: 404 });
+          setStatusState({ kind: 'http_not_found', status: 404, endpoint: statusEndpoint });
+          return;
+        }
+
+        if (res.status === 502 || res.status === 503 || res.status === 504) {
+          setStatusState({
+            kind: 'gateway_unavailable',
+            status: res.status,
+            detail: `${statusEndpoint} returned HTTP ${res.status}. The backend service or reverse proxy is temporarily unavailable.`,
+          });
           return;
         }
 
@@ -111,7 +127,16 @@ export default function AdminLoginPage({ onLogin, onNavigate }: AdminLoginPagePr
           setStatusState({
             kind: 'proxy_or_network_error',
             status: res.status,
-            detail: `GET /api/auth/admin/status returned HTTP ${res.status}.`,
+            detail: `${statusEndpoint} returned HTTP ${res.status}.`,
+          });
+          return;
+        }
+
+        if (contentType && !contentType.includes('application/json') && !contentType.includes('+json')) {
+          setStatusState({
+            kind: 'proxy_or_network_error',
+            status: res.status,
+            detail: `Expected application/json from ${statusEndpoint}, received "${contentType}".`,
           });
           return;
         }
@@ -123,16 +148,17 @@ export default function AdminLoginPage({ onLogin, onNavigate }: AdminLoginPagePr
           setStatusState({
             kind: 'proxy_or_network_error',
             status: res.status,
-            detail: 'GET /api/auth/admin/status returned invalid JSON.',
+            detail: `${statusEndpoint} returned invalid JSON.`,
           });
           return;
         }
 
-        if (typeof parsed?.configured === 'boolean') {
-          const adminPresent = Boolean(parsed.adminUserPresent);
-          if (parsed.configured) {
+        if (typeof parsed?.configured === 'boolean' && typeof parsed?.adminUserPresent === 'boolean') {
+          if (parsed.configured === true && parsed.adminUserPresent === true) {
             setStatusState({ kind: 'ready', configured: true, adminUserPresent: true });
-          } else if (adminPresent) {
+            setErrorMsg('');
+            setErrorCode('');
+          } else if (parsed.adminUserPresent === true) {
             setStatusState({ kind: 'password_reset_required', configured: false, adminUserPresent: true });
           } else {
             setStatusState({ kind: 'not_configured', configured: false, adminUserPresent: false });
@@ -143,11 +169,18 @@ export default function AdminLoginPage({ onLogin, onNavigate }: AdminLoginPagePr
         setStatusState({
           kind: 'proxy_or_network_error',
           status: res.status,
-          detail: 'Unexpected status payload returned from /api/auth/admin/status.',
+          detail: `Unexpected status payload returned from ${statusEndpoint}.`,
         });
       } catch (err: any) {
         if (cancelled || isAbortError(err)) return;
         if (err instanceof ApiError) {
+          if (err.code === 'CERTIFICATE_ERROR') {
+            setStatusState({
+              kind: 'certificate_error',
+              detail: err.message || 'HTTPS / SSL certificate error while contacting the backend API.',
+            });
+            return;
+          }
           if (err.code === 'API_ROUTING_MISMATCH') {
             setStatusState({ kind: 'html_mismatch', status: err.status || 502 });
             return;
@@ -157,20 +190,36 @@ export default function AdminLoginPage({ onLogin, onNavigate }: AdminLoginPagePr
             return;
           }
           if (err.status === 404) {
-            setStatusState({ kind: 'http_not_found', status: 404 });
+            setStatusState({ kind: 'http_not_found', status: 404, endpoint: statusEndpoint });
+            return;
+          }
+          if (err.status === 502 || err.status === 503 || err.status === 504 || err.code === 'PROXY_ERROR') {
+            setStatusState({
+              kind: 'gateway_unavailable',
+              status: err.status || 502,
+              detail: err.message || `Backend or reverse proxy unavailable at ${statusEndpoint}.`,
+            });
+            return;
+          }
+          const certPattern = /err_cert|cert_|sec_error|ssl|tls|certificate|self_signed|unable_to_verify/i;
+          if (certPattern.test(err.message || '')) {
+            setStatusState({ kind: 'certificate_error', detail: err.message });
             return;
           }
           setStatusState({
             kind: 'proxy_or_network_error',
             status: err.status || 0,
-            detail: err.message || 'Unable to reach /api/auth/admin/status.',
+            detail:
+              err.status === 0 && statusEndpoint.startsWith('https://')
+                ? `Unable to connect to ${statusEndpoint}. Check HTTPS/SSL certificate validity, DNS, and CORS headers on the backend.`
+                : err.message || `Unable to reach ${statusEndpoint}.`,
           });
           return;
         }
         setStatusState({
           kind: 'proxy_or_network_error',
           status: 0,
-          detail: 'Network error while reaching /api/auth/admin/status.',
+          detail: `Network error while reaching ${statusEndpoint}.`,
         });
       }
     })();
@@ -365,9 +414,9 @@ export default function AdminLoginPage({ onLogin, onNavigate }: AdminLoginPagePr
           <div className="flex gap-2.5">
             <AlertTriangle className="w-4.5 h-4.5 shrink-0 text-red-600" />
             <div className="space-y-1">
-              <span className="font-semibold block">Admin Status Endpoint Not Found (HTTP 404)</span>
+              <span className="font-semibold block">Wrong API URL or Missing Route (HTTP 404)</span>
               <p className="leading-relaxed text-red-700">
-                <code className="font-mono">GET /api/auth/admin/status</code> returned HTTP 404. Redeploy the backend container so the latest server build is running on port 3000.
+                <code className="font-mono break-all">GET {statusState.endpoint}</code> returned HTTP 404. Verify the backend API URL and confirm the latest backend server build is deployed.
               </p>
             </div>
           </div>
@@ -381,10 +430,38 @@ export default function AdminLoginPage({ onLogin, onNavigate }: AdminLoginPagePr
           <div className="flex gap-2.5">
             <AlertTriangle className="w-4.5 h-4.5 shrink-0 text-red-600" />
             <div className="space-y-1">
-              <span className="font-semibold block">Status Endpoint Blocked (HTTP {statusState.status})</span>
+              <span className="font-semibold block">Authentication or Permission Blocked (HTTP {statusState.status})</span>
               <p className="leading-relaxed text-red-700">
-                <code className="font-mono">GET /api/auth/admin/status</code> returned HTTP {statusState.status}. Ensure upstream proxy rules allow unauthenticated GET requests to <code className="font-mono">/api/auth/admin/status</code>.
+                The admin status check returned HTTP {statusState.status}. Ensure upstream proxy and authentication rules permit public GET requests to <code className="font-mono">/api/auth/admin/status</code>.
               </p>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    if (statusState.kind === 'gateway_unavailable') {
+      return (
+        <div className="bg-red-50 border border-red-200 text-red-800 text-xs p-4 rounded-2xl space-y-1.5" id="admin-status-notice">
+          <div className="flex gap-2.5">
+            <AlertTriangle className="w-4.5 h-4.5 shrink-0 text-red-600" />
+            <div className="space-y-1">
+              <span className="font-semibold block">Backend or Proxy Unavailable (HTTP {statusState.status})</span>
+              <p className="leading-relaxed text-red-700">{statusState.detail}</p>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    if (statusState.kind === 'certificate_error') {
+      return (
+        <div className="bg-red-50 border border-red-200 text-red-800 text-xs p-4 rounded-2xl space-y-1.5" id="admin-status-notice">
+          <div className="flex gap-2.5">
+            <AlertTriangle className="w-4.5 h-4.5 shrink-0 text-red-600" />
+            <div className="space-y-1">
+              <span className="font-semibold block">HTTPS / Certificate Configuration Error</span>
+              <p className="leading-relaxed text-red-700">{statusState.detail}</p>
             </div>
           </div>
         </div>
@@ -397,9 +474,9 @@ export default function AdminLoginPage({ onLogin, onNavigate }: AdminLoginPagePr
           <div className="flex gap-2.5">
             <AlertTriangle className="w-4.5 h-4.5 shrink-0 text-red-600" />
             <div className="space-y-1">
-              <span className="font-semibold block">API Routing Mismatch (HTML Returned)</span>
+              <span className="font-semibold block">Wrong API URL or Routing Mismatch (HTML Returned)</span>
               <p className="leading-relaxed text-red-700">
-                <code className="font-mono">GET /api/auth/admin/status</code> returned HTML instead of JSON (HTTP {statusState.status}). Configure the reverse proxy to forward <code className="font-mono">/api/*</code> to the Node.js server on port 3000 instead of static SPA assets.
+                The API request returned HTML instead of JSON (HTTP {statusState.status}). Confirm requests target the production backend API and not static SPA fallback files.
               </p>
             </div>
           </div>
@@ -421,6 +498,8 @@ export default function AdminLoginPage({ onLogin, onNavigate }: AdminLoginPagePr
       </div>
     );
   };
+
+  const isConfigBlocked = statusState.kind === 'not_configured';
 
   return (
     <div className="min-h-[85vh] flex items-center justify-center p-4 sm:p-6 md:p-8 relative overflow-hidden" id="admin-login-page-container">
@@ -643,9 +722,9 @@ export default function AdminLoginPage({ onLogin, onNavigate }: AdminLoginPagePr
 
               <button
                 type="submit"
-                disabled={isLoading}
+                disabled={isLoading || isConfigBlocked}
                 className={`w-full py-3 rounded-xl text-xs font-bold transition-all shadow-sm flex items-center justify-center gap-2 cursor-pointer ${
-                  isLoading
+                  isLoading || isConfigBlocked
                     ? 'bg-gray-100 text-gray-400 border border-gray-200 cursor-not-allowed'
                     : 'bg-slate-900 hover:bg-slate-950 text-white hover:shadow-md active:scale-98'
                 }`}

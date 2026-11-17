@@ -64,6 +64,8 @@ export interface ApiDiagnosticsSnapshot {
   failedTabs: TabFailureSample[];
 }
 
+export const PRODUCTION_API_BASE_URL = 'https://api.university-tutors.com/api';
+
 function isDisallowedApiBaseUrl(rawUrl: string): boolean {
   try {
     const parsed = new URL(rawUrl);
@@ -83,28 +85,28 @@ function isDisallowedApiBaseUrl(rawUrl: string): boolean {
     ) {
       return true;
     }
-    // Never call ephemeral preview or legacy tunnel domains from production
+    // Never call ephemeral preview or legacy tunnel domains
     if (
       host.endsWith('.run.app') ||
       host.endsWith('.nip.io') ||
       host.endsWith('.sslip.io') ||
-      host.endsWith('.traefik.me')
+      host.endsWith('.traefik.me') ||
+      host.endsWith('.pages.dev') ||
+      host.endsWith('.vercel.app') ||
+      host.endsWith('.netlify.app')
     ) {
       return true;
     }
-    if (typeof window !== 'undefined') {
-      const currentHost = window.location.hostname.toLowerCase();
-      // On the primary production domain, always use same-origin /api/* routes
-      if (
-        (currentHost === 'university-tutors.com' || currentHost === 'www.university-tutors.com') &&
-        host !== currentHost
-      ) {
-        return true;
-      }
-      // Never downgrade HTTPS pages to an insecure HTTP API origin
-      if (window.location.protocol === 'https:' && parsed.protocol === 'http:') {
-        return true;
-      }
+    // Never call /api on the frontend-only domain; production API lives on api.university-tutors.com
+    if (host === 'university-tutors.com' || host === 'www.university-tutors.com') {
+      return true;
+    }
+    // Never allow insecure HTTP for api.university-tutors.com or when page is served over HTTPS
+    if (host === 'api.university-tutors.com' && parsed.protocol !== 'https:') {
+      return true;
+    }
+    if (typeof window !== 'undefined' && window.location.protocol === 'https:' && parsed.protocol === 'http:') {
+      return true;
     }
     return false;
   } catch {
@@ -112,35 +114,76 @@ function isDisallowedApiBaseUrl(rawUrl: string): boolean {
   }
 }
 
-function resolveBackendApiBaseUrl(): string {
+export function resolveBackendApiBaseUrl(): string {
   try {
-    const metaEnv = (import.meta as any)?.env;
-    const raw = String(metaEnv?.VITE_API_BASE_URL || metaEnv?.VITE_API_URL || '').trim().replace(/\/+$/, '');
-    if (!raw) return '';
-    if (!/^https?:\/\//i.test(raw)) return '';
-    if (isDisallowedApiBaseUrl(raw)) return '';
-    return raw;
-  } catch {
+    const rawViteBase =
+      typeof import.meta !== 'undefined' && import.meta.env ? import.meta.env.VITE_API_BASE_URL : '';
+    const rawAltBase =
+      typeof import.meta !== 'undefined' && import.meta.env ? import.meta.env.VITE_API_URL : '';
+    const raw = String(rawViteBase || rawAltBase || '').trim().replace(/\/+$/, '');
+    const isProdBuild = Boolean(
+      typeof import.meta !== 'undefined' && import.meta.env ? import.meta.env.PROD : false
+    );
+    const onProdDomain =
+      typeof window !== 'undefined' && /^(www\.)?university-tutors\.com$/i.test(window.location.hostname);
+
+    if (raw && /^https?:\/\//i.test(raw) && !isDisallowedApiBaseUrl(raw)) {
+      if (/^https:\/\/api\.university-tutors\.com$/i.test(raw)) {
+        return PRODUCTION_API_BASE_URL;
+      }
+      return raw;
+    }
+
+    if (isProdBuild || onProdDomain) {
+      return PRODUCTION_API_BASE_URL;
+    }
+
     return '';
+  } catch {
+    return PRODUCTION_API_BASE_URL;
   }
+}
+
+function joinBaseAndPath(base: string, normalizedPath: string): string {
+  const cleanBase = base.replace(/\/+$/, '');
+  if (normalizedPath.startsWith('/uploads/')) {
+    try {
+      const parsed = new URL(cleanBase);
+      return `${parsed.origin}${normalizedPath}`;
+    } catch {
+      return `${cleanBase}${normalizedPath}`;
+    }
+  }
+  if (cleanBase.toLowerCase().endsWith('/api')) {
+    if (normalizedPath === '/api') return cleanBase;
+    if (normalizedPath.startsWith('/api/')) {
+      return `${cleanBase}${normalizedPath.slice(4)}`;
+    }
+    if (normalizedPath.startsWith('/api?')) {
+      return `${cleanBase}${normalizedPath.slice(4)}`;
+    }
+  }
+  return `${cleanBase}${normalizedPath}`;
 }
 
 export function resolveApiUrl(url: string): string {
   if (!url) return url;
+  const base = resolveBackendApiBaseUrl();
   if (/^https?:\/\//i.test(url)) {
     if (isDisallowedApiBaseUrl(url)) {
       try {
         const parsed = new URL(url);
-        return `${parsed.pathname}${parsed.search}`;
+        const pathWithQuery = `${parsed.pathname}${parsed.search}`;
+        return base ? joinBaseAndPath(base, pathWithQuery) : pathWithQuery;
       } catch {
         return url;
       }
     }
     return url;
   }
-  const base = resolveBackendApiBaseUrl();
-  if (!base) return url.startsWith('/') ? url : `/${url}`;
-  return url.startsWith('/') ? `${base}${url}` : `${base}/${url}`;
+  const normalizedPath = url.startsWith('/') ? url : `/${url}`;
+  if (!base) return normalizedPath;
+  return joinBaseAndPath(base, normalizedPath);
 }
 
 function normalizeRouteForMetrics(url: string): string {
@@ -259,6 +302,8 @@ function emitSessionExpiredIfNeeded(url: string, status: number) {
   if (status !== 401) return;
   if (
     url.includes('/api/auth/login') ||
+    url.includes('/api/auth/admin/login') ||
+    url.includes('/api/auth/admin/status') ||
     url.includes('/api/auth/register') ||
     url.includes('/api/auth/me')
   ) {
@@ -447,7 +492,13 @@ async function executeTimedFetch(
       throw new ApiError(timeoutMsg, 408, 'TIMEOUT', { isTimeout: true, route: normRoute });
     }
 
-    const netMsg = err?.message || 'Network connection failed. Please check your connection and retry.';
+    const rawMsg = String(err?.message || '');
+    const rawCauseCode = String(err?.cause?.code || err?.code || '');
+    const certPattern = /err_cert|cert_|sec_error|ssl|tls|certificate|self_signed|unable_to_verify|depth_zero_self_signed/i;
+    const isCertificateFailure = certPattern.test(rawMsg) || certPattern.test(rawCauseCode);
+    const netMsg = isCertificateFailure
+      ? 'HTTPS / SSL certificate verification failed when contacting the backend API. Verify a valid TLS certificate is installed on api.university-tutors.com.'
+      : rawMsg || 'Network connection failed. Please check your HTTPS/CORS configuration and connection, then retry.';
     recordApiMetric({
       id: `${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
       method,
@@ -460,7 +511,7 @@ async function executeTimedFetch(
       error: netMsg.slice(0, 120),
       timestamp: new Date().toISOString(),
     });
-    throw new ApiError(netMsg, 0, 'NETWORK_ERROR', { route: normRoute });
+    throw new ApiError(netMsg, 0, isCertificateFailure ? 'CERTIFICATE_ERROR' : 'NETWORK_ERROR', { route: normRoute });
   } finally {
     clearTimeout(timer);
     for (const { sig, fn } of abortHandlers) {
@@ -518,16 +569,17 @@ export async function apiFetch(url: string, options: ApiFetchOptions = {}): Prom
     return executeTimedFetch(url, options);
   }
 
-  let existing = inFlightGetRequests.get(url);
+  const cacheKey = `${resolveApiUrl(url)}`;
+  let existing = inFlightGetRequests.get(cacheKey);
   if (!existing) {
     // Run the shared network fetch without individual caller abort signal so one unmounting widget doesn't kill another caller's shared GET
     const { signal: _ignoredSignal, ...sharedOptions } = options;
     existing = executeTimedFetch(url, sharedOptions)
       .then(bufferResponse)
       .finally(() => {
-        inFlightGetRequests.delete(url);
+        inFlightGetRequests.delete(cacheKey);
       });
-    inFlightGetRequests.set(url, existing);
+    inFlightGetRequests.set(cacheKey, existing);
   }
 
   const buffered = await raceWithAbort(existing, options.signal, url);

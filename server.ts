@@ -853,9 +853,18 @@ export async function createApp(options: CreateAppOptions = {}) {
   // Do not use wildcard Access-Control-Allow-Origin: * for authenticated cookie requests.
   app.use((req, res, next) => {
     const normalizedAppUrl = getRuntimeAppUrl();
+    const allowedProductionOrigins = new Set<string>([
+      'https://university-tutors.com',
+      'https://www.university-tutors.com',
+      'https://api.university-tutors.com',
+    ]);
+    if (normalizedAppUrl) {
+      allowedProductionOrigins.add(normalizedAppUrl);
+    }
+
     const origin = req.headers.origin;
     if (origin) {
-      if ((process.env.NODE_ENV || NODE_ENV) !== 'production' || (normalizedAppUrl && origin === normalizedAppUrl)) {
+      if ((process.env.NODE_ENV || NODE_ENV) !== 'production' || allowedProductionOrigins.has(origin)) {
         res.setHeader('Access-Control-Allow-Origin', origin);
         res.setHeader('Access-Control-Allow-Credentials', 'true');
       }
@@ -865,7 +874,10 @@ export async function createApp(options: CreateAppOptions = {}) {
     }
 
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, X-Auth-Token');
+    res.setHeader(
+      'Access-Control-Allow-Headers',
+      'Content-Type, Authorization, X-Requested-With, X-Auth-Token, Cache-Control, Pragma, Expires'
+    );
     res.setHeader('Vary', 'Origin');
 
     if (req.method === 'OPTIONS') {
@@ -9295,7 +9307,9 @@ export async function createApp(options: CreateAppOptions = {}) {
           if (filePath.toLowerCase().endsWith('robots.txt')) {
             res.setHeader('Content-Type', 'text/plain; charset=utf-8');
           } else if (filePath.endsWith('.html')) {
-            res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+            res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate, proxy-revalidate, max-age=0');
+            res.setHeader('Pragma', 'no-cache');
+            res.setHeader('Expires', '0');
             res.setHeader('Link', '</.well-known/ard.json>; rel="ard"; type="application/json"');
           } else if (/(logo-\d+|logo_transparent-\d+)\.(avif|webp)$/i.test(filePath)) {
             res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
@@ -9334,7 +9348,9 @@ export async function createApp(options: CreateAppOptions = {}) {
         ) {
           return next();
         }
-        res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+        res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate, proxy-revalidate, max-age=0');
+        res.setHeader('Pragma', 'no-cache');
+        res.setHeader('Expires', '0');
         res.setHeader('Link', '</.well-known/ard.json>; rel="ard"; type="application/json"');
         try {
           const templateHtml =

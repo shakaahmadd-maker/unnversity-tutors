@@ -7,6 +7,7 @@
     <link rel="ard" type="application/json" href="/.well-known/ard.json" />
     <meta http-equiv="X-UA-Compatible" content="IE=edge" />
     <meta name="theme-color" content="#EA580C" />
+    <meta name="app-asset-version" content="2026.11.17.2" />
     <meta name="description" content="Connect with vetted 1-on-1 university tutors for STEM, essays, coursework & exam prep, plus 60+ free student calculators and academic tools." />
     <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1" />
 
@@ -87,6 +88,22 @@
               document.head.appendChild(robotsMeta);
             }
             robotsMeta.setAttribute('content', isUtilityWhatsapp ? 'noindex, follow' : 'noindex, nofollow');
+          }
+          if ('serviceWorker' in navigator && navigator.serviceWorker.getRegistrations) {
+            navigator.serviceWorker.getRegistrations().then(function (regs) {
+              if (regs && regs.length > 0) {
+                regs.forEach(function (reg) {
+                  reg.unregister().catch(function () {});
+                });
+                if ('caches' in window && window.caches.keys) {
+                  window.caches.keys().then(function (keys) {
+                    keys.forEach(function (key) {
+                      window.caches.delete(key).catch(function () {});
+                    });
+                  }).catch(function () {});
+                }
+              }
+            }).catch(function () {});
           }
         } catch (e) {
           // Ignore canonical fallback errors

@@ -47,6 +47,9 @@ export default defineConfig(({ command }) => {
       chunkSizeWarningLimit: 1000,
       rollupOptions: {
         output: {
+          entryFileNames: 'assets/[name]-[hash].js',
+          chunkFileNames: 'assets/[name]-[hash].js',
+          assetFileNames: 'assets/[name]-[hash].[ext]',
           manualChunks(id) {
             if (id.includes('node_modules')) {
               if (/node_modules\/(react|react-dom|scheduler)\//.test(id)) {
