@@ -546,10 +546,12 @@ export default function AuthPage({ onLogin, onRegister, onNavigate }: AuthPagePr
               <span className="shrink-0 text-amber-600 text-sm font-bold">⚠️</span>
               <p className="font-semibold leading-relaxed">{errorMsg}</p>
             </div>
-            {(errorCode === 'PASSWORD_NOT_SET' ||
-              errorCode === 'SOCIAL_OR_NO_PASSWORD' ||
-              errorMsg.toLowerCase().includes('password reset') ||
-              errorMsg.toLowerCase().includes('social login')) && (
+            {errorCode !== 'ADMIN_AUTH_NOT_CONFIGURED' &&
+              (errorCode === 'PASSWORD_RESET_REQUIRED' ||
+                errorCode === 'PASSWORD_NOT_SET' ||
+                errorCode === 'SOCIAL_OR_NO_PASSWORD' ||
+                errorMsg.toLowerCase().includes('password reset') ||
+                errorMsg.toLowerCase().includes('social login')) && (
               <div className="flex flex-wrap gap-2 pl-6">
                 <button
                   type="button"

@@ -18,7 +18,7 @@ import { store } from '../lib/store';
 import { apiFetch, getFriendlyErrorMessage, isAbortError } from '../lib/apiClient';
 
 interface AdminLoginPageProps {
-  onLogin: (email: string, password?: string) => Promise<boolean>;
+  onLogin: (email: string, password?: string, options?: { adminPortal?: boolean }) => Promise<boolean>;
   onNavigate: (view: string) => void;
 }
 
@@ -46,6 +46,22 @@ export default function AdminLoginPage({ onLogin, onNavigate }: AdminLoginPagePr
   const [googleConfigured, setGoogleConfigured] = useState(false);
 
   useEffect(() => {
+    if (typeof window !== 'undefined' && window.location.search) {
+      const params = new URLSearchParams(window.location.search);
+      const tokenParam = params.get('reset_token') || params.get('token');
+      const emailParam = params.get('email');
+      if (tokenParam) {
+        setResetToken(tokenParam.trim());
+        if (emailParam) {
+          setResetEmail(emailParam.trim());
+          setEmail(emailParam.trim());
+        }
+        setViewMode('reset');
+        setSuccessMsg('Recovery link verified. Enter a new administrator password below.');
+        window.history.replaceState(null, '', window.location.pathname);
+      }
+    }
+
     const controller = new AbortController();
     apiFetch('/api/auth/providers', { credentials: 'include', signal: controller.signal })
       .then((res) => (res.ok ? res.json() : null))
@@ -76,7 +92,7 @@ export default function AdminLoginPage({ onLogin, onNavigate }: AdminLoginPagePr
 
     setIsLoading(true);
     try {
-      const success = await onLogin(trimmedEmail, password);
+      const success = await onLogin(trimmedEmail, password, { adminPortal: true });
       if (success) {
         const meRes = await apiFetch('/api/auth/me', { credentials: 'include' });
         const meData = meRes.ok ? await meRes.json() : null;
@@ -189,10 +205,11 @@ export default function AdminLoginPage({ onLogin, onNavigate }: AdminLoginPagePr
   };
 
   const showPasswordRecoveryHint =
-    errorCode === 'PASSWORD_NOT_SET' ||
-    errorCode === 'SOCIAL_OR_NO_PASSWORD' ||
-    errorMsg.toLowerCase().includes('password reset') ||
-    errorMsg.toLowerCase().includes('not configured yet');
+    errorCode !== 'ADMIN_AUTH_NOT_CONFIGURED' &&
+    (errorCode === 'PASSWORD_RESET_REQUIRED' ||
+      errorCode === 'PASSWORD_NOT_SET' ||
+      errorCode === 'SOCIAL_OR_NO_PASSWORD' ||
+      errorMsg.toLowerCase().includes('password reset'));
 
   return (
     <div className="min-h-[85vh] flex items-center justify-center p-4 sm:p-6 md:p-8 relative overflow-hidden" id="admin-login-page-container">

@@ -98,7 +98,12 @@ function resolveInitialViewFromWindow(): string {
   if (decodedPath === '/google-disclosure' || decodedPath === '/google-oauth-disclosure' || hash === '#google-disclosure') {
     return 'google-disclosure';
   }
-  if (decodedPath === '/auth' || hash === '#auth') return 'auth';
+  if (decodedPath === '/auth' || decodedPath === '/reset-password' || hash === '#auth' || hash === '#reset-password') {
+    return 'auth';
+  }
+  if (decodedPath === '/admin-login' || hash === '#admin-login') {
+    return 'admin-login';
+  }
   if (
     decodedPath === '/student' ||
     decodedPath === '/student/dashboard' ||
@@ -120,6 +125,10 @@ function resolveInitialViewFromWindow(): string {
     hash === '#admin' ||
     hash.startsWith('#admin/')
   ) {
+    const searchParams = new URLSearchParams(window.location.search || '');
+    if (searchParams.get('reset_token') || searchParams.get('token')) {
+      return 'admin-login';
+    }
     const cookieStr = typeof document !== 'undefined' ? document.cookie || '' : '';
     const hasCookieHint = /(?:^|;\s*)ut_session_active=1(?:;|$)/.test(cookieStr);
     let hasStoredHint = false;
@@ -1392,12 +1401,21 @@ export default function App() {
           setActiveView('dashboard');
           window.history.replaceState(null, '', '/admin');
         }
+      } else if (decodedPath === '/admin-login' || hash === '#admin-login') {
+        setAdminRoutePath('/admin');
+        setActiveView('admin-login');
       } else if (
         decodedPath === '/admin' ||
         decodedPath.startsWith('/admin/') ||
         hash === '#admin' ||
         hash.startsWith('#admin/')
       ) {
+        const searchParams = new URLSearchParams(window.location.search || '');
+        if (searchParams.get('reset_token') || searchParams.get('token')) {
+          setAdminRoutePath('/admin');
+          setActiveView('admin-login');
+          return;
+        }
         if (!store.isSessionInitialized) {
           await store.sessionReadyPromise;
         }
@@ -1474,7 +1492,7 @@ export default function App() {
       ) {
         setSelectedTutorProfile(null);
         setActiveView('google-disclosure');
-      } else if (decodedPath === '/auth' || hash === '#auth') {
+      } else if (decodedPath === '/auth' || decodedPath === '/reset-password' || hash === '#auth' || hash === '#reset-password') {
         setActiveView('auth');
       } else if (decodedPath.startsWith('/online-tutoring-') || hash.startsWith('#online-tutoring-')) {
         const fullKey = decodedPath.startsWith('/online-tutoring-')
@@ -1791,8 +1809,12 @@ export default function App() {
     };
   }, []);
 
-  const handleLogin = async (email: string, password?: string): Promise<boolean> => {
-    const success = await store.login(email, password);
+  const handleLogin = async (
+    email: string,
+    password?: string,
+    options?: { adminPortal?: boolean }
+  ): Promise<boolean> => {
+    const success = await store.login(email, password, options);
     if (success) {
       const user = store.currentUser;
       setStoreState((prev) => ({ ...prev, currentUser: user, users: store.users }));

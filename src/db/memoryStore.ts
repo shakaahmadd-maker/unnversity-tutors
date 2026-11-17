@@ -245,25 +245,8 @@ export class MemoryStore {
   }
 
   private seedDefaults() {
-    const adminUser: UserRecord = {
-      id: 'admin_shaka',
-      role: 'admin',
-      name: 'Shaka Ahmad',
-      email: 'shaka.ahmadd@gmail.com',
-      passwordHash: null,
-      avatarUrl: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150&auto=format&fit=crop&q=80',
-      createdAt: new Date().toISOString(),
-      verified: true,
-      suspended: false,
-      isActive: true,
-      roleLabel: 'Super Admin',
-      permissions: ['blog', 'chats', 'orders', 'tutors', 'payments', 'settings'],
-      bio: 'Platform Owner and Superior Administrator.',
-      country: 'US',
-      isApproved: true,
-      status: 'approved',
-    };
-    this.users.set(adminUser.id, adminUser);
+    // Initial administrator account is created strictly by server startup bootstrap
+    // when no administrator exists and process.env.ADMIN_INITIAL_PASSWORD is set.
 
     // Initial Certified Tutors (individual password hashes must be established via admin provisioning or password reset)
     const initialTutors: UserRecord[] = [

@@ -1156,9 +1156,9 @@ export class AppStore {
     return ops.subscribeToChatDetails(this, chatId);
   }
 
-  async login(email: string, password?: string): Promise<boolean> {
+  async login(email: string, password?: string, options?: { adminPortal?: boolean }): Promise<boolean> {
     const ops = await this.loadOps();
-    return ops.login(this, email, password);
+    return ops.login(this, email, password, options);
   }
 
   async register(name: string, email: string, role: UserRole, extra?: any): Promise<boolean> {

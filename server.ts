@@ -65,8 +65,10 @@ export function getRuntimeAppUrl(): string {
 }
 
 export function getConfiguredAdminInitialPassword(): string {
-  return readRuntimeEnv('ADMIN_INITIAL_PASSWORD') || readRuntimeEnv('ADMIN_PASSWORD');
+  return readRuntimeEnv('ADMIN_INITIAL_PASSWORD');
 }
+
+export const DEFAULT_INITIAL_ADMIN_EMAIL = 'shaka.ahmadd@gmail.com';
 
 export const GOOGLE_OAUTH_CALLBACK_PATH = '/api/auth/callback/google';
 
@@ -81,6 +83,12 @@ const FORBIDDEN_LOG_KEYS = new Set([
   'id_token',
   'password',
   'passwordhash',
+  'admin_initial_password',
+  'admininitialpassword',
+  'admin_password',
+  'smtp_password',
+  'smtppassword',
+  'smtp_pass',
   'sessionsecret',
   'session_secret',
   'databaseurl',
@@ -614,32 +622,42 @@ const SEED_TUTORS = [
 async function seedInitialDatabase() {
   if (!isDbConnected() || !db) return;
   try {
-    // Seed default Superior Admin record; only set initial passwordHash when configured in runtime process.env
-    const adminEmail = 'shaka.ahmadd@gmail.com';
-    const configuredAdminPass = getConfiguredAdminInitialPassword();
-    const existingAdmin = await db.select().from(users).where(eq(users.email, adminEmail)).limit(1);
-    if (existingAdmin.length === 0) {
-      const initialAdminHash = configuredAdminPass ? hashPassword(configuredAdminPass) : null;
-      await db.insert(users).values({
-        id: 'admin_shaka',
-        role: 'admin',
-        name: 'Shaka Ahmad',
-        email: adminEmail,
-        passwordHash: initialAdminHash,
-        avatarUrl: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150&auto=format&fit=crop&q=80',
-        createdAt: new Date().toISOString(),
-        verified: true,
-        suspended: false,
-        bio: 'Platform Owner and Superior Administrator.',
-        country: 'US',
-        isApproved: true,
-        status: 'approved',
-      }).onConflictDoNothing();
-      console.log(`[SEED] Ensured Superior Admin account record exists: ${adminEmail}`);
-    } else if (!existingAdmin[0].passwordHash && configuredAdminPass) {
-      const initialAdminHash = hashPassword(configuredAdminPass);
-      await db.update(users).set({ passwordHash: initialAdminHash }).where(eq(users.id, existingAdmin[0].id));
-      console.log(`[SEED] Initialized Superior Admin password hash from runtime environment variable.`);
+    // Check if any administrator account already exists in PostgreSQL.
+    // Never overwrite an existing administrator password or modify existing user roles during startup.
+    const existingAdmins = await db.select({ id: users.id }).from(users).where(eq(users.role, 'admin')).limit(1);
+    if (existingAdmins.length === 0) {
+      const configuredAdminPass = getConfiguredAdminInitialPassword();
+      if (!configuredAdminPass) {
+        console.warn('[AUTH] No administrator account exists and initial administrator password is not configured in server environment.');
+      } else {
+        const existingWithEmail = await db
+          .select({ id: users.id })
+          .from(users)
+          .where(eq(users.email, DEFAULT_INITIAL_ADMIN_EMAIL))
+          .limit(1);
+        if (existingWithEmail.length === 0) {
+          const initialAdminHash = hashPassword(configuredAdminPass);
+          await db.insert(users).values({
+            id: 'admin_shaka',
+            role: 'admin',
+            name: 'Shaka Ahmad',
+            email: DEFAULT_INITIAL_ADMIN_EMAIL,
+            passwordHash: initialAdminHash,
+            avatarUrl: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150&auto=format&fit=crop&q=80',
+            createdAt: new Date().toISOString(),
+            verified: true,
+            suspended: false,
+            isActive: true,
+            roleLabel: 'Super Admin',
+            permissions: JSON.stringify(['blog', 'chats', 'orders', 'tutors', 'payments', 'settings']),
+            bio: 'Platform Owner and Superior Administrator.',
+            country: 'US',
+            isApproved: true,
+            status: 'approved',
+          }).onConflictDoNothing();
+          logSafeAuthEvent('initial_admin_created', { email: DEFAULT_INITIAL_ADMIN_EMAIL, role: 'admin' });
+        }
+      }
     }
 
     // Seed each certified initial tutor individually without shared fallback passwords
@@ -1063,11 +1081,82 @@ export async function createApp(options: CreateAppOptions = {}) {
     return null;
   }
 
+  async function hasAnyAdministratorAccount(): Promise<boolean> {
+    if (isDbConnected() && db) {
+      try {
+        const rows = await db.select({ id: users.id }).from(users).where(eq(users.role, 'admin')).limit(1);
+        return rows.length > 0;
+      } catch (dbErr: any) {
+        console.warn('[AUTH] Notice checking administrator account existence in PostgreSQL:', dbErr.message);
+      }
+    }
+    const persistedMap = getPersistedUserUpdates();
+    for (const u of memoryStore.getAllUsers()) {
+      const merged = persistedMap[u.id] ? { ...u, ...persistedMap[u.id] } : u;
+      if (merged.role === 'admin' && merged.deleted !== true) {
+        return true;
+      }
+    }
+    for (const record of Object.values(persistedMap)) {
+      if (record && record.role === 'admin' && record.deleted !== true) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  async function ensureInitialAdministratorBootstrap(): Promise<'exists' | 'created' | 'missing_config'> {
+    if (await hasAnyAdministratorAccount()) {
+      return 'exists';
+    }
+    const configuredAdminPass = getConfiguredAdminInitialPassword();
+    if (!configuredAdminPass) {
+      return 'missing_config';
+    }
+    if (isDbConnected() && db) {
+      await seedInitialDatabase();
+      return (await hasAnyAdministratorAccount()) ? 'created' : 'exists';
+    }
+    const existingByEmail = await resolveAuthoritativeUserByEmail(DEFAULT_INITIAL_ADMIN_EMAIL);
+    if (existingByEmail) {
+      // Do not overwrite or change an existing non-admin user's role
+      return 'exists';
+    }
+    const initialAdminHash = hashPassword(configuredAdminPass);
+    const initialAdminRecord = {
+      id: 'admin_shaka',
+      role: 'admin' as const,
+      name: 'Shaka Ahmad',
+      email: DEFAULT_INITIAL_ADMIN_EMAIL,
+      passwordHash: initialAdminHash,
+      avatarUrl: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150&auto=format&fit=crop&q=80',
+      createdAt: new Date().toISOString(),
+      verified: true,
+      suspended: false,
+      isActive: true,
+      roleLabel: 'Super Admin',
+      permissions: ['blog', 'chats', 'orders', 'tutors', 'payments', 'settings'],
+      bio: 'Platform Owner and Superior Administrator.',
+      country: 'US',
+      isApproved: true,
+      status: 'approved',
+    };
+    memoryStore.setUser(initialAdminRecord);
+    savePersistedUserUpdate(initialAdminRecord.id, initialAdminRecord);
+    logSafeAuthEvent('initial_admin_created', { email: DEFAULT_INITIAL_ADMIN_EMAIL, role: 'admin' });
+    return 'created';
+  }
+
   // Check database connectivity and run migrations on normal server startup
   if (!options.skipStaticAndVite) {
     await checkDbConnection();
     await runMigrations();
     await seedInitialDatabase();
+    if (!isDbConnected()) {
+      await ensureInitialAdministratorBootstrap();
+    }
+  } else if (!options.oauthUserRepo) {
+    await ensureInitialAdministratorBootstrap();
   }
 
   // Helper middleware to extract user strictly from cryptographically verified session cookie/token
@@ -1848,7 +1937,7 @@ export async function createApp(options: CreateAppOptions = {}) {
   // Invalid or missing passwords, or social accounts without passwordHash, ALWAYS return HTTP 401.
   app.post('/api/auth/login', async (req, res) => {
     try {
-      const { email, password } = req.body || {};
+      const { email, password, adminPortal } = req.body || {};
       if (!email || typeof email !== 'string' || !password || typeof password !== 'string') {
         return res.status(401).json({ error: 'Invalid email or password.' });
       }
@@ -1857,6 +1946,17 @@ export async function createApp(options: CreateAppOptions = {}) {
       const clientIp = getClientIp(req);
       if (isRateLimited(`login:${clientIp}:${cleanEmail}`, 15, 15 * 60 * 1000)) {
         return res.status(429).json({ error: 'Too many failed login attempts. Please wait and try again.' });
+      }
+
+      const isAdminPortalRequest = adminPortal === true;
+      if (isAdminPortalRequest || cleanEmail === DEFAULT_INITIAL_ADMIN_EMAIL) {
+        const bootstrapState = await ensureInitialAdministratorBootstrap();
+        if (bootstrapState === 'missing_config') {
+          return res.status(503).json({
+            code: 'ADMIN_AUTH_NOT_CONFIGURED',
+            error: 'Administrator authentication is not configured on the server. Please contact the system administrator.',
+          });
+        }
       }
 
       const foundUser = await resolveAuthoritativeUserByEmail(cleanEmail);
@@ -1868,31 +1968,27 @@ export async function createApp(options: CreateAppOptions = {}) {
         return res.status(403).json({ error: 'This account has been suspended or revoked by a Super Administrator.' });
       }
 
-      // If Superior Admin has no stored passwordHash yet and runtime ADMIN_INITIAL_PASSWORD/ADMIN_PASSWORD is set, initialize it once
-      let activePasswordHash = foundUser.passwordHash;
-      if (!activePasswordHash && (foundUser.id === 'admin_shaka' || cleanEmail === 'shaka.ahmadd@gmail.com')) {
-        const configuredAdminPass = getConfiguredAdminInitialPassword();
-        if (configuredAdminPass) {
-          activePasswordHash = hashPassword(configuredAdminPass);
-          if (isDbConnected() && db) {
-            await db.update(users).set({ passwordHash: activePasswordHash }).where(eq(users.id, foundUser.id));
-          }
-          memoryStore.updateUser(foundUser.id, { passwordHash: activePasswordHash });
-          savePersistedUserUpdate(foundUser.id, { passwordHash: activePasswordHash });
-        }
+      if (isAdminPortalRequest && !isStaffUser(foundUser)) {
+        return res.status(403).json({
+          code: 'FORBIDDEN_ADMIN_PORTAL',
+          error: 'Access Denied: Administrator or Subadmin privileges are required to access this portal.',
+        });
       }
 
-      // Accounts without passwordHash must NEVER allow arbitrary or blank passwords
+      const activePasswordHash = foundUser.passwordHash;
+
+      // Accounts without passwordHash must NEVER allow arbitrary or blank passwords.
+      // Existing administrator accounts without a stored password hash must use the normal password reset flow.
       if (!activePasswordHash || typeof activePasswordHash !== 'string') {
         if (isStaffUser(foundUser)) {
           return res.status(401).json({
-            code: 'PASSWORD_NOT_SET',
-            error: 'Administrator password is not configured yet. Sign in with Google, set a password via Password Reset, or configure ADMIN_INITIAL_PASSWORD in server environment variables.'
+            code: 'PASSWORD_RESET_REQUIRED',
+            error: 'Please use the password reset flow below ("Forgot or set password?") to receive a recovery email and set your administrator password.',
           });
         }
         return res.status(401).json({
           code: 'SOCIAL_OR_NO_PASSWORD',
-          error: 'No password is set for this account yet. Sign in with Google or Instagram, or click "Forgot password?" to establish a password.'
+          error: 'No password is set for this account yet. Sign in with Google or Instagram, or click "Forgot password?" to establish a password.',
         });
       }
 
@@ -2128,14 +2224,27 @@ export async function createApp(options: CreateAppOptions = {}) {
     return { subject, text, html };
   }
 
-  function renderPasswordResetEmail(params: { userName?: string; emailLogoUrl?: string; resetUrl: string; appUrl?: string }): { subject: string; text: string; html: string } {
+  function renderPasswordResetEmail(params: {
+    userName?: string;
+    emailLogoUrl?: string;
+    resetUrl: string;
+    resetToken?: string;
+    appUrl?: string;
+  }): { subject: string; text: string; html: string } {
     const userName = params.userName || 'Student';
     const liveDomain = params.appUrl || 'https://university-tutors.com';
     const logoUrl = params.emailLogoUrl || 'https://firebasestorage.googleapis.com/v0/b/gen-lang-client-0303245370.firebasestorage.app/o/uni-tutors%20logo.png?alt=media&token=b2796c13-d74a-45d7-9dc7-4a9723aa9440';
     const resetUrl = params.resetUrl;
+    const tokenLineText = params.resetToken ? `\nRecovery token (if prompted on the reset screen):\n${params.resetToken}\n` : '';
+    const tokenBoxHtml = params.resetToken
+      ? `<div style="margin: 20px 0; padding: 12px 16px; background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; text-align: center;">
+          <div style="font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: #64748b; margin-bottom: 6px;">One-Time Recovery Token</div>
+          <code style="font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size: 12px; color: #0f172a; word-break: break-all;">${params.resetToken}</code>
+        </div>`
+      : '';
 
     const subject = 'Reset your University Tutors password';
-    const text = `Hello ${userName},\n\nWe received a request to reset your University Tutors password.\n\nPlease reset your password by opening the link below:\n${resetUrl}\n\nThis link expires in 30 minutes and can only be used once.\n\nIf you did not request this change, you can safely ignore this email.\n\nSupport: support@university-tutors.com\nAdmin: admin@university-tutors.com`;
+    const text = `Hello ${userName},\n\nWe received a request to reset your University Tutors password.\n\nPlease reset your password by opening the link below:\n${resetUrl}\n${tokenLineText}\nThis link expires in 30 minutes and can only be used once.\n\nIf you did not request this change, you can safely ignore this email.\n\nSupport: support@university-tutors.com\nAdmin: admin@university-tutors.com`;
 
     const html = `<!DOCTYPE html>
 <html lang="en">
@@ -2156,6 +2265,7 @@ export async function createApp(options: CreateAppOptions = {}) {
               <div style="text-align: center; margin: 32px 0;">
                 <a href="${resetUrl}" target="_blank" style="background-color: #f36514; color: #ffffff; text-decoration: none; padding: 14px 32px; border-radius: 6px; font-size: 15px; font-weight: bold; display: inline-block; box-shadow: 0 2px 4px rgba(243, 101, 20, 0.2);">Reset my password</a>
               </div>
+              ${tokenBoxHtml}
               <p style="margin: 0 0 12px 0; font-size: 13px; color: #64748b; text-align: center;">
                 This link expires in 30 minutes and can only be used once.
               </p>
@@ -2176,46 +2286,145 @@ export async function createApp(options: CreateAppOptions = {}) {
     return { subject, text, html };
   }
 
-  async function deliverPasswordResetEmail(toEmail: string, resetToken: string, appUrl: string, userName?: string): Promise<boolean> {
-    const host = readRuntimeEnv('SMTP_HOST');
-    const portStr = readRuntimeEnv('SMTP_PORT');
-    const user = readRuntimeEnv('SMTP_USER');
-    const pass = readRuntimeEnv('SMTP_PASSWORD');
-    const from = readRuntimeEnv('SMTP_FROM') || 'noreply@university-tutors.com';
-    const port = portStr ? parseInt(portStr, 10) : 587;
+  interface SmtpRuntimeConfig {
+    host: string;
+    port: number;
+    secure: boolean;
+    user: string;
+    pass: string;
+    from: string;
+    fallbackFrom: string;
+  }
+
+  function getHostingerSmtpConfig(): SmtpRuntimeConfig | null {
+    const host = readRuntimeEnv('SMTP_HOST') || readRuntimeEnv('MAIL_HOST');
+    const portStr = readRuntimeEnv('SMTP_PORT') || readRuntimeEnv('MAIL_PORT');
+    const secureRaw = (readRuntimeEnv('SMTP_SECURE') || readRuntimeEnv('MAIL_SECURE')).toLowerCase();
+    const user = readRuntimeEnv('SMTP_USER') || readRuntimeEnv('SMTP_USERNAME') || readRuntimeEnv('MAIL_USER');
+    const pass = readRuntimeEnv('SMTP_PASSWORD') || readRuntimeEnv('SMTP_PASS') || readRuntimeEnv('MAIL_PASSWORD') || readRuntimeEnv('MAIL_PASS');
+    const configuredFrom = readRuntimeEnv('SMTP_FROM') || readRuntimeEnv('MAIL_FROM');
 
     if (!host || !user || !pass) {
+      return null;
+    }
+
+    const parsedPort = portStr ? parseInt(portStr, 10) : NaN;
+    const defaultPort = secureRaw === 'true' || secureRaw === '1' || secureRaw === 'ssl' ? 465 : 587;
+    const port = Number.isFinite(parsedPort) && parsedPort > 0 ? parsedPort : defaultPort;
+    const secure =
+      port === 465
+        ? true
+        : port === 587
+          ? false
+          : secureRaw === 'true' || secureRaw === '1' || secureRaw === 'ssl';
+
+    const authenticatedSender = user.includes('@') ? `University Tutors <${user}>` : user;
+    const from = configuredFrom || authenticatedSender;
+
+    return {
+      host,
+      port,
+      secure,
+      user,
+      pass,
+      from,
+      fallbackFrom: authenticatedSender,
+    };
+  }
+
+  async function sendMailViaHostingerSmtp(
+    smtp: SmtpRuntimeConfig,
+    mail: { to: string; subject: string; text: string; html: string },
+    operationLabel: string
+  ): Promise<void> {
+    const transporter = nodemailer.createTransport({
+      host: smtp.host,
+      port: smtp.port,
+      secure: smtp.secure,
+      requireTLS: !smtp.secure && smtp.port === 587,
+      connectionTimeout: 10000,
+      greetingTimeout: 10000,
+      socketTimeout: 15000,
+      auth: {
+        user: smtp.user,
+        pass: smtp.pass,
+      },
+      tls: {
+        servername: smtp.host,
+      },
+    });
+
+    try {
+      await withDbTimeout(
+        transporter.sendMail({
+          from: smtp.from,
+          to: mail.to,
+          subject: mail.subject,
+          text: mail.text,
+          html: mail.html,
+        }),
+        15000,
+        operationLabel
+      );
+    } catch (firstErr: any) {
+      const msg = String(firstErr?.message || '');
+      const isSenderMismatch =
+        smtp.from !== smtp.fallbackFrom &&
+        (msg.includes('553') ||
+          msg.includes('550') ||
+          msg.toLowerCase().includes('sender address rejected') ||
+          msg.toLowerCase().includes('not owned by user'));
+
+      if (!isSenderMismatch) {
+        throw firstErr;
+      }
+
+      await withDbTimeout(
+        transporter.sendMail({
+          from: smtp.fallbackFrom,
+          to: mail.to,
+          subject: mail.subject,
+          text: mail.text,
+          html: mail.html,
+        }),
+        15000,
+        `${operationLabel} (authenticated sender fallback)`
+      );
+    }
+  }
+
+  async function deliverPasswordResetEmail(
+    toEmail: string,
+    resetToken: string,
+    appUrl: string,
+    userName?: string,
+    isAdminAccount = false
+  ): Promise<boolean> {
+    const smtp = getHostingerSmtpConfig();
+    if (!smtp) {
       console.warn('[AUTH] SMTP configuration missing: SMTP_HOST, SMTP_USER, and SMTP_PASSWORD are required to deliver reset emails.');
       return false;
     }
 
     try {
-      const transporter = nodemailer.createTransport({
-        host,
-        port,
-        secure: port === 465,
-        connectionTimeout: 8000,
-        greetingTimeout: 8000,
-        socketTimeout: 10000,
-        auth: {
-          user,
-          pass,
-        },
+      const liveDomain = appUrl || 'https://university-tutors.com';
+      const resetPath = isAdminAccount ? '/admin' : '/auth';
+      const resetUrl = `${liveDomain}${resetPath}?reset_token=${encodeURIComponent(resetToken)}&email=${encodeURIComponent(toEmail)}`;
+      const emailContent = renderPasswordResetEmail({
+        userName: userName || (isAdminAccount ? 'Administrator' : 'Student'),
+        resetUrl,
+        resetToken,
+        appUrl: liveDomain,
       });
 
-      const liveDomain = appUrl || 'https://university-tutors.com';
-      const resetUrl = `${liveDomain}/auth?reset_token=${encodeURIComponent(resetToken)}&email=${encodeURIComponent(toEmail)}`;
-      const emailContent = renderPasswordResetEmail({ userName: userName || 'Student', resetUrl, appUrl: liveDomain });
-
-      await withDbTimeout(
-        transporter.sendMail({
-          from,
+      await sendMailViaHostingerSmtp(
+        smtp,
+        {
           to: toEmail,
           subject: emailContent.subject,
           text: emailContent.text,
           html: emailContent.html,
-        }),
-        12000,
+        },
         'SMTP password reset delivery'
       );
 
@@ -2225,52 +2434,32 @@ export async function createApp(options: CreateAppOptions = {}) {
       if (err?.message?.includes('554 5.7.1') || err?.message?.includes('reserved for documentation')) {
         console.warn('[AUTH] SMTP notice: Test recipient domain is reserved (RFC 2606); email simulated successfully in test sandbox.');
       } else {
-        console.error('[AUTH] Failed to dispatch password reset email via SMTP:', err.message);
+        console.error('[AUTH] Failed to dispatch password reset email via SMTP:', err?.code || 'SMTP_SEND_ERROR');
       }
       return false;
     }
   }
 
   async function deliverEmailVerificationEmail(toEmail: string, verificationToken: string, appUrl: string, userName?: string): Promise<boolean> {
-    const host = readRuntimeEnv('SMTP_HOST');
-    const portStr = readRuntimeEnv('SMTP_PORT');
-    const user = readRuntimeEnv('SMTP_USER');
-    const pass = readRuntimeEnv('SMTP_PASSWORD');
-    const from = readRuntimeEnv('SMTP_FROM') || 'noreply@university-tutors.com';
-    const port = portStr ? parseInt(portStr, 10) : 587;
-
-    if (!host || !user || !pass) {
+    const smtp = getHostingerSmtpConfig();
+    if (!smtp) {
       console.warn('[AUTH] SMTP configuration missing: SMTP_HOST, SMTP_USER, and SMTP_PASSWORD are required to deliver email verification.');
       return false;
     }
 
     try {
-      const transporter = nodemailer.createTransport({
-        host,
-        port,
-        secure: port === 465,
-        connectionTimeout: 8000,
-        greetingTimeout: 8000,
-        socketTimeout: 10000,
-        auth: {
-          user,
-          pass,
-        },
-      });
-
       const liveDomain = appUrl || 'https://university-tutors.com';
       const verificationUrl = `${liveDomain}/api/auth/verify-email?token=${encodeURIComponent(verificationToken)}&email=${encodeURIComponent(toEmail)}`;
       const emailContent = renderVerificationEmail({ userName: userName || 'Student', verificationUrl, appUrl: liveDomain });
 
-      await withDbTimeout(
-        transporter.sendMail({
-          from,
+      await sendMailViaHostingerSmtp(
+        smtp,
+        {
           to: toEmail,
           subject: emailContent.subject,
           text: emailContent.text,
           html: emailContent.html,
-        }),
-        12000,
+        },
         'SMTP verification delivery'
       );
 
@@ -2280,7 +2469,7 @@ export async function createApp(options: CreateAppOptions = {}) {
       if (err?.message?.includes('554 5.7.1') || err?.message?.includes('reserved for documentation')) {
         console.warn('[AUTH] SMTP notice: Test recipient domain is reserved (RFC 2606); email simulated successfully in test sandbox.');
       } else {
-        console.error('[AUTH] Failed to dispatch email verification via SMTP:', err.message);
+        console.error('[AUTH] Failed to dispatch email verification via SMTP:', err?.code || 'SMTP_SEND_ERROR');
       }
       return false;
     }
@@ -2350,8 +2539,16 @@ export async function createApp(options: CreateAppOptions = {}) {
         writePersistedResetTokens(current);
       }
 
-      // Deliver reset email via SMTP (using runtime SMTP_* variables without logging token)
-      await deliverPasswordResetEmail(cleanEmail, rawToken, getRuntimeAppUrl(), foundUser.name);
+      // Deliver reset email via Hostinger SMTP (using runtime SMTP_* variables without logging token or credentials)
+      const requestOrigin = req.get('host') ? `${req.protocol}://${req.get('host')}` : '';
+      const resolvedAppUrl = getRuntimeAppUrl() || requestOrigin || 'https://university-tutors.com';
+      await deliverPasswordResetEmail(
+        cleanEmail,
+        rawToken,
+        resolvedAppUrl,
+        foundUser.name,
+        isStaffUser(foundUser)
+      );
 
       await logAudit('PASSWORD_RESET_REQUESTED', `Password recovery requested for: ${cleanEmail}`, foundUser.id, foundUser.name, foundUser.role, req);
 

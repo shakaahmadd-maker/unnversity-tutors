@@ -335,13 +335,22 @@ export async function subscribeToChatDetails(store: AppStore, chatId: string) {
   }
 }
 
-export async function login(store: AppStore, email: string, password?: string): Promise<boolean> {
+export async function login(
+  store: AppStore,
+  email: string,
+  password?: string,
+  options?: { adminPortal?: boolean }
+): Promise<boolean> {
   const cleanEmail = email.toLowerCase().trim();
   try {
     const res = await apiFetch('/api/auth/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: cleanEmail, password: password || '' }),
+      body: JSON.stringify({
+        email: cleanEmail,
+        password: password || '',
+        ...(options?.adminPortal ? { adminPortal: true } : {}),
+      }),
       skipAuthEvent: true,
     });
 
