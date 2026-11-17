@@ -75,29 +75,15 @@ export function getRuntimeAppUrl(): string {
 }
 
 export function getConfiguredAdminInitialPassword(): string {
-  const candidates = [
-    process.env.ADMIN_INITIAL_PASSWORD,
-    process.env.ADMIN_PASSWORD,
-    process.env.INITIAL_ADMIN_PASSWORD,
-  ];
-  for (const raw of candidates) {
-    if (raw && typeof raw === 'string') {
-      const cleaned = stripSurroundingQuotePair(raw);
-      if (cleaned) return cleaned;
-    }
-  }
-  return '';
+  const raw = process.env.ADMIN_INITIAL_PASSWORD;
+  if (!raw || typeof raw !== 'string') return '';
+  return stripSurroundingQuotePair(raw);
 }
-
-const DEFAULT_INITIAL_ADMIN_EMAIL = 'shaka.ahmadd@gmail.com';
 
 export function getConfiguredAdminEmail(): string {
   const raw = process.env.ADMIN_EMAIL;
-  if (raw && typeof raw === 'string') {
-    const cleaned = stripSurroundingQuotePair(raw).toLowerCase();
-    if (cleaned) return cleaned;
-  }
-  return DEFAULT_INITIAL_ADMIN_EMAIL;
+  if (!raw || typeof raw !== 'string') return '';
+  return stripSurroundingQuotePair(raw).toLowerCase();
 }
 
 const BCRYPT_HASH_PATTERN = /^\$2[aby]\$\d{2}\$[./A-Za-z0-9]{53}$/;
@@ -133,6 +119,8 @@ const FORBIDDEN_LOG_KEYS = new Set([
   'password',
   'passwordhash',
   'password_hash',
+  'admin_email',
+  'adminemail',
   'admin_initial_password',
   'admininitialpassword',
   'initial_admin_password',
@@ -181,7 +169,6 @@ export function logSafeAdminLoginFailure(
 ) {
   logSafeAuthEvent('admin_login_failed', {
     reason,
-    email: details.email,
     userId: details.userId,
     role: details.role,
     active: details.active,
@@ -1115,6 +1102,7 @@ export async function createApp(options: CreateAppOptions = {}) {
   }
 
   interface AdministratorAuthDiagnosticState {
+    adminEmailConfigured: boolean;
     adminPasswordConfigured: boolean;
     adminUserPresent: boolean;
     adminPasswordHashPresent: boolean;
@@ -1125,6 +1113,7 @@ export async function createApp(options: CreateAppOptions = {}) {
     if (hasDatabaseUrl && !isDbConnected()) {
       await checkDbConnection();
     }
+    const adminEmailConfigured = Boolean(getConfiguredAdminEmail());
     const adminPasswordConfigured = Boolean(getConfiguredAdminInitialPassword());
     let adminRecords: Array<{
       id: string;
@@ -1153,7 +1142,32 @@ export async function createApp(options: CreateAppOptions = {}) {
       } catch (dbErr: any) {
         console.warn('[AUTH] Notice inspecting administrator state in PostgreSQL:', dbErr.message);
       }
+    } else if (!hasDatabaseUrl) {
+      const seenIds = new Set<string>();
+      const persistedMap = getPersistedUserUpdates();
+      for (const u of memoryStore.getAllUsers()) {
+        const merged = persistedMap[u.id] ? { ...u, ...persistedMap[u.id] } : u;
+        seenIds.add(u.id);
+        if (
+          isAdministratorRole(merged.role) &&
+          merged.deleted !== true &&
+          !isSyntheticTestAccountEmail(merged.email)
+        ) {
+          adminRecords.push(merged);
+        }
+      }
+      for (const [uid, record] of Object.entries(persistedMap)) {
+        if (seenIds.has(uid) || !record) continue;
+        if (
+          isAdministratorRole(record.role) &&
+          record.deleted !== true &&
+          !isSyntheticTestAccountEmail(record.email)
+        ) {
+          adminRecords.push({ ...record, id: uid });
+        }
+      }
     } else {
+      // DATABASE_URL is configured at runtime, fallback only when PostgreSQL is offline in local/preview environments
       const seenIds = new Set<string>();
       const persistedMap = getPersistedUserUpdates();
       for (const u of memoryStore.getAllUsers()) {
@@ -1186,6 +1200,7 @@ export async function createApp(options: CreateAppOptions = {}) {
     );
 
     return {
+      adminEmailConfigured,
       adminPasswordConfigured,
       adminUserPresent,
       adminPasswordHashPresent,
@@ -1194,14 +1209,15 @@ export async function createApp(options: CreateAppOptions = {}) {
   }
 
   function emitSafeAdminStartupDiagnostic(diag: AdministratorAuthDiagnosticState): void {
-    console.info(
-      `adminPasswordConfigured=${diag.adminPasswordConfigured}\n` +
-      `adminUserPresent=${diag.adminUserPresent}\n` +
-      `adminPasswordHashPresent=${diag.adminPasswordHashPresent}`
-    );
+    console.log(`adminEmailConfigured=${diag.adminEmailConfigured}`);
+    console.log(`adminPasswordConfigured=${diag.adminPasswordConfigured}`);
+    console.log(`adminUserPresent=${diag.adminUserPresent}`);
+    console.log(`adminPasswordHashPresent=${diag.adminPasswordHashPresent}`);
   }
 
-  async function ensureInitialAdministratorBootstrap(): Promise<'exists' | 'created' | 'missing_config'> {
+  async function ensureInitialAdministratorBootstrap(): Promise<
+    'exists' | 'created' | 'missing_config' | 'non_admin_email_exists'
+  > {
     const currentState = await inspectAdministratorAuthState();
     // Never overwrite an existing administrator password during startup
     if (currentState.adminUserPresent) {
@@ -1214,59 +1230,22 @@ export async function createApp(options: CreateAppOptions = {}) {
       return 'missing_config';
     }
 
-    const nowIso = new Date().toISOString();
-    const allModules: AdminPermissionKey[] = ['blog', 'chats', 'orders', 'tutors', 'payments', 'settings'];
-    const adminAvatarUrl = 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150&auto=format&fit=crop&q=80';
-
-    // Check if the designated initial ADMIN_EMAIL already exists (e.g. created earlier via Google OAuth as student)
+    // Never promote a Google OAuth user, student, or tutor to administrator just because the email matches,
+    // and never create duplicate accounts.
     const existingByEmail = await resolveAuthoritativeUserByEmail(configuredAdminEmail);
     if (existingByEmail) {
       if (isAdministratorRole(existingByEmail.role) && existingByEmail.deleted !== true) {
         return 'exists';
       }
-
-      const preservedOrInitialHash = hasValidPasswordHash(existingByEmail.passwordHash)
-        ? existingByEmail.passwordHash
-        : hashPassword(configuredAdminPass);
-
-      if (isDbConnected() && db) {
-        await db
-          .update(users)
-          .set({
-            role: 'admin',
-            roleLabel: 'Super Admin',
-            permissions: JSON.stringify(allModules),
-            passwordHash: preservedOrInitialHash,
-            isActive: true,
-            suspended: false,
-            verified: true,
-            isApproved: true,
-            status: 'approved',
-            updatedAt: nowIso,
-          })
-          .where(eq(users.id, existingByEmail.id));
-      } else {
-        const promotedRecord = {
-          ...existingByEmail,
-          role: 'admin' as const,
-          roleLabel: 'Super Admin',
-          permissions: allModules,
-          passwordHash: preservedOrInitialHash,
-          isActive: true,
-          suspended: false,
-          deleted: false,
-          verified: true,
-          isApproved: true,
-          status: 'approved',
-        };
-        memoryStore.setUser(promotedRecord);
-        savePersistedUserUpdate(existingByEmail.id, promotedRecord);
-      }
-
-      logSafeAuthEvent('initial_admin_created', { role: 'admin' });
-      return 'created';
+      logSafeAuthEvent('admin_bootstrap_skipped_existing_non_admin', {
+        existingRole: typeof existingByEmail.role === 'string' ? existingByEmail.role : 'unknown',
+      });
+      return 'non_admin_email_exists';
     }
 
+    const nowIso = new Date().toISOString();
+    const allModules: AdminPermissionKey[] = ['blog', 'chats', 'orders', 'tutors', 'payments', 'settings'];
+    const adminAvatarUrl = 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150&auto=format&fit=crop&q=80';
     const initialAdminHash = hashPassword(configuredAdminPass);
     const deterministicAdminId =
       'admin_' + crypto.createHash('sha256').update(configuredAdminEmail).digest('hex').slice(0, 16);
@@ -1345,16 +1324,24 @@ export async function createApp(options: CreateAppOptions = {}) {
     return 'created';
   }
 
-  // Check database connectivity, run migrations, bootstrap initial admin if needed, and log safe startup diagnostics
+  // Check database connectivity, run migrations, bootstrap initial admin if needed, and ALWAYS log safe startup diagnostics
   if (!options.skipStaticAndVite) {
     await checkDbConnection();
     await runMigrations();
     await seedInitialDatabase();
-    await ensureInitialAdministratorBootstrap();
+    try {
+      await ensureInitialAdministratorBootstrap();
+    } catch (bootErr: any) {
+      console.error('[AUTH] Initial administrator bootstrap error:', formatSafeDatabaseError(bootErr));
+    }
     const startupAdminDiag = await inspectAdministratorAuthState();
     emitSafeAdminStartupDiagnostic(startupAdminDiag);
   } else if (!options.oauthUserRepo) {
-    await ensureInitialAdministratorBootstrap();
+    try {
+      await ensureInitialAdministratorBootstrap();
+    } catch (bootErr: any) {
+      console.error('[AUTH] Initial administrator bootstrap error:', formatSafeDatabaseError(bootErr));
+    }
     const startupAdminDiag = await inspectAdministratorAuthState();
     emitSafeAdminStartupDiagnostic(startupAdminDiag);
   }
@@ -2133,17 +2120,20 @@ export async function createApp(options: CreateAppOptions = {}) {
   });
 
   // GET /api/auth/admin/status
-  // Safe administrator configuration status endpoint returning ONLY { "configured": boolean }
-  app.get(['/api/auth/admin/status', '/api/admin/auth/status'], async (_req, res) => {
+  // Safe administrator configuration status endpoint returning ONLY { "configured": boolean, "adminUserPresent": boolean }
+  app.get('/api/auth/admin/status', async (_req, res) => {
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate');
     try {
       await ensureInitialAdministratorBootstrap();
       const diag = await inspectAdministratorAuthState();
       return res.status(200).json({
         configured: Boolean(diag.adminUserPresent && diag.activeAdminWithValidHash),
+        adminUserPresent: Boolean(diag.adminUserPresent),
       });
     } catch {
       return res.status(200).json({
         configured: false,
+        adminUserPresent: false,
       });
     }
   });
@@ -2166,16 +2156,23 @@ export async function createApp(options: CreateAppOptions = {}) {
       const cleanEmail = email.toLowerCase().trim();
       if (isRateLimited(`login:${clientIp}:${cleanEmail}`, 15, 15 * 60 * 1000)) {
         if (isAdminPortalRequest) {
-          logSafeAdminLoginFailure('rate_limited', { email: cleanEmail, ip: clientIp });
+          logSafeAdminLoginFailure('rate_limited', { ip: clientIp });
         }
         return res.status(429).json({ error: 'Too many failed login attempts. Please wait and try again.' });
       }
 
       if (isAdminPortalRequest) {
-        await ensureInitialAdministratorBootstrap();
+        const bootstrapOutcome = await ensureInitialAdministratorBootstrap();
         const adminDiag = await inspectAdministratorAuthState();
         if (!adminDiag.adminUserPresent) {
-          logSafeAdminLoginFailure('admin_not_configured', { email: cleanEmail, ip: clientIp });
+          if (bootstrapOutcome === 'non_admin_email_exists') {
+            logSafeAdminLoginFailure('admin_email_belongs_to_non_admin', { ip: clientIp });
+            return res.status(503).json({
+              code: 'ADMIN_BOOTSTRAP_CONFLICT',
+              error: 'Initial administrator setup was skipped because the configured administrator email belongs to an existing non-administrator account. Configure a dedicated administrator email on the server.',
+            });
+          }
+          logSafeAdminLoginFailure('admin_not_configured', { ip: clientIp });
           return res.status(503).json({
             code: 'ADMIN_AUTH_NOT_CONFIGURED',
             error: 'Administrator authentication is not configured on the server.',

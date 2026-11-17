@@ -345,6 +345,7 @@ export async function login(
   try {
     const res = await apiFetch('/api/auth/login', {
       method: 'POST',
+      credentials: 'include',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         email: cleanEmail,
@@ -354,11 +355,40 @@ export async function login(
       skipAuthEvent: true,
     });
 
-    const data = await res.json().catch(() => ({}));
+    const rawText = await res.text();
+    const trimmedBody = rawText.trim();
+    if (trimmedBody.startsWith('<!DOCTYPE') || trimmedBody.toLowerCase().startsWith('<html')) {
+      const htmlErr: any = new Error(
+        `Endpoint /api/auth/login returned HTML instead of JSON (HTTP ${res.status}). Verify reverse-proxy routing forwards /api/* to port 3000.`
+      );
+      htmlErr.status = res.status >= 400 ? res.status : 502;
+      htmlErr.code = 'API_ROUTING_MISMATCH';
+      throw htmlErr;
+    }
+
+    let data: any = {};
+    if (trimmedBody) {
+      try {
+        data = JSON.parse(trimmedBody);
+      } catch {
+        data = {};
+      }
+    }
+
     if (!res.ok) {
-      const authErr: any = new Error(data.error || 'Authentication rejected');
+      const fallbackMessage =
+        res.status === 404
+          ? 'Backend endpoint /api/auth/login returned HTTP 404. Verify the Node.js backend is deployed on port 3000.'
+          : res.status === 502 || res.status === 503 || res.status === 504
+          ? `Backend service or reverse proxy returned HTTP ${res.status}.`
+          : res.status === 403
+          ? 'Access denied: Administrator privileges are required.'
+          : res.status === 401
+          ? 'Invalid administrator email or password.'
+          : `Authentication failed (HTTP ${res.status}).`;
+      const authErr: any = new Error(data.error || fallbackMessage);
       authErr.status = res.status;
-      authErr.code = data.code;
+      authErr.code = data.code || `HTTP_${res.status}`;
       throw authErr;
     }
 

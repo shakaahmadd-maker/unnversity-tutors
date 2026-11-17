@@ -64,19 +64,61 @@ export interface ApiDiagnosticsSnapshot {
   failedTabs: TabFailureSample[];
 }
 
+function isDisallowedApiBaseUrl(rawUrl: string): boolean {
+  try {
+    const parsed = new URL(rawUrl);
+    const host = parsed.hostname.toLowerCase();
+    // Never call localhost, loopback, or unspecified addresses
+    if (host === 'localhost' || host === '127.0.0.1' || host === '0.0.0.0' || host === '[::1]' || host === '::1') {
+      return true;
+    }
+    // Never call internal Docker/Kubernetes service hostnames (single-label or internal suffixes)
+    if (
+      !host.includes('.') ||
+      host.endsWith('.internal') ||
+      host.endsWith('.local') ||
+      host.endsWith('.docker') ||
+      host.endsWith('.svc') ||
+      host.endsWith('.cluster.local')
+    ) {
+      return true;
+    }
+    // Never call ephemeral preview or legacy tunnel domains from production
+    if (
+      host.endsWith('.run.app') ||
+      host.endsWith('.nip.io') ||
+      host.endsWith('.sslip.io') ||
+      host.endsWith('.traefik.me')
+    ) {
+      return true;
+    }
+    if (typeof window !== 'undefined') {
+      const currentHost = window.location.hostname.toLowerCase();
+      // On the primary production domain, always use same-origin /api/* routes
+      if (
+        (currentHost === 'university-tutors.com' || currentHost === 'www.university-tutors.com') &&
+        host !== currentHost
+      ) {
+        return true;
+      }
+      // Never downgrade HTTPS pages to an insecure HTTP API origin
+      if (window.location.protocol === 'https:' && parsed.protocol === 'http:') {
+        return true;
+      }
+    }
+    return false;
+  } catch {
+    return true;
+  }
+}
+
 function resolveBackendApiBaseUrl(): string {
   try {
     const metaEnv = (import.meta as any)?.env;
     const raw = String(metaEnv?.VITE_API_BASE_URL || metaEnv?.VITE_API_URL || '').trim().replace(/\/+$/, '');
     if (!raw) return '';
-    if (
-      typeof window !== 'undefined' &&
-      window.location.hostname !== 'localhost' &&
-      window.location.hostname !== '127.0.0.1' &&
-      (raw.includes('localhost') || raw.includes('127.0.0.1'))
-    ) {
-      return '';
-    }
+    if (!/^https?:\/\//i.test(raw)) return '';
+    if (isDisallowedApiBaseUrl(raw)) return '';
     return raw;
   } catch {
     return '';
@@ -85,9 +127,19 @@ function resolveBackendApiBaseUrl(): string {
 
 export function resolveApiUrl(url: string): string {
   if (!url) return url;
-  if (/^https?:\/\//i.test(url)) return url;
+  if (/^https?:\/\//i.test(url)) {
+    if (isDisallowedApiBaseUrl(url)) {
+      try {
+        const parsed = new URL(url);
+        return `${parsed.pathname}${parsed.search}`;
+      } catch {
+        return url;
+      }
+    }
+    return url;
+  }
   const base = resolveBackendApiBaseUrl();
-  if (!base) return url;
+  if (!base) return url.startsWith('/') ? url : `/${url}`;
   return url.startsWith('/') ? `${base}${url}` : `${base}/${url}`;
 }
 
@@ -326,23 +378,27 @@ async function executeTimedFetch(
 
     const durationMs = Math.round((typeof performance !== 'undefined' ? performance.now() : Date.now()) - startMs);
     const contentType = (res.headers.get('content-type') || '').toLowerCase();
-    if (isApiRoute && contentType.includes('text/html') && res.ok) {
+    if (isApiRoute && contentType.includes('text/html')) {
+      const isProxyGatewayError = res.status === 502 || res.status === 503 || res.status === 504;
+      const reportedStatus = res.status && res.status >= 400 ? res.status : 502;
       recordApiMetric({
         id: `${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
         method,
         route: normRoute,
-        status: 502,
+        status: reportedStatus,
         durationMs,
         ok: false,
         slow: durationMs >= 2000,
         verySlow: durationMs >= 10000,
-        error: 'Unexpected HTML on API route',
+        error: isProxyGatewayError ? `Proxy gateway HTTP ${res.status}` : `Unexpected HTML on API route (HTTP ${res.status})`,
         timestamp: new Date().toISOString(),
       });
       throw new ApiError(
-        'Backend API endpoint returned HTML instead of JSON. Verify reverse-proxy routing for /api/*.',
-        502,
-        'API_ROUTING_MISMATCH',
+        isProxyGatewayError
+          ? `Reverse proxy returned HTTP ${res.status} while contacting ${normRoute}. Verify the Node.js backend on port 3000 is running.`
+          : `Endpoint ${normRoute} returned HTML instead of JSON (HTTP ${res.status}). Verify reverse-proxy routing forwards /api/* to port 3000.`,
+        reportedStatus,
+        isProxyGatewayError ? 'PROXY_ERROR' : 'API_ROUTING_MISMATCH',
         { route: normRoute }
       );
     }

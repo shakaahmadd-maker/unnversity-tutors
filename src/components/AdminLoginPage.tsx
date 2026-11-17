@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   ShieldCheck,
   Lock,
@@ -15,12 +15,22 @@ import {
   Check,
 } from 'lucide-react';
 import { store } from '../lib/store';
-import { apiFetch, getFriendlyErrorMessage, isAbortError } from '../lib/apiClient';
+import { ApiError, apiFetch, getFriendlyErrorMessage, isAbortError } from '../lib/apiClient';
 
 interface AdminLoginPageProps {
   onLogin: (email: string, password?: string, options?: { adminPortal?: boolean }) => Promise<boolean>;
   onNavigate: (view: string) => void;
 }
+
+type AdminStatusState =
+  | { kind: 'checking' }
+  | { kind: 'ready'; configured: true; adminUserPresent: true }
+  | { kind: 'password_reset_required'; configured: false; adminUserPresent: true }
+  | { kind: 'not_configured'; configured: false; adminUserPresent: false }
+  | { kind: 'http_auth_error'; status: number }
+  | { kind: 'http_not_found'; status: 404 }
+  | { kind: 'html_mismatch'; status: number }
+  | { kind: 'proxy_or_network_error'; status: number; detail: string };
 
 export default function AdminLoginPage({ onLogin, onNavigate }: AdminLoginPageProps) {
   const [viewMode, setViewMode] = useState<'login' | 'forgot' | 'reset'>('login');
@@ -34,7 +44,8 @@ export default function AdminLoginPage({ onLogin, onNavigate }: AdminLoginPagePr
   const [errorCode, setErrorCode] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [adminConfigured, setAdminConfigured] = useState<boolean | null>(null);
+  const [statusState, setStatusState] = useState<AdminStatusState>({ kind: 'checking' });
+  const hasRequestedStatusRef = useRef(false);
 
   useEffect(() => {
     if (typeof window !== 'undefined' && window.location.search) {
@@ -53,25 +64,120 @@ export default function AdminLoginPage({ onLogin, onNavigate }: AdminLoginPagePr
       }
     }
 
-    const controller = new AbortController();
-    apiFetch('/api/auth/admin/status', {
-      credentials: 'include',
-      signal: controller.signal,
-      dedupe: false,
-      skipAuthEvent: true,
-    })
-      .then((res) => (res.ok ? res.json() : null))
-      .then((data) => {
-        if (!controller.signal.aborted && typeof data?.configured === 'boolean') {
-          setAdminConfigured(data.configured);
+    // Execute GET /api/auth/admin/status once per mount (no retry loops)
+    if (hasRequestedStatusRef.current) {
+      return;
+    }
+    hasRequestedStatusRef.current = true;
+
+    let cancelled = false;
+
+    (async () => {
+      try {
+        const res = await apiFetch('/api/auth/admin/status', {
+          method: 'GET',
+          credentials: 'include',
+          cache: 'no-store',
+          dedupe: false,
+          skipAuthEvent: true,
+          timeoutMs: 12_000,
+        });
+
+        const contentType = (res.headers.get('content-type') || '').toLowerCase();
+        const rawBody = await res.text();
+        if (cancelled) return;
+
+        const trimmed = rawBody.trim();
+        if (
+          contentType.includes('text/html') ||
+          trimmed.startsWith('<!DOCTYPE') ||
+          trimmed.toLowerCase().startsWith('<html')
+        ) {
+          setStatusState({ kind: 'html_mismatch', status: res.status || 200 });
+          return;
         }
-      })
-      .catch((err) => {
-        if (!isAbortError(err)) {
-          setAdminConfigured(null);
+
+        if (res.status === 401 || res.status === 403) {
+          setStatusState({ kind: 'http_auth_error', status: res.status });
+          return;
         }
-      });
-    return () => controller.abort();
+
+        if (res.status === 404) {
+          setStatusState({ kind: 'http_not_found', status: 404 });
+          return;
+        }
+
+        if (!res.ok) {
+          setStatusState({
+            kind: 'proxy_or_network_error',
+            status: res.status,
+            detail: `GET /api/auth/admin/status returned HTTP ${res.status}.`,
+          });
+          return;
+        }
+
+        let parsed: any = null;
+        try {
+          parsed = trimmed ? JSON.parse(trimmed) : null;
+        } catch {
+          setStatusState({
+            kind: 'proxy_or_network_error',
+            status: res.status,
+            detail: 'GET /api/auth/admin/status returned invalid JSON.',
+          });
+          return;
+        }
+
+        if (typeof parsed?.configured === 'boolean') {
+          const adminPresent = Boolean(parsed.adminUserPresent);
+          if (parsed.configured) {
+            setStatusState({ kind: 'ready', configured: true, adminUserPresent: true });
+          } else if (adminPresent) {
+            setStatusState({ kind: 'password_reset_required', configured: false, adminUserPresent: true });
+          } else {
+            setStatusState({ kind: 'not_configured', configured: false, adminUserPresent: false });
+          }
+          return;
+        }
+
+        setStatusState({
+          kind: 'proxy_or_network_error',
+          status: res.status,
+          detail: 'Unexpected status payload returned from /api/auth/admin/status.',
+        });
+      } catch (err: any) {
+        if (cancelled || isAbortError(err)) return;
+        if (err instanceof ApiError) {
+          if (err.code === 'API_ROUTING_MISMATCH') {
+            setStatusState({ kind: 'html_mismatch', status: err.status || 502 });
+            return;
+          }
+          if (err.status === 401 || err.status === 403) {
+            setStatusState({ kind: 'http_auth_error', status: err.status });
+            return;
+          }
+          if (err.status === 404) {
+            setStatusState({ kind: 'http_not_found', status: 404 });
+            return;
+          }
+          setStatusState({
+            kind: 'proxy_or_network_error',
+            status: err.status || 0,
+            detail: err.message || 'Unable to reach /api/auth/admin/status.',
+          });
+          return;
+        }
+        setStatusState({
+          kind: 'proxy_or_network_error',
+          status: 0,
+          detail: 'Network error while reaching /api/auth/admin/status.',
+        });
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const handleAdminEmailLogin = async (e: React.FormEvent) => {
@@ -90,25 +196,33 @@ export default function AdminLoginPage({ onLogin, onNavigate }: AdminLoginPagePr
     try {
       const success = await onLogin(trimmedEmail, password, { adminPortal: true });
       if (success) {
-        const meRes = await apiFetch('/api/auth/me', { credentials: 'include', dedupe: false });
+        const meRes = await apiFetch('/api/auth/me', {
+          credentials: 'include',
+          dedupe: false,
+        });
         const meData = meRes.ok ? await meRes.json() : null;
         const verifiedRole = String(meData?.user?.role || store.currentUser?.role || '').toLowerCase();
 
-        if (verifiedRole !== 'admin' && verifiedRole !== 'super_admin' && verifiedRole !== 'subadmin' && verifiedRole !== 'sub_admin') {
+        if (
+          verifiedRole !== 'admin' &&
+          verifiedRole !== 'super_admin' &&
+          verifiedRole !== 'subadmin' &&
+          verifiedRole !== 'sub_admin'
+        ) {
           await store.logout();
           setErrorMsg('Access Denied: Administrator or Subadmin privileges are required to access this portal.');
           return;
         }
 
-        setAdminConfigured(true);
+        setStatusState({ kind: 'ready', configured: true, adminUserPresent: true });
         setSuccessMsg('Access authorized. Initializing administrative environment...');
         onNavigate('dashboard');
       } else {
-        setErrorMsg('Authentication failed: Invalid administrator email or password.');
+        setErrorMsg('Invalid administrator email or password.');
       }
     } catch (err: any) {
       setErrorCode(typeof err?.code === 'string' ? err.code : '');
-      setErrorMsg(err?.message || 'Administrative authentication gateway rejected your request.');
+      setErrorMsg(err?.message || 'Unable to complete administrator sign-in.');
     } finally {
       setIsLoading(false);
     }
@@ -161,7 +275,12 @@ export default function AdminLoginPage({ onLogin, onNavigate }: AdminLoginPagePr
       const ok = await store.resetPassword(resetEmail.trim(), resetToken.trim(), newPassword, newPassword);
       if (ok) {
         const verifiedUser = store.currentUser || (await store.verifySession());
-        if (verifiedUser && (verifiedUser.role === 'admin' || verifiedUser.role === 'subadmin')) {
+        const verifiedRole = String(verifiedUser?.role || '').toLowerCase();
+        if (
+          verifiedUser &&
+          (verifiedRole === 'admin' || verifiedRole === 'super_admin' || verifiedRole === 'subadmin' || verifiedRole === 'sub_admin')
+        ) {
+          setStatusState({ kind: 'ready', configured: true, adminUserPresent: true });
           setSuccessMsg('Administrator password updated. Accessing portal...');
           onNavigate('dashboard');
         } else {
@@ -180,10 +299,128 @@ export default function AdminLoginPage({ onLogin, onNavigate }: AdminLoginPagePr
 
   const showPasswordRecoveryHint =
     errorCode !== 'ADMIN_AUTH_NOT_CONFIGURED' &&
+    errorCode !== 'ADMIN_BOOTSTRAP_CONFLICT' &&
     (errorCode === 'PASSWORD_RESET_REQUIRED' ||
       errorCode === 'PASSWORD_NOT_SET' ||
       errorCode === 'SOCIAL_OR_NO_PASSWORD' ||
       errorMsg.toLowerCase().includes('password reset'));
+
+  const renderStatusBanner = () => {
+    if (viewMode !== 'login') return null;
+    if (statusState.kind === 'checking' || statusState.kind === 'ready') return null;
+
+    if (statusState.kind === 'password_reset_required') {
+      return (
+        <div className="bg-amber-50 border border-amber-200 text-amber-900 text-xs p-4 rounded-2xl space-y-2.5" id="admin-status-notice">
+          <div className="flex gap-2.5">
+            <AlertTriangle className="w-4.5 h-4.5 shrink-0 text-amber-600" />
+            <div className="space-y-1">
+              <span className="font-semibold block">Administrator Password Setup Required</span>
+              <p className="leading-relaxed text-amber-800">
+                An administrator account is present in PostgreSQL (<code className="font-mono">adminUserPresent=true</code>), but an active password hash is not configured (<code className="font-mono">configured=false</code>). Existing accounts are never overwritten on startup — use the password-reset flow below.
+              </p>
+            </div>
+          </div>
+          <div className="pl-7">
+            <button
+              type="button"
+              onClick={() => {
+                setErrorMsg('');
+                setErrorCode('');
+                setResetEmail(email.trim());
+                setViewMode('forgot');
+              }}
+              className="inline-flex items-center gap-1.5 bg-white hover:bg-amber-100/60 text-amber-900 border border-amber-300 font-bold text-[11px] px-2.5 py-1.5 rounded-lg transition-colors cursor-pointer"
+            >
+              <KeyRound className="w-3.5 h-3.5" />
+              <span>Set / Reset Administrator Password</span>
+            </button>
+          </div>
+        </div>
+      );
+    }
+
+    if (statusState.kind === 'not_configured') {
+      if (errorCode === 'ADMIN_AUTH_NOT_CONFIGURED' || errorCode === 'ADMIN_BOOTSTRAP_CONFLICT') {
+        return null;
+      }
+      return (
+        <div className="bg-amber-50 border border-amber-200 text-amber-900 text-xs p-4 rounded-2xl space-y-1.5" id="admin-status-notice">
+          <div className="flex gap-2.5">
+            <AlertTriangle className="w-4.5 h-4.5 shrink-0 text-amber-600" />
+            <div className="space-y-1">
+              <span className="font-semibold block">Initial Administrator Not Configured</span>
+              <p className="leading-relaxed text-amber-800">
+                Server reported <code className="font-mono">configured=false</code> and <code className="font-mono">adminUserPresent=false</code>. Configure the dedicated administrator email and initial password in the backend runtime environment, then restart the server.
+              </p>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    if (statusState.kind === 'http_not_found') {
+      return (
+        <div className="bg-red-50 border border-red-200 text-red-800 text-xs p-4 rounded-2xl space-y-1.5" id="admin-status-notice">
+          <div className="flex gap-2.5">
+            <AlertTriangle className="w-4.5 h-4.5 shrink-0 text-red-600" />
+            <div className="space-y-1">
+              <span className="font-semibold block">Admin Status Endpoint Not Found (HTTP 404)</span>
+              <p className="leading-relaxed text-red-700">
+                <code className="font-mono">GET /api/auth/admin/status</code> returned HTTP 404. Redeploy the backend container so the latest server build is running on port 3000.
+              </p>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    if (statusState.kind === 'http_auth_error') {
+      return (
+        <div className="bg-red-50 border border-red-200 text-red-800 text-xs p-4 rounded-2xl space-y-1.5" id="admin-status-notice">
+          <div className="flex gap-2.5">
+            <AlertTriangle className="w-4.5 h-4.5 shrink-0 text-red-600" />
+            <div className="space-y-1">
+              <span className="font-semibold block">Status Endpoint Blocked (HTTP {statusState.status})</span>
+              <p className="leading-relaxed text-red-700">
+                <code className="font-mono">GET /api/auth/admin/status</code> returned HTTP {statusState.status}. Ensure upstream proxy rules allow unauthenticated GET requests to <code className="font-mono">/api/auth/admin/status</code>.
+              </p>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    if (statusState.kind === 'html_mismatch') {
+      return (
+        <div className="bg-red-50 border border-red-200 text-red-800 text-xs p-4 rounded-2xl space-y-1.5" id="admin-status-notice">
+          <div className="flex gap-2.5">
+            <AlertTriangle className="w-4.5 h-4.5 shrink-0 text-red-600" />
+            <div className="space-y-1">
+              <span className="font-semibold block">API Routing Mismatch (HTML Returned)</span>
+              <p className="leading-relaxed text-red-700">
+                <code className="font-mono">GET /api/auth/admin/status</code> returned HTML instead of JSON (HTTP {statusState.status}). Configure the reverse proxy to forward <code className="font-mono">/api/*</code> to the Node.js server on port 3000 instead of static SPA assets.
+              </p>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    return (
+      <div className="bg-red-50 border border-red-200 text-red-800 text-xs p-4 rounded-2xl space-y-1.5" id="admin-status-notice">
+        <div className="flex gap-2.5">
+          <AlertTriangle className="w-4.5 h-4.5 shrink-0 text-red-600" />
+          <div className="space-y-1">
+            <span className="font-semibold block">
+              Backend Connection Error{statusState.status ? ` (HTTP ${statusState.status})` : ''}
+            </span>
+            <p className="leading-relaxed text-red-700">{statusState.detail}</p>
+          </div>
+        </div>
+      </div>
+    );
+  };
 
   return (
     <div className="min-h-[85vh] flex items-center justify-center p-4 sm:p-6 md:p-8 relative overflow-hidden" id="admin-login-page-container">
@@ -207,19 +444,7 @@ export default function AdminLoginPage({ onLogin, onNavigate }: AdminLoginPagePr
 
         <div className="p-6 md:p-8 space-y-5">
 
-          {adminConfigured === false && !errorMsg && viewMode === 'login' && (
-            <div className="bg-amber-50 border border-amber-200 text-amber-800 text-xs p-4 rounded-2xl space-y-2" id="admin-status-notice">
-              <div className="flex gap-2.5">
-                <AlertTriangle className="w-4.5 h-4.5 shrink-0 text-amber-600" />
-                <div className="space-y-1">
-                  <span className="font-semibold block">Administrator Password Setup Pending</span>
-                  <p className="leading-relaxed text-amber-700">
-                    If your administrator account already exists, use <strong>Forgot or set password?</strong> below to establish a hashed password via email recovery. Otherwise, ensure backend runtime environment variables are configured.
-                  </p>
-                </div>
-              </div>
-            </div>
-          )}
+          {renderStatusBanner()}
 
           {errorMsg && (
             <div className="bg-red-50 border border-red-200 text-red-700 text-xs p-4 rounded-2xl space-y-2.5" id="admin-login-error">
@@ -359,87 +584,85 @@ export default function AdminLoginPage({ onLogin, onNavigate }: AdminLoginPagePr
               </div>
             </form>
           ) : (
-            <>
-              <form onSubmit={handleAdminEmailLogin} className="space-y-4">
-                <div className="space-y-1.5">
+            <form onSubmit={handleAdminEmailLogin} className="space-y-4">
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-bold text-gray-700 uppercase tracking-wider flex items-center gap-1.5">
+                  <Mail className="w-3.5 h-3.5 text-gray-400" /> Administrator Email
+                </label>
+                <input
+                  type="email"
+                  required
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="admin@university-tutors.com"
+                  className="w-full bg-gray-50/50 border border-gray-200 hover:border-gray-300 focus:border-slate-800 focus:bg-white text-sm py-2.5 px-3.5 rounded-xl transition-all focus:ring-1 focus:ring-slate-800 outline-none"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <div className="flex justify-between items-center">
                   <label className="text-[10px] font-bold text-gray-700 uppercase tracking-wider flex items-center gap-1.5">
-                    <Mail className="w-3.5 h-3.5 text-gray-400" /> Administrator Email
+                    <Key className="w-3.5 h-3.5 text-gray-400" /> Account Password
                   </label>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setErrorMsg('');
+                      setErrorCode('');
+                      setSuccessMsg('');
+                      setResetEmail(email.trim());
+                      setViewMode('forgot');
+                    }}
+                    className="text-[11px] font-bold text-orange-600 hover:text-orange-700 cursor-pointer"
+                  >
+                    Forgot or set password?
+                  </button>
+                </div>
+                <div className="relative">
                   <input
-                    type="email"
+                    type={showPassword ? 'text' : 'password'}
                     required
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    placeholder="admin@university-tutors.com"
-                    className="w-full bg-gray-50/50 border border-gray-200 hover:border-gray-300 focus:border-slate-800 focus:bg-white text-sm py-2.5 px-3.5 rounded-xl transition-all focus:ring-1 focus:ring-slate-800 outline-none"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="Enter your administrator password"
+                    className="w-full bg-gray-50/50 border border-gray-200 hover:border-gray-300 focus:border-slate-800 focus:bg-white text-sm py-2.5 pl-3.5 pr-10 rounded-xl transition-all focus:ring-1 focus:ring-slate-800 outline-none"
                   />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600 cursor-pointer"
+                    aria-label={showPassword ? 'Hide password' : 'Show password'}
+                  >
+                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
                 </div>
+                <p className="text-[10px] text-slate-400 mt-0.5">
+                  Role permissions and hashed credentials are verified directly against PostgreSQL.
+                </p>
+              </div>
 
-                <div className="space-y-1.5">
-                  <div className="flex justify-between items-center">
-                    <label className="text-[10px] font-bold text-gray-700 uppercase tracking-wider flex items-center gap-1.5">
-                      <Key className="w-3.5 h-3.5 text-gray-400" /> Account Password
-                    </label>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setErrorMsg('');
-                        setErrorCode('');
-                        setSuccessMsg('');
-                        setResetEmail(email.trim());
-                        setViewMode('forgot');
-                      }}
-                      className="text-[11px] font-bold text-orange-600 hover:text-orange-700 cursor-pointer"
-                    >
-                      Forgot or set password?
-                    </button>
-                  </div>
-                  <div className="relative">
-                    <input
-                      type={showPassword ? 'text' : 'password'}
-                      required
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      placeholder="Enter your administrator password"
-                      className="w-full bg-gray-50/50 border border-gray-200 hover:border-gray-300 focus:border-slate-800 focus:bg-white text-sm py-2.5 pl-3.5 pr-10 rounded-xl transition-all focus:ring-1 focus:ring-slate-800 outline-none"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowPassword(!showPassword)}
-                      className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600 cursor-pointer"
-                      aria-label={showPassword ? 'Hide password' : 'Show password'}
-                    >
-                      {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                    </button>
-                  </div>
-                  <p className="text-[10px] text-slate-400 mt-0.5">
-                    Role permissions and hashed credentials are verified directly against PostgreSQL.
-                  </p>
-                </div>
-
-                <button
-                  type="submit"
-                  disabled={isLoading}
-                  className={`w-full py-3 rounded-xl text-xs font-bold transition-all shadow-sm flex items-center justify-center gap-2 cursor-pointer ${
-                    isLoading
-                      ? 'bg-gray-100 text-gray-400 border border-gray-200 cursor-not-allowed'
-                      : 'bg-slate-900 hover:bg-slate-950 text-white hover:shadow-md active:scale-98'
-                  }`}
-                >
-                  {isLoading ? (
-                    <>
-                      <span className="w-4 h-4 border-2 border-slate-400 border-t-transparent rounded-full animate-spin"></span>
-                      <span>Verifying Credentials...</span>
-                    </>
-                  ) : (
-                    <>
-                      <Lock className="w-4 h-4 text-orange-400" />
-                      <span>Execute Admin Login</span>
-                    </>
-                  )}
-                </button>
-              </form>
-            </>
+              <button
+                type="submit"
+                disabled={isLoading}
+                className={`w-full py-3 rounded-xl text-xs font-bold transition-all shadow-sm flex items-center justify-center gap-2 cursor-pointer ${
+                  isLoading
+                    ? 'bg-gray-100 text-gray-400 border border-gray-200 cursor-not-allowed'
+                    : 'bg-slate-900 hover:bg-slate-950 text-white hover:shadow-md active:scale-98'
+                }`}
+              >
+                {isLoading ? (
+                  <>
+                    <span className="w-4 h-4 border-2 border-slate-400 border-t-transparent rounded-full animate-spin"></span>
+                    <span>Verifying Credentials...</span>
+                  </>
+                ) : (
+                  <>
+                    <Lock className="w-4 h-4 text-orange-400" />
+                    <span>Execute Admin Login</span>
+                  </>
+                )}
+              </button>
+            </form>
           )}
 
           <div className="text-center pt-1">
