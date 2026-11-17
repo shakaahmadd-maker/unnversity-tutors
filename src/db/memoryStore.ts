@@ -245,8 +245,7 @@ export class MemoryStore {
   }
 
   private seedDefaults() {
-    // Initial administrator account is created strictly by server startup bootstrap
-    // when no administrator exists and process.env.ADMIN_INITIAL_PASSWORD is set.
+    // Initial administrator account is provisioned strictly by the backend startup bootstrap when no administrator exists.
 
     // Initial Certified Tutors (individual password hashes must be established via admin provisioning or password reset)
     const initialTutors: UserRecord[] = [

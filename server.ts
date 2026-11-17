@@ -1,5 +1,4 @@
-import dotenv from 'dotenv';
-dotenv.config({ override: false, quiet: true } as any);
+import 'dotenv/config';
 
 import express from 'express';
 import compression from 'compression';
@@ -13,7 +12,7 @@ import nodemailer from 'nodemailer';
 import { createServer as createViteServer } from 'vite';
 import { db, isDbConnected, checkDbConnection, hasDatabaseUrl, withDbTimeout } from './src/db/index';
 import { users, userProfiles, userSessions, orders, inquiries, messages, quotes, auditLogs, chatRooms, chatRoomMembers, blogs, tutors, notifications, passwordResetTokens as passwordResetTokensTable, emailVerificationTokens as emailVerificationTokensTable } from './src/db/schema';
-import { eq, desc, and, inArray, isNull, or } from 'drizzle-orm';
+import { eq, desc, and, inArray, isNull, or, sql } from 'drizzle-orm';
 import { runMigrations, verifyUsersTableSchema } from './src/db/migrate';
 import { memoryStore, PrivateFileRecord } from './src/db/memoryStore';
 import { DEFAULT_20_BLOGS } from './src/data/defaultBlogsData';
@@ -49,12 +48,23 @@ import {
   hasModulePermission,
 } from './src/lib/adminPermissions';
 
-// Bundler-safe runtime environment reader: reads strictly from process['env'] at runtime (zero hardcoded fallbacks)
+function stripSurroundingQuotePair(raw: string): string {
+  const trimmed = raw.trim();
+  if (
+    trimmed.length >= 2 &&
+    ((trimmed.startsWith('"') && trimmed.endsWith('"')) ||
+      (trimmed.startsWith("'") && trimmed.endsWith("'")))
+  ) {
+    return trimmed.slice(1, -1).trim();
+  }
+  return trimmed;
+}
+
+// Bundler-safe runtime environment reader: reads strictly from process.env at runtime (zero hardcoded fallbacks)
 export function readRuntimeEnv(key: string): string {
-  const runtimeEnv: Record<string, string | undefined> = process['env'];
-  const val = runtimeEnv[key];
+  const val = process.env[key];
   if (!val || typeof val !== 'string') return '';
-  return val.trim().replace(/^['"]+|['"]+$/g, '').trim();
+  return stripSurroundingQuotePair(val);
 }
 
 const PORT = readRuntimeEnv('PORT') ? parseInt(readRuntimeEnv('PORT'), 10) : 3000;
@@ -65,10 +75,29 @@ export function getRuntimeAppUrl(): string {
 }
 
 export function getConfiguredAdminInitialPassword(): string {
-  return readRuntimeEnv('ADMIN_INITIAL_PASSWORD');
+  const raw = process.env.ADMIN_INITIAL_PASSWORD;
+  if (!raw || typeof raw !== 'string') return '';
+  return stripSurroundingQuotePair(raw);
 }
 
-export const DEFAULT_INITIAL_ADMIN_EMAIL = 'shaka.ahmadd@gmail.com';
+export function getConfiguredAdminEmail(): string {
+  const raw = process.env.ADMIN_EMAIL;
+  if (!raw || typeof raw !== 'string') return '';
+  return stripSurroundingQuotePair(raw).toLowerCase();
+}
+
+const BCRYPT_HASH_PATTERN = /^\$2[aby]\$\d{2}\$[./A-Za-z0-9]{53}$/;
+const SCRYPT_HASH_PATTERN = /^[a-f0-9]{16,64}:[a-f0-9]{128}$/i;
+
+export function hasValidPasswordHash(passwordHash: unknown): passwordHash is string {
+  if (!passwordHash || typeof passwordHash !== 'string') return false;
+  return BCRYPT_HASH_PATTERN.test(passwordHash) || SCRYPT_HASH_PATTERN.test(passwordHash);
+}
+
+export function isAdministratorRole(role: unknown): boolean {
+  const normalized = typeof role === 'string' ? role.trim().toLowerCase() : '';
+  return normalized === 'admin' || normalized === 'super_admin';
+}
 
 export const GOOGLE_OAUTH_CALLBACK_PATH = '/api/auth/callback/google';
 
@@ -83,6 +112,7 @@ const FORBIDDEN_LOG_KEYS = new Set([
   'id_token',
   'password',
   'passwordhash',
+  'password_hash',
   'admin_initial_password',
   'admininitialpassword',
   'admin_password',
@@ -121,6 +151,20 @@ export function logSafeAuthEvent(
     safePayload[k] = v;
   }
   console.info(`[AUTH] ${JSON.stringify(safePayload)}`);
+}
+
+export function logSafeAdminLoginFailure(
+  reason: string,
+  details: { email?: string; userId?: string; role?: string; active?: boolean; ip?: string } = {}
+) {
+  logSafeAuthEvent('admin_login_failed', {
+    reason,
+    email: details.email,
+    userId: details.userId,
+    role: details.role,
+    active: details.active,
+    ip: details.ip,
+  });
 }
 
 export interface SafeDatabaseErrorInfo {
@@ -622,45 +666,8 @@ const SEED_TUTORS = [
 async function seedInitialDatabase() {
   if (!isDbConnected() || !db) return;
   try {
-    // Check if any administrator account already exists in PostgreSQL.
-    // Never overwrite an existing administrator password or modify existing user roles during startup.
-    const existingAdmins = await db.select({ id: users.id }).from(users).where(eq(users.role, 'admin')).limit(1);
-    if (existingAdmins.length === 0) {
-      const configuredAdminPass = getConfiguredAdminInitialPassword();
-      if (!configuredAdminPass) {
-        console.warn('[AUTH] No administrator account exists and initial administrator password is not configured in server environment.');
-      } else {
-        const existingWithEmail = await db
-          .select({ id: users.id })
-          .from(users)
-          .where(eq(users.email, DEFAULT_INITIAL_ADMIN_EMAIL))
-          .limit(1);
-        if (existingWithEmail.length === 0) {
-          const initialAdminHash = hashPassword(configuredAdminPass);
-          await db.insert(users).values({
-            id: 'admin_shaka',
-            role: 'admin',
-            name: 'Shaka Ahmad',
-            email: DEFAULT_INITIAL_ADMIN_EMAIL,
-            passwordHash: initialAdminHash,
-            avatarUrl: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150&auto=format&fit=crop&q=80',
-            createdAt: new Date().toISOString(),
-            verified: true,
-            suspended: false,
-            isActive: true,
-            roleLabel: 'Super Admin',
-            permissions: JSON.stringify(['blog', 'chats', 'orders', 'tutors', 'payments', 'settings']),
-            bio: 'Platform Owner and Superior Administrator.',
-            country: 'US',
-            isApproved: true,
-            status: 'approved',
-          }).onConflictDoNothing();
-          logSafeAuthEvent('initial_admin_created', { email: DEFAULT_INITIAL_ADMIN_EMAIL, role: 'admin' });
-        }
-      }
-    }
-
     // Seed each certified initial tutor individually without shared fallback passwords
+    // (Initial administrator bootstrap is handled separately via ensureInitialAdministratorBootstrap)
     for (const t of SEED_TUTORS) {
       try {
         const existing = await db.select().from(users).where(eq(users.id, t.id)).limit(1);
@@ -1056,7 +1063,11 @@ export async function createApp(options: CreateAppOptions = {}) {
     }
     if (isDbConnected() && db) {
       try {
-        const rows = await db.select().from(users).where(eq(users.email, cleanEmail)).limit(1);
+        const rows = await db
+          .select()
+          .from(users)
+          .where(sql`lower(trim(${users.email})) = ${cleanEmail}`)
+          .limit(1);
         if (rows.length > 0) {
           return rows[0];
         }
@@ -1081,82 +1092,206 @@ export async function createApp(options: CreateAppOptions = {}) {
     return null;
   }
 
-  async function hasAnyAdministratorAccount(): Promise<boolean> {
+  interface AdministratorAuthDiagnosticState {
+    adminPasswordConfigured: boolean;
+    adminUserPresent: boolean;
+    adminPasswordHashPresent: boolean;
+    activeAdminWithValidHash: boolean;
+  }
+
+  async function inspectAdministratorAuthState(): Promise<AdministratorAuthDiagnosticState> {
+    if (hasDatabaseUrl && !isDbConnected()) {
+      await checkDbConnection();
+    }
+    const adminPasswordConfigured = Boolean(getConfiguredAdminInitialPassword());
+    let adminRecords: Array<{
+      id: string;
+      role?: unknown;
+      passwordHash?: unknown;
+      isActive?: unknown;
+      suspended?: unknown;
+      deleted?: unknown;
+    }> = [];
+
     if (isDbConnected() && db) {
       try {
-        const rows = await db.select({ id: users.id }).from(users).where(eq(users.role, 'admin')).limit(1);
-        return rows.length > 0;
+        const rows = await db
+          .select({
+            id: users.id,
+            role: users.role,
+            passwordHash: users.passwordHash,
+            isActive: users.isActive,
+            suspended: users.suspended,
+          })
+          .from(users)
+          .where(sql`lower(trim(${users.role})) in ('admin', 'super_admin')`);
+        adminRecords = rows;
       } catch (dbErr: any) {
-        console.warn('[AUTH] Notice checking administrator account existence in PostgreSQL:', dbErr.message);
+        console.warn('[AUTH] Notice inspecting administrator state in PostgreSQL:', dbErr.message);
+      }
+    } else if (!hasDatabaseUrl) {
+      const seenIds = new Set<string>();
+      const persistedMap = getPersistedUserUpdates();
+      for (const u of memoryStore.getAllUsers()) {
+        const merged = persistedMap[u.id] ? { ...u, ...persistedMap[u.id] } : u;
+        seenIds.add(u.id);
+        if (isAdministratorRole(merged.role) && merged.deleted !== true) {
+          adminRecords.push(merged);
+        }
+      }
+      for (const [uid, record] of Object.entries(persistedMap)) {
+        if (seenIds.has(uid) || !record) continue;
+        if (isAdministratorRole(record.role) && record.deleted !== true) {
+          adminRecords.push({ ...record, id: uid });
+        }
       }
     }
-    const persistedMap = getPersistedUserUpdates();
-    for (const u of memoryStore.getAllUsers()) {
-      const merged = persistedMap[u.id] ? { ...u, ...persistedMap[u.id] } : u;
-      if (merged.role === 'admin' && merged.deleted !== true) {
-        return true;
-      }
-    }
-    for (const record of Object.values(persistedMap)) {
-      if (record && record.role === 'admin' && record.deleted !== true) {
-        return true;
-      }
-    }
-    return false;
+
+    const adminUserPresent = adminRecords.length > 0;
+    const adminPasswordHashPresent = adminRecords.some((u) => hasValidPasswordHash(u.passwordHash));
+    const activeAdminWithValidHash = adminRecords.some(
+      (u) => u.isActive !== false && u.suspended !== true && hasValidPasswordHash(u.passwordHash)
+    );
+
+    return {
+      adminPasswordConfigured,
+      adminUserPresent,
+      adminPasswordHashPresent,
+      activeAdminWithValidHash,
+    };
   }
 
-  async function ensureInitialAdministratorBootstrap(): Promise<'exists' | 'created' | 'missing_config'> {
-    if (await hasAnyAdministratorAccount()) {
+  function emitSafeAdminStartupDiagnostic(diag: AdministratorAuthDiagnosticState): void {
+    console.info(
+      `adminPasswordConfigured=${diag.adminPasswordConfigured}\n` +
+      `adminUserPresent=${diag.adminUserPresent}\n` +
+      `adminPasswordHashPresent=${diag.adminPasswordHashPresent}`
+    );
+  }
+
+  async function ensureInitialAdministratorBootstrap(): Promise<'exists' | 'created' | 'missing_config' | 'email_conflict'> {
+    const currentState = await inspectAdministratorAuthState();
+    // Never overwrite an existing administrator password during startup
+    if (currentState.adminUserPresent) {
       return 'exists';
     }
+
+    const configuredAdminEmail = getConfiguredAdminEmail();
     const configuredAdminPass = getConfiguredAdminInitialPassword();
-    if (!configuredAdminPass) {
+    if (!configuredAdminEmail || !configuredAdminPass) {
       return 'missing_config';
     }
-    if (isDbConnected() && db) {
-      await seedInitialDatabase();
-      return (await hasAnyAdministratorAccount()) ? 'created' : 'exists';
-    }
-    const existingByEmail = await resolveAuthoritativeUserByEmail(DEFAULT_INITIAL_ADMIN_EMAIL);
+
+    // Do not create duplicate accounts and do not change existing user roles
+    const existingByEmail = await resolveAuthoritativeUserByEmail(configuredAdminEmail);
     if (existingByEmail) {
-      // Do not overwrite or change an existing non-admin user's role
-      return 'exists';
+      if (isAdministratorRole(existingByEmail.role) && existingByEmail.deleted !== true) {
+        return 'exists';
+      }
+      logSafeAuthEvent('initial_admin_email_conflict', {
+        existingRole: typeof existingByEmail.role === 'string' ? existingByEmail.role : 'unknown',
+      });
+      return 'email_conflict';
     }
+
     const initialAdminHash = hashPassword(configuredAdminPass);
-    const initialAdminRecord = {
-      id: 'admin_shaka',
-      role: 'admin' as const,
-      name: 'Shaka Ahmad',
-      email: DEFAULT_INITIAL_ADMIN_EMAIL,
-      passwordHash: initialAdminHash,
-      avatarUrl: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150&auto=format&fit=crop&q=80',
-      createdAt: new Date().toISOString(),
-      verified: true,
-      suspended: false,
-      isActive: true,
-      roleLabel: 'Super Admin',
-      permissions: ['blog', 'chats', 'orders', 'tutors', 'payments', 'settings'],
-      bio: 'Platform Owner and Superior Administrator.',
-      country: 'US',
-      isApproved: true,
-      status: 'approved',
-    };
-    memoryStore.setUser(initialAdminRecord);
-    savePersistedUserUpdate(initialAdminRecord.id, initialAdminRecord);
-    logSafeAuthEvent('initial_admin_created', { email: DEFAULT_INITIAL_ADMIN_EMAIL, role: 'admin' });
-    return 'created';
+    const nowIso = new Date().toISOString();
+    const deterministicAdminId =
+      'admin_' + crypto.createHash('sha256').update(configuredAdminEmail).digest('hex').slice(0, 16);
+    const allModules: AdminPermissionKey[] = ['blog', 'chats', 'orders', 'tutors', 'payments', 'settings'];
+
+    const adminAvatarUrl = 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150&auto=format&fit=crop&q=80';
+
+    if (isDbConnected() && db) {
+      await db
+        .insert(users)
+        .values({
+          id: deterministicAdminId,
+          role: 'admin',
+          name: 'Administrator',
+          fullName: 'Administrator',
+          email: configuredAdminEmail,
+          passwordHash: initialAdminHash,
+          avatarUrl: adminAvatarUrl,
+          createdAt: nowIso,
+          updatedAt: nowIso,
+          verified: true,
+          suspended: false,
+          isActive: true,
+          roleLabel: 'Super Admin',
+          permissions: JSON.stringify(allModules),
+          bio: 'Platform Administrator.',
+          country: 'US',
+          isApproved: true,
+          status: 'approved',
+        })
+        .onConflictDoNothing();
+
+      try {
+        await db
+          .insert(userProfiles)
+          .values({
+            id: 'prof_' + deterministicAdminId,
+            userId: deterministicAdminId,
+            fullName: 'Administrator',
+            email: configuredAdminEmail,
+            role: 'admin',
+            avatarUrl: adminAvatarUrl,
+            country: 'US',
+            createdAt: nowIso,
+            updatedAt: nowIso,
+          })
+          .onConflictDoNothing();
+      } catch {
+        // Optional profile mirror; primary authentication resides in users table
+      }
+
+      logSafeAuthEvent('initial_admin_created', { role: 'admin' });
+      return 'created';
+    }
+
+    if (!hasDatabaseUrl) {
+      const initialAdminRecord = {
+        id: deterministicAdminId,
+        role: 'admin' as const,
+        name: 'Administrator',
+        fullName: 'Administrator',
+        email: configuredAdminEmail,
+        passwordHash: initialAdminHash,
+        avatarUrl: adminAvatarUrl,
+        createdAt: nowIso,
+        verified: true,
+        suspended: false,
+        isActive: true,
+        deleted: false,
+        roleLabel: 'Super Admin',
+        permissions: allModules,
+        bio: 'Platform Administrator.',
+        country: 'US',
+        isApproved: true,
+        status: 'approved',
+      };
+      memoryStore.setUser(initialAdminRecord);
+      savePersistedUserUpdate(initialAdminRecord.id, initialAdminRecord);
+      logSafeAuthEvent('initial_admin_created', { role: 'admin' });
+      return 'created';
+    }
+
+    return 'missing_config';
   }
 
-  // Check database connectivity and run migrations on normal server startup
+  // Check database connectivity, run migrations, bootstrap initial admin if needed, and log safe startup diagnostics
   if (!options.skipStaticAndVite) {
     await checkDbConnection();
     await runMigrations();
     await seedInitialDatabase();
-    if (!isDbConnected()) {
-      await ensureInitialAdministratorBootstrap();
-    }
+    await ensureInitialAdministratorBootstrap();
+    const startupAdminDiag = await inspectAdministratorAuthState();
+    emitSafeAdminStartupDiagnostic(startupAdminDiag);
   } else if (!options.oauthUserRepo) {
     await ensureInitialAdministratorBootstrap();
+    const startupAdminDiag = await inspectAdministratorAuthState();
+    emitSafeAdminStartupDiagnostic(startupAdminDiag);
   }
 
   // Helper middleware to extract user strictly from cryptographically verified session cookie/token
@@ -1932,55 +2067,105 @@ export async function createApp(options: CreateAppOptions = {}) {
     }
   });
 
-  // POST /api/auth/login
-  // Authenticates against PostgreSQL hashed passwords for ALL roles (including admins).
-  // Invalid or missing passwords, or social accounts without passwordHash, ALWAYS return HTTP 401.
-  app.post('/api/auth/login', async (req, res) => {
+  // GET /api/auth/admin/status
+  // Safe administrator configuration status endpoint returning ONLY { "configured": boolean }
+  app.get(['/api/auth/admin/status', '/api/admin/auth/status'], async (_req, res) => {
+    try {
+      await ensureInitialAdministratorBootstrap();
+      const diag = await inspectAdministratorAuthState();
+      return res.status(200).json({
+        configured: Boolean(diag.adminUserPresent && diag.activeAdminWithValidHash),
+      });
+    } catch {
+      return res.status(200).json({
+        configured: false,
+      });
+    }
+  });
+
+  // POST /api/auth/login (and POST /api/auth/admin/login)
+  // Verifies email, valid bcrypt/scrypt password hash, administrator role (on admin portal), and active account status.
+  const handlePasswordLogin = async (req: express.Request, res: express.Response, forceAdminPortal = false) => {
     try {
       const { email, password, adminPortal } = req.body || {};
+      const isAdminPortalRequest = forceAdminPortal || adminPortal === true;
+      const clientIp = getClientIp(req);
+
       if (!email || typeof email !== 'string' || !password || typeof password !== 'string') {
+        if (isAdminPortalRequest) {
+          logSafeAdminLoginFailure('missing_credentials', { ip: clientIp });
+        }
         return res.status(401).json({ error: 'Invalid email or password.' });
       }
 
       const cleanEmail = email.toLowerCase().trim();
-      const clientIp = getClientIp(req);
       if (isRateLimited(`login:${clientIp}:${cleanEmail}`, 15, 15 * 60 * 1000)) {
+        if (isAdminPortalRequest) {
+          logSafeAdminLoginFailure('rate_limited', { email: cleanEmail, ip: clientIp });
+        }
         return res.status(429).json({ error: 'Too many failed login attempts. Please wait and try again.' });
       }
 
-      const isAdminPortalRequest = adminPortal === true;
-      if (isAdminPortalRequest || cleanEmail === DEFAULT_INITIAL_ADMIN_EMAIL) {
-        const bootstrapState = await ensureInitialAdministratorBootstrap();
-        if (bootstrapState === 'missing_config') {
+      if (isAdminPortalRequest) {
+        await ensureInitialAdministratorBootstrap();
+        const adminDiag = await inspectAdministratorAuthState();
+        if (!adminDiag.adminUserPresent) {
+          logSafeAdminLoginFailure('admin_not_configured', { email: cleanEmail, ip: clientIp });
           return res.status(503).json({
             code: 'ADMIN_AUTH_NOT_CONFIGURED',
-            error: 'Administrator authentication is not configured on the server. Please contact the system administrator.',
+            error: 'Administrator authentication is not configured on the server.',
           });
         }
       }
 
       const foundUser = await resolveAuthoritativeUserByEmail(cleanEmail);
       if (!foundUser) {
+        if (isAdminPortalRequest) {
+          logSafeAdminLoginFailure('user_not_found', { email: cleanEmail, ip: clientIp });
+        }
         return res.status(401).json({ error: 'Invalid email or password.' });
       }
 
-      if (foundUser.suspended || foundUser.isActive === false || foundUser.deleted === true) {
-        return res.status(403).json({ error: 'This account has been suspended or revoked by a Super Administrator.' });
-      }
-
+      // Enforce administrator role check for admin portal requests
       if (isAdminPortalRequest && !isStaffUser(foundUser)) {
+        logSafeAdminLoginFailure('insufficient_role', {
+          email: cleanEmail,
+          userId: foundUser.id,
+          role: String(foundUser.role || ''),
+          ip: clientIp,
+        });
         return res.status(403).json({
           code: 'FORBIDDEN_ADMIN_PORTAL',
           error: 'Access Denied: Administrator or Subadmin privileges are required to access this portal.',
         });
       }
 
+      // Enforce active account status
+      if (foundUser.suspended || foundUser.isActive === false || foundUser.deleted === true) {
+        if (isAdminPortalRequest || isStaffUser(foundUser)) {
+          logSafeAdminLoginFailure('account_inactive', {
+            email: cleanEmail,
+            userId: foundUser.id,
+            role: String(foundUser.role || ''),
+            active: false,
+            ip: clientIp,
+          });
+        }
+        return res.status(403).json({ error: 'This account has been suspended or revoked by a Super Administrator.' });
+      }
+
       const activePasswordHash = foundUser.passwordHash;
 
-      // Accounts without passwordHash must NEVER allow arbitrary or blank passwords.
-      // Existing administrator accounts without a stored password hash must use the normal password reset flow.
-      if (!activePasswordHash || typeof activePasswordHash !== 'string') {
+      // Require a valid cryptographic password hash (never accept or store plaintext passwords).
+      // Existing administrator accounts without a valid password hash are repaired via the secure reset flow.
+      if (!hasValidPasswordHash(activePasswordHash)) {
         if (isStaffUser(foundUser)) {
+          logSafeAdminLoginFailure('missing_or_invalid_password_hash', {
+            email: cleanEmail,
+            userId: foundUser.id,
+            role: String(foundUser.role || ''),
+            ip: clientIp,
+          });
           return res.status(401).json({
             code: 'PASSWORD_RESET_REQUIRED',
             error: 'Please use the password reset flow below ("Forgot or set password?") to receive a recovery email and set your administrator password.',
@@ -1994,6 +2179,14 @@ export async function createApp(options: CreateAppOptions = {}) {
 
       const isValid = verifyPassword(password, activePasswordHash);
       if (!isValid) {
+        if (isAdminPortalRequest || isStaffUser(foundUser)) {
+          logSafeAdminLoginFailure('invalid_password', {
+            email: cleanEmail,
+            userId: foundUser.id,
+            role: String(foundUser.role || ''),
+            ip: clientIp,
+          });
+        }
         return res.status(401).json({ error: 'Invalid email or password.' });
       }
 
@@ -2022,7 +2215,10 @@ export async function createApp(options: CreateAppOptions = {}) {
       console.error('[AUTH] Login error:', error.message);
       return res.status(500).json({ error: 'Authentication failed' });
     }
-  });
+  };
+
+  app.post('/api/auth/login', (req, res) => handlePasswordLogin(req, res, false));
+  app.post('/api/auth/admin/login', (req, res) => handlePasswordLogin(req, res, true));
 
   // POST /api/auth/logout
   app.post('/api/auth/logout', async (req, res) => {
@@ -2598,6 +2794,9 @@ export async function createApp(options: CreateAppOptions = {}) {
       const foundUser = await resolveAuthoritativeUserByEmail(cleanEmail);
       if (!foundUser) {
         return res.status(400).json({ error: 'Invalid or expired recovery token.' });
+      }
+      if (foundUser.suspended || foundUser.isActive === false || foundUser.deleted === true) {
+        return res.status(403).json({ error: 'This account has been suspended or revoked by a Super Administrator.' });
       }
 
       const candidateHash = hashResetToken(cleanToken);
@@ -3496,6 +3695,23 @@ export async function createApp(options: CreateAppOptions = {}) {
       );
     }
 
+    // Keep Google OAuth strictly separate from administrator password login
+    if (isStaffUser(targetUser)) {
+      logSafeAdminLoginFailure('oauth_blocked_for_admin', {
+        email: targetUser.email,
+        userId: targetUser.id,
+        role: String(targetUser.role || ''),
+        ip: getClientIp(req),
+      });
+      return sendOAuthErrorResponse(
+        req,
+        res,
+        403,
+        'admin_password_login_required',
+        'Administrator accounts must sign in with their administrator email and password on the Admin Portal.'
+      );
+    }
+
     if (!userLookupResult.created) {
       await logAudit('OAUTH_LOGIN', `User signed in via ${providerLabel}: ${targetUser.email} (${targetUser.role})`, targetUser.id, targetUser.name, targetUser.role, req);
     }
@@ -3512,9 +3728,7 @@ export async function createApp(options: CreateAppOptions = {}) {
     setSecureSessionCookie(req, res, sessionToken);
 
     let targetRedirectUrl = '/student/dashboard';
-    if (isStaffUser(targetUser)) {
-      targetRedirectUrl = '/admin';
-    } else if (targetUser.role === 'tutor') {
+    if (targetUser.role === 'tutor') {
       targetRedirectUrl = '/tutor/dashboard';
     }
 

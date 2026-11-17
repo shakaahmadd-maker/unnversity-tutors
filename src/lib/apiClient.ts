@@ -64,8 +64,35 @@ export interface ApiDiagnosticsSnapshot {
   failedTabs: TabFailureSample[];
 }
 
+function resolveBackendApiBaseUrl(): string {
+  try {
+    const metaEnv = (import.meta as any)?.env;
+    const raw = String(metaEnv?.VITE_API_BASE_URL || metaEnv?.VITE_API_URL || '').trim().replace(/\/+$/, '');
+    if (!raw) return '';
+    if (
+      typeof window !== 'undefined' &&
+      window.location.hostname !== 'localhost' &&
+      window.location.hostname !== '127.0.0.1' &&
+      (raw.includes('localhost') || raw.includes('127.0.0.1'))
+    ) {
+      return '';
+    }
+    return raw;
+  } catch {
+    return '';
+  }
+}
+
+export function resolveApiUrl(url: string): string {
+  if (!url) return url;
+  if (/^https?:\/\//i.test(url)) return url;
+  const base = resolveBackendApiBaseUrl();
+  if (!base) return url;
+  return url.startsWith('/') ? `${base}${url}` : `${base}/${url}`;
+}
+
 function normalizeRouteForMetrics(url: string): string {
-  const pathOnly = (url || '/').split('?')[0];
+  const pathOnly = (url || '/').replace(/^https?:\/\/[^/]+/i, '').split('?')[0];
   return pathOnly
     .replace(/\/[0-9a-f]{8,}/gi, '/:id')
     .replace(/\/(ord|usr|tut|tutor|room|msg|qte|inv|pay|notif|log|file|doc)_[a-zA-Z0-9_-]+/gi, '/:id')
@@ -282,8 +309,14 @@ async function executeTimedFetch(
   const method = (options.method || 'GET').toUpperCase();
   const normRoute = normalizeRouteForMetrics(url);
 
+  const resolvedUrl = resolveApiUrl(url);
+  const isApiRoute = normRoute.startsWith('/api/');
+  if (isApiRoute && !headers['Accept'] && !headers['accept']) {
+    headers['Accept'] = 'application/json';
+  }
+
   try {
-    const res = await fetch(url, {
+    const res = await fetch(resolvedUrl, {
       ...options,
       method,
       credentials: options.credentials || 'include',
@@ -292,6 +325,28 @@ async function executeTimedFetch(
     });
 
     const durationMs = Math.round((typeof performance !== 'undefined' ? performance.now() : Date.now()) - startMs);
+    const contentType = (res.headers.get('content-type') || '').toLowerCase();
+    if (isApiRoute && contentType.includes('text/html') && res.ok) {
+      recordApiMetric({
+        id: `${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+        method,
+        route: normRoute,
+        status: 502,
+        durationMs,
+        ok: false,
+        slow: durationMs >= 2000,
+        verySlow: durationMs >= 10000,
+        error: 'Unexpected HTML on API route',
+        timestamp: new Date().toISOString(),
+      });
+      throw new ApiError(
+        'Backend API endpoint returned HTML instead of JSON. Verify reverse-proxy routing for /api/*.',
+        502,
+        'API_ROUTING_MISMATCH',
+        { route: normRoute }
+      );
+    }
+
     recordApiMetric({
       id: `${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
       method,

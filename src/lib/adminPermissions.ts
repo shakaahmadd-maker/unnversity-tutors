@@ -203,13 +203,8 @@ export const ADMIN_TAB_TO_ROUTE_PATH: Record<string, string> = {
 export function isSuperAdminUser(user: { role?: string | null; email?: string | null; isActive?: boolean; suspended?: boolean } | null | undefined): boolean {
   if (!user) return false;
   if (user.isActive === false || user.suspended === true) return false;
-  const role = String(user.role || '').trim();
-  const normalizedRole = role.toLowerCase();
-  const normalizedEmail = String(user.email || '').toLowerCase().trim();
-  if (normalizedRole === 'admin' || role === 'SUPER_ADMIN') {
-    return true;
-  }
-  return normalizedEmail === 'shaka.ahmadd@gmail.com' || normalizedEmail === 'shaka.ahmad@gmail.com';
+  const normalizedRole = String(user.role || '').trim().toLowerCase();
+  return normalizedRole === 'admin' || normalizedRole === 'super_admin';
 }
 
 export function isStaffUser(user: { role?: string | null; email?: string | null; isActive?: boolean; suspended?: boolean } | null | undefined): boolean {
