@@ -381,7 +381,9 @@ export default function SiteFooter({ onNavigate, onOpenBecomeTutor }: SiteFooter
           <div className="flex items-center gap-2">
             <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0" />
             <span>
-              © 2026 University-Tutors.com · 100% Client-Side Scientific Calculators · Ethical Academic Mentorship
+              © 2026 university-tutors.com · Powered by{' '}
+              <strong className="font-semibold text-slate-700">Academic Resources Hub</strong> · 100%
+              Client-Side Scientific Calculators · Ethical Academic Mentorship
             </span>
           </div>
 

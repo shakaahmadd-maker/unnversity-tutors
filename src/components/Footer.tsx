@@ -969,7 +969,8 @@ export default function Footer({ onNavigate, onOpenBecomeTutor }: FooterProps) {
         <div className="flex flex-col items-center justify-center text-center gap-2.5 sm:gap-3 pt-0.5 sm:pt-1">
           {/* Centered Copyright & Regional Curriculum Notice */}
           <p className="text-[11px] sm:text-xs text-stone-600 leading-snug sm:leading-relaxed max-w-2xl mx-auto text-center">
-            &copy; 2026 universitytutors.com. All Rights Reserved. Created under educational technology guidelines for UK, US, CA, AU, NZ &amp; IE local curriculum support.
+            &copy; 2026 university-tutors.com. All Rights Reserved. Powered by{' '}
+            <span className="font-semibold text-stone-800">Academic Resources Hub</span>. Created under educational technology guidelines for UK, US, CA, AU, NZ &amp; IE local curriculum support.
           </p>
 
           {/* Centered Inline Navigation Links */}
