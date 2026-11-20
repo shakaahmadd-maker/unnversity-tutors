@@ -36,23 +36,25 @@ export default function TutorImageUploader({
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
+    e.target.value = '';
     if (!file) return;
-    uploadFile(file);
+    void uploadFile(file);
   };
 
   const uploadFile = async (file: File) => {
     setUploadError(null);
 
-    // Validate file type
-    const validMimes = ['image/jpeg', 'image/png', 'image/webp', 'image/jpg'];
-    if (!validMimes.includes(file.type.toLowerCase()) && !file.type.startsWith('image/')) {
-      setUploadError('Invalid format: Only JPEG, PNG, and WEBP images are supported.');
+    // Validate file type (accept MIME or valid image extension)
+    const validMimes = ['image/jpeg', 'image/png', 'image/webp', 'image/jpg', 'image/pjpeg', 'image/gif', 'image/avif'];
+    const hasValidExt = /\.(jpe?g|png|webp|gif|avif|jfif)$/i.test(file.name || '');
+    if (!validMimes.includes(file.type.toLowerCase()) && !file.type.startsWith('image/') && !hasValidExt) {
+      setUploadError('Invalid format: Supported image types are JPEG, PNG, WEBP, GIF, and AVIF.');
       return;
     }
 
-    // Validate file size (10MB max)
-    if (file.size > 10 * 1024 * 1024) {
-      setUploadError('Image size exceeds 10MB limit. Please choose a smaller photo.');
+    // Validate file size (15MB max)
+    if (file.size > 15 * 1024 * 1024) {
+      setUploadError('Image size exceeds 15MB limit. Please choose a smaller photo.');
       return;
     }
 
@@ -260,7 +262,7 @@ export default function TutorImageUploader({
             type="file"
             ref={fileInputRef}
             onChange={handleFileChange}
-            accept="image/jpeg,image/png,image/webp,image/jpg"
+            accept="image/jpeg,image/png,image/webp,image/gif,image/avif,.jpg,.jpeg,.png,.webp,.gif,.avif"
             className="hidden"
             disabled={isUploading}
           />
@@ -271,7 +273,7 @@ export default function TutorImageUploader({
             {isUploading ? 'Uploading image to persistent storage...' : 'Click to upload or drag & drop image file'}
           </span>
           <span className="text-[10px] text-slate-400 block mt-0.5">
-            Supports PNG, JPG, JPEG, WEBP (Max 10MB)
+            Supports PNG, JPG, JPEG, WEBP, GIF, AVIF (Max 15MB)
           </span>
         </div>
       )}

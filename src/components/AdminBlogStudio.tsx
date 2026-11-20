@@ -6,6 +6,10 @@ import {
   Sparkles,
   Bold,
   Italic,
+  Underline,
+  Strikethrough,
+  Subscript,
+  Superscript,
   Heading1,
   Heading2,
   Heading3,
@@ -34,11 +38,66 @@ import {
   AlignLeft,
   AlignCenter,
   AlignRight,
+  AlignJustify,
+  IndentIncrease,
+  IndentDecrease,
+  RemoveFormatting,
+  Highlighter,
+  CaseSensitive,
+  ArrowUpDown,
   Maximize2,
   WrapText,
+  Loader2,
+  ChevronDown,
 } from 'lucide-react';
 import { Blog } from '../types';
-import { apiFetch } from '../lib/apiClient';
+import { apiFetch, getFriendlyErrorMessage, resolveMediaUrl } from '../lib/apiClient';
+
+const WORD_FONT_FAMILIES = [
+  { label: 'Default (Inter)', value: 'Inter, system-ui, sans-serif' },
+  { label: 'Georgia (Serif)', value: 'Georgia, serif' },
+  { label: 'Times New Roman', value: 'Times New Roman, serif' },
+  { label: 'Calibri', value: 'Calibri, Arial, sans-serif' },
+  { label: 'Arial', value: 'Arial, Helvetica, sans-serif' },
+  { label: 'Verdana', value: 'Verdana, Geneva, sans-serif' },
+  { label: 'Trebuchet MS', value: 'Trebuchet MS, sans-serif' },
+  { label: 'Garamond', value: 'Garamond, Georgia, serif' },
+  { label: 'Courier New', value: 'Courier New, monospace' },
+];
+
+const WORD_FONT_SIZES = [12, 14, 15, 16, 18, 20, 24, 28, 32, 36];
+
+const WORD_LINE_SPACINGS = [
+  { label: '1.0 — Compact', value: '1.0' },
+  { label: '1.15 — Standard', value: '1.15' },
+  { label: '1.5 — Comfortable', value: '1.5' },
+  { label: '1.75 — Academic', value: '1.75' },
+  { label: '2.0 — Double Spaced', value: '2.0' },
+];
+
+const WORD_TEXT_COLORS = [
+  { label: 'Default Ink', value: '#1e293b' },
+  { label: 'Pure Black', value: '#000000' },
+  { label: 'Slate Gray', value: '#475569' },
+  { label: 'Brand Orange', value: '#ea580c' },
+  { label: 'Crimson Red', value: '#dc2626' },
+  { label: 'Academic Blue', value: '#1d4ed8' },
+  { label: 'Navy', value: '#1e3a8a' },
+  { label: 'Teal', value: '#0f766e' },
+  { label: 'Emerald', value: '#047857' },
+  { label: 'Purple', value: '#7e22ce' },
+  { label: 'Amber Brown', value: '#b45309' },
+  { label: 'Rose', value: '#be123c' },
+];
+
+const WORD_HIGHLIGHT_COLORS = [
+  { label: 'Yellow', value: '#fef08a' },
+  { label: 'Lime', value: '#bbf7d0' },
+  { label: 'Sky Blue', value: '#bae6fd' },
+  { label: 'Peach', value: '#fed7aa' },
+  { label: 'Pink', value: '#fbcfe8' },
+  { label: 'Lavender', value: '#e9d5ff' },
+];
 
 export interface AcademicTemplateItem {
   group: string;
@@ -448,7 +507,9 @@ export const AdminBlogStudio: React.FC<AdminBlogStudioProps> = ({
   const [lsiKeywords, setLsiKeywords] = useState<string>(initialBlog?.lsiKeywords || '');
 
   // UI & Workspace State
-  const [viewMode, setViewMode] = useState<'write' | 'split' | 'preview'>('write');
+  const [viewMode, setViewMode] = useState<'write' | 'split' | 'preview'>(() =>
+    typeof window !== 'undefined' && window.innerWidth >= 1024 ? 'split' : 'write'
+  );
   const [showSidebarMobile, setShowSidebarMobile] = useState<boolean>(false);
   const [showTemplateBanner, setShowTemplateBanner] = useState<boolean>(!initialBlog);
   const [saveStatus, setSaveStatus] = useState<'saved' | 'saving' | 'unsaved'>('saved');
@@ -461,6 +522,14 @@ export const AdminBlogStudio: React.FC<AdminBlogStudioProps> = ({
   const [inlineImageAlign, setInlineImageAlign] = useState<'left' | 'center' | 'right' | 'full'>('center');
   const [inlineImageWrap, setInlineImageWrap] = useState<boolean>(true);
   const [coverImageTab, setCoverImageTab] = useState<'upload' | 'gallery' | 'url'>('upload');
+
+  // MS Word Ribbon Control State
+  const [selectedFontFamily, setSelectedFontFamily] = useState<string>(WORD_FONT_FAMILIES[0].value);
+  const [selectedFontSize, setSelectedFontSize] = useState<number>(15);
+  const [selectedTextColor, setSelectedTextColor] = useState<string>('#ea580c');
+  const [selectedHighlightColor, setSelectedHighlightColor] = useState<string>('#fef08a');
+  const [selectedLineSpacing, setSelectedLineSpacing] = useState<string>('1.5');
+  const [openRibbonMenu, setOpenRibbonMenu] = useState<'textColor' | 'highlight' | 'lineSpacing' | 'case' | null>(null);
 
   // Custom Outline Creator Modal State
   const [outlineModalOpen, setOutlineModalOpen] = useState<boolean>(false);
@@ -512,26 +581,36 @@ export const AdminBlogStudio: React.FC<AdminBlogStudioProps> = ({
   const readingTime = Math.max(1, Math.ceil(words / 200));
 
   const uploadBlogMediaFile = async (file: File): Promise<string> => {
-    const dataUrl = await new Promise<string>((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => resolve(String(reader.result || ''));
-      reader.onerror = () => reject(new Error('Failed to read image file'));
-      reader.readAsDataURL(file);
-    });
-    try {
-      const res = await apiFetch('/api/upload', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ file: dataUrl, folder: 'blogs', prefix: 'blog' }),
-      });
-      const json = await res.json().catch(() => ({}));
-      if (res.ok && json?.url) {
-        return json.url;
-      }
-    } catch {
-      // Fallback to dataUrl if upload endpoint unreachable
+    const validExt = /\.(jpe?g|png|webp|gif|avif|svg|jfif)$/i.test(file.name || '');
+    if (!file.type.startsWith('image/') && !validExt) {
+      throw new Error('Unsupported file type. Please choose a JPEG, PNG, WebP, GIF, AVIF, or SVG image.');
     }
-    return dataUrl;
+    if (file.size > 15 * 1024 * 1024) {
+      throw new Error('Image exceeds the 15MB upload limit. Please select a smaller image.');
+    }
+
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('folder', 'blogs');
+    formData.append('prefix', 'blog');
+
+    const res = await apiFetch('/api/upload?folder=blogs&prefix=blog', {
+      method: 'POST',
+      credentials: 'include',
+      body: formData,
+      timeoutMs: 30000,
+    });
+
+    const json = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      throw new Error(json?.error || `Image upload failed (HTTP ${res.status}).`);
+    }
+
+    const uploadedUrl = json?.relativeUrl || json?.url || json?.imageUrl;
+    if (!uploadedUrl || typeof uploadedUrl !== 'string') {
+      throw new Error('Server did not return a valid image URL.');
+    }
+    return uploadedUrl;
   };
 
   const handleSelectTemplate = (templateKey: string) => {
@@ -630,6 +709,305 @@ export const AdminBlogStudio: React.FC<AdminBlogStudioProps> = ({
     }, 10);
   };
 
+  // Parse a CSS style attribute into key/value map
+  const parseCssStyleString = (styleStr: string): Record<string, string> => {
+    const map: Record<string, string> = {};
+    for (const part of styleStr.split(';')) {
+      const idx = part.indexOf(':');
+      if (idx === -1) continue;
+      const key = part.slice(0, idx).trim().toLowerCase();
+      const val = part.slice(idx + 1).trim();
+      if (key && val) map[key] = val;
+    }
+    return map;
+  };
+
+  const serializeCssStyleMap = (map: Record<string, string>): string =>
+    Object.entries(map)
+      .filter(([, v]) => Boolean(v && v.trim()))
+      .map(([k, v]) => `${k}: ${v}`)
+      .join('; ');
+
+  // Apply MS Word inline font property (font-family, font-size, color) cleanly without nesting duplicate spans
+  const applyInlineSpanStyle = (prop: string, value: string | null, placeholder = 'formatted text') => {
+    const textarea = textareaRef.current;
+    if (!textarea) return;
+    const start = textarea.selectionStart;
+    const end = textarea.selectionEnd;
+    const selectedText = content.substring(start, end);
+    const before = content.substring(0, start);
+    const after = content.substring(end);
+
+    const existingSpan = selectedText.match(/^<span\s+style="([^"]*)"\s*>([\s\S]*)<\/span>$/i);
+    let replacement = '';
+    if (existingSpan) {
+      const styleMap = parseCssStyleString(existingSpan[1]);
+      if (value) {
+        styleMap[prop] = value;
+      } else {
+        delete styleMap[prop];
+      }
+      const nextStyle = serializeCssStyleMap(styleMap);
+      replacement = nextStyle ? `<span style="${nextStyle}">${existingSpan[2]}</span>` : existingSpan[2];
+    } else {
+      const inner = selectedText || placeholder;
+      replacement = value ? `<span style="${prop}: ${value}">${inner}</span>` : inner;
+    }
+
+    const updated = `${before}${replacement}${after}`;
+    setContent(updated);
+    setOpenRibbonMenu(null);
+    setTimeout(() => {
+      textarea.focus();
+      textarea.setSelectionRange(start, start + replacement.length);
+    }, 10);
+  };
+
+  // Apply MS Word Highlight color
+  const applyHighlightColor = (color: string | null) => {
+    const textarea = textareaRef.current;
+    if (!textarea) return;
+    const start = textarea.selectionStart;
+    const end = textarea.selectionEnd;
+    const selectedText = content.substring(start, end);
+    const before = content.substring(0, start);
+    const after = content.substring(end);
+
+    const existingMark = selectedText.match(/^<mark(?:\s+style="[^"]*")?\s*>([\s\S]*)<\/mark>$/i);
+    const inner = existingMark ? existingMark[1] : (selectedText || 'highlighted text');
+    const replacement = color ? `<mark style="background-color: ${color}">${inner}</mark>` : inner;
+
+    setContent(`${before}${replacement}${after}`);
+    setOpenRibbonMenu(null);
+    setTimeout(() => {
+      textarea.focus();
+      textarea.setSelectionRange(start, start + replacement.length);
+    }, 10);
+  };
+
+  // Grow / Shrink font size (MS Word A+ / A-)
+  const adjustFontSize = (step: 1 | -1) => {
+    const idx = WORD_FONT_SIZES.findIndex((s) => s >= selectedFontSize);
+    const currentIdx = idx === -1 ? WORD_FONT_SIZES.length - 1 : idx;
+    const nextIdx = Math.max(0, Math.min(WORD_FONT_SIZES.length - 1, currentIdx + step));
+    const nextSize = WORD_FONT_SIZES[nextIdx];
+    setSelectedFontSize(nextSize);
+    applyInlineSpanStyle('font-size', `${nextSize}px`);
+  };
+
+  // MS Word Change Case (Aa)
+  const applyChangeCase = (mode: 'sentence' | 'lower' | 'upper' | 'title') => {
+    const textarea = textareaRef.current;
+    if (!textarea) return;
+    const start = textarea.selectionStart;
+    const end = textarea.selectionEnd;
+    if (start === end) {
+      triggerToast('Select text first to change its letter case.', 'error');
+      setOpenRibbonMenu(null);
+      return;
+    }
+    const raw = content.substring(start, end);
+    let transformed = raw;
+    if (mode === 'upper') {
+      transformed = raw.toUpperCase();
+    } else if (mode === 'lower') {
+      transformed = raw.toLowerCase();
+    } else if (mode === 'title') {
+      transformed = raw.toLowerCase().replace(/\b([a-z])/g, (m) => m.toUpperCase());
+    } else {
+      transformed = raw
+        .toLowerCase()
+        .replace(/(^\s*[a-z]|[.!?]\s+[a-z])/g, (m) => m.toUpperCase());
+    }
+    setContent(`${content.substring(0, start)}${transformed}${content.substring(end)}`);
+    setOpenRibbonMenu(null);
+    setTimeout(() => {
+      textarea.focus();
+      textarea.setSelectionRange(start, start + transformed.length);
+    }, 10);
+  };
+
+  // MS Word Clear All Formatting on selection
+  const clearSelectionFormatting = () => {
+    const textarea = textareaRef.current;
+    if (!textarea) return;
+    const start = textarea.selectionStart;
+    const end = textarea.selectionEnd;
+    if (start === end) {
+      triggerToast('Highlight text to clear its formatting.', 'error');
+      return;
+    }
+    let cleaned = content.substring(start, end);
+    // Strip allowlisted inline/block tags & markdown emphasis
+    cleaned = cleaned
+      .replace(/<\/?(?:span|mark|u|s|sup|sub|div|p)(?:\s+style="[^"]*")?\s*>/gi, '')
+      .replace(/\*\*([\s\S]*?)\*\*/g, '$1')
+      .replace(/__([\s\S]*?)__/g, '$1')
+      .replace(/~~([\s\S]*?)~~/g, '$1')
+      .replace(/\*([^*\n]+)\*/g, '$1')
+      .replace(/`([^`]+)`/g, '$1')
+      .replace(/^#{1,4}\s+/gm, '')
+      .replace(/^>\s+/gm, '');
+
+    setContent(`${content.substring(0, start)}${cleaned}${content.substring(end)}`);
+    setTimeout(() => {
+      textarea.focus();
+      textarea.setSelectionRange(start, start + cleaned.length);
+    }, 10);
+  };
+
+  // Find full paragraph/line boundaries around cursor or selection
+  const getParagraphBounds = (text: string, selStart: number, selEnd: number) => {
+    const lineStart = text.lastIndexOf('\n', Math.max(0, selStart - 1)) + 1;
+    const nextNewline = text.indexOf('\n', selEnd);
+    const lineEnd = nextNewline === -1 ? text.length : nextNewline;
+    return { blockStart: lineStart, blockEnd: lineEnd };
+  };
+
+  // Apply MS Word Paragraph Style properties (text-align, line-height, margin-left) cleanly
+  const applyParagraphStyle = (updates: Record<string, string | null>) => {
+    const textarea = textareaRef.current;
+    if (!textarea) return;
+    const { blockStart, blockEnd } = getParagraphBounds(
+      content,
+      textarea.selectionStart,
+      textarea.selectionEnd
+    );
+    const rawBlock = content.substring(blockStart, blockEnd);
+    const trimmed = rawBlock.trim();
+
+    let styleMap: Record<string, string> = {};
+    let innerBody = rawBlock || 'Paragraph text...';
+
+    const existingDiv = trimmed.match(/^<div\s+style="([^"]*)"\s*>([\s\S]*)<\/div>$/i);
+    if (existingDiv) {
+      styleMap = parseCssStyleString(existingDiv[1]);
+      innerBody = existingDiv[2].trim();
+    }
+
+    for (const [key, val] of Object.entries(updates)) {
+      if (val === null || val === '') {
+        delete styleMap[key];
+      } else {
+        styleMap[key] = val;
+      }
+    }
+
+    const nextStyle = serializeCssStyleMap(styleMap);
+    const isMultiLine = innerBody.includes('\n');
+    const replacement = nextStyle
+      ? isMultiLine
+        ? `<div style="${nextStyle}">\n${innerBody}\n</div>`
+        : `<div style="${nextStyle}">${innerBody}</div>`
+      : innerBody;
+
+    const updated = `${content.substring(0, blockStart)}${replacement}${content.substring(blockEnd)}`;
+    setContent(updated);
+    setOpenRibbonMenu(null);
+    setTimeout(() => {
+      textarea.focus();
+      textarea.setSelectionRange(blockStart, blockStart + replacement.length);
+    }, 10);
+  };
+
+  // MS Word Increase / Decrease Paragraph Indent
+  const adjustParagraphIndent = (deltaPx: number) => {
+    const textarea = textareaRef.current;
+    if (!textarea) return;
+    const { blockStart, blockEnd } = getParagraphBounds(
+      content,
+      textarea.selectionStart,
+      textarea.selectionEnd
+    );
+    const rawBlock = content.substring(blockStart, blockEnd).trim();
+    const existingDiv = rawBlock.match(/^<div\s+style="([^"]*)"\s*>([\s\S]*)<\/div>$/i);
+    let currentIndent = 0;
+    if (existingDiv) {
+      const styleMap = parseCssStyleString(existingDiv[1]);
+      const ml = styleMap['margin-left'] || styleMap['padding-left'] || '0px';
+      const parsed = parseInt(ml, 10);
+      if (Number.isFinite(parsed)) currentIndent = parsed;
+    }
+    const nextIndent = Math.max(0, Math.min(160, currentIndent + deltaPx));
+    applyParagraphStyle({ 'margin-left': nextIndent > 0 ? `${nextIndent}px` : null });
+  };
+
+  // MS Word Paragraph Heading / Block Style selector
+  const applyBlockStylePreset = (preset: 'normal' | 'h1' | 'h2' | 'h3' | 'h4' | 'quote' | 'callout') => {
+    const textarea = textareaRef.current;
+    if (!textarea) return;
+    const { blockStart, blockEnd } = getParagraphBounds(
+      content,
+      textarea.selectionStart,
+      textarea.selectionEnd
+    );
+    const rawBlock = content.substring(blockStart, blockEnd);
+    const stripped = rawBlock
+      .replace(/^#{1,4}\s+/gm, '')
+      .replace(/^>\s*(\[!(?:NOTE|TIP|IMPORTANT|WARNING)\]\s*)?/gm, '')
+      .trim() || (preset === 'normal' ? 'Paragraph text' : 'Section Heading');
+
+    let replacement = stripped;
+    if (preset === 'h1') replacement = `# ${stripped}`;
+    else if (preset === 'h2') replacement = `## ${stripped}`;
+    else if (preset === 'h3') replacement = `### ${stripped}`;
+    else if (preset === 'h4') replacement = `#### ${stripped}`;
+    else if (preset === 'quote') replacement = stripped.split('\n').map((l) => `> ${l}`).join('\n');
+    else if (preset === 'callout') replacement = `> [!NOTE] Academic Note\n> ${stripped}`;
+
+    const updated = `${content.substring(0, blockStart)}${replacement}${content.substring(blockEnd)}`;
+    setContent(updated);
+    setTimeout(() => {
+      textarea.focus();
+      textarea.setSelectionRange(blockStart, blockStart + replacement.length);
+    }, 10);
+  };
+
+  // Apply bullet or numbered list cleanly across selected lines
+  const applyListFormatting = (ordered: boolean) => {
+    const textarea = textareaRef.current;
+    if (!textarea) return;
+    const { blockStart, blockEnd } = getParagraphBounds(
+      content,
+      textarea.selectionStart,
+      textarea.selectionEnd
+    );
+    const rawBlock = content.substring(blockStart, blockEnd);
+    const lines = (rawBlock || 'List item').split('\n');
+    const formatted = lines
+      .map((line, idx) => {
+        const clean = line.replace(/^\s*(?:[-*+]|\d+\.)\s+/, '').trim();
+        if (!clean) return '';
+        return ordered ? `${idx + 1}. ${clean}` : `- ${clean}`;
+      })
+      .filter(Boolean)
+      .join('\n');
+
+    const updated = `${content.substring(0, blockStart)}${formatted}${content.substring(blockEnd)}`;
+    setContent(updated);
+    setTimeout(() => {
+      textarea.focus();
+      textarea.setSelectionRange(blockStart, blockStart + formatted.length);
+    }, 10);
+  };
+
+  // Keyboard shortcuts inside editor (Ctrl/Cmd+B, Ctrl/Cmd+I, Ctrl/Cmd+U)
+  const handleEditorKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.ctrlKey || e.metaKey) {
+      const k = e.key.toLowerCase();
+      if (k === 'b') {
+        e.preventDefault();
+        insertMarkdown('**', '**', 'bold text');
+      } else if (k === 'i') {
+        e.preventDefault();
+        insertMarkdown('*', '*', 'italic text');
+      } else if (k === 'u') {
+        e.preventDefault();
+        insertMarkdown('<u>', '</u>', 'underlined text');
+      }
+    }
+  };
+
   const handleInsertInlineImage = () => {
     if (!inlineImageUrl.trim()) return;
     const altLabel = inlineImageAlt.trim() || 'Article illustration';
@@ -658,20 +1036,25 @@ export const AdminBlogStudio: React.FC<AdminBlogStudioProps> = ({
   const handleInlineFileUpload = async (e: React.ChangeEvent<HTMLInputElement> | React.DragEvent<HTMLDivElement>) => {
     if ('preventDefault' in e) e.preventDefault();
     const dtFiles = 'dataTransfer' in e ? e.dataTransfer?.files : undefined;
-    const targetFiles = 'target' in e ? (e.target as HTMLInputElement).files : undefined;
+    const inputEl = 'target' in e ? (e.target as HTMLInputElement) : null;
+    const targetFiles = inputEl?.files;
     const file = dtFiles?.[0] || targetFiles?.[0];
-    if (file && file.type.startsWith('image/')) {
-      setUploadingImage(true);
-      try {
-        const uploadedUrl = await uploadBlogMediaFile(file);
-        setInlineImageUrl(uploadedUrl);
-        if (!inlineImageAlt) {
-          setInlineImageAlt(file.name.replace(/\.[^/.]+$/, '').replace(/[-_]/g, ' '));
-        }
-        triggerToast(`Uploaded inline image: ${file.name}`);
-      } finally {
-        setUploadingImage(false);
+    if (inputEl && 'value' in inputEl) {
+      inputEl.value = '';
+    }
+    if (!file) return;
+    setUploadingImage(true);
+    try {
+      const uploadedUrl = await uploadBlogMediaFile(file);
+      setInlineImageUrl(uploadedUrl);
+      if (!inlineImageAlt) {
+        setInlineImageAlt(file.name.replace(/\.[^/.]+$/, '').replace(/[-_]/g, ' '));
       }
+      triggerToast(`Uploaded inline image: ${file.name}`);
+    } catch (err: any) {
+      triggerToast(getFriendlyErrorMessage(err, 'Failed to upload image.'), 'error');
+    } finally {
+      setUploadingImage(false);
     }
   };
 
@@ -696,21 +1079,26 @@ export const AdminBlogStudio: React.FC<AdminBlogStudioProps> = ({
     e.preventDefault();
     setIsDragging(false);
     const dtFiles = 'dataTransfer' in e ? e.dataTransfer?.files : undefined;
-    const targetFiles = 'target' in e ? (e.target as HTMLInputElement).files : undefined;
+    const inputEl = 'target' in e ? (e.target as HTMLInputElement) : null;
+    const targetFiles = inputEl?.files;
     const file = dtFiles?.[0] || targetFiles?.[0];
-    if (file && file.type.startsWith('image/')) {
-      setUploadingImage(true);
-      try {
-        const uploadedUrl = await uploadBlogMediaFile(file);
-        setCoverUrl(uploadedUrl);
-        setImageError(false);
-        if (!altText) {
-          setAltText(file.name.replace(/\.[^/.]+$/, '').replace(/[-_]/g, ' '));
-        }
-        triggerToast(`Uploaded cover image: ${file.name}`);
-      } finally {
-        setUploadingImage(false);
+    if (inputEl && 'value' in inputEl) {
+      inputEl.value = '';
+    }
+    if (!file) return;
+    setUploadingImage(true);
+    try {
+      const uploadedUrl = await uploadBlogMediaFile(file);
+      setCoverUrl(uploadedUrl);
+      setImageError(false);
+      if (!altText) {
+        setAltText(file.name.replace(/\.[^/.]+$/, '').replace(/[-_]/g, ' '));
       }
+      triggerToast(`Uploaded cover image: ${file.name}`);
+    } catch (err: any) {
+      triggerToast(getFriendlyErrorMessage(err, 'Failed to upload cover image.'), 'error');
+    } finally {
+      setUploadingImage(false);
     }
   };
 
@@ -852,11 +1240,14 @@ export const AdminBlogStudio: React.FC<AdminBlogStudioProps> = ({
                     className="hidden"
                   />
                   {uploadingImage ? (
-                    <p className="text-xs font-semibold text-orange-600 py-4">Uploading image...</p>
+                    <div className="flex items-center justify-center gap-2 text-xs font-semibold text-orange-600 py-4">
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <span>Uploading image...</span>
+                    </div>
                   ) : inlineImageUrl ? (
                     <div className="space-y-2">
                       <img
-                        src={inlineImageUrl}
+                        src={resolveMediaUrl(inlineImageUrl)}
                         alt="Preview"
                         className="max-h-36 mx-auto rounded-lg object-cover border border-slate-200"
                       />
@@ -1310,112 +1701,483 @@ export const AdminBlogStudio: React.FC<AdminBlogStudioProps> = ({
               </div>
             </div>
 
-            {/* Formatting & View-Mode Toolbar */}
-            <div className="px-4 sm:px-6 py-2.5 bg-slate-50/80 border-b border-slate-200 flex flex-wrap items-center justify-between gap-2">
-              <div className="flex flex-wrap items-center gap-0.5 sm:gap-1">
-                <ToolbarButton
-                  icon={<Bold className="w-4 h-4" />}
-                  label="Bold"
-                  onClick={() => insertMarkdown('**', '**', 'bold text')}
-                />
-                <ToolbarButton
-                  icon={<Italic className="w-4 h-4" />}
-                  label="Italic"
-                  onClick={() => insertMarkdown('*', '*', 'italic text')}
-                />
-                <div className="h-4 w-px bg-slate-200 mx-1" />
-                <ToolbarButton
-                  icon={<Heading1 className="w-4 h-4" />}
-                  label="Heading 1"
-                  onClick={() => insertMarkdown('\n# ', '', 'Main Heading')}
-                />
-                <ToolbarButton
-                  icon={<Heading2 className="w-4 h-4" />}
-                  label="Heading 2"
-                  onClick={() => insertMarkdown('\n## ', '', 'Section Heading')}
-                />
-                <ToolbarButton
-                  icon={<Heading3 className="w-4 h-4" />}
-                  label="Heading 3"
-                  onClick={() => insertMarkdown('\n### ', '', 'Subheading')}
-                />
-                <div className="h-4 w-px bg-slate-200 mx-1" />
-                <ToolbarButton
-                  icon={<List className="w-4 h-4" />}
-                  label="Bullet List"
-                  onClick={() => insertMarkdown('\n* ', '', 'List item')}
-                />
-                <ToolbarButton
-                  icon={<ListOrdered className="w-4 h-4" />}
-                  label="Numbered List"
-                  onClick={() => insertMarkdown('\n1. ', '', 'First item')}
-                />
-                <div className="h-4 w-px bg-slate-200 mx-1" />
-                <ToolbarButton
-                  icon={<Code className="w-4 h-4" />}
-                  label="Code Snippet"
-                  onClick={() => insertMarkdown('`', '`', 'citation')}
-                />
-                <ToolbarButton
-                  icon={<Quote className="w-4 h-4" />}
-                  label="Academic Quote"
-                  onClick={() => insertMarkdown('\n> ', '', 'Quoted scholarly text...')}
-                />
-                <ToolbarButton
-                  icon={<LinkIcon className="w-4 h-4" />}
-                  label="Insert Link"
-                  onClick={() => insertMarkdown('[', '](https://)', 'link text')}
-                />
-                <ToolbarButton
-                  icon={<ImageIcon className="w-4 h-4" />}
-                  label="Insert Inline Image"
-                  onClick={() => setInlineImageModal(true)}
-                />
-                <ToolbarButton
-                  icon={<Minus className="w-4 h-4" />}
-                  label="Horizontal Divider"
-                  onClick={() => insertMarkdown('\n---\n', '', '')}
-                />
-              </div>
+            {/* MS Word-Style Font & Paragraph Ribbon Toolbar */}
+            <div className="px-3 sm:px-5 py-2.5 bg-slate-50/95 border-b border-slate-200 space-y-2 relative">
+              <div className="flex flex-wrap items-stretch justify-between gap-2">
+                <div className="flex flex-wrap items-stretch gap-2">
+                  {/* GROUP 1: FONT (MS Word Home -> Font) */}
+                  <div className="flex flex-col justify-between bg-white border border-slate-200/90 rounded-xl px-2.5 py-1.5 shadow-2xs">
+                    <div className="flex flex-wrap items-center gap-1">
+                      {/* Font Family */}
+                      <select
+                        aria-label="Font Family"
+                        title="Font Family"
+                        value={selectedFontFamily}
+                        onChange={(e) => {
+                          setSelectedFontFamily(e.target.value);
+                          applyInlineSpanStyle('font-family', e.target.value);
+                        }}
+                        className="h-7 px-2 text-xs font-medium text-slate-800 bg-slate-50 border border-slate-200 rounded-md focus:outline-none focus:border-orange-500 cursor-pointer max-w-[140px]"
+                      >
+                        {WORD_FONT_FAMILIES.map((f) => (
+                          <option key={f.label} value={f.value}>
+                            {f.label}
+                          </option>
+                        ))}
+                      </select>
 
-              <div className="flex items-center bg-slate-200/70 p-0.5 rounded-xl">
-                <button
-                  type="button"
-                  onClick={() => setViewMode('write')}
-                  className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold transition ${
-                    viewMode === 'write' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-600 hover:text-slate-900'
-                  }`}
-                >
-                  <PenLine className="w-3.5 h-3.5 text-orange-600" />
-                  <span>Write</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setViewMode('split')}
-                  className={`hidden md:flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold transition ${
-                    viewMode === 'split' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-600 hover:text-slate-900'
-                  }`}
-                >
-                  <Columns className="w-3.5 h-3.5 text-orange-600" />
-                  <span>Split</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setViewMode('preview')}
-                  className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold transition ${
-                    viewMode === 'preview'
-                      ? 'bg-white text-slate-900 shadow-xs'
-                      : 'text-slate-600 hover:text-slate-900'
-                  }`}
-                >
-                  <Eye className="w-3.5 h-3.5 text-orange-600" />
-                  <span>Preview</span>
-                </button>
+                      {/* Font Size */}
+                      <select
+                        aria-label="Font Size"
+                        title="Font Size"
+                        value={selectedFontSize}
+                        onChange={(e) => {
+                          const sz = Number(e.target.value);
+                          setSelectedFontSize(sz);
+                          applyInlineSpanStyle('font-size', `${sz}px`);
+                        }}
+                        className="h-7 px-1.5 text-xs font-semibold text-slate-800 bg-slate-50 border border-slate-200 rounded-md focus:outline-none focus:border-orange-500 cursor-pointer w-[58px]"
+                      >
+                        {WORD_FONT_SIZES.map((sz) => (
+                          <option key={sz} value={sz}>
+                            {sz}px
+                          </option>
+                        ))}
+                      </select>
+
+                      {/* Grow / Shrink Font (A+ / A-) */}
+                      <button
+                        type="button"
+                        onClick={() => adjustFontSize(1)}
+                        title="Increase Font Size"
+                        className="h-7 px-1.5 rounded-md text-xs font-bold text-slate-700 hover:text-orange-600 hover:bg-orange-50 transition cursor-pointer"
+                      >
+                        A<span className="text-[9px] align-top">+</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => adjustFontSize(-1)}
+                        title="Decrease Font Size"
+                        className="h-7 px-1.5 rounded-md text-[11px] font-bold text-slate-700 hover:text-orange-600 hover:bg-orange-50 transition cursor-pointer"
+                      >
+                        A<span className="text-[9px] align-top">-</span>
+                      </button>
+
+                      {/* Change Case (Aa) */}
+                      <div className="relative">
+                        <button
+                          type="button"
+                          onClick={() => setOpenRibbonMenu(openRibbonMenu === 'case' ? null : 'case')}
+                          title="Change Case"
+                          className="h-7 px-1.5 rounded-md text-slate-700 hover:text-orange-600 hover:bg-orange-50 transition cursor-pointer flex items-center gap-0.5"
+                        >
+                          <CaseSensitive className="w-4 h-4" />
+                          <ChevronDown className="w-3 h-3 opacity-60" />
+                        </button>
+                        {openRibbonMenu === 'case' && (
+                          <div className="absolute left-0 top-8 z-30 w-44 bg-white border border-slate-200 rounded-xl shadow-lg py-1 text-xs">
+                            {[
+                              { id: 'sentence' as const, label: 'Sentence case.' },
+                              { id: 'lower' as const, label: 'lowercase' },
+                              { id: 'upper' as const, label: 'UPPERCASE' },
+                              { id: 'title' as const, label: 'Capitalize Each Word' },
+                            ].map((opt) => (
+                              <button
+                                key={opt.id}
+                                type="button"
+                                onClick={() => applyChangeCase(opt.id)}
+                                className="w-full text-left px-3 py-1.5 hover:bg-orange-50 hover:text-orange-700 text-slate-700 cursor-pointer"
+                              >
+                                {opt.label}
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+
+                      <ToolbarButton
+                        icon={<RemoveFormatting className="w-3.5 h-3.5" />}
+                        label="Clear All Formatting"
+                        onClick={clearSelectionFormatting}
+                      />
+                    </div>
+
+                    <div className="flex flex-wrap items-center gap-0.5 mt-1 pt-1 border-t border-slate-100">
+                      <ToolbarButton
+                        icon={<Bold className="w-3.5 h-3.5" />}
+                        label="Bold (Ctrl+B)"
+                        onClick={() => insertMarkdown('**', '**', 'bold text')}
+                      />
+                      <ToolbarButton
+                        icon={<Italic className="w-3.5 h-3.5" />}
+                        label="Italic (Ctrl+I)"
+                        onClick={() => insertMarkdown('*', '*', 'italic text')}
+                      />
+                      <ToolbarButton
+                        icon={<Underline className="w-3.5 h-3.5" />}
+                        label="Underline (Ctrl+U)"
+                        onClick={() => insertMarkdown('<u>', '</u>', 'underlined text')}
+                      />
+                      <ToolbarButton
+                        icon={<Strikethrough className="w-3.5 h-3.5" />}
+                        label="Strikethrough"
+                        onClick={() => insertMarkdown('~~', '~~', 'strikethrough text')}
+                      />
+                      <ToolbarButton
+                        icon={<Subscript className="w-3.5 h-3.5" />}
+                        label="Subscript (H₂O)"
+                        onClick={() => insertMarkdown('<sub>', '</sub>', '2')}
+                      />
+                      <ToolbarButton
+                        icon={<Superscript className="w-3.5 h-3.5" />}
+                        label="Superscript (X²)"
+                        onClick={() => insertMarkdown('<sup>', '</sup>', '2')}
+                      />
+
+                      <div className="h-4 w-px bg-slate-200 mx-1" />
+
+                      {/* Text Color Picker */}
+                      <div className="relative">
+                        <div className="flex items-center">
+                          <button
+                            type="button"
+                            onClick={() => applyInlineSpanStyle('color', selectedTextColor)}
+                            title="Apply Font Color"
+                            className="p-1.5 rounded-l-md text-slate-700 hover:bg-orange-50 transition cursor-pointer flex flex-col items-center justify-center"
+                          >
+                            <span className="text-xs font-extrabold leading-none">A</span>
+                            <span
+                              className="w-3.5 h-1 rounded-xs mt-0.5"
+                              style={{ backgroundColor: selectedTextColor }}
+                            />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setOpenRibbonMenu(openRibbonMenu === 'textColor' ? null : 'textColor')}
+                            title="Choose Font Color"
+                            className="px-0.5 py-1.5 rounded-r-md text-slate-500 hover:bg-orange-50 hover:text-orange-600 transition cursor-pointer"
+                          >
+                            <ChevronDown className="w-3 h-3" />
+                          </button>
+                        </div>
+                        {openRibbonMenu === 'textColor' && (
+                          <div className="absolute left-0 top-8 z-30 w-52 bg-white border border-slate-200 rounded-xl shadow-lg p-2.5 space-y-2">
+                            <div className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                              Font Color
+                            </div>
+                            <div className="grid grid-cols-6 gap-1.5">
+                              {WORD_TEXT_COLORS.map((c) => (
+                                <button
+                                  key={c.value}
+                                  type="button"
+                                  title={c.label}
+                                  onClick={() => {
+                                    setSelectedTextColor(c.value);
+                                    applyInlineSpanStyle('color', c.value);
+                                  }}
+                                  className="w-6 h-6 rounded-md border border-slate-200 hover:scale-110 transition cursor-pointer"
+                                  style={{ backgroundColor: c.value }}
+                                />
+                              ))}
+                            </div>
+                            <div className="flex items-center justify-between pt-1 border-t border-slate-100">
+                              <label className="text-[11px] text-slate-600 flex items-center gap-1.5 cursor-pointer">
+                                <span>Custom:</span>
+                                <input
+                                  type="color"
+                                  value={selectedTextColor}
+                                  onChange={(e) => {
+                                    setSelectedTextColor(e.target.value);
+                                    applyInlineSpanStyle('color', e.target.value);
+                                  }}
+                                  className="w-6 h-5 cursor-pointer border-0 bg-transparent p-0"
+                                />
+                              </label>
+                              <button
+                                type="button"
+                                onClick={() => applyInlineSpanStyle('color', null)}
+                                className="text-[11px] font-semibold text-slate-500 hover:text-orange-600 cursor-pointer"
+                              >
+                                Reset
+                              </button>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Text Highlight Color Picker */}
+                      <div className="relative">
+                        <div className="flex items-center">
+                          <button
+                            type="button"
+                            onClick={() => applyHighlightColor(selectedHighlightColor)}
+                            title="Apply Text Highlight Color"
+                            className="p-1.5 rounded-l-md text-slate-700 hover:bg-orange-50 transition cursor-pointer flex flex-col items-center justify-center"
+                          >
+                            <Highlighter className="w-3.5 h-3.5" />
+                            <span
+                              className="w-3.5 h-1 rounded-xs mt-0.5"
+                              style={{ backgroundColor: selectedHighlightColor }}
+                            />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setOpenRibbonMenu(openRibbonMenu === 'highlight' ? null : 'highlight')}
+                            title="Choose Highlight Color"
+                            className="px-0.5 py-1.5 rounded-r-md text-slate-500 hover:bg-orange-50 hover:text-orange-600 transition cursor-pointer"
+                          >
+                            <ChevronDown className="w-3 h-3" />
+                          </button>
+                        </div>
+                        {openRibbonMenu === 'highlight' && (
+                          <div className="absolute left-0 top-8 z-30 w-48 bg-white border border-slate-200 rounded-xl shadow-lg p-2.5 space-y-2">
+                            <div className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                              Text Highlight
+                            </div>
+                            <div className="grid grid-cols-6 gap-1.5">
+                              {WORD_HIGHLIGHT_COLORS.map((c) => (
+                                <button
+                                  key={c.value}
+                                  type="button"
+                                  title={c.label}
+                                  onClick={() => {
+                                    setSelectedHighlightColor(c.value);
+                                    applyHighlightColor(c.value);
+                                  }}
+                                  className="w-6 h-6 rounded-md border border-slate-200 hover:scale-110 transition cursor-pointer"
+                                  style={{ backgroundColor: c.value }}
+                                />
+                              ))}
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => applyHighlightColor(null)}
+                              className="w-full py-1 text-[11px] font-semibold text-slate-600 hover:text-orange-600 border-t border-slate-100 cursor-pointer"
+                            >
+                              No Highlight
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                    <div className="text-[9px] font-bold uppercase tracking-widest text-slate-400 text-center mt-1 select-none">
+                      Font
+                    </div>
+                  </div>
+
+                  {/* GROUP 2: PARAGRAPH (MS Word Home -> Paragraph) */}
+                  <div className="flex flex-col justify-between bg-white border border-slate-200/90 rounded-xl px-2.5 py-1.5 shadow-2xs">
+                    <div className="flex flex-wrap items-center gap-1">
+                      {/* Paragraph Heading / Block Style */}
+                      <select
+                        aria-label="Paragraph Style"
+                        title="Paragraph Style (Headings, Normal, Callout)"
+                        defaultValue=""
+                        onChange={(e) => {
+                          const v = e.target.value as 'normal' | 'h1' | 'h2' | 'h3' | 'h4' | 'quote' | 'callout';
+                          if (v) applyBlockStylePreset(v);
+                          e.target.value = '';
+                        }}
+                        className="h-7 px-2 text-xs font-medium text-slate-800 bg-slate-50 border border-slate-200 rounded-md focus:outline-none focus:border-orange-500 cursor-pointer"
+                      >
+                        <option value="" disabled>
+                          Styles...
+                        </option>
+                        <option value="normal">Normal Paragraph</option>
+                        <option value="h1">Heading 1</option>
+                        <option value="h2">Heading 2</option>
+                        <option value="h3">Heading 3</option>
+                        <option value="h4">Heading 4</option>
+                        <option value="quote">Blockquote</option>
+                        <option value="callout">Academic Callout Box</option>
+                      </select>
+
+                      <div className="h-4 w-px bg-slate-200 mx-0.5" />
+
+                      <ToolbarButton
+                        icon={<List className="w-3.5 h-3.5" />}
+                        label="Bulleted List"
+                        onClick={() => applyListFormatting(false)}
+                      />
+                      <ToolbarButton
+                        icon={<ListOrdered className="w-3.5 h-3.5" />}
+                        label="Numbered List"
+                        onClick={() => applyListFormatting(true)}
+                      />
+
+                      <div className="h-4 w-px bg-slate-200 mx-0.5" />
+
+                      <ToolbarButton
+                        icon={<IndentDecrease className="w-3.5 h-3.5" />}
+                        label="Decrease Paragraph Indent"
+                        onClick={() => adjustParagraphIndent(-32)}
+                      />
+                      <ToolbarButton
+                        icon={<IndentIncrease className="w-3.5 h-3.5" />}
+                        label="Increase Paragraph Indent"
+                        onClick={() => adjustParagraphIndent(32)}
+                      />
+                    </div>
+
+                    <div className="flex flex-wrap items-center gap-0.5 mt-1 pt-1 border-t border-slate-100">
+                      <ToolbarButton
+                        icon={<AlignLeft className="w-3.5 h-3.5" />}
+                        label="Align Left"
+                        onClick={() => applyParagraphStyle({ 'text-align': 'left' })}
+                      />
+                      <ToolbarButton
+                        icon={<AlignCenter className="w-3.5 h-3.5" />}
+                        label="Align Center"
+                        onClick={() => applyParagraphStyle({ 'text-align': 'center' })}
+                      />
+                      <ToolbarButton
+                        icon={<AlignRight className="w-3.5 h-3.5" />}
+                        label="Align Right"
+                        onClick={() => applyParagraphStyle({ 'text-align': 'right' })}
+                      />
+                      <ToolbarButton
+                        icon={<AlignJustify className="w-3.5 h-3.5" />}
+                        label="Justify Paragraph"
+                        onClick={() => applyParagraphStyle({ 'text-align': 'justify' })}
+                      />
+
+                      <div className="h-4 w-px bg-slate-200 mx-1" />
+
+                      {/* Line & Paragraph Spacing */}
+                      <div className="relative">
+                        <button
+                          type="button"
+                          onClick={() => setOpenRibbonMenu(openRibbonMenu === 'lineSpacing' ? null : 'lineSpacing')}
+                          title="Line and Paragraph Spacing"
+                          className="h-7 px-1.5 rounded-md text-slate-700 hover:text-orange-600 hover:bg-orange-50 transition cursor-pointer flex items-center gap-1 text-xs font-semibold"
+                        >
+                          <ArrowUpDown className="w-3.5 h-3.5" />
+                          <span>{selectedLineSpacing}</span>
+                          <ChevronDown className="w-3 h-3 opacity-60" />
+                        </button>
+                        {openRibbonMenu === 'lineSpacing' && (
+                          <div className="absolute left-0 top-8 z-30 w-44 bg-white border border-slate-200 rounded-xl shadow-lg py-1 text-xs">
+                            <div className="px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                              Line Spacing
+                            </div>
+                            {WORD_LINE_SPACINGS.map((ls) => (
+                              <button
+                                key={ls.value}
+                                type="button"
+                                onClick={() => {
+                                  setSelectedLineSpacing(ls.value);
+                                  applyParagraphStyle({ 'line-height': ls.value });
+                                }}
+                                className={`w-full text-left px-3 py-1.5 hover:bg-orange-50 hover:text-orange-700 cursor-pointer ${
+                                  selectedLineSpacing === ls.value ? 'font-bold text-orange-700 bg-orange-50/50' : 'text-slate-700'
+                                }`}
+                              >
+                                {ls.label}
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="h-4 w-px bg-slate-200 mx-1" />
+
+                      <ToolbarButton
+                        icon={<Heading1 className="w-3.5 h-3.5" />}
+                        label="Heading 1"
+                        onClick={() => applyBlockStylePreset('h1')}
+                      />
+                      <ToolbarButton
+                        icon={<Heading2 className="w-3.5 h-3.5" />}
+                        label="Heading 2"
+                        onClick={() => applyBlockStylePreset('h2')}
+                      />
+                      <ToolbarButton
+                        icon={<Heading3 className="w-3.5 h-3.5" />}
+                        label="Heading 3"
+                        onClick={() => applyBlockStylePreset('h3')}
+                      />
+                    </div>
+                    <div className="text-[9px] font-bold uppercase tracking-widest text-slate-400 text-center mt-1 select-none">
+                      Paragraph
+                    </div>
+                  </div>
+
+                  {/* GROUP 3: INSERT */}
+                  <div className="flex flex-col justify-between bg-white border border-slate-200/90 rounded-xl px-2.5 py-1.5 shadow-2xs">
+                    <div className="flex flex-wrap items-center gap-0.5 my-auto">
+                      <ToolbarButton
+                        icon={<ImageIcon className="w-3.5 h-3.5" />}
+                        label="Insert Inline Image"
+                        onClick={() => setInlineImageModal(true)}
+                      />
+                      <ToolbarButton
+                        icon={<LinkIcon className="w-3.5 h-3.5" />}
+                        label="Insert Link"
+                        onClick={() => insertMarkdown('[', '](https://)', 'link text')}
+                      />
+                      <ToolbarButton
+                        icon={<Quote className="w-3.5 h-3.5" />}
+                        label="Academic Quote"
+                        onClick={() => applyBlockStylePreset('quote')}
+                      />
+                      <ToolbarButton
+                        icon={<Code className="w-3.5 h-3.5" />}
+                        label="Inline Code / Citation"
+                        onClick={() => insertMarkdown('`', '`', 'citation')}
+                      />
+                      <ToolbarButton
+                        icon={<Minus className="w-3.5 h-3.5" />}
+                        label="Horizontal Divider"
+                        onClick={() => insertMarkdown('\n---\n', '', '')}
+                      />
+                    </div>
+                    <div className="text-[9px] font-bold uppercase tracking-widest text-slate-400 text-center mt-1 select-none">
+                      Insert
+                    </div>
+                  </div>
+                </div>
+
+                {/* View Mode Switcher */}
+                <div className="flex items-center self-start bg-slate-200/70 p-0.5 rounded-xl">
+                  <button
+                    type="button"
+                    onClick={() => setViewMode('write')}
+                    className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold transition cursor-pointer ${
+                      viewMode === 'write' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    <PenLine className="w-3.5 h-3.5 text-orange-600" />
+                    <span>Write</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setViewMode('split')}
+                    className={`hidden md:flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold transition cursor-pointer ${
+                      viewMode === 'split' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    <Columns className="w-3.5 h-3.5 text-orange-600" />
+                    <span>Split</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setViewMode('preview')}
+                    className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold transition cursor-pointer ${
+                      viewMode === 'preview'
+                        ? 'bg-white text-slate-900 shadow-xs'
+                        : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    <Eye className="w-3.5 h-3.5 text-orange-600" />
+                    <span>Preview</span>
+                  </button>
+                </div>
               </div>
             </div>
 
             {/* Editor Body (Write / Split / Live Preview) */}
             <div
+              onClick={() => openRibbonMenu && setOpenRibbonMenu(null)}
               className={`flex-1 grid ${
                 viewMode === 'split'
                   ? 'grid-cols-1 md:grid-cols-2 divide-y md:divide-y-0 md:divide-x divide-slate-200'
@@ -1428,7 +2190,8 @@ export const AdminBlogStudio: React.FC<AdminBlogStudioProps> = ({
                     ref={textareaRef}
                     value={content}
                     onChange={(e) => setContent(e.target.value)}
-                    placeholder="Write beautiful educational details here. Markdown syntax is fully supported (e.g., ## Heading, **bold**, * list)..."
+                    onKeyDown={handleEditorKeyDown}
+                    placeholder="Write your academic article here. Select text to apply Font styles (family, size, color, highlight, bold, italic, underline) or Paragraph styles (alignment, line spacing, indent, headings, lists)..."
                     className="w-full flex-1 min-h-[460px] resize-none text-[15px] leading-relaxed text-slate-800 placeholder:text-slate-400 focus:outline-none font-mono sm:font-sans"
                   />
                 </div>
@@ -1439,13 +2202,13 @@ export const AdminBlogStudio: React.FC<AdminBlogStudioProps> = ({
                   {viewMode === 'split' && (
                     <div className="text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-4 flex items-center gap-1.5">
                       <Eye className="w-3.5 h-3.5 text-orange-500" />
-                      Live Student View
+                      Live Document Preview
                     </div>
                   )}
                   <article className="max-w-3xl mx-auto">
                     {coverUrl && !imageError && (
                       <img
-                        src={coverUrl}
+                        src={resolveMediaUrl(coverUrl)}
                         alt={altText || title}
                         className="w-full h-56 sm:h-64 object-cover rounded-2xl mb-6 border border-slate-200 shadow-xs"
                       />
@@ -1555,15 +2318,19 @@ export const AdminBlogStudio: React.FC<AdminBlogStudioProps> = ({
               {coverUrl && !imageError ? (
                 <>
                   <img
-                    src={coverUrl}
+                    src={resolveMediaUrl(coverUrl)}
                     alt={altText || 'Cover preview'}
                     onError={() => setImageError(true)}
                     className="w-full h-full object-cover"
                   />
-                  <div className="absolute inset-0 bg-slate-900/55 opacity-0 group-hover:opacity-100 transition flex flex-col items-center justify-center text-white p-4 text-center">
-                    <UploadCloud className="w-6 h-6 mb-1.5 text-orange-400" />
+                  <div className={`absolute inset-0 bg-slate-900/55 ${uploadingImage ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'} transition flex flex-col items-center justify-center text-white p-4 text-center`}>
+                    {uploadingImage ? (
+                      <Loader2 className="w-6 h-6 mb-1.5 text-orange-400 animate-spin" />
+                    ) : (
+                      <UploadCloud className="w-6 h-6 mb-1.5 text-orange-400" />
+                    )}
                     <span className="text-xs font-semibold">
-                      {uploadingImage ? 'Uploading...' : 'Upload New Cover Image'}
+                      {uploadingImage ? 'Uploading Cover Image...' : 'Upload New Cover Image'}
                     </span>
                     <span className="text-[11px] text-slate-200 mt-0.5">Click to browse or drag & drop</span>
                   </div>
@@ -1571,12 +2338,12 @@ export const AdminBlogStudio: React.FC<AdminBlogStudioProps> = ({
               ) : (
                 <div className="p-4 text-center">
                   <div className="w-10 h-10 rounded-full bg-orange-100 text-orange-600 flex items-center justify-center mx-auto mb-2">
-                    <UploadCloud className="w-5 h-5" />
+                    {uploadingImage ? <Loader2 className="w-5 h-5 animate-spin" /> : <UploadCloud className="w-5 h-5" />}
                   </div>
                   <p className="text-xs font-semibold text-slate-700">
-                    Click to upload or drag & drop cover photo
+                    {uploadingImage ? 'Uploading cover photo...' : 'Click to upload or drag & drop cover photo'}
                   </p>
-                  <p className="text-[11px] text-slate-400 mt-0.5">PNG, JPG, WebP • Recommended 1200 × 675px</p>
+                  <p className="text-[11px] text-slate-400 mt-0.5">PNG, JPG, WebP, GIF, AVIF • Max 15MB</p>
                 </div>
               )}
             </div>

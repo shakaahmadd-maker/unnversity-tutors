@@ -186,6 +186,32 @@ export function resolveApiUrl(url: string): string {
   return joinBaseAndPath(base, normalizedPath);
 }
 
+/**
+ * Resolves uploaded media URLs (`/uploads/...` or frontend-domain `/uploads/...`)
+ * to the live backend origin (`https://api.university-tutors.com/uploads/...` in production)
+ * while leaving external CDN URLs, `data:`, and `blob:` URLs untouched.
+ */
+export function resolveMediaUrl(url: string | undefined | null): string {
+  if (!url || typeof url !== 'string') return '';
+  const trimmed = url.trim();
+  if (!trimmed) return '';
+  if (trimmed.startsWith('data:') || trimmed.startsWith('blob:')) return trimmed;
+  if (trimmed.startsWith('/uploads/')) {
+    return resolveApiUrl(trimmed);
+  }
+  if (/^https?:\/\//i.test(trimmed)) {
+    try {
+      const parsed = new URL(trimmed);
+      if (parsed.pathname.startsWith('/uploads/') && isDisallowedApiBaseUrl(trimmed)) {
+        return resolveApiUrl(`${parsed.pathname}${parsed.search}`);
+      }
+    } catch {
+      return trimmed;
+    }
+  }
+  return trimmed;
+}
+
 function normalizeRouteForMetrics(url: string): string {
   const pathOnly = (url || '/').replace(/^https?:\/\/[^/]+/i, '').split('?')[0];
   return pathOnly

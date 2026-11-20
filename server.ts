@@ -395,6 +395,73 @@ export async function generateAvatarDerivatives(
   }
 }
 
+const ALLOWED_UPLOAD_IMAGE_MIMES = new Set([
+  'image/jpeg',
+  'image/jpg',
+  'image/pjpeg',
+  'image/png',
+  'image/webp',
+  'image/gif',
+  'image/avif',
+  'image/x-png',
+]);
+
+const ALLOWED_BLOG_IMAGE_MIMES = new Set([
+  ...ALLOWED_UPLOAD_IMAGE_MIMES,
+  'image/svg+xml',
+]);
+
+const ALLOWED_UPLOAD_IMAGE_EXTS = new Set(['.jpg', '.jpeg', '.png', '.webp', '.gif', '.avif']);
+const ALLOWED_BLOG_IMAGE_EXTS = new Set([...ALLOWED_UPLOAD_IMAGE_EXTS, '.svg']);
+
+function inferSafeImageExtension(
+  originalname?: string,
+  mimetype?: string,
+  allowSvg: boolean = false
+): string {
+  const allowedExts = allowSvg ? ALLOWED_BLOG_IMAGE_EXTS : ALLOWED_UPLOAD_IMAGE_EXTS;
+  const rawExt = path.extname(originalname || '').toLowerCase();
+  if (rawExt === '.jfif') return '.jpg';
+  if (allowedExts.has(rawExt)) return rawExt === '.jpeg' ? '.jpg' : rawExt;
+
+  const mime = (mimetype || '').toLowerCase();
+  if (mime.includes('png')) return '.png';
+  if (mime.includes('webp')) return '.webp';
+  if (mime.includes('gif')) return '.gif';
+  if (mime.includes('avif')) return '.avif';
+  if (allowSvg && mime.includes('svg')) return '.svg';
+  return '.jpg';
+}
+
+export async function saveUploadedImageBufferToUploads(
+  buffer: Buffer,
+  ext: string,
+  folder: 'avatars' | 'blogs' | 'general' = 'blogs',
+  prefix: string = 'media'
+): Promise<{ relativeUrl: string; filename: string; filePath: string }> {
+  const safePrefix = (prefix || 'media').replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 30) || 'media';
+  const cleanExt = ext.startsWith('.') ? ext.toLowerCase() : `.${ext.toLowerCase()}`;
+  const targetSubDir = path.join(UPLOADS_DIR, folder);
+  await fs.promises.mkdir(targetSubDir, { recursive: true });
+  await fs.promises.access(targetSubDir, fs.constants.W_OK);
+
+  const stem = `${safePrefix}_${Date.now()}_${crypto.randomBytes(6).toString('hex')}`;
+  const filename = `${stem}${cleanExt}`;
+  const filePath = path.join(targetSubDir, filename);
+  await fs.promises.writeFile(filePath, buffer);
+
+  if (folder === 'avatars' && cleanExt !== '.svg' && cleanExt !== '.gif') {
+    await generateAvatarDerivatives(buffer, targetSubDir, stem);
+  }
+
+  console.info(`[UPLOADS] Saved uploaded asset to persistent disk: ${filePath}`);
+  return {
+    relativeUrl: `/uploads/${folder}/${filename}?v=${Date.now()}`,
+    filename,
+    filePath,
+  };
+}
+
 // Helper to save base64 image data URI to persistent disk and return public path
 export function saveBase64ImageToUploads(dataUriOrBase64: string, folder: string = 'avatars', prefix: string = 'avatar'): string {
   if (!dataUriOrBase64 || typeof dataUriOrBase64 !== 'string') return dataUriOrBase64;
@@ -403,12 +470,14 @@ export function saveBase64ImageToUploads(dataUriOrBase64: string, folder: string
   }
 
   try {
-    const match = dataUriOrBase64.match(/^data:image\/([a-zA-Z0-9+]+);base64,(.+)$/);
+    const match = dataUriOrBase64.match(/^data:image\/([a-zA-Z0-9.+_-]+);base64,(.+)$/);
     if (!match) return dataUriOrBase64;
 
     let ext = match[1].toLowerCase();
-    if (ext === 'jpeg') ext = 'jpg';
+    if (ext === 'jpeg' || ext === 'pjpeg') ext = 'jpg';
     if (ext === 'svg+xml') ext = 'svg';
+    if (ext === 'x-png') ext = 'png';
+    if (!['jpg', 'png', 'webp', 'gif', 'avif', 'svg'].includes(ext)) ext = 'jpg';
 
     const base64Data = match[2];
     const buffer = Buffer.from(base64Data, 'base64');
@@ -423,7 +492,7 @@ export function saveBase64ImageToUploads(dataUriOrBase64: string, folder: string
     const filePath = path.join(targetSubDir, filename);
     fs.writeFileSync(filePath, buffer);
 
-    if (folder === 'avatars' && ext !== 'svg') {
+    if (folder === 'avatars' && ext !== 'svg' && ext !== 'gif') {
       void generateAvatarDerivatives(buffer, targetSubDir, stem);
     }
 
@@ -438,13 +507,35 @@ export function saveBase64ImageToUploads(dataUriOrBase64: string, folder: string
 // Multer Memory Storage Configuration for Persistent Profile Image Uploads
 export const avatarMulterUpload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB
-  fileFilter: (req, file, cb) => {
-    const allowed = ['image/jpeg', 'image/png', 'image/webp', 'image/jpg'];
-    if (allowed.includes(file.mimetype.toLowerCase())) {
+  limits: { fileSize: 15 * 1024 * 1024 }, // 15MB
+  fileFilter: (_req, file, cb) => {
+    const mime = (file.mimetype || '').toLowerCase();
+    const ext = path.extname(file.originalname || '').toLowerCase();
+    if (
+      ALLOWED_UPLOAD_IMAGE_MIMES.has(mime) ||
+      ((!mime || mime === 'application/octet-stream') && (ALLOWED_UPLOAD_IMAGE_EXTS.has(ext) || ext === '.jfif'))
+    ) {
       cb(null, true);
     } else {
-      cb(new Error('Invalid image format. Only JPEG, PNG, and WEBP are supported.'));
+      cb(new Error('Invalid image format. Supported formats: JPEG, PNG, WEBP, GIF, and AVIF.'));
+    }
+  }
+});
+
+// Multer Memory Storage Configuration for Blog & Editorial Media Uploads
+export const blogMediaMulterUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 15 * 1024 * 1024 }, // 15MB
+  fileFilter: (_req, file, cb) => {
+    const mime = (file.mimetype || '').toLowerCase();
+    const ext = path.extname(file.originalname || '').toLowerCase();
+    if (
+      ALLOWED_BLOG_IMAGE_MIMES.has(mime) ||
+      ((!mime || mime === 'application/octet-stream') && (ALLOWED_BLOG_IMAGE_EXTS.has(ext) || ext === '.jfif'))
+    ) {
+      cb(null, true);
+    } else {
+      cb(new Error('Invalid image format. Supported formats: JPEG, PNG, WEBP, GIF, AVIF, and SVG.'));
     }
   }
 });
@@ -811,8 +902,8 @@ export async function createApp(options: CreateAppOptions = {}) {
   app.set('trust proxy', 1);
 
   app.use(compression());
-  app.use(express.json({ limit: '15mb' }));
-  app.use(express.urlencoded({ extended: true, limit: '15mb' }));
+  app.use(express.json({ limit: '25mb' }));
+  app.use(express.urlencoded({ extended: true, limit: '25mb' }));
   app.use(cookieParser());
 
   // Request duration telemetry & slow-route warning logger (zero secrets/PII)
@@ -3279,6 +3370,43 @@ export async function createApp(options: CreateAppOptions = {}) {
     }
   }
 
+  // Resolve the public origin where this backend serves /uploads/* assets
+  // (e.g. https://api.university-tutors.com in production, NEVER the frontend-only static domain).
+  function resolveBackendMediaOrigin(req?: express.Request): string {
+    const configuredApiOrigin =
+      readRuntimeEnv('PUBLIC_API_URL') ||
+      readRuntimeEnv('API_BASE_URL') ||
+      readRuntimeEnv('BACKEND_PUBLIC_URL');
+    if (configuredApiOrigin) {
+      try {
+        const parsed = new URL(configuredApiOrigin);
+        if (!isForbiddenProductionUrl(parsed.origin)) {
+          return parsed.origin;
+        }
+      } catch {
+        // ignore invalid env value
+      }
+    }
+    if (req) {
+      const forwardedHost = String(req.headers['x-forwarded-host'] || req.headers.host || '').split(',')[0].trim();
+      const forwardedProto = String(req.headers['x-forwarded-proto'] || req.protocol || 'https').split(',')[0].trim();
+      if (forwardedHost && !/^(localhost|127\.0\.0\.1|0\.0\.0\.0)(:\d+)?$/i.test(forwardedHost)) {
+        const candidate = `${forwardedProto === 'http' ? 'http' : 'https'}://${forwardedHost}`;
+        if (!isForbiddenProductionUrl(candidate)) {
+          return candidate;
+        }
+      }
+    }
+    return '';
+  }
+
+  function formatPublicUploadUrl(req: express.Request | undefined, relativePath: string): string {
+    if (!relativePath || /^https?:\/\//i.test(relativePath)) return relativePath;
+    const normalized = relativePath.startsWith('/') ? relativePath : `/${relativePath}`;
+    const origin = resolveBackendMediaOrigin(req);
+    return origin ? `${origin}${normalized}` : normalized;
+  }
+
   // 1. GOOGLE OAUTH CONFIGURATION
   // Reads ONLY GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, GOOGLE_REDIRECT_URI, and APP_URL from runtime process.env.
   // Never uses fallback credentials, preview container URLs, localhost URLs, or dynamic container hosts.
@@ -5506,93 +5634,64 @@ export async function createApp(options: CreateAppOptions = {}) {
   });
 
   // POST /api/admin/tutors/upload-avatar
-  // Protected multipart image upload controller for admin tutor headshots
-  // POST /api/admin/tutors/upload-avatar
-  // Protected multipart image upload controller for admin tutor headshots
+  // Protected multipart image upload controller for admin & sub-admin tutor headshots
   app.post('/api/admin/tutors/upload-avatar', (req, res) => {
-    console.log('[UPLOAD] upload request received');
+    console.log('[UPLOAD] tutor avatar upload request received');
 
-    // Security requirement 1 & 2: Require authentication & tutors module authorization
+    // Require authentication & tutors module authorization (Super Admin or Sub-Admin with tutors permission)
     const currentUser = (req as any).user;
     if (!currentUser) {
-      console.log('[UPLOAD] response sent');
       return res.status(401).json({ error: 'Unauthorized: Authentication required. Please log in as an administrator.' });
     }
     if (!hasModulePermission(currentUser, 'tutors')) {
-      console.log('[UPLOAD] response sent');
       return res.status(403).json({ error: 'Forbidden: Tutors Management permission required to upload tutor avatars.' });
     }
 
-    avatarMulterUpload.single('image')(req, res, async (err: any) => {
-      // Security requirement 3: Validate image type and file size
-      if (err) {
-        console.error('[UPLOAD] Multer upload error:', err.message);
-        console.log('[UPLOAD] response sent');
-        return res.status(400).json({ error: err.message || 'Invalid image file or upload failed.' });
-      }
-
+    const handleAvatarUpload = async () => {
       try {
         let fileBuffer: Buffer | null = null;
         let fileExt = '.jpg';
 
-        if (req.file) {
-          if (req.file.buffer) {
-            fileBuffer = req.file.buffer;
-          } else if (req.file.path && fs.existsSync(req.file.path)) {
-            fileBuffer = await fs.promises.readFile(req.file.path);
+        const uploadedFiles = Array.isArray((req as any).files) ? (req as any).files : [];
+        const uploadedFile = (req as any).file || uploadedFiles[0] || null;
+
+        if (uploadedFile) {
+          if (uploadedFile.buffer) {
+            fileBuffer = uploadedFile.buffer;
+          } else if (uploadedFile.path && fs.existsSync(uploadedFile.path)) {
+            fileBuffer = await fs.promises.readFile(uploadedFile.path);
           }
-          const ext = path.extname(req.file.originalname).toLowerCase();
-          fileExt = ['.jpg', '.jpeg', '.png', '.webp'].includes(ext) ? ext : '.jpg';
+          fileExt = inferSafeImageExtension(uploadedFile.originalname, uploadedFile.mimetype, false);
         } else {
-          // Fallback check for base64 in body
-          const { image, avatarUrl } = req.body || {};
-          const dataUri = image || avatarUrl;
+          // Fallback check for base64 in JSON body
+          const { image, file, avatarUrl } = req.body || {};
+          const dataUri = image || file || avatarUrl;
           if (dataUri && typeof dataUri === 'string' && dataUri.startsWith('data:image/')) {
-            const match = dataUri.match(/^data:image\/([a-zA-Z0-9+]+);base64,(.+)$/);
+            const match = dataUri.match(/^data:image\/([a-zA-Z0-9.+_-]+);base64,(.+)$/);
             if (match) {
               let ext = match[1].toLowerCase();
-              if (ext === 'jpeg') ext = 'jpg';
-              fileExt = `.${ext}`;
+              if (ext === 'jpeg' || ext === 'pjpeg') ext = 'jpg';
+              if (ext === 'x-png') ext = 'png';
+              fileExt = ALLOWED_UPLOAD_IMAGE_EXTS.has(`.${ext}`) ? `.${ext}` : '.jpg';
               fileBuffer = Buffer.from(match[2], 'base64');
             }
           }
         }
 
         if (!fileBuffer || fileBuffer.length === 0) {
-          console.log('[UPLOAD] response sent');
-          return res.status(400).json({ error: 'No image file uploaded. Only JPEG, PNG, and WEBP images under 10MB are accepted.' });
+          return res.status(400).json({ error: 'No image file uploaded. Supported formats: JPEG, PNG, WEBP, GIF, AVIF (max 15MB).' });
         }
 
-        if (fileBuffer.length > 10 * 1024 * 1024) {
-          console.log('[UPLOAD] response sent');
-          return res.status(400).json({ error: 'Image size exceeds 10MB limit.' });
+        if (fileBuffer.length > 15 * 1024 * 1024) {
+          return res.status(400).json({ error: 'Image size exceeds 15MB limit.' });
         }
 
-        // Backend requirement 3: Use process.env.UPLOADS_DIR and confirm it is: /app/uploads
-        const baseUploadsDir = process.env.UPLOADS_DIR || '/app/uploads';
-        const avatarsDir = path.join(baseUploadsDir, 'avatars');
-
-        // Backend requirement 2: Create the upload directory with fs.mkdir({ recursive: true })
-        await fs.promises.mkdir(avatarsDir, { recursive: true });
-
-        // Backend requirement 4: Verify the directory is writable before saving
-        await fs.promises.access(avatarsDir, fs.constants.W_OK);
-        console.log('[UPLOAD] directory ready');
-
-        // Backend requirement 5: Await the file write operation (preserve untouched original file)
-        const cleanExt = ['.jpg', '.jpeg', '.png', '.webp'].includes(fileExt) ? fileExt : '.jpg';
-        const stem = `avatar_${Date.now()}_${crypto.randomBytes(6).toString('hex')}`;
-        const filename = `${stem}${cleanExt}`;
-        const filePath = path.join(avatarsDir, filename);
-        await fs.promises.writeFile(filePath, fileBuffer);
-        await generateAvatarDerivatives(fileBuffer, avatarsDir, stem);
-        console.log('[UPLOAD] file saved');
-
-        const relativeUrl = `/uploads/avatars/${filename}`;
+        const saved = await saveUploadedImageBufferToUploads(fileBuffer, fileExt, 'avatars', 'avatar');
+        const relativeUrl = saved.relativeUrl;
         const variantMeta = buildAvatarVariantMetadata(relativeUrl);
 
-        // Backend requirement 6 & 7: Save final relative path in PostgreSQL and await update
-        const targetTutorId = (req.body?.tutorId || req.body?.userId || req.query?.tutorId || req.query?.userId as string)?.trim();
+        // Save final relative path in PostgreSQL and local stores if tutorId was provided
+        const targetTutorId = String(req.body?.tutorId || req.body?.userId || req.query?.tutorId || req.query?.userId || '').trim();
         if (targetTutorId) {
           if (isDbConnected() && db) {
             try {
@@ -5666,26 +5765,35 @@ export async function createApp(options: CreateAppOptions = {}) {
             ...(variantMeta || {}),
           } as any);
         }
-        console.log('[UPLOAD] database updated');
 
-        // Backend requirement 8: Return HTTP 201 with JSON containing success: true, imageUrl: the saved image URL
-        console.log('[UPLOAD] response sent');
+        const absoluteUrl = formatPublicUploadUrl(req, relativeUrl);
         return res.status(201).json({
           success: true,
           imageUrl: relativeUrl,
-          url: `${resolveProductionBaseUrl()}${relativeUrl}?v=${Date.now()}`,
+          url: absoluteUrl,
           relativeUrl,
           savedUrl: relativeUrl,
-          filename,
+          filename: saved.filename,
           tutorId: targetTutorId || null,
           ...(variantMeta || {}),
         });
       } catch (uploadErr: any) {
         console.error('[UPLOAD] Error saving uploaded avatar:', uploadErr.message);
-        console.log('[UPLOAD] response sent');
         return res.status(500).json({ error: uploadErr.message || 'Failed to process image upload.' });
       }
-    });
+    };
+
+    if (req.is('multipart/form-data')) {
+      avatarMulterUpload.any()(req, res, (err: any) => {
+        if (err) {
+          console.error('[UPLOAD] Multer upload error:', err.message);
+          return res.status(400).json({ error: err.message || 'Invalid image file or upload failed.' });
+        }
+        void handleAvatarUpload();
+      });
+    } else {
+      void handleAvatarUpload();
+    }
   });
 
   // POST /api/admin/tutors
@@ -5781,11 +5889,12 @@ export async function createApp(options: CreateAppOptions = {}) {
 
       // Handle profile image: file upload > base64 > provided URL > fallback
       let finalImageUrl = profileImageUrl || avatarUrl || '';
-      if (req.file) {
-        finalImageUrl = `${resolveProductionBaseUrl()}/uploads/avatars/${req.file.filename}?v=${Date.now()}`;
+      if (req.file && req.file.buffer) {
+        const ext = inferSafeImageExtension(req.file.originalname, req.file.mimetype, false);
+        const saved = await saveUploadedImageBufferToUploads(req.file.buffer, ext, 'avatars', 'avatar');
+        finalImageUrl = saved.relativeUrl;
       } else if (finalImageUrl.startsWith('data:image/')) {
-        const rel = saveBase64ImageToUploads(finalImageUrl, 'avatars', 'avatar');
-        finalImageUrl = rel.startsWith('http') ? rel : `${resolveProductionBaseUrl()}${rel}`;
+        finalImageUrl = saveBase64ImageToUploads(finalImageUrl, 'avatars', 'avatar');
       } else if (!finalImageUrl) {
         finalImageUrl = 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=256';
       }
@@ -5933,17 +6042,19 @@ export async function createApp(options: CreateAppOptions = {}) {
       const updates = { ...req.body };
 
       // Handle image upload / replacement
-      if (req.file) {
-        updates.profileImageUrl = `${resolveProductionBaseUrl()}/uploads/avatars/${req.file.filename}?v=${Date.now()}`;
-        updates.avatarUrl = updates.profileImageUrl;
+      if (req.file && req.file.buffer) {
+        const ext = inferSafeImageExtension(req.file.originalname, req.file.mimetype, false);
+        const saved = await saveUploadedImageBufferToUploads(req.file.buffer, ext, 'avatars', `avatar_${id}`);
+        updates.profileImageUrl = saved.relativeUrl;
+        updates.avatarUrl = saved.relativeUrl;
       } else if (updates.profileImageUrl && updates.profileImageUrl.startsWith('data:image/')) {
         const rel = saveBase64ImageToUploads(updates.profileImageUrl, 'avatars', `avatar_${id}`);
-        updates.profileImageUrl = rel.startsWith('http') ? rel : `${resolveProductionBaseUrl()}${rel}`;
-        updates.avatarUrl = updates.profileImageUrl;
+        updates.profileImageUrl = rel;
+        updates.avatarUrl = rel;
       } else if (updates.avatarUrl && updates.avatarUrl.startsWith('data:image/')) {
         const rel = saveBase64ImageToUploads(updates.avatarUrl, 'avatars', `avatar_${id}`);
-        updates.avatarUrl = rel.startsWith('http') ? rel : `${resolveProductionBaseUrl()}${rel}`;
-        updates.profileImageUrl = updates.avatarUrl;
+        updates.avatarUrl = rel;
+        updates.profileImageUrl = rel;
       }
 
       // 6. Confirm the file exists on disk before saving its database path
@@ -6806,33 +6917,92 @@ export async function createApp(options: CreateAppOptions = {}) {
     }
   });
 
-  // POST /api/upload - Generic persistent upload endpoint for public images (e.g. avatars, approved public media)
+  // POST /api/upload - Generic persistent upload endpoint for public images (blogs, avatars, general media)
+  // Supports BOTH multipart/form-data (recommended for fast, zero-bloat uploads) and JSON base64 payloads.
   app.post('/api/upload', requireAuth, (req, res) => {
-    try {
-      const currentUser = (req as any).user;
-      let { file, folder = 'general', prefix = 'file' } = req.body;
-      if (!file) {
-        return res.status(400).json({ error: 'file (data URI or base64) is required' });
+    const processUpload = async () => {
+      try {
+        const currentUser = (req as any).user;
+        const rawFolder = String(req.body?.folder || req.query?.folder || 'general').trim().toLowerCase();
+        const rawPrefix = String(req.body?.prefix || req.query?.prefix || 'file').trim();
+
+        // Prevent private documents from being routed through general public endpoint
+        if (rawFolder === 'documents') {
+          return res.status(400).json({ error: 'Private documents must be uploaded via /api/upload-document.' });
+        }
+
+        // Restrict public blog uploads strictly to staff with Blog Manager permission (Super Admin & Blog Sub-Admins)
+        if (rawFolder === 'blogs' && !hasModulePermission(currentUser, 'blog')) {
+          return res.status(403).json({ error: 'Forbidden: Blog Manager permission required to upload blog media.' });
+        }
+
+        const safeFolder: 'avatars' | 'blogs' | 'general' =
+          rawFolder === 'avatars' || rawFolder === 'blogs' ? rawFolder : 'general';
+        const safePrefix = rawPrefix.replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 30) || 'file';
+
+        const uploadedFiles = Array.isArray((req as any).files) ? (req as any).files : [];
+        const uploadedFile = (req as any).file || uploadedFiles[0] || null;
+
+        let fileBuffer: Buffer | null = null;
+        let fileExt = '.jpg';
+
+        if (uploadedFile) {
+          fileBuffer = uploadedFile.buffer || (uploadedFile.path && fs.existsSync(uploadedFile.path)
+            ? await fs.promises.readFile(uploadedFile.path)
+            : null);
+          fileExt = inferSafeImageExtension(uploadedFile.originalname, uploadedFile.mimetype, safeFolder === 'blogs');
+        } else {
+          const dataUri = req.body?.file || req.body?.image;
+          if (!dataUri || typeof dataUri !== 'string') {
+            return res.status(400).json({ error: 'Image file is required (multipart file or data URI).' });
+          }
+          const match = dataUri.match(/^data:image\/([a-zA-Z0-9.+_-]+);base64,(.+)$/);
+          if (!match) {
+            return res.status(400).json({ error: 'Invalid image payload. Expected a valid image file or base64 image data URI.' });
+          }
+          let ext = match[1].toLowerCase();
+          if (ext === 'jpeg' || ext === 'pjpeg') ext = 'jpg';
+          if (ext === 'svg+xml') ext = 'svg';
+          if (ext === 'x-png') ext = 'png';
+          const allowedExts = safeFolder === 'blogs' ? ALLOWED_BLOG_IMAGE_EXTS : ALLOWED_UPLOAD_IMAGE_EXTS;
+          fileExt = allowedExts.has(`.${ext}`) ? `.${ext}` : '.jpg';
+          fileBuffer = Buffer.from(match[2], 'base64');
+        }
+
+        if (!fileBuffer || fileBuffer.length === 0) {
+          return res.status(400).json({ error: 'Uploaded image file is empty.' });
+        }
+
+        if (fileBuffer.length > 15 * 1024 * 1024) {
+          return res.status(400).json({ error: 'Image exceeds the 15MB maximum upload size.' });
+        }
+
+        const saved = await saveUploadedImageBufferToUploads(fileBuffer, fileExt, safeFolder, safePrefix);
+        const absoluteUrl = formatPublicUploadUrl(req, saved.relativeUrl);
+
+        return res.status(200).json({
+          success: true,
+          url: saved.relativeUrl,
+          relativeUrl: saved.relativeUrl,
+          imageUrl: saved.relativeUrl,
+          absoluteUrl,
+          filename: saved.filename,
+        });
+      } catch (err: any) {
+        console.error('[UPLOAD] /api/upload error:', err?.message || err);
+        return res.status(500).json({ error: err?.message || 'Failed to save uploaded image to server storage.' });
       }
+    };
 
-      // Restrict public blog uploads strictly to staff with Blog Manager permission
-      if (folder === 'blogs' && !hasModulePermission(currentUser, 'blog')) {
-        return res.status(403).json({ error: 'Forbidden: Blog Manager permission required to upload blog media.' });
-      }
-
-      // Prevent private documents from being routed through general public endpoint
-      if (folder === 'documents') {
-        return res.status(400).json({ error: 'Private documents must be uploaded via /api/upload-document.' });
-      }
-
-      // Sanitize folder name to prevent path traversal
-      const safeFolder = (folder === 'avatars' || folder === 'blogs') ? folder : 'general';
-      const safePrefix = prefix.replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 30) || 'file';
-
-      const publicUrl = saveBase64ImageToUploads(file, safeFolder, safePrefix);
-      return res.status(200).json({ success: true, url: publicUrl });
-    } catch (err: any) {
-      return res.status(500).json({ error: err.message });
+    if (req.is('multipart/form-data')) {
+      blogMediaMulterUpload.any()(req, res, (err: any) => {
+        if (err) {
+          return res.status(400).json({ error: err.message || 'Invalid image upload.' });
+        }
+        void processUpload();
+      });
+    } else {
+      void processUpload();
     }
   });
 

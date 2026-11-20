@@ -405,11 +405,17 @@ export async function login(
     store.sessionExpiredMessage = null;
     store.isSessionInitialized = true;
     try {
+      if (typeof window !== 'undefined' && data.token) {
+        window.localStorage.setItem(
+          'ut_current_user',
+          JSON.stringify({ id: data.user.id, role: data.user.role, token: data.token })
+        );
+      }
       if (typeof document !== 'undefined') {
         document.cookie = 'ut_session_active=1; path=/; SameSite=Lax';
       }
     } catch {
-      // ignore cookie write errors
+      // ignore storage/cookie write errors
     }
     store.ensureBackgroundTimersStarted();
     store.fetchData(true).catch(() => {});
@@ -471,11 +477,17 @@ export async function register(
     store.isSessionInitialized = true;
     store.users.push(data.user);
     try {
+      if (typeof window !== 'undefined' && data.token) {
+        window.localStorage.setItem(
+          'ut_current_user',
+          JSON.stringify({ id: data.user.id, role: data.user.role, token: data.token })
+        );
+      }
       if (typeof document !== 'undefined') {
         document.cookie = 'ut_session_active=1; path=/; SameSite=Lax';
       }
     } catch {
-      // ignore cookie write errors
+      // ignore storage/cookie write errors
     }
     store.ensureBackgroundTimersStarted();
     store.fetchData(true).catch(() => {});

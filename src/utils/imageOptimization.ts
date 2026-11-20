@@ -1,3 +1,5 @@
+import { resolveMediaUrl } from '../lib/apiClient';
+
 export interface ResponsiveImageSources {
   src: string;
   srcSet?: string;
@@ -95,7 +97,8 @@ export function getResponsiveAvatarProps(
   fallbackUrl: string,
   displaySizePx: number = 48
 ): ResponsiveImageSources {
-  const src = (rawUrl && rawUrl.trim()) || fallbackUrl;
+  const resolvedRaw = resolveMediaUrl(rawUrl);
+  const src = resolvedRaw || fallbackUrl;
   if (!src || src.startsWith('data:') || src.startsWith('blob:')) {
     return { src: src || fallbackUrl, fallbackSrc: fallbackUrl };
   }
@@ -146,8 +149,9 @@ export function getResponsiveBannerProps(
   sizes: string = '(max-width: 768px) 92vw, 420px',
   defaultWidth: number = 560
 ): ResponsiveImageSources {
-  if (!isUnsplashUrl(rawUrl)) {
-    return { src: rawUrl, sizes, fallbackSrc: rawUrl };
+  const resolvedUrl = resolveMediaUrl(rawUrl) || rawUrl;
+  if (!isUnsplashUrl(resolvedUrl)) {
+    return { src: resolvedUrl, sizes, fallbackSrc: resolvedUrl };
   }
   return {
     src: buildUnsplashUrl(rawUrl, defaultWidth, { quality: 76 }),
