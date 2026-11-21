@@ -1,0 +1,1228 @@
+<!DOCTYPE html>
+<html lang="en" class="scroll-smooth">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Expert Assignment Guidance & Academic Support | university-tutors.com</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Playfair+Display:ital,wght@0,600;0,700;1,600&display=swap" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                        serif: ['Playfair Display', 'serif'],
+                    },
+                    colors: {
+                        brand: {
+                            50: '#FFF7ED',
+                            100: '#FFEDD5',
+                            200: '#FED7AA',
+                            300: '#FDBA74',
+                            400: '#FB923C',
+                            500: '#F97316',
+                            600: '#EA580C',
+                            700: '#C2410C',
+                            800: '#9A3412',
+                            900: '#7C2D12',
+                        }
+                    },
+                    keyframes: {
+                        marqueeRTL: {
+                            '0%': { transform: 'translateX(0%)' },
+                            '100%': { transform: 'translateX(-50%)' },
+                        }
+                    },
+                    animation: {
+                        'marquee-rtl': 'marqueeRTL 34s linear infinite',
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        /* Pause tutor profile marquee smoothly on hover or touch */
+        .tutor-marquee-wrapper:hover .tutor-marquee-track,
+        .tutor-marquee-wrapper:active .tutor-marquee-track {
+            animation-play-state: paused;
+        }
+    </style>
+</head>
+<body class="bg-white text-slate-800 font-sans antialiased selection:bg-orange-200 selection:text-orange-950">
+
+    <!-- Hero Section: White & Vibrant Orange Editorial Layout with Cutout Illustration -->
+    <section class="relative bg-white pt-8 pb-12 sm:pt-14 sm:pb-20 border-b border-orange-100">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="grid lg:grid-cols-12 gap-8 lg:gap-14 items-center">
+                <!-- Left Column: Full Editorial Introduction -->
+                <div class="lg:col-span-7 space-y-4 sm:space-y-5">
+                    <div class="inline-flex items-center space-x-2 px-3.5 py-1 rounded-full bg-orange-50 border border-orange-200 text-orange-700 text-xs font-semibold">
+                        <span class="w-2 h-2 rounded-full bg-orange-600 animate-pulse"></span>
+                        <span>university-tutors.com • One-on-One Academic Mentorship</span>
+                    </div>
+                    <h1 class="font-serif text-2xl sm:text-4xl lg:text-5xl font-bold text-slate-900 leading-tight">
+                        Expert Assignment Guidance &amp; <span class="text-orange-600">Academic Support</span>
+                    </h1>
+                    <p class="text-sm sm:text-base text-slate-700 leading-relaxed text-justify">
+                        Navigating complex university coursework, overlapping submission deadlines, and rigorous academic grading standards can feel overwhelming—especially when a single assignment carries a significant percentage of your final module grade. Whether you are staring at a blank document unsure how to structure a 4,000-word research paper, struggling to decode an intricate marking rubric, or trying to synthesize dozens of peer-reviewed journal articles into a coherent literature review, our Assignment Guidance service is designed to bridge the gap between confusion and clarity.
+                    </p>
+                    <p class="text-sm sm:text-base text-slate-700 leading-relaxed text-justify">
+                        We provide personalized, one-on-one academic mentorship that empowers you to understand your coursework deeply, organize your arguments with logical precision, and produce high-caliber scholarly work with complete confidence. Rather than offering short-sighted shortcuts that compromise your education, we equip you with the critical thinking frameworks, research methodologies, structural blueprints, and academic writing techniques needed to succeed independently across any university discipline.
+                    </p>
+                    <div class="pt-2 flex flex-col sm:flex-row flex-wrap gap-3">
+                        <button onclick="openModal('bookingModal')" class="w-full sm:w-auto px-6 py-3.5 text-sm font-bold text-white bg-orange-600 hover:bg-orange-700 rounded-xl shadow-md hover:shadow-lg transition text-center">
+                            Book Your Assignment Guidance Session
+                        </button>
+                        <button onclick="openModal('mentorModal')" class="w-full sm:w-auto px-5 py-3.5 text-sm font-semibold text-orange-700 bg-orange-50 hover:bg-orange-100 rounded-xl border border-orange-200 transition text-center">
+                            Browse Mentors by Subject
+                        </button>
+                        <a href="#stickyEnquiryCard" class="lg:hidden w-full sm:w-auto px-5 py-3 text-sm font-semibold text-slate-800 bg-white hover:bg-orange-50 rounded-xl border border-orange-200 transition text-center">
+                            Quick Enquiry &darr;
+                        </a>
+                    </div>
+                </div>
+
+                <!-- Right Column: Cutout Editorial Illustration 1 (Hero Section) -->
+                <div class="lg:col-span-5 flex items-center justify-center">
+                    <img
+                        src="https://firebasestorage.googleapis.com/v0/b/gen-lang-client-0303245370.firebasestorage.app/o/image-11-fotor-bg-remover-2026112112457.png?alt=media&token=aa8de304-cc01-419b-8fc1-d6f324494834"
+                        alt="Expert Assignment Guidance & Academic Support Illustration"
+                        class="w-full max-w-sm sm:max-w-lg lg:max-w-none lg:scale-110 h-auto object-contain drop-shadow-[0_14px_20px_rgba(27,36,50,0.15)]"
+                        onerror="this.onerror=null;this.src='https://placehold.co/440x540/FFF7ED/EA580C?text=Assignment+Clarity';"
+                    />
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Main Content + Sticky Right-Hand Quick Enquiry Sidebar Wrapper -->
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 sm:py-16">
+        <div class="grid lg:grid-cols-12 gap-8 lg:gap-12 items-start">
+
+            <!-- Left Column: Full Editorial Content (8 Columns on Desktop) -->
+            <main class="lg:col-span-8 space-y-12 sm:space-y-16">
+
+                <!-- Section 1: Why Academic Assignments Feel So Challenging -->
+                <section id="challenges" class="scroll-mt-10 space-y-6 pb-12 border-b border-orange-100">
+                    <div class="space-y-4 sm:space-y-5 text-slate-700 text-sm sm:text-base leading-relaxed text-justify">
+                        <span class="inline-block px-3 py-1 rounded-full bg-orange-100 text-orange-700 text-[11px] font-bold uppercase tracking-wider">
+                            Understanding Academic Expectations
+                        </span>
+                        <h2 class="font-serif text-xl sm:text-3xl font-bold text-slate-900 leading-snug text-left">
+                            Why Academic Assignments Feel So Challenging
+                        </h2>
+
+                        <p>
+                            Higher education requires a fundamentally different approach to learning and communication than secondary school or workplace writing. Many capable, hardworking students lose valuable marks not because they lack intelligence or effort, but because the unwritten rules of academic writing are rarely taught explicitly in lectures.
+                        </p>
+
+                        <ul class="space-y-3.5 pl-4 border-l-4 border-orange-500">
+                            <li>
+                                <strong class="text-slate-900 font-bold">Ambiguous Assignment Prompts:</strong> University briefs often rely on dense command words—such as <em>critically evaluate</em>, <em>problematize</em>, <em>synthesize</em>, or <em>juxtapose</em>—without explaining what those expectations look like in practice on the page.
+                            </li>
+                            <li>
+                                <strong class="text-slate-900 font-bold">Descriptive vs. Analytical Traps:</strong> One of the most common reasons essays receive average grades is summarizing what sources say rather than critically analyzing why those findings matter, how they conflict, and what limitations exist in their methodologies.
+                            </li>
+                            <li>
+                                <strong class="text-slate-900 font-bold">Information Overload:</strong> Access to massive academic databases can make it difficult to distinguish seminal foundational texts from peripheral studies, leading to unfocused reading and disorganized notes.
+                            </li>
+                            <li>
+                                <strong class="text-slate-900 font-bold">Strict Disciplinary Conventions:</strong> A persuasive argument in sociology looks vastly different from an empirical report in psychology, a case brief in law, or an executive strategy analysis in an MBA program.
+                            </li>
+                            <li>
+                                <strong class="text-slate-900 font-bold">Time Management Under Pressure:</strong> Balancing multiple modules, part-time work, internships, and personal responsibilities often leaves students rushing through the planning phase—the exact stage that determines the quality of the final submission.
+                            </li>
+                        </ul>
+
+                        <p class="font-medium text-slate-900 bg-orange-50/70 p-4 sm:p-5 rounded-2xl border-l-4 border-orange-600 shadow-sm">
+                            Our Assignment Guidance service directly resolves each of these bottlenecks through targeted, human-led academic coaching.
+                        </p>
+                    </div>
+
+                    <!-- Cutout Editorial Illustration 2 (Natural Cutout Edges) -->
+                    <div class="flex items-center justify-center pt-2">
+                        <img
+                            src="https://firebasestorage.googleapis.com/v0/b/gen-lang-client-0303245370.firebasestorage.app/o/Why%20Academic%20Assignments%20Feel%20So%20Challenging.png?alt=media&token=49260c70-de22-424e-bdc2-9514c31ae5b4"
+                            alt="Why Academic Assignments Feel So Challenging Illustration"
+                            class="w-full max-w-sm sm:max-w-xl h-auto object-contain drop-shadow-[0_14px_20px_rgba(27,36,50,0.15)]"
+                            onerror="this.onerror=null;this.src='https://placehold.co/440x500/FFF7ED/EA580C?text=Critical+Analysis';"
+                        />
+                    </div>
+                </section>
+
+                <!-- Section 2: How Our Assignment Guidance Works -->
+                <section id="process" class="scroll-mt-10 space-y-6 pb-12 border-b border-orange-100">
+                    <div class="space-y-4 sm:space-y-5 text-slate-700 text-sm sm:text-base leading-relaxed text-justify">
+                        <span class="inline-block px-3 py-1 rounded-full bg-orange-100 text-orange-700 text-[11px] font-bold uppercase tracking-wider">
+                            Step-by-Step Mentorship
+                        </span>
+                        <h2 class="font-serif text-xl sm:text-3xl font-bold text-slate-900 leading-snug text-left">
+                            How Our Assignment Guidance Works
+                        </h2>
+                        <p>
+                            Our structured, step-by-step mentorship process meets you wherever you are in your writing, research, or problem-solving journey—whether you have just downloaded the assignment brief or are refining a penultimate draft.
+                        </p>
+
+                        <div class="space-y-5 pt-1">
+                            <div>
+                                <h3 class="text-base sm:text-lg font-bold text-slate-900 flex items-center gap-2.5 mb-1.5 text-left">
+                                    <span class="w-7 h-7 rounded-full bg-orange-600 text-white text-xs font-bold flex items-center justify-center flex-shrink-0">1</span>
+                                    Upload Your Brief, Rubric, and Context
+                                </h3>
+                                <p class="pl-9">
+                                    Begin by submitting your assignment prompt, grading rubric, relevant lecture slides, reading lists, and any preliminary notes or drafts through our secure student portal. Sharing details about your degree level, target grade, and specific pain points allows us to understand your exact requirements from the outset.
+                                </p>
+                            </div>
+
+                            <div>
+                                <h3 class="text-base sm:text-lg font-bold text-slate-900 flex items-center gap-2.5 mb-1.5 text-left">
+                                    <span class="w-7 h-7 rounded-full bg-orange-600 text-white text-xs font-bold flex items-center justify-center flex-shrink-0">2</span>
+                                    Precision Matching With a Subject-Matter Mentor
+                                </h3>
+                                <p class="pl-9">
+                                    We pair you with an experienced academic advisor who holds postgraduate credentials (Master's or PhD) and teaching or grading experience in your specific field—spanning STEM, humanities, business, economics, social sciences, healthcare, and law.
+                                </p>
+                            </div>
+
+                            <div>
+                                <h3 class="text-base sm:text-lg font-bold text-slate-900 flex items-center gap-2.5 mb-1.5 text-left">
+                                    <span class="w-7 h-7 rounded-full bg-orange-600 text-white text-xs font-bold flex items-center justify-center flex-shrink-0">3</span>
+                                    Interactive Strategy &amp; Blueprinting Session
+                                </h3>
+                                <p class="pl-9">
+                                    During a live one-on-one video consultation or an in-depth annotated asynchronous review, your mentor dissects the assignment requirements alongside you. Together, you unpack the core research question, establish a defensible thesis statement or analytical framework, identify key literature themes, and map out a clear, word-count-allocated section-by-section outline.
+                                </p>
+                            </div>
+
+                            <div>
+                                <h3 class="text-base sm:text-lg font-bold text-slate-900 flex items-center gap-2.5 mb-1.5 text-left">
+                                    <span class="w-7 h-7 rounded-full bg-orange-600 text-white text-xs font-bold flex items-center justify-center flex-shrink-0">4</span>
+                                    Targeted Research &amp; Methodology Coaching
+                                </h3>
+                                <p class="pl-9">
+                                    If you are stuck finding credible sources or structuring an empirical investigation, your mentor demonstrates effective database search strategies, helps you evaluate source reliability, and guides you through selecting appropriate qualitative or quantitative frameworks.
+                                </p>
+                            </div>
+
+                            <div>
+                                <h3 class="text-base sm:text-lg font-bold text-slate-900 flex items-center gap-2.5 mb-1.5 text-left">
+                                    <span class="w-7 h-7 rounded-full bg-orange-600 text-white text-xs font-bold flex items-center justify-center flex-shrink-0">5</span>
+                                    Iterative Draft Feedback &amp; Skill Reinforcement
+                                </h3>
+                                <p class="pl-9">
+                                    As you write your assignment, submit milestones or complete drafts for comprehensive developmental feedback. Your mentor highlights areas to strengthen your critical analysis, improve paragraph-to-paragraph transitions, sharpen academic tone, refine data presentation, and ensure complete alignment with every criterion on your marking rubric.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Cutout Editorial Illustration 3 (Natural Cutout Edges) -->
+                    <div class="flex items-center justify-center pt-2">
+                        <img
+                            src="https://firebasestorage.googleapis.com/v0/b/gen-lang-client-0303245370.firebasestorage.app/o/How%20Our%20Assignment%20Guidance%20Works.png?alt=media&token=7262766e-c0b9-4fe7-b404-1331d67d1c89"
+                            alt="How Our Assignment Guidance Works Illustration"
+                            class="w-full max-w-sm sm:max-w-xl h-auto object-contain drop-shadow-[0_14px_20px_rgba(27,36,50,0.15)]"
+                            onerror="this.onerror=null;this.src='https://placehold.co/420x520/FFF7ED/EA580C?text=Mentorship+Workflow';"
+                        />
+                    </div>
+                </section>
+
+                <!-- Section 3: Comprehensive Coverage Across Academic Formats & Subject Disciplines -->
+                <section id="formats" class="scroll-mt-10 space-y-5 text-slate-700 text-sm sm:text-base leading-relaxed text-justify pb-12 border-b border-orange-100">
+                    <span class="inline-block px-3 py-1 rounded-full bg-orange-100 text-orange-700 text-[11px] font-bold uppercase tracking-wider">
+                        Coursework &amp; Disciplines
+                    </span>
+                    <h2 class="font-serif text-xl sm:text-3xl font-bold text-slate-900 leading-snug text-left">
+                        Comprehensive Coverage Across Academic Formats
+                    </h2>
+                    <p>
+                        University coursework takes many forms, and each deliverable demands its own specialized structure, evidence base, and rhetorical style. Our mentors provide tailored guidance across all major academic formats:
+                    </p>
+
+                    <div class="divide-y divide-orange-200/80 border-t border-b border-orange-200/80 my-6">
+                        <div class="py-4 sm:py-5">
+                            <h3 class="text-base sm:text-lg font-bold text-orange-700 mb-1.5 text-left">Research Papers &amp; Analytical Essays</h3>
+                            <p>
+                                From short 1,500-word argumentative essays to expansive 5,000-word term papers, we help you formulate original, nuanced thesis statements that directly answer the prompt. You will learn how to structure cohesive body paragraphs using proven academic frameworks (such as Claim-Evidence-Analysis-Link), integrate counterarguments effectively, and maintain an authoritative, objective scholarly voice throughout.
+                            </p>
+                        </div>
+
+                        <div class="py-4 sm:py-5">
+                            <h3 class="text-base sm:text-lg font-bold text-orange-700 mb-1.5 text-left">Literature Reviews &amp; Annotated Bibliographies</h3>
+                            <p>
+                                A strong literature review does far more than list summaries of individual studies. We coach you on how to map the broader scholarly conversation, group sources by shared themes or theoretical debates, identify gaps in existing research, and position your own inquiry within the academic landscape.
+                            </p>
+                        </div>
+
+                        <div class="py-4 sm:py-5">
+                            <h3 class="text-base sm:text-lg font-bold text-orange-700 mb-1.5 text-left">Business Case Studies &amp; Strategy Reports</h3>
+                            <p>
+                                Business and management assignments require bridging academic theory with practical commercial reality. Our mentors guide you in applying diagnostic frameworks—such as SWOT, PESTLE, Porter’s Five Forces, VRIO, and financial ratio analysis—to real-world organizational challenges, while formatting crisp executive summaries and actionable, evidence-backed recommendations.
+                            </p>
+                        </div>
+
+                        <div class="py-4 sm:py-5">
+                            <h3 class="text-base sm:text-lg font-bold text-orange-700 mb-1.5 text-left">Scientific Lab Reports &amp; Technical Documentation</h3>
+                            <p>
+                                Precision, reproducibility, and clarity define strong scientific communication. We assist you in structuring formal IMRaD (Introduction, Methods, Results, and Discussion) reports, articulating testable hypotheses, presenting statistical findings accurately without overstating conclusions, and explaining experimental limitations rigorously.
+                            </p>
+                        </div>
+
+                        <div class="py-4 sm:py-5">
+                            <h3 class="text-base sm:text-lg font-bold text-orange-700 mb-1.5 text-left">Reflective Journals &amp; Practice-Based Portfolios</h3>
+                            <p>
+                                Common in nursing, education, social work, and leadership programs, reflective assignments require balancing personal insight with academic literature. We show you how to apply established reflective models—such as Gibbs’ Reflective Cycle, Schön’s Reflection-in-Action, or Kolb’s Experiential Learning Cycle—so your reflections demonstrate genuine professional growth rather than casual storytelling.
+                            </p>
+                        </div>
+
+                        <div class="py-4 sm:py-5">
+                            <h3 class="text-base sm:text-lg font-bold text-orange-700 mb-1.5 text-left">Quantitative, Coding &amp; Problem-Solving Coursework</h3>
+                            <p>
+                                For technical modules in economics, statistics, data science, engineering, and computer science, our mentors walk you through problem-solving logic, model selection, algorithmic thinking, and code documentation. Rather than handing you answers, we help you debug your reasoning, interpret statistical outputs (such as regression tables or p-values), and explain technical results clearly in plain academic prose.
+                            </p>
+                        </div>
+
+                        <div class="py-4 sm:py-5">
+                            <h3 class="text-base sm:text-lg font-bold text-orange-700 mb-1.5 text-left">Presentations, Posters &amp; Capstone Proposals</h3>
+                            <p>
+                                Translating dense written research into visual or spoken formats is a distinct skill. We help you distill complex arguments into clean, scannable slide decks, design effective academic posters, craft persuasive speaker notes, and prepare confident responses for Q&amp;A panels or viva defenses.
+                            </p>
+                        </div>
+
+                        <div class="py-4 sm:py-5">
+                            <h3 class="text-base sm:text-lg font-bold text-orange-700 mb-1.5 text-left">Referencing, Citations &amp; Academic Formatting</h3>
+                            <p>
+                                Inconsistent citations cost easy marks and create accidental plagiarism risks. Our mentors help you master the exact mechanical rules of APA (7th ed.), MLA (9th ed.), Harvard, Chicago/Turabian, IEEE, Vancouver, and OSCOLA styles—covering in-text citations, secondary referencing, block quotations, tables, appendices, and reference lists.
+                            </p>
+                        </div>
+                    </div>
+
+                    <!-- Subject Disciplines We Support -->
+                    <div class="pt-2 space-y-4">
+                        <h3 class="font-serif text-lg sm:text-2xl font-bold text-slate-900 text-left">
+                            Subject Disciplines We Support
+                        </h3>
+                        <p>
+                            Because academic standards vary dramatically across faculties, we maintain a diverse network of specialists covering:
+                        </p>
+                        <ul class="space-y-3 pl-4 border-l-4 border-orange-600">
+                            <li>
+                                <strong class="text-slate-900">Business, Finance &amp; Economics:</strong> Corporate strategy, marketing analytics, micro/macroeconomics, accounting, supply chain management, and organizational behavior.
+                            </li>
+                            <li>
+                                <strong class="text-slate-900">Social Sciences &amp; Humanities:</strong> Psychology, sociology, political science, international relations, history, philosophy, literature, and media studies.
+                            </li>
+                            <li>
+                                <strong class="text-slate-900">STEM &amp; Computing:</strong> Computer science, data analytics, mathematics, statistics, biology, chemistry, environmental science, and mechanical/electrical engineering.
+                            </li>
+                            <li>
+                                <strong class="text-slate-900">Health &amp; Life Sciences:</strong> Nursing, public health, pharmacology, biomedical sciences, nutrition, and healthcare management.
+                            </li>
+                            <li>
+                                <strong class="text-slate-900">Law &amp; Public Policy:</strong> Constitutional law, contract and tort analysis, criminal justice, human rights, and policy evaluation briefs.
+                            </li>
+                        </ul>
+                    </div>
+                </section>
+
+                <!-- Section 4: Why Choose Structured Academic Mentorship & Academic Integrity -->
+                <section id="integrity" class="scroll-mt-10 space-y-10 pb-12 border-b border-orange-100">
+                    <div class="space-y-4 sm:space-y-5 text-slate-700 text-sm sm:text-base leading-relaxed text-justify">
+                        <span class="inline-block px-3 py-1 rounded-full bg-orange-100 text-orange-700 text-[11px] font-bold uppercase tracking-wider">
+                            Mentorship vs. Generic Tools
+                        </span>
+                        <h2 class="font-serif text-xl sm:text-3xl font-bold text-slate-900 leading-snug text-left">
+                            Why Choose Structured Academic Mentorship?
+                        </h2>
+                        <p>
+                            Students often turn to generic writing blogs, automated grammar tools, or unverified online forums when stuck on an assignment. While those resources offer surface-level tips, they cannot evaluate your specific argument against your professor's grading rubric.
+                        </p>
+
+                        <div class="overflow-x-auto rounded-2xl border border-orange-200 shadow-sm my-4 text-left">
+                            <table class="w-full text-left border-collapse text-xs sm:text-sm">
+                                <thead>
+                                    <tr class="bg-orange-600 text-white">
+                                        <th class="py-3 px-4 font-bold">Comparison Dimension</th>
+                                        <th class="py-3 px-4 font-semibold text-orange-100">Generic Online Guides &amp; Automated Tools</th>
+                                        <th class="py-3 px-4 font-bold bg-orange-700">Our One-on-One Assignment Guidance</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-orange-100 bg-white">
+                                    <tr>
+                                        <td class="py-3 px-4 font-bold text-slate-900">Alignment With Your Brief</td>
+                                        <td class="py-3 px-4 text-slate-600">Broad, generic advice disconnected from your module's learning outcomes</td>
+                                        <td class="py-3 px-4 text-slate-900 font-medium bg-orange-50/40">Tailored directly to your exact prompt, course level, and grading rubric</td>
+                                    </tr>
+                                    <tr>
+                                        <td class="py-3 px-4 font-bold text-slate-900">Depth of Feedback</td>
+                                        <td class="py-3 px-4 text-slate-600">Focuses on surface spelling, punctuation, and basic phrasing</td>
+                                        <td class="py-3 px-4 text-slate-900 font-medium bg-orange-50/40">Addresses thesis strength, logical flow, evidence quality, and critical depth</td>
+                                    </tr>
+                                    <tr>
+                                        <td class="py-3 px-4 font-bold text-slate-900">Disciplinary Accuracy</td>
+                                        <td class="py-3 px-4 text-slate-600">Treats all writing the same regardless of subject conventions</td>
+                                        <td class="py-3 px-4 text-slate-900 font-medium bg-orange-50/40">Delivered by mentors trained in your specific academic discipline</td>
+                                    </tr>
+                                    <tr>
+                                        <td class="py-3 px-4 font-bold text-slate-900">Long-Term Skill Transfer</td>
+                                        <td class="py-3 px-4 text-slate-600">Encourages passive reading or blind acceptance of automated edits</td>
+                                        <td class="py-3 px-4 text-slate-900 font-medium bg-orange-50/40">Active, Socratic coaching that builds lasting research and writing skills</td>
+                                    </tr>
+                                    <tr>
+                                        <td class="py-3 px-4 font-bold text-slate-900">Academic Integrity</td>
+                                        <td class="py-3 px-4 text-slate-600">High risk of unintentional plagiarism or inappropriate AI reliance</td>
+                                        <td class="py-3 px-4 text-slate-900 font-medium bg-orange-50/40">100% original work conceived, researched, and written entirely by you</td>
+                                    </tr>
+                                    <tr>
+                                        <td class="py-3 px-4 font-bold text-slate-900">Submission Confidence</td>
+                                        <td class="py-3 px-4 text-slate-600">Guesswork about whether your draft actually answers the question</td>
+                                        <td class="py-3 px-4 text-slate-900 font-medium bg-orange-50/40">Clear verification against every rubric criterion before you submit</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- Built on Uncompromising Academic Integrity -->
+                    <div class="space-y-6">
+                        <div class="space-y-4 sm:space-y-5 text-slate-700 text-sm sm:text-base leading-relaxed text-justify">
+                            <span class="inline-block px-3 py-1 rounded-full bg-orange-600 text-white text-[11px] font-bold uppercase tracking-wider">
+                                100% Honor-Code Compliant
+                            </span>
+                            <h2 class="font-serif text-xl sm:text-3xl font-bold text-slate-900 leading-snug text-left">
+                                Built on Uncompromising Academic Integrity
+                            </h2>
+
+                            <p>
+                                True academic success—and genuine career readiness—comes from mastering the material yourself. Our platform operates strictly as an educational coaching, tutoring, and mentorship service. We never write, ghostwrite, or complete assignments on behalf of students, nor do we supply pre-written essays, model answers for submission, or AI-generated coursework.
+                            </p>
+
+                            <p class="font-semibold text-slate-900">
+                                Instead, our mentors act as dedicated academic coaches and Socratic guides. During every interaction, we focus on:
+                            </p>
+
+                            <ul class="space-y-3 pl-4 border-l-4 border-orange-500">
+                                <li>
+                                    <strong class="text-slate-900">Unlocking Your Own Ideas:</strong> Asking targeted questions that help you clarify what you actually think about the topic and why your perspective is supported by evidence.
+                                </li>
+                                <li>
+                                    <strong class="text-slate-900">Diagnosing Structural &amp; Logical Gaps:</strong> Pointing out where an argument jumps too quickly to a conclusion, lacks peer-reviewed backing, or drifts away from the prompt.
+                                </li>
+                                <li>
+                                    <strong class="text-slate-900">Demonstrating Techniques on Sample Material:</strong> Showing you how to paraphrase properly, synthesize two conflicting studies, or interpret a dataset using illustrative examples so you can apply the technique yourself.
+                                </li>
+                                <li>
+                                    <strong class="text-slate-900">Teaching Self-Editing Mastery:</strong> Equipping you with practical checklists to revise your own drafts for clarity, conciseness, and scholarly tone.
+                                </li>
+                            </ul>
+
+                            <p class="text-slate-900 font-medium bg-orange-50 p-4 sm:p-5 rounded-2xl border border-orange-200">
+                                Every single word, calculation, and citation you submit to your university remains 100% authentically yours. This ethical framework ensures full compliance with institutional honor codes while developing analytical capabilities you will rely on throughout your degree and career.
+                            </p>
+                        </div>
+
+                        <!-- Cutout Editorial Illustration 4 (Natural Cutout Edges) -->
+                        <div class="flex items-center justify-center pt-2">
+                            <img
+                                src="https://firebasestorage.googleapis.com/v0/b/gen-lang-client-0303245370.firebasestorage.app/o/Built%20on%20Uncompromising%20Academic%20Integrity.png?alt=media&token=de7294ab-305c-4639-9d60-95971df876d1"
+                                alt="Built on Uncompromising Academic Integrity Illustration"
+                                class="w-full max-w-sm sm:max-w-xl h-auto object-contain drop-shadow-[0_14px_20px_rgba(27,36,50,0.15)]"
+                                onerror="this.onerror=null;this.src='https://placehold.co/440x520/FFF7ED/EA580C?text=Academic+Integrity';"
+                            />
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Section 5: Who Benefits Most & Flexible Support Packages -->
+                <section id="packages" class="scroll-mt-10 space-y-10 pb-12 border-b border-orange-100 text-slate-700 text-sm sm:text-base leading-relaxed text-justify">
+                    <div class="space-y-4 sm:space-y-5">
+                        <span class="inline-block px-3 py-1 rounded-full bg-orange-100 text-orange-700 text-[11px] font-bold uppercase tracking-wider">
+                            Tailored For Every Learner
+                        </span>
+                        <h2 class="font-serif text-xl sm:text-3xl font-bold text-slate-900 leading-snug text-left">
+                            Who Benefits Most From Assignment Guidance?
+                        </h2>
+                        <p>
+                            Our mentorship model adapts to the unique goals, backgrounds, and schedules of diverse learners across higher education:
+                        </p>
+
+                        <ul class="space-y-3 pl-4 border-l-4 border-orange-600">
+                            <li>
+                                <strong class="text-slate-900">First-Year Undergraduates:</strong> Navigating the steep transition from high school essays to university-level independent research, critical evaluation, and formal academic citation standards.
+                            </li>
+                            <li>
+                                <strong class="text-slate-900">International &amp; Multilingual Students:</strong> Refining academic register, sentence clarity, and structural cohesion so sophisticated ideas are never obscured by second-language phrasing barriers.
+                            </li>
+                            <li>
+                                <strong class="text-slate-900">Postgraduate, Master's &amp; MBA Candidates:</strong> Managing accelerated modules, complex quantitative case studies, systematic literature reviews, and high-stakes capstone projects alongside demanding schedules.
+                            </li>
+                            <li>
+                                <strong class="text-slate-900">Mature &amp; Returning Students:</strong> Returning to formal study after years in the workforce and quickly getting up to speed with modern digital libraries, referencing software, and contemporary academic conventions.
+                            </li>
+                            <li>
+                                <strong class="text-slate-900">High-Achieving Students Aiming for Top Marks:</strong> Moving from solid B-grade competence to distinction-level (First-Class / A+) critical originality, theoretical sophistication, and publication-grade clarity.
+                            </li>
+                        </ul>
+                    </div>
+
+                    <div class="space-y-4 sm:space-y-5 pt-6 border-t border-orange-200">
+                        <span class="inline-block px-3 py-1 rounded-full bg-orange-100 text-orange-700 text-[11px] font-bold uppercase tracking-wider">
+                            Flexible Engagement Models
+                        </span>
+                        <h2 class="font-serif text-xl sm:text-3xl font-bold text-slate-900 leading-snug text-left">
+                            Flexible Support Packages for Every Stage of Your Semester
+                        </h2>
+                        <p>
+                            Every assignment requires a different level of support. You can engage with our mentors in the way that best fits your timeline and learning style:
+                        </p>
+
+                        <ol class="space-y-4 list-decimal pl-5 marker:text-orange-600 marker:font-bold">
+                            <li class="pl-1">
+                                <strong class="text-slate-900">Rapid Brief &amp; Outline Kickstart (30–45 Minutes):</strong> Ideal right after receiving an assignment prompt. Walk away with a decoded rubric, a refined thesis or research question, a section-by-section word count plan, and a targeted reading strategy.
+                                <div class="mt-1.5 text-left">
+                                    <button onclick="selectPackage('Rapid Brief & Outline Kickstart (30–45 Minutes)')" class="text-xs sm:text-sm font-bold text-orange-600 hover:text-orange-700 underline">
+                                        Book Rapid Kickstart &rarr;
+                                    </button>
+                                </div>
+                            </li>
+                            <li class="pl-1">
+                                <strong class="text-slate-900">Comprehensive Draft Review (Asynchronous Annotated Feedback):</strong> Submit your completed or partial draft along with your rubric. Receive detailed margin comments dissecting argument clarity, evidence integration, structure, and referencing, accompanied by an actionable revision roadmap.
+                                <div class="mt-1.5 text-left">
+                                    <button onclick="selectPackage('Comprehensive Draft Review (Asynchronous Annotated Feedback)')" class="text-xs sm:text-sm font-bold text-orange-600 hover:text-orange-700 underline">
+                                        Request Draft Review &rarr;
+                                    </button>
+                                </div>
+                            </li>
+                            <li class="pl-1">
+                                <strong class="text-slate-900">Live Deep-Dive Coaching Session (60 Minutes):</strong> Real-time collaborative screen-sharing and discussion with your mentor to work through complex data, restructure challenging sections, or refine your analytical framework together.
+                                <div class="mt-1.5 text-left">
+                                    <button onclick="selectPackage('Live Deep-Dive Coaching Session (60 Minutes)')" class="text-xs sm:text-sm font-bold text-orange-600 hover:text-orange-700 underline">
+                                        Schedule Live Coaching &rarr;
+                                    </button>
+                                </div>
+                            </li>
+                            <li class="pl-1">
+                                <strong class="text-slate-900">End-to-End Milestone Mentorship:</strong> Multi-session guidance spanning your entire assignment lifecycle—from initial topic scoping and literature mapping through mid-draft review and final pre-submission rubric verification.
+                                <div class="mt-1.5 text-left">
+                                    <button onclick="selectPackage('End-to-End Milestone Mentorship')" class="text-xs sm:text-sm font-bold text-orange-600 hover:text-orange-700 underline">
+                                        Start Milestone Mentorship &rarr;
+                                    </button>
+                                </div>
+                            </li>
+                        </ol>
+                    </div>
+                </section>
+
+                <!-- Section 6: Frequently Asked Questions -->
+                <section id="faq" class="scroll-mt-10">
+                    <div class="mb-6">
+                        <span class="inline-block px-3 py-1 rounded-full bg-orange-100 text-orange-700 text-[11px] font-bold uppercase tracking-wider mb-2">
+                            Answers &amp; Policies
+                        </span>
+                        <h2 class="font-serif text-xl sm:text-3xl font-bold text-slate-900 text-left">
+                            Frequently Asked Questions
+                        </h2>
+                    </div>
+
+                    <div class="divide-y divide-orange-200 border-t border-b border-orange-200">
+                        <div class="py-4">
+                            <button onclick="toggleFaq(this)" class="w-full text-left flex justify-between items-center gap-3 focus:outline-none">
+                                <span class="font-bold text-slate-900 text-sm sm:text-base">How quickly can I get matched with a qualified mentor?</span>
+                                <svg class="w-5 h-5 text-orange-600 transform transition-transform duration-200 rotate-180 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+                            </button>
+                            <div class="mt-2.5 text-slate-700 text-xs sm:text-sm leading-relaxed text-justify">
+                                Most assignment guidance requests are matched with an appropriate subject-matter specialist within 2 to 4 hours. If you are working against an imminent deadline, our priority matching option connects you with an available mentor in under 60 minutes.
+                            </div>
+                        </div>
+
+                        <div class="py-4">
+                            <button onclick="toggleFaq(this)" class="w-full text-left flex justify-between items-center gap-3 focus:outline-none">
+                                <span class="font-bold text-slate-900 text-sm sm:text-base">Do I need to have started writing before booking a session?</span>
+                                <svg class="w-5 h-5 text-orange-600 transform transition-transform duration-200 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+                            </button>
+                            <div class="hidden mt-2.5 text-slate-700 text-xs sm:text-sm leading-relaxed text-justify">
+                                Not at all. In fact, many students achieve their best results by booking a session immediately after receiving their assignment prompt. Spending 30 minutes building a strong structural outline before you start drafting saves hours of stressful rewriting later.
+                            </div>
+                        </div>
+
+                        <div class="py-4">
+                            <button onclick="toggleFaq(this)" class="w-full text-left flex justify-between items-center gap-3 focus:outline-none">
+                                <span class="font-bold text-slate-900 text-sm sm:text-base">Will my mentor edit or rewrite my paragraphs for me?</span>
+                                <svg class="w-5 h-5 text-orange-600 transform transition-transform duration-200 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+                            </button>
+                            <div class="hidden mt-2.5 text-slate-700 text-xs sm:text-sm leading-relaxed text-justify">
+                                No. In accordance with our strict academic integrity policy, mentors do not rewrite or edit your text directly. Instead, they highlight specific sentences or paragraphs that need improvement, explain why they are unclear or unsupported, and show you strategies to revise them effectively yourself.
+                            </div>
+                        </div>
+
+                        <div class="py-4">
+                            <button onclick="toggleFaq(this)" class="w-full text-left flex justify-between items-center gap-3 focus:outline-none">
+                                <span class="font-bold text-slate-900 text-sm sm:text-base">What materials should I upload when submitting a request?</span>
+                                <svg class="w-5 h-5 text-orange-600 transform transition-transform duration-200 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+                            </button>
+                            <div class="hidden mt-2.5 text-slate-700 text-xs sm:text-sm leading-relaxed text-justify">
+                                For the most productive session, upload your official assignment brief, the grading rubric or marking criteria, any relevant lecture notes or core readings, and whatever outline, notes, or draft pages you have produced so far.
+                            </div>
+                        </div>
+
+                        <div class="py-4">
+                            <button onclick="toggleFaq(this)" class="w-full text-left flex justify-between items-center gap-3 focus:outline-none">
+                                <span class="font-bold text-slate-900 text-sm sm:text-base">Can you help with group projects as well as individual assignments?</span>
+                                <svg class="w-5 h-5 text-orange-600 transform transition-transform duration-200 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+                            </button>
+                            <div class="hidden mt-2.5 text-slate-700 text-xs sm:text-sm leading-relaxed text-justify">
+                                Yes. Group members can book a joint strategy session to divide responsibilities logically, establish a unified structural outline, align analytical frameworks across sections, and ensure consistent academic tone throughout the combined submission.
+                            </div>
+                        </div>
+
+                        <div class="py-4">
+                            <button onclick="toggleFaq(this)" class="w-full text-left flex justify-between items-center gap-3 focus:outline-none">
+                                <span class="font-bold text-slate-900 text-sm sm:text-base">Is my coursework kept confidential?</span>
+                                <svg class="w-5 h-5 text-orange-600 transform transition-transform duration-200 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+                            </button>
+                            <div class="hidden mt-2.5 text-slate-700 text-xs sm:text-sm leading-relaxed text-justify">
+                                Absolutely. All uploaded briefs, drafts, and session discussions are encrypted, strictly confidential, and never shared with third parties or stored in public databases.
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+            </main>
+
+            <!-- Right Column: Sticky Quick Enquiry Form Sidebar (Scrolls With Page) -->
+            <aside id="stickyEnquiryCard" class="lg:col-span-4 lg:sticky lg:top-8 scroll-mt-8">
+                <div class="bg-white rounded-3xl shadow-xl border-2 border-orange-200 overflow-hidden">
+                    <!-- Orange Header Banner -->
+                    <div class="bg-orange-600 px-5 py-4 text-white">
+                        <div class="flex items-center justify-between gap-2 mb-1">
+                            <span class="text-[11px] font-bold uppercase tracking-wider text-orange-100">Fast Mentor Match</span>
+                            <span class="px-2.5 py-0.5 rounded-full bg-white/20 text-white text-[11px] font-semibold">2–4 hr reply</span>
+                        </div>
+                        <h3 class="font-serif text-lg sm:text-xl font-bold leading-snug">
+                            Quick Assignment Enquiry
+                        </h3>
+                        <p class="text-orange-100 text-xs mt-1 text-justify">
+                            Share your brief details and get matched with a PhD/Master's specialist.
+                        </p>
+                    </div>
+
+                    <!-- Form Body -->
+                    <div class="p-5">
+                        <form id="quickEnquiryForm" onsubmit="submitQuickEnquiry(event)" class="space-y-3">
+                            <div>
+                                <label for="eqName" class="block text-xs font-semibold text-slate-700 mb-1">Your Name *</label>
+                                <input id="eqName" type="text" required placeholder="Alex Morgan" class="w-full rounded-xl border border-slate-300 px-3.5 py-2 text-sm focus:ring-2 focus:ring-orange-600 focus:border-orange-600 focus:outline-none">
+                            </div>
+
+                            <div>
+                                <label for="eqEmail" class="block text-xs font-semibold text-slate-700 mb-1">University Email *</label>
+                                <input id="eqEmail" type="email" required placeholder="a.morgan@university.edu" class="w-full rounded-xl border border-slate-300 px-3.5 py-2 text-sm focus:ring-2 focus:ring-orange-600 focus:border-orange-600 focus:outline-none">
+                            </div>
+
+                            <div>
+                                <label for="eqFormat" class="block text-xs font-semibold text-slate-700 mb-1">Assignment Format</label>
+                                <select id="eqFormat" class="w-full rounded-xl border border-slate-300 px-3.5 py-2 text-sm bg-white focus:ring-2 focus:ring-orange-600 focus:border-orange-600 focus:outline-none">
+                                    <option>Research Paper / Analytical Essay</option>
+                                    <option>Literature Review / Annotated Bibliography</option>
+                                    <option>Business Case Study / Strategy Report</option>
+                                    <option>Scientific Lab Report (IMRaD)</option>
+                                    <option>Reflective Journal / Portfolio</option>
+                                    <option>Quantitative / Coding Coursework</option>
+                                    <option>Presentation / Capstone Proposal</option>
+                                </select>
+                            </div>
+
+                            <div>
+                                <label for="eqDeadline" class="block text-xs font-semibold text-slate-700 mb-1">Submission Deadline *</label>
+                                <input id="eqDeadline" type="text" required placeholder="e.g., Next Friday / In 4 days" class="w-full rounded-xl border border-slate-300 px-3.5 py-2 text-sm focus:ring-2 focus:ring-orange-600 focus:border-orange-600 focus:outline-none">
+                            </div>
+
+                            <div>
+                                <label for="eqNote" class="block text-xs font-semibold text-slate-700 mb-1">Brief Topic &amp; Word Count *</label>
+                                <textarea id="eqNote" rows="3" required placeholder="Module subject, word count, or where you need guidance..." class="w-full rounded-xl border border-slate-300 px-3.5 py-2 text-sm focus:ring-2 focus:ring-orange-600 focus:border-orange-600 focus:outline-none"></textarea>
+                            </div>
+
+                            <button type="submit" class="w-full py-3 bg-orange-600 hover:bg-orange-700 text-white font-bold rounded-xl shadow-md hover:shadow-lg transition text-sm">
+                                Send Quick Enquiry &rarr;
+                            </button>
+
+                            <div class="pt-2 border-t border-orange-100 flex items-center justify-between text-[11px] text-slate-500">
+                                <span>&#128274; 100% Confidential</span>
+                                <span>Honor-Code Compliant</span>
+                            </div>
+                        </form>
+
+                        <div id="quickEnquirySuccess" class="hidden text-center py-5 space-y-2.5">
+                            <div class="w-11 h-11 bg-orange-100 text-orange-600 rounded-full flex items-center justify-center mx-auto text-xl font-bold">&#10003;</div>
+                            <h4 class="text-base font-bold text-slate-900">Enquiry Received!</h4>
+                            <p class="text-xs text-slate-600 leading-relaxed text-justify">
+                                Thank you! A subject-matter coordinator will reply within 2–4 hours with available mentors for your deadline.
+                            </p>
+                            <button type="button" onclick="resetQuickEnquiry()" class="mt-2 text-xs font-bold text-orange-600 hover:text-orange-700 underline">
+                                Send another enquiry
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </aside>
+
+        </div>
+    </div>
+
+    <!-- Continuous Right-to-Left Sliding Tutors Profile Showcase -->
+    <section id="tutorShowcase" class="py-10 sm:py-14 bg-orange-50/60 border-t border-orange-100 overflow-hidden">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mb-6 sm:mb-8">
+            <div class="flex flex-col sm:flex-row sm:items-end justify-between gap-3">
+                <div>
+                    <span class="inline-block px-3 py-1 rounded-full bg-orange-100 text-orange-700 text-[11px] font-bold uppercase tracking-wider mb-2">
+                        Verified Postgraduate Mentors
+                    </span>
+                    <h2 class="font-serif text-xl sm:text-3xl font-bold text-slate-900">
+                        Meet Our Subject-Matter Tutors
+                    </h2>
+                </div>
+                <button onclick="openModal('mentorModal')" class="self-start sm:self-auto text-xs sm:text-sm font-bold text-orange-600 hover:text-orange-700 underline">
+                    View All Faculty Mentors &rarr;
+                </button>
+            </div>
+        </div>
+
+        <!-- Seamless Right-to-Left Infinite Marquee Track -->
+        <div class="tutor-marquee-wrapper relative w-full overflow-hidden">
+            <div class="tutor-marquee-track flex w-max gap-4 sm:gap-5 px-4 animate-marquee-rtl">
+
+                <!-- Tutor Card 1 -->
+                <article class="w-72 sm:w-80 flex-shrink-0 bg-white rounded-2xl border border-orange-200/80 p-5 shadow-sm hover:shadow-md transition flex flex-col justify-between">
+                    <div>
+                        <div class="flex items-center gap-3 mb-3">
+                            <img src="https://placehold.co/96x96/EA580C/FFFFFF?text=EV" alt="Dr. Eleanor Vance" class="w-12 h-12 rounded-full object-cover border-2 border-orange-200 flex-shrink-0">
+                            <div>
+                                <span class="text-[10px] font-bold uppercase tracking-wider text-orange-600 block">Business &amp; Finance</span>
+                                <h3 class="font-bold text-slate-900 text-sm sm:text-base leading-snug">Dr. Eleanor Vance, PhD</h3>
+                                <span class="text-[11px] text-slate-500">9+ Yrs University Grading</span>
+                            </div>
+                        </div>
+                        <p class="text-xs text-slate-600 leading-relaxed text-justify mb-3">
+                            Guides MBA &amp; finance students through corporate strategy case studies, VRIO/PESTLE frameworks, and ratio analysis.
+                        </p>
+                    </div>
+                    <div class="pt-3 border-t border-orange-100 flex items-center justify-between">
+                        <span class="text-[11px] font-semibold text-slate-700">&#9733; 4.98 (140+ sessions)</span>
+                        <button onclick="bookWithTutor('Business, Finance & Economics')" class="text-xs font-bold text-orange-600 hover:text-orange-700">
+                            Match Mentor &rarr;
+                        </button>
+                    </div>
+                </article>
+
+                <!-- Tutor Card 2 -->
+                <article class="w-72 sm:w-80 flex-shrink-0 bg-white rounded-2xl border border-orange-200/80 p-5 shadow-sm hover:shadow-md transition flex flex-col justify-between">
+                    <div>
+                        <div class="flex items-center gap-3 mb-3">
+                            <img src="https://placehold.co/96x96/1E293B/FFFFFF?text=MS" alt="Dr. Marcus Sterling" class="w-12 h-12 rounded-full object-cover border-2 border-orange-200 flex-shrink-0">
+                            <div>
+                                <span class="text-[10px] font-bold uppercase tracking-wider text-orange-600 block">Humanities &amp; Politics</span>
+                                <h3 class="font-bold text-slate-900 text-sm sm:text-base leading-snug">Dr. Marcus Sterling, PhD</h3>
+                                <span class="text-[11px] text-slate-500">11+ Yrs Seminar Lecturer</span>
+                            </div>
+                        </div>
+                        <p class="text-xs text-slate-600 leading-relaxed text-justify mb-3">
+                            Specializes in thesis construction, thematic literature reviews, and critical theory synthesis for essays up to 6,000 words.
+                        </p>
+                    </div>
+                    <div class="pt-3 border-t border-orange-100 flex items-center justify-between">
+                        <span class="text-[11px] font-semibold text-slate-700">&#9733; 4.99 (195+ sessions)</span>
+                        <button onclick="bookWithTutor('Social Sciences & Humanities')" class="text-xs font-bold text-orange-600 hover:text-orange-700">
+                            Match Mentor &rarr;
+                        </button>
+                    </div>
+                </article>
+
+                <!-- Tutor Card 3 -->
+                <article class="w-72 sm:w-80 flex-shrink-0 bg-white rounded-2xl border border-orange-200/80 p-5 shadow-sm hover:shadow-md transition flex flex-col justify-between">
+                    <div>
+                        <div class="flex items-center gap-3 mb-3">
+                            <img src="https://placehold.co/96x96/C2410C/FFFFFF?text=PN" alt="Prof. Priya Nair" class="w-12 h-12 rounded-full object-cover border-2 border-orange-200 flex-shrink-0">
+                            <div>
+                                <span class="text-[10px] font-bold uppercase tracking-wider text-orange-600 block">STEM &amp; Data Science</span>
+                                <h3 class="font-bold text-slate-900 text-sm sm:text-base leading-snug">Prof. Priya Nair, MSc, PhD</h3>
+                                <span class="text-[11px] text-slate-500">8+ Yrs Quantitative Advisor</span>
+                            </div>
+                        </div>
+                        <p class="text-xs text-slate-600 leading-relaxed text-justify mb-3">
+                            Coaches statistical interpretation, Python/R problem-solving logic, formal IMRaD lab reports, and IEEE citations.
+                        </p>
+                    </div>
+                    <div class="pt-3 border-t border-orange-100 flex items-center justify-between">
+                        <span class="text-[11px] font-semibold text-slate-700">&#9733; 4.97 (160+ sessions)</span>
+                        <button onclick="bookWithTutor('STEM & Computing')" class="text-xs font-bold text-orange-600 hover:text-orange-700">
+                            Match Mentor &rarr;
+                        </button>
+                    </div>
+                </article>
+
+                <!-- Tutor Card 4 -->
+                <article class="w-72 sm:w-80 flex-shrink-0 bg-white rounded-2xl border border-orange-200/80 p-5 shadow-sm hover:shadow-md transition flex flex-col justify-between">
+                    <div>
+                        <div class="flex items-center gap-3 mb-3">
+                            <img src="https://placehold.co/96x96/EA580C/FFFFFF?text=HL" alt="Dr. Hannah Lindqvist" class="w-12 h-12 rounded-full object-cover border-2 border-orange-200 flex-shrink-0">
+                            <div>
+                                <span class="text-[10px] font-bold uppercase tracking-wider text-orange-600 block">Health &amp; Nursing</span>
+                                <h3 class="font-bold text-slate-900 text-sm sm:text-base leading-snug">Dr. Hannah Lindqvist, PhD</h3>
+                                <span class="text-[11px] text-slate-500">10+ Yrs Clinical Educator</span>
+                            </div>
+                        </div>
+                        <p class="text-xs text-slate-600 leading-relaxed text-justify mb-3">
+                            Mentors nursing &amp; public health students on Gibbs/Kolb reflective portfolios, systematic reviews, and APA 7th style.
+                        </p>
+                    </div>
+                    <div class="pt-3 border-t border-orange-100 flex items-center justify-between">
+                        <span class="text-[11px] font-semibold text-slate-700">&#9733; 4.99 (175+ sessions)</span>
+                        <button onclick="bookWithTutor('Health & Life Sciences')" class="text-xs font-bold text-orange-600 hover:text-orange-700">
+                            Match Mentor &rarr;
+                        </button>
+                    </div>
+                </article>
+
+                <!-- Tutor Card 5 -->
+                <article class="w-72 sm:w-80 flex-shrink-0 bg-white rounded-2xl border border-orange-200/80 p-5 shadow-sm hover:shadow-md transition flex flex-col justify-between">
+                    <div>
+                        <div class="flex items-center gap-3 mb-3">
+                            <img src="https://placehold.co/96x96/1E293B/FFFFFF?text=DA" alt="Dr. David Alverez" class="w-12 h-12 rounded-full object-cover border-2 border-orange-200 flex-shrink-0">
+                            <div>
+                                <span class="text-[10px] font-bold uppercase tracking-wider text-orange-600 block">Law &amp; Public Policy</span>
+                                <h3 class="font-bold text-slate-900 text-sm sm:text-base leading-snug">Dr. David Alverez, LLM, PhD</h3>
+                                <span class="text-[11px] text-slate-500">12+ Yrs Law Faculty Tutor</span>
+                            </div>
+                        </div>
+                        <p class="text-xs text-slate-600 leading-relaxed text-justify mb-3">
+                            Helps students structure IRAC legal problem questions, statutory interpretation briefs, and OSCOLA referencing.
+                        </p>
+                    </div>
+                    <div class="pt-3 border-t border-orange-100 flex items-center justify-between">
+                        <span class="text-[11px] font-semibold text-slate-700">&#9733; 4.98 (130+ sessions)</span>
+                        <button onclick="bookWithTutor('Law & Public Policy')" class="text-xs font-bold text-orange-600 hover:text-orange-700">
+                            Match Mentor &rarr;
+                        </button>
+                    </div>
+                </article>
+
+                <!-- Duplicate Set for Seamless Infinite Right-to-Left Loop -->
+                <article aria-hidden="true" class="w-72 sm:w-80 flex-shrink-0 bg-white rounded-2xl border border-orange-200/80 p-5 shadow-sm hover:shadow-md transition flex flex-col justify-between">
+                    <div>
+                        <div class="flex items-center gap-3 mb-3">
+                            <img src="https://placehold.co/96x96/EA580C/FFFFFF?text=EV" alt="" class="w-12 h-12 rounded-full object-cover border-2 border-orange-200 flex-shrink-0">
+                            <div>
+                                <span class="text-[10px] font-bold uppercase tracking-wider text-orange-600 block">Business &amp; Finance</span>
+                                <h3 class="font-bold text-slate-900 text-sm sm:text-base leading-snug">Dr. Eleanor Vance, PhD</h3>
+                                <span class="text-[11px] text-slate-500">9+ Yrs University Grading</span>
+                            </div>
+                        </div>
+                        <p class="text-xs text-slate-600 leading-relaxed text-justify mb-3">
+                            Guides MBA &amp; finance students through corporate strategy case studies, VRIO/PESTLE frameworks, and ratio analysis.
+                        </p>
+                    </div>
+                    <div class="pt-3 border-t border-orange-100 flex items-center justify-between">
+                        <span class="text-[11px] font-semibold text-slate-700">&#9733; 4.98 (140+ sessions)</span>
+                        <button onclick="bookWithTutor('Business, Finance & Economics')" class="text-xs font-bold text-orange-600 hover:text-orange-700">
+                            Match Mentor &rarr;
+                        </button>
+                    </div>
+                </article>
+
+                <article aria-hidden="true" class="w-72 sm:w-80 flex-shrink-0 bg-white rounded-2xl border border-orange-200/80 p-5 shadow-sm hover:shadow-md transition flex flex-col justify-between">
+                    <div>
+                        <div class="flex items-center gap-3 mb-3">
+                            <img src="https://placehold.co/96x96/1E293B/FFFFFF?text=MS" alt="" class="w-12 h-12 rounded-full object-cover border-2 border-orange-200 flex-shrink-0">
+                            <div>
+                                <span class="text-[10px] font-bold uppercase tracking-wider text-orange-600 block">Humanities &amp; Politics</span>
+                                <h3 class="font-bold text-slate-900 text-sm sm:text-base leading-snug">Dr. Marcus Sterling, PhD</h3>
+                                <span class="text-[11px] text-slate-500">11+ Yrs Seminar Lecturer</span>
+                            </div>
+                        </div>
+                        <p class="text-xs text-slate-600 leading-relaxed text-justify mb-3">
+                            Specializes in thesis construction, thematic literature reviews, and critical theory synthesis for essays up to 6,000 words.
+                        </p>
+                    </div>
+                    <div class="pt-3 border-t border-orange-100 flex items-center justify-between">
+                        <span class="text-[11px] font-semibold text-slate-700">&#9733; 4.99 (195+ sessions)</span>
+                        <button onclick="bookWithTutor('Social Sciences & Humanities')" class="text-xs font-bold text-orange-600 hover:text-orange-700">
+                            Match Mentor &rarr;
+                        </button>
+                    </div>
+                </article>
+
+                <article aria-hidden="true" class="w-72 sm:w-80 flex-shrink-0 bg-white rounded-2xl border border-orange-200/80 p-5 shadow-sm hover:shadow-md transition flex flex-col justify-between">
+                    <div>
+                        <div class="flex items-center gap-3 mb-3">
+                            <img src="https://placehold.co/96x96/C2410C/FFFFFF?text=PN" alt="" class="w-12 h-12 rounded-full object-cover border-2 border-orange-200 flex-shrink-0">
+                            <div>
+                                <span class="text-[10px] font-bold uppercase tracking-wider text-orange-600 block">STEM &amp; Data Science</span>
+                                <h3 class="font-bold text-slate-900 text-sm sm:text-base leading-snug">Prof. Priya Nair, MSc, PhD</h3>
+                                <span class="text-[11px] text-slate-500">8+ Yrs Quantitative Advisor</span>
+                            </div>
+                        </div>
+                        <p class="text-xs text-slate-600 leading-relaxed text-justify mb-3">
+                            Coaches statistical interpretation, Python/R problem-solving logic, formal IMRaD lab reports, and IEEE citations.
+                        </p>
+                    </div>
+                    <div class="pt-3 border-t border-orange-100 flex items-center justify-between">
+                        <span class="text-[11px] font-semibold text-slate-700">&#9733; 4.97 (160+ sessions)</span>
+                        <button onclick="bookWithTutor('STEM & Computing')" class="text-xs font-bold text-orange-600 hover:text-orange-700">
+                            Match Mentor &rarr;
+                        </button>
+                    </div>
+                </article>
+
+                <article aria-hidden="true" class="w-72 sm:w-80 flex-shrink-0 bg-white rounded-2xl border border-orange-200/80 p-5 shadow-sm hover:shadow-md transition flex flex-col justify-between">
+                    <div>
+                        <div class="flex items-center gap-3 mb-3">
+                            <img src="https://placehold.co/96x96/EA580C/FFFFFF?text=HL" alt="" class="w-12 h-12 rounded-full object-cover border-2 border-orange-200 flex-shrink-0">
+                            <div>
+                                <span class="text-[10px] font-bold uppercase tracking-wider text-orange-600 block">Health &amp; Nursing</span>
+                                <h3 class="font-bold text-slate-900 text-sm sm:text-base leading-snug">Dr. Hannah Lindqvist, PhD</h3>
+                                <span class="text-[11px] text-slate-500">10+ Yrs Clinical Educator</span>
+                            </div>
+                        </div>
+                        <p class="text-xs text-slate-600 leading-relaxed text-justify mb-3">
+                            Mentors nursing &amp; public health students on Gibbs/Kolb reflective portfolios, systematic reviews, and APA 7th style.
+                        </p>
+                    </div>
+                    <div class="pt-3 border-t border-orange-100 flex items-center justify-between">
+                        <span class="text-[11px] font-semibold text-slate-700">&#9733; 4.99 (175+ sessions)</span>
+                        <button onclick="bookWithTutor('Health & Life Sciences')" class="text-xs font-bold text-orange-600 hover:text-orange-700">
+                            Match Mentor &rarr;
+                        </button>
+                    </div>
+                </article>
+
+                <article aria-hidden="true" class="w-72 sm:w-80 flex-shrink-0 bg-white rounded-2xl border border-orange-200/80 p-5 shadow-sm hover:shadow-md transition flex flex-col justify-between">
+                    <div>
+                        <div class="flex items-center gap-3 mb-3">
+                            <img src="https://placehold.co/96x96/1E293B/FFFFFF?text=DA" alt="" class="w-12 h-12 rounded-full object-cover border-2 border-orange-200 flex-shrink-0">
+                            <div>
+                                <span class="text-[10px] font-bold uppercase tracking-wider text-orange-600 block">Law &amp; Public Policy</span>
+                                <h3 class="font-bold text-slate-900 text-sm sm:text-base leading-snug">Dr. David Alverez, LLM, PhD</h3>
+                                <span class="text-[11px] text-slate-500">12+ Yrs Law Faculty Tutor</span>
+                            </div>
+                        </div>
+                        <p class="text-xs text-slate-600 leading-relaxed text-justify mb-3">
+                            Helps students structure IRAC legal problem questions, statutory interpretation briefs, and OSCOLA referencing.
+                        </p>
+                    </div>
+                    <div class="pt-3 border-t border-orange-100 flex items-center justify-between">
+                        <span class="text-[11px] font-semibold text-slate-700">&#9733; 4.98 (130+ sessions)</span>
+                        <button onclick="bookWithTutor('Law & Public Policy')" class="text-xs font-bold text-orange-600 hover:text-orange-700">
+                            Match Mentor &rarr;
+                        </button>
+                    </div>
+                </article>
+
+            </div>
+        </div>
+    </section>
+
+    <!-- Final Call-to-Action Section: Vibrant Orange & Crisp White -->
+    <section id="finalActionSection" class="py-10 sm:py-16 lg:py-20 bg-orange-600 text-white">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="grid lg:grid-cols-12 gap-8 lg:gap-12 items-center">
+                <div class="lg:col-span-7 space-y-4 sm:space-y-5">
+                    <span class="inline-block px-3 py-1 rounded-full bg-white/15 border border-white/25 text-orange-50 text-[11px] font-bold uppercase tracking-wider">
+                        Ready To Start Your Draft?
+                    </span>
+                    <h2 class="font-serif text-xl sm:text-3xl lg:text-4xl font-bold leading-snug text-left">
+                        Turn Your Next Assignment Brief Into a Clear Plan of Action
+                    </h2>
+                    <p class="text-orange-50 text-sm sm:text-base leading-relaxed text-justify">
+                        You do not have to stare at a complex prompt in isolation or hope your structure hits the mark on submission day. With the right academic mentorship, every assignment becomes an opportunity to sharpen your thinking, master your subject, and elevate your academic performance.
+                    </p>
+                    <p class="text-white font-semibold text-sm sm:text-base leading-relaxed text-justify">
+                        Upload your assignment brief and grading rubric today to connect with a dedicated subject-matter mentor—and approach your next deadline with clarity, structure, and confidence.
+                    </p>
+
+                    <!-- Clear Plan of Action 3-Step Strip -->
+                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-1">
+                        <div class="bg-white/15 backdrop-blur-sm border border-white/30 rounded-2xl p-3.5">
+                            <span class="block text-[11px] font-bold uppercase tracking-wider text-orange-100">Step 01</span>
+                            <span class="block font-bold text-white text-xs sm:text-sm mt-0.5">Share Brief &amp; Rubric</span>
+                            <span class="block text-[11px] text-orange-100 mt-0.5">Upload prompt &amp; target grade</span>
+                        </div>
+                        <div class="bg-white/15 backdrop-blur-sm border border-white/30 rounded-2xl p-3.5">
+                            <span class="block text-[11px] font-bold uppercase tracking-wider text-orange-100">Step 02</span>
+                            <span class="block font-bold text-white text-xs sm:text-sm mt-0.5">Build Thesis Blueprint</span>
+                            <span class="block text-[11px] text-orange-100 mt-0.5">Section plan &amp; key literature</span>
+                        </div>
+                        <div class="bg-white/15 backdrop-blur-sm border border-white/30 rounded-2xl p-3.5">
+                            <span class="block text-[11px] font-bold uppercase tracking-wider text-orange-100">Step 03</span>
+                            <span class="block font-bold text-white text-xs sm:text-sm mt-0.5">Submit With Confidence</span>
+                            <span class="block text-[11px] text-orange-100 mt-0.5">Verified against every criterion</span>
+                        </div>
+                    </div>
+
+                    <div class="pt-2 flex flex-col sm:flex-row flex-wrap gap-3">
+                        <button onclick="openModal('bookingModal')" class="w-full sm:w-auto px-6 py-3.5 bg-white hover:bg-orange-50 text-orange-700 font-bold rounded-xl shadow-lg transition text-sm text-center">
+                            Book Your Assignment Guidance Session
+                        </button>
+                        <button onclick="openModal('mentorModal')" class="w-full sm:w-auto px-5 py-3.5 bg-orange-700 hover:bg-orange-800 text-white font-semibold rounded-xl border border-orange-400 transition text-sm text-center">
+                            Browse Mentors by Subject
+                        </button>
+                        <button onclick="openModal('sampleModal')" class="w-full sm:w-auto px-5 py-3.5 bg-transparent hover:bg-orange-700/60 text-white font-semibold rounded-xl border border-white/60 transition text-sm text-center">
+                            View Sample Feedback
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Right Column: Transparent PNG Cutout Illustration (Brief-to-Action-Plan Visual) -->
+                <div class="lg:col-span-5 flex items-center justify-center pt-2 lg:pt-0">
+                    <img
+                        src="https://firebasestorage.googleapis.com/v0/b/gen-lang-client-0303245370.firebasestorage.app/o/Next%20Assignment%20Brief.png?alt=media&token=33c89ce2-f1dc-4473-83e3-ebd622af8dbf"
+                        alt="Turn Your Next Assignment Brief Into a Clear Plan of Action"
+                        class="w-full max-w-xs sm:max-w-lg lg:max-w-none lg:scale-125 lg:translate-x-4 h-auto object-contain drop-shadow-[0_18px_28px_rgba(0,0,0,0.28)]"
+                        onerror="this.onerror=null;this.src='https://placehold.co/420x480/EA580C/FFFFFF?text=Submission+Confidence';"
+                    />
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- MODAL 1: Book Assignment Guidance Session -->
+    <div id="bookingModal" class="fixed inset-0 z-50 hidden bg-slate-950/70 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
+        <div class="bg-white rounded-2xl max-w-xl w-full p-6 sm:p-8 shadow-2xl border border-orange-100 relative my-8">
+            <button onclick="closeModal('bookingModal')" class="absolute top-5 right-5 text-slate-400 hover:text-orange-600 p-1">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+            </button>
+
+            <span class="inline-block px-3 py-1 bg-orange-100 text-orange-700 text-xs font-bold rounded-full mb-2">Secure Student Portal</span>
+            <h3 class="font-serif text-2xl font-bold text-slate-900 mb-1">Book Your Assignment Guidance Session</h3>
+            <p class="text-slate-600 text-sm mb-6">Submit your brief context to be matched with a Master's or PhD subject mentor within 2–4 hours.</p>
+
+            <form id="bookingForm" onsubmit="submitBooking(event)" class="space-y-4">
+                <div class="grid sm:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 mb-1">Your Name *</label>
+                        <input type="text" required placeholder="Alex Morgan" class="w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm focus:ring-2 focus:ring-orange-600 focus:outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 mb-1">University Email *</label>
+                        <input type="email" required placeholder="a.morgan@university.edu" class="w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm focus:ring-2 focus:ring-orange-600 focus:outline-none">
+                    </div>
+                </div>
+
+                <div class="grid sm:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 mb-1">Subject Discipline</label>
+                        <select id="modalDiscipline" class="w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm focus:ring-2 focus:ring-orange-600 focus:outline-none">
+                            <option>Business, Finance &amp; Economics</option>
+                            <option>Social Sciences &amp; Humanities</option>
+                            <option>STEM &amp; Computing</option>
+                            <option>Health &amp; Life Sciences</option>
+                            <option>Law &amp; Public Policy</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 mb-1">Support Package</label>
+                        <select id="modalPackage" class="w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm focus:ring-2 focus:ring-orange-600 focus:outline-none">
+                            <option>Rapid Brief &amp; Outline Kickstart (30–45 Minutes)</option>
+                            <option>Comprehensive Draft Review (Asynchronous Annotated Feedback)</option>
+                            <option>Live Deep-Dive Coaching Session (60 Minutes)</option>
+                            <option>End-to-End Milestone Mentorship</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-semibold text-slate-700 mb-1">Assignment Prompt, Rubric &amp; Specific Pain Points *</label>
+                    <textarea rows="3" required placeholder="Paste your assignment prompt, word count, deadline, or specific areas where you need guidance..." class="w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm focus:ring-2 focus:ring-orange-600 focus:outline-none"></textarea>
+                </div>
+
+                <div class="flex items-start gap-2.5 bg-orange-50 p-3 rounded-xl border border-orange-200">
+                    <input type="checkbox" required id="integrityCheck" class="mt-1 rounded text-orange-600 focus:ring-orange-600">
+                    <label for="integrityCheck" class="text-xs text-slate-700">
+                        I understand that university-tutors.com provides ethical academic coaching and feedback only, and does not write or rewrite coursework on behalf of students.
+                    </label>
+                </div>
+
+                <button type="submit" class="w-full py-3.5 bg-orange-600 hover:bg-orange-700 text-white font-bold rounded-xl shadow-md transition">
+                    Request Subject Mentor Match
+                </button>
+            </form>
+
+            <div id="bookingSuccess" class="hidden text-center py-6 space-y-3">
+                <div class="w-14 h-14 bg-orange-100 text-orange-600 rounded-full flex items-center justify-center mx-auto text-2xl font-bold">&#10003;</div>
+                <h4 class="text-xl font-bold text-slate-900">Request Received!</h4>
+                <p class="text-sm text-slate-600">
+                    We are matching your brief with a qualified postgraduate specialist in your discipline. Check your inbox within 2–4 hours for your secure portal link.
+                </p>
+                <button onclick="closeModal('bookingModal')" class="mt-4 px-6 py-2.5 bg-orange-600 text-white text-sm font-semibold rounded-xl">Return to Page</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL 2: Browse Mentors by Subject -->
+    <div id="mentorModal" class="fixed inset-0 z-50 hidden bg-slate-950/70 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
+        <div class="bg-white rounded-2xl max-w-3xl w-full p-6 sm:p-8 shadow-2xl border border-orange-100 relative my-8">
+            <button onclick="closeModal('mentorModal')" class="absolute top-5 right-5 text-slate-400 hover:text-orange-600 p-1">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+            </button>
+
+            <h3 class="font-serif text-2xl font-bold text-slate-900 mb-2">Browse Subject-Matter Mentors</h3>
+            <p class="text-slate-600 text-sm mb-5">Filter our postgraduate academic advisors by faculty to preview their coaching expertise.</p>
+
+            <div class="flex flex-wrap gap-2 mb-6" id="mentorFilters">
+                <button onclick="filterMentors('all', this)" class="mentor-filter-btn px-3.5 py-1.5 rounded-full text-xs font-semibold bg-orange-600 text-white">All Faculties</button>
+                <button onclick="filterMentors('business', this)" class="mentor-filter-btn px-3.5 py-1.5 rounded-full text-xs font-semibold bg-orange-50 text-slate-700 hover:bg-orange-100">Business &amp; Econ</button>
+                <button onclick="filterMentors('humanities', this)" class="mentor-filter-btn px-3.5 py-1.5 rounded-full text-xs font-semibold bg-orange-50 text-slate-700 hover:bg-orange-100">Social Sciences &amp; Humanities</button>
+                <button onclick="filterMentors('stem', this)" class="mentor-filter-btn px-3.5 py-1.5 rounded-full text-xs font-semibold bg-orange-50 text-slate-700 hover:bg-orange-100">STEM &amp; Computing</button>
+                <button onclick="filterMentors('health', this)" class="mentor-filter-btn px-3.5 py-1.5 rounded-full text-xs font-semibold bg-orange-50 text-slate-700 hover:bg-orange-100">Health &amp; Law</button>
+            </div>
+
+            <div class="divide-y divide-orange-100 border-t border-b border-orange-100 max-h-96 overflow-y-auto pr-1" id="mentorGrid">
+                <div class="mentor-card py-4" data-cat="business">
+                    <span class="text-[11px] font-bold uppercase text-orange-600">Business, Finance &amp; Economics</span>
+                    <h4 class="font-bold text-slate-900 text-base mt-0.5">Dr. Eleanor Vance, PhD — Strategic Management &amp; Corporate Finance</h4>
+                    <p class="text-xs text-slate-600 mt-1 leading-relaxed">Specializes in MBA case studies, Porter’s Five Forces, VRIO diagnostics, and quantitative financial ratio evaluations.</p>
+                </div>
+
+                <div class="mentor-card py-4" data-cat="humanities">
+                    <span class="text-[11px] font-bold uppercase text-orange-600">Social Sciences &amp; Humanities</span>
+                    <h4 class="font-bold text-slate-900 text-base mt-0.5">Dr. Marcus Sterling, PhD — Political Science &amp; International Relations</h4>
+                    <p class="text-xs text-slate-600 mt-1 leading-relaxed">Coaches students on thesis formulation, thematic literature reviews, and critical discourse analysis.</p>
+                </div>
+
+                <div class="mentor-card py-4" data-cat="stem">
+                    <span class="text-[11px] font-bold uppercase text-orange-600">STEM &amp; Computing</span>
+                    <h4 class="font-bold text-slate-900 text-base mt-0.5">Prof. Priya Nair, MSc, PhD — Data Science, Statistics &amp; Computer Science</h4>
+                    <p class="text-xs text-slate-600 mt-1 leading-relaxed">Guides students through regression modeling, Python/R debugging logic, IMRaD lab reports, and IEEE formatting.</p>
+                </div>
+
+                <div class="mentor-card py-4" data-cat="health">
+                    <span class="text-[11px] font-bold uppercase text-orange-600">Health &amp; Public Policy</span>
+                    <h4 class="font-bold text-slate-900 text-base mt-0.5">Dr. Hannah Lindqvist, PhD — Public Health, Nursing &amp; Bioethics</h4>
+                    <p class="text-xs text-slate-600 mt-1 leading-relaxed">Supports reflective portfolios (Gibbs &amp; Kolb), systematic reviews, and Vancouver/APA 7th citation precision.</p>
+                </div>
+            </div>
+
+            <div class="mt-6 flex justify-end">
+                <button onclick="closeModal('mentorModal'); openModal('bookingModal');" class="px-5 py-2.5 bg-orange-600 text-white text-sm font-semibold rounded-xl hover:bg-orange-700">
+                    Book a Session With a Specialist
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL 3: View Sample Developmental Feedback -->
+    <div id="sampleModal" class="fixed inset-0 z-50 hidden bg-slate-950/70 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
+        <div class="bg-white rounded-2xl max-w-3xl w-full p-6 sm:p-8 shadow-2xl border border-orange-100 relative my-8">
+            <button onclick="closeModal('sampleModal')" class="absolute top-5 right-5 text-slate-400 hover:text-orange-600 p-1">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+            </button>
+
+            <span class="inline-block px-3 py-1 bg-orange-100 text-orange-700 text-xs font-bold rounded-full mb-2">Ethical Socratic Coaching Example</span>
+            <h3 class="font-serif text-2xl font-bold text-slate-900 mb-2">Sample Mentor Developmental Feedback</h3>
+            <p class="text-slate-600 text-sm mb-5">Notice how our mentors never rewrite text—instead, they diagnose analytical gaps and guide you toward distinction-level revision.</p>
+
+            <div class="space-y-4 bg-orange-50/60 p-5 rounded-2xl border border-orange-200">
+                <div class="bg-white p-4 rounded-xl border border-orange-100">
+                    <span class="text-[11px] font-bold uppercase tracking-wider text-slate-400">Student Draft Excerpt (Sociology)</span>
+                    <p class="mt-2 text-sm text-slate-700 leading-relaxed font-serif italic">
+                        "Smith (2022) found that remote work increased employee productivity by 13%. On the other hand, Jones (2023) argued that remote workers experienced higher burnout rates. Therefore, companies should use hybrid policies."
+                    </p>
+                </div>
+
+                <div class="bg-white p-4 rounded-xl border-l-4 border-orange-600">
+                    <span class="text-[11px] font-bold uppercase tracking-wider text-orange-700">Mentor Margin Feedback (Rubric Criterion: Critical Analysis)</span>
+                    <p class="mt-2 text-xs sm:text-sm text-slate-800 leading-relaxed">
+                        <strong>Diagnosis:</strong> Right now, you are summarizing two studies back-to-back (descriptive trap) and jumping straight to a recommendation without explaining <em>why</em> these findings conflict.
+                    </p>
+                    <p class="mt-2 text-xs sm:text-sm text-slate-800 leading-relaxed">
+                        <strong>Revision Strategy:</strong> Ask yourself: Did Smith and Jones measure different industries or timeframes? Add a linking sentence comparing their methodologies before drawing your conclusion.
+                    </p>
+                </div>
+            </div>
+
+            <div class="mt-6 flex flex-col sm:flex-row justify-between items-center gap-3">
+                <span class="text-xs text-slate-500">100% written and revised by the student • Full rubric alignment verified</span>
+                <button onclick="closeModal('sampleModal'); openModal('bookingModal');" class="w-full sm:w-auto px-5 py-2.5 bg-orange-600 text-white text-sm font-semibold rounded-xl hover:bg-orange-700">
+                    Get Feedback on Your Draft
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Modal management
+        function openModal(modalId) {
+            document.getElementById(modalId).classList.remove('hidden');
+            document.body.style.overflow = 'hidden';
+        }
+
+        function closeModal(modalId) {
+            document.getElementById(modalId).classList.add('hidden');
+            document.body.style.overflow = '';
+        }
+
+        // Select specific support package
+        function selectPackage(packageName) {
+            document.getElementById('modalPackage').value = packageName;
+            openModal('bookingModal');
+        }
+
+        // Pre-select discipline when clicking a tutor card
+        function bookWithTutor(disciplineName) {
+            const disciplineSelect = document.getElementById('modalDiscipline');
+            if (disciplineSelect) {
+                disciplineSelect.value = disciplineName;
+            }
+            openModal('bookingModal');
+        }
+
+        // Handle booking submission state
+        function submitBooking(event) {
+            event.preventDefault();
+            document.getElementById('bookingForm').classList.add('hidden');
+            document.getElementById('bookingSuccess').classList.remove('hidden');
+        }
+
+        // Handle inline quick enquiry submission
+        function submitQuickEnquiry(event) {
+            event.preventDefault();
+            document.getElementById('quickEnquiryForm').classList.add('hidden');
+            document.getElementById('quickEnquirySuccess').classList.remove('hidden');
+        }
+
+        function resetQuickEnquiry() {
+            document.getElementById('quickEnquiryForm').reset();
+            document.getElementById('quickEnquirySuccess').classList.add('hidden');
+            document.getElementById('quickEnquiryForm').classList.remove('hidden');
+        }
+
+        // FAQ Accordion Toggle
+        function toggleFaq(button) {
+            const content = button.nextElementSibling;
+            const icon = button.querySelector('svg');
+            content.classList.toggle('hidden');
+            icon.classList.toggle('rotate-180');
+        }
+
+        // Mentor Subject Filter
+        function filterMentors(category, btnElement) {
+            document.querySelectorAll('.mentor-filter-btn').forEach(btn => {
+                btn.classList.remove('bg-orange-600', 'text-white');
+                btn.classList.add('bg-orange-50', 'text-slate-700');
+            });
+            btnElement.classList.remove('bg-orange-50', 'text-slate-700');
+            btnElement.classList.add('bg-orange-600', 'text-white');
+
+            document.querySelectorAll('.mentor-card').forEach(card => {
+                if (category === 'all' || card.dataset.cat === category) {
+                    card.classList.remove('hidden');
+                } else {
+                    card.classList.add('hidden');
+                }
+            });
+        }
+    </script>
+</body>
+</html>

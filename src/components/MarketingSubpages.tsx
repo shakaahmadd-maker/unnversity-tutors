@@ -565,7 +565,11 @@ export default function MarketingSubpages({
       {(activeView === 'services' || Boolean(resolveDedicatedServiceRoute(activeView))) && (
         <section
           id="services-section"
-          className="py-12 md:py-20 container mx-auto px-4 md:px-8 max-w-7xl text-left animate-fade-in"
+          className={
+            selectedServiceId !== null
+              ? 'w-full bg-white text-left animate-fade-in'
+              : 'py-12 md:py-20 container mx-auto px-4 md:px-8 max-w-7xl text-left animate-fade-in'
+          }
         >
           {selectedServiceId === null ? (
             /* ==================== SERVICES OVERVIEW HUB ==================== */

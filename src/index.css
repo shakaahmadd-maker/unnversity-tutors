@@ -210,6 +210,29 @@
   animation-play-state: paused;
 }
 
+/* Editorial Serif Font & Seamless RTL Tutor Profile Marquee (/services/assignment-guidance) */
+.font-editorial-serif {
+  font-family: "Playfair Display", Georgia, serif;
+}
+
+@keyframes marqueeRTL {
+  0% {
+    transform: translateX(0%);
+  }
+  100% {
+    transform: translateX(-50%);
+  }
+}
+
+.animate-marquee-rtl {
+  animation: marqueeRTL 34s linear infinite;
+}
+
+.tutor-marquee-wrapper:hover .tutor-marquee-track,
+.tutor-marquee-wrapper:active .tutor-marquee-track {
+  animation-play-state: paused;
+}
+
 /* Mobile Viewport (360px–480px) Overflow Protection & 44px Touch Ergonomics */
 html,
 body,
