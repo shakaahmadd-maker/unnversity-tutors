@@ -65,6 +65,8 @@ const EXCLUDED_ROUTE_PREFIXES = [
   '/admin',
   '/admin-login',
   '/api',
+  '/uploads',
+  '/health',
   '/reset-password',
   '/user-data',
   '/users-data',
@@ -90,6 +92,12 @@ export const ROBOTS_TXT_CONTENT = [
   'Disallow: /signup',
   '',
   `Sitemap: ${SITEMAP_BASE_URL}/sitemap.xml`,
+  '',
+].join('\n');
+
+export const API_ROBOTS_TXT_CONTENT = [
+  'User-agent: *',
+  'Disallow: /',
   '',
 ].join('\n');
 
@@ -125,6 +133,9 @@ function formatW3CDate(input?: string | Date | null): string | undefined {
 }
 
 export function isExcludedFromSitemap(routePath: string): boolean {
+  const rawLower = String(routePath || '').trim().toLowerCase();
+  if (rawLower.includes('api.university-tutors.com')) return true;
+
   const normalized = ('/' + String(routePath || '').trim().replace(/^\/+/, ''))
     .split('?')[0]
     .split('#')[0]

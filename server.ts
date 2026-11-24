@@ -19,6 +19,7 @@ import { DEFAULT_20_BLOGS } from './src/data/defaultBlogsData';
 import { TRENDING_TUTORS_500, TRENDING_TUTORS_200 } from './src/data/trendingTutors500Data';
 import { CURATED_SPECIALIZED_TUTORS } from './src/data/tutorsDirectoryData';
 import {
+  API_ROBOTS_TXT_CONTENT,
   getOrBuildSitemapPayload,
   invalidateSitemapCache,
   ROBOTS_TXT_CONTENT,
@@ -72,6 +73,46 @@ const NODE_ENV = readRuntimeEnv('NODE_ENV') || 'production';
 
 export function getRuntimeAppUrl(): string {
   return readRuntimeEnv('APP_URL').replace(/\/+$/, '');
+}
+
+export const API_ROBOTS_TAG_HEADER = 'noindex, nofollow, noarchive';
+export const API_SUBDOMAIN_HOST = 'api.university-tutors.com';
+
+export function getNormalizedRequestHost(req: express.Request): string {
+  const rawHost = String(req.hostname || req.headers.host || '')
+    .split(',')[0]
+    .trim()
+    .toLowerCase();
+  if (!rawHost) return '';
+  if (rawHost.startsWith('[')) {
+    const closeIdx = rawHost.indexOf(']');
+    return closeIdx >= 0 ? rawHost.slice(0, closeIdx + 1) : rawHost;
+  }
+  return rawHost.replace(/:\d+$/, '');
+}
+
+export function isApiSubdomainRequest(req: express.Request): boolean {
+  const host = getNormalizedRequestHost(req);
+  if (!host) return false;
+  if (host === API_SUBDOMAIN_HOST) return true;
+  const configuredApiHost = readRuntimeEnv('API_HOSTNAME')
+    .replace(/^https?:\/\//i, '')
+    .replace(/\/.*$/, '')
+    .replace(/:\d+$/, '')
+    .trim()
+    .toLowerCase();
+  return Boolean(configuredApiHost && host === configuredApiHost);
+}
+
+function isApiOrUploadPath(reqPath: string): boolean {
+  const clean = reqPath || '/';
+  return (
+    clean === '/api' ||
+    clean.startsWith('/api/') ||
+    clean === '/uploads' ||
+    clean.startsWith('/uploads/') ||
+    clean === '/health'
+  );
 }
 
 export function getConfiguredAdminInitialPassword(): string {
@@ -901,6 +942,15 @@ export async function createApp(options: CreateAppOptions = {}) {
   const app = express();
   app.set('trust proxy', 1);
 
+  // Prevent search engine indexing of every API/upload/health response and every response on api.university-tutors.com
+  // Mounted before body parsers, CORS, and routes so error/400/413/401/403/404/500 responses all include X-Robots-Tag.
+  app.use((req, res, next) => {
+    if (isApiSubdomainRequest(req) || isApiOrUploadPath(req.path)) {
+      res.setHeader('X-Robots-Tag', API_ROBOTS_TAG_HEADER);
+    }
+    next();
+  });
+
   app.use(compression());
   app.use(express.json({ limit: '25mb' }));
   app.use(express.urlencoded({ extended: true, limit: '25mb' }));
@@ -975,6 +1025,36 @@ export async function createApp(options: CreateAppOptions = {}) {
       return res.sendStatus(204);
     }
     next();
+  });
+
+  // Strict API Subdomain Isolation (https://api.university-tutors.com)
+  // - Keeps /api/*, /uploads/*, and /health fully functional for the production frontend & auth/CORS.
+  // - Serves a restrictive robots.txt on the API host (paired with X-Robots-Tag: noindex, nofollow, noarchive).
+  // - Never renders the website homepage, SPA HTML, sitemap.xml, or public discovery files on the API hostname.
+  app.use((req, res, next) => {
+    if (!isApiSubdomainRequest(req)) {
+      return next();
+    }
+
+    res.setHeader('X-Robots-Tag', API_ROBOTS_TAG_HEADER);
+
+    const reqPath = req.path || '/';
+    if (isApiOrUploadPath(reqPath)) {
+      return next();
+    }
+
+    if ((req.method === 'GET' || req.method === 'HEAD') && reqPath === '/robots.txt') {
+      res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+      res.setHeader('Cache-Control', 'public, max-age=3600');
+      return res.status(200).send(API_ROBOTS_TXT_CONTENT);
+    }
+
+    res.setHeader('Cache-Control', 'no-store');
+    return res.status(404).json({
+      error: 'Not Found',
+      code: 'NOT_FOUND',
+      status: 404,
+    });
   });
 
   // =========================================================================
@@ -9104,8 +9184,13 @@ export async function createApp(options: CreateAppOptions = {}) {
     }
   });
 
-  app.get('/robots.txt', (_req, res) => {
+  app.get('/robots.txt', (req, res) => {
     res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+    if (isApiSubdomainRequest(req)) {
+      res.setHeader('X-Robots-Tag', API_ROBOTS_TAG_HEADER);
+      res.setHeader('Cache-Control', 'public, max-age=3600');
+      return res.status(200).send(API_ROBOTS_TXT_CONTENT);
+    }
     res.setHeader('Cache-Control', 'public, max-age=3600, stale-while-revalidate=86400');
     return res.status(200).send(ROBOTS_TXT_CONTENT);
   });
@@ -9353,10 +9438,22 @@ export async function createApp(options: CreateAppOptions = {}) {
     res.status(200).json({ status: "ok", dbConnected: isDbConnected() });
   });
 
-  // Unknown API route JSON 404 (never return HTML for missing /api/* routes)
-  app.all('/api/*', (req, res) => {
+  // Unknown API or upload route JSON 404 (never return HTML for missing /api, /api/*, /uploads, or /uploads/* routes)
+  app.all(['/api', '/api/*'], (req, res) => {
+    res.setHeader('X-Robots-Tag', API_ROBOTS_TAG_HEADER);
+    res.setHeader('Cache-Control', 'no-store');
     return res.status(404).json({
       error: `API route not found: ${req.method} ${req.path}`,
+      code: 'NOT_FOUND',
+      status: 404,
+    });
+  });
+
+  app.all(['/uploads', '/uploads/*'], (req, res) => {
+    res.setHeader('X-Robots-Tag', API_ROBOTS_TAG_HEADER);
+    res.setHeader('Cache-Control', 'no-store');
+    return res.status(404).json({
+      error: 'Resource not found',
       code: 'NOT_FOUND',
       status: 404,
     });
@@ -9549,6 +9646,9 @@ export async function createApp(options: CreateAppOptions = {}) {
   app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
     if (res.headersSent) {
       return next(err);
+    }
+    if (isApiSubdomainRequest(req) || isApiOrUploadPath(req.path)) {
+      res.setHeader('X-Robots-Tag', API_ROBOTS_TAG_HEADER);
     }
     const status = Number(err?.statusCode || err?.status) || 500;
     const code = String(err?.code || (status === 504 ? 'TIMEOUT' : 'INTERNAL_ERROR'));

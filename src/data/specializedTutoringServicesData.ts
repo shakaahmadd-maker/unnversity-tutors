@@ -6,7 +6,7 @@ export interface SpecializedServicePageData {
   countrySlug?: string;          // 'usa', 'canada', 'uk', 'uae', 'ireland', 'australia', 'new-zealand', 'singapore' or undefined (global)
   countryName: string;           // 'United States', 'Canada', 'United Kingdom', etc. or 'Global'
   flagEmoji: string;
-  url: string;                   // 'https://www.university-tutors.com/assignment-guidance-usa'
+  url: string;                   // 'https://university-tutors.com/assignment-guidance-usa'
   path: string;                  // '/assignment-guidance-usa'
   seoTitle: string;
   h1: string;
@@ -169,7 +169,7 @@ export function generateSpecializedServicePage(
   const flagEmoji = country ? country.flag : '🌐';
   const slug = isGlobal ? base.slugBase : `${base.slugBase}-${countrySlug}`;
   const path = `/${slug}`;
-  const url = `https://www.university-tutors.com${path}`;
+  const url = `https://university-tutors.com${path}`;
 
   let seoTitle = '';
   let h1 = '';

@@ -75,6 +75,9 @@ export function normalizeIndexNowUrl(rawInput: string): string | null {
   if (/^https?:\/\//i.test(trimmed)) {
     try {
       const parsed = new URL(trimmed);
+      if (parsed.hostname.toLowerCase() === 'api.university-tutors.com') {
+        return null;
+      }
       pathname = parsed.pathname || '/';
       search = parsed.search || '';
     } catch {
