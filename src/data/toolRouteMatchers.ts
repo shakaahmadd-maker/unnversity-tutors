@@ -64,6 +64,19 @@ export const CHEMISTRY_TOOL_SLUGS = new Set([
   'radioactive-decay-halflife-calculator',
 ]);
 
+export const CS_TOOL_SLUGS = new Set([
+  'sql-playground',
+  'truth-table-generator',
+  'binary-hex-converter',
+  'algorithm-visualizer',
+  'data-structure-visualizer',
+  'subnet-calculator',
+  'regex-tester',
+  'big-o-calculator',
+  'code-formatter-diff',
+  'crypto-jwt-tool',
+]);
+
 export const STUDENT_TOOL_SLUGS = new Set([
   'merge-pdf',
   'split-pdf',
@@ -131,6 +144,24 @@ export function matchScienceRouteView(input: string): string | null {
   if (cleaned.startsWith('tools/chemistry/')) {
     const slug = cleaned.slice('tools/chemistry/'.length);
     if (CHEMISTRY_TOOL_SLUGS.has(slug)) return `tools/chemistry/${slug}`;
+  }
+  return null;
+}
+
+export function matchCsRouteView(input: string): string | null {
+  const cleaned = cleanRouteInput(input);
+  if (!cleaned) return null;
+  if (cleaned === 'tools/computer-science' || cleaned === 'tools/cs') {
+    return 'tools/computer-science';
+  }
+  let candidate = cleaned;
+  if (cleaned.startsWith('tools/computer-science/')) {
+    candidate = cleaned.slice('tools/computer-science/'.length);
+  } else if (cleaned.startsWith('tools/')) {
+    candidate = cleaned.slice('tools/'.length);
+  }
+  if (CS_TOOL_SLUGS.has(candidate)) {
+    return `tools/${candidate}`;
   }
   return null;
 }

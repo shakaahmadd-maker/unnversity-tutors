@@ -8,6 +8,7 @@ import { resolveDedicatedServiceRoute } from './data/dedicatedServiceRoutes';
 import {
   matchMathRouteView,
   matchScienceRouteView,
+  matchCsRouteView,
   matchStudentToolRoute,
   matchStudentToolSlug,
   isSpecializedServiceSlug,
@@ -45,6 +46,7 @@ const DataDeletionPage = lazy(() => import('./components/DataDeletionPage'));
 const ToolsHub = lazy(() => import('./components/tools/ToolsHub'));
 const ScienceToolsRouter = lazy(() => import('./components/tools/ScienceToolsRouter'));
 const MathToolsRouter = lazy(() => import('./components/tools/MathToolsRouter'));
+const CsToolsRouter = lazy(() => import('./components/tools/cs/CsToolsRouter'));
 const ChatNotificationToast = lazy(() => import('./components/ChatNotificationToast'));
 
 function resolveInitialViewFromWindow(): string {
@@ -61,9 +63,11 @@ function resolveInitialViewFromWindow(): string {
     decodedPath === '/get a quote' ||
     decodedPath === '/getaquote' ||
     decodedPath === '/pricing' ||
+    decodedPath === '/book' ||
     hash === '#get-a-quote' ||
     hash === '#get-quote' ||
-    hash === '#pricing'
+    hash === '#pricing' ||
+    hash === '#book'
   ) {
     return 'get-a-quote';
   }
@@ -72,6 +76,8 @@ function resolveInitialViewFromWindow(): string {
   if (mView) return mView;
   const sciView = matchScienceRouteView(decodedPath) || matchScienceRouteView(hash);
   if (sciView) return sciView;
+  const csView = matchCsRouteView(decodedPath) || matchCsRouteView(hash);
+  if (csView) return csView;
   if (decodedPath.startsWith('/tools/') || hash.startsWith('#tools/')) {
     const matched = matchStudentToolRoute(decodedPath) || matchStudentToolRoute(hash);
     if (matched) return matched.viewKey;
@@ -428,6 +434,7 @@ export default function App() {
     const applySeo = async () => {
       let title = defaultTitle;
       let description = defaultDesc;
+      let keywords: string[] | undefined;
       let canonicalPath = '/';
       let ogType: 'website' | 'article' | 'profile' = 'website';
       let ogImage: string | undefined = 'https://university-tutors.com/logo.webp';
@@ -730,6 +737,34 @@ export default function App() {
             offers: { '@type': 'Offer', price: '0', priceCurrency: 'USD' },
           };
         }
+      } else if (matchCsRouteView(activeView)) {
+        const { CS_HUB_KEYWORDS, resolveCsRoute } = await import('./data/csToolsRegistry');
+        const csRoute = resolveCsRoute(activeView);
+        if (csRoute) {
+          if (csRoute.kind === 'hub') {
+            title = 'Free Computer Science & Programming Student Tools (10 Tools) | University-Tutors.com';
+            description =
+              '10 free 100% browser-based Computer Science tools: SQL Query Playground, Boolean Truth Table & Logic Gates, Binary/IEEE 754 Converter, Sorting & BST Visualizers, CIDR Subnet Calculator, Regex Debugger, Big-O Analyzer, Diff Checker & JWT Inspector.';
+            canonicalPath = '/tools/computer-science';
+            keywords = CS_HUB_KEYWORDS;
+          } else {
+            title = csRoute.tool.seoTitle;
+            description = csRoute.tool.seoDescription;
+            canonicalPath = csRoute.tool.path;
+            keywords = csRoute.tool.keywords;
+          }
+          structuredData = {
+            '@context': 'https://schema.org',
+            '@type': 'WebApplication',
+            name: title,
+            description,
+            keywords: keywords.join(', '),
+            url: `https://university-tutors.com${canonicalPath}`,
+            applicationCategory: 'EducationalApplication',
+            operatingSystem: 'Any',
+            offers: { '@type': 'Offer', price: '0', priceCurrency: 'USD' },
+          };
+        }
       } else if (matchStudentToolSlug(activeView)) {
         const toolSlug = matchStudentToolSlug(activeView)!;
         const { STUDENT_TOOLS_BY_SLUG } = await import('./data/studentToolsData');
@@ -755,6 +790,7 @@ export default function App() {
         updatePageSeo({
           title,
           description,
+          keywords,
           canonicalPath,
           ogType,
           ogImage,
@@ -1022,6 +1058,15 @@ export default function App() {
       return;
     }
 
+    const matchedCsView = matchCsRouteView(view);
+    if (matchedCsView) {
+      setSelectedTutorProfile(null);
+      setActiveView(matchedCsView);
+      window.history.pushState(null, '', '/' + matchedCsView);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
+
     const matchedTool = matchStudentToolRoute(view);
     if (matchedTool) {
       setSelectedTutorProfile(null);
@@ -1183,11 +1228,17 @@ export default function App() {
       view === 'get-quote' ||
       view === '/get-quote' ||
       view === 'pricing' ||
-      view === '/pricing'
+      view === '/pricing' ||
+      view === 'book' ||
+      view === '/book' ||
+      view.startsWith('book?') ||
+      view.startsWith('/book?')
     ) {
       const isPricing = view === 'pricing' || view === '/pricing';
+      const isBook = view === 'book' || view === '/book' || view.startsWith('book?') || view.startsWith('/book?');
+      const bookSuffix = view.includes('?') ? view.slice(view.indexOf('?')) : '';
       view = 'get-a-quote';
-      path = isPricing ? '/pricing' : '/get-a-quote';
+      path = isPricing ? '/pricing' : isBook ? `/book${bookSuffix}` : '/get-a-quote';
     } else if (view === 'services') {
       path = '/services';
     } else if (view === 'faqs') {
@@ -1313,10 +1364,12 @@ export default function App() {
         decodedPath === '/get a quote' ||
         decodedPath === '/getaquote' ||
         decodedPath === '/pricing' ||
+        decodedPath === '/book' ||
         hash === '#get-a-quote' ||
         hash === '#get-quote' ||
         hash === '#get a quote' ||
-        hash === '#pricing'
+        hash === '#pricing' ||
+        hash === '#book'
       ) {
         void store.ensureFullDirectoryLoaded();
         setActiveView('get-a-quote');
@@ -1336,6 +1389,10 @@ export default function App() {
         const sciView = (matchScienceRouteView(decodedPath) || matchScienceRouteView(hash))!;
         setSelectedTutorProfile(null);
         setActiveView(sciView);
+      } else if (matchCsRouteView(decodedPath) || matchCsRouteView(hash)) {
+        const csView = (matchCsRouteView(decodedPath) || matchCsRouteView(hash))!;
+        setSelectedTutorProfile(null);
+        setActiveView(csView);
       } else if (
         (decodedPath.startsWith('/tools/') && matchStudentToolRoute(decodedPath)) ||
         (hash.startsWith('#tools/') && matchStudentToolRoute(hash))
@@ -1607,13 +1664,15 @@ export default function App() {
           href === '/get-quote' ||
           href === '/get a quote' ||
           href === '/pricing' ||
+          href === '/book' ||
+          href.startsWith('/book?') ||
           href === '#get-a-quote' ||
           href === '#get-quote' ||
           href === '#get a quote' ||
           href === '#pricing'
         ) {
           e.preventDefault();
-          handleNavigate('get-a-quote');
+          handleNavigate(href.startsWith('/book') ? href.slice(1) : 'get-a-quote');
         } else if (href === '/how-it-works' || href === '#how-it-works') {
           e.preventDefault();
           handleNavigate('how-it-works');
@@ -1632,6 +1691,12 @@ export default function App() {
         ) {
           e.preventDefault();
           handleNavigate(matchScienceRouteView(href)!);
+        } else if (
+          (href.startsWith('/tools/') || href.startsWith('#tools/') || href.includes('university-tutors.com/tools/')) &&
+          matchCsRouteView(href)
+        ) {
+          e.preventDefault();
+          handleNavigate(matchCsRouteView(href)!);
         } else if (
           (href.startsWith('/tools/') || href.startsWith('#tools/') || href.includes('university-tutors.com/tools/')) &&
           matchStudentToolRoute(href)
@@ -2260,6 +2325,12 @@ export default function App() {
                 onNavigate={handleNavigate}
                 onOpenBecomeTutor={() => setIsBecomeTutorOpen(true)}
               />
+            ) : Boolean(matchCsRouteView(activeView)) ? (
+              <CsToolsRouter
+                currentView={activeView}
+                onNavigate={handleNavigate}
+                onOpenBecomeTutor={() => setIsBecomeTutorOpen(true)}
+              />
             ) : activeView === 'tools' || Boolean(matchStudentToolSlug(activeView)) ? (
               <ToolsHub
                 activeView={activeView}
@@ -2309,6 +2380,7 @@ export default function App() {
         activeView !== 'tools' &&
         !matchMathRouteView(activeView) &&
         !matchScienceRouteView(activeView) &&
+        !matchCsRouteView(activeView) &&
         !matchStudentToolSlug(activeView) && (
           <div ref={footerSentinelRef}>
             {shouldRenderFooter ? (

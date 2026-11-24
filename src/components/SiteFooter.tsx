@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { ChevronDown, ShieldCheck, Clock, ArrowRight } from 'lucide-react';
 import { SCIENCE_TOOLS_REGISTRY } from '../data/scienceToolsRegistry';
 import { MATH_TOOLS_REGISTRY } from '../data/mathToolsRegistry';
+import { CS_TOOLS_LIST } from '../data/csToolsRegistry';
 import { STUDENT_TOOLS } from '../data/studentToolsData';
 import { isModifiedAnchorClick } from '../data/dedicatedServiceRoutes';
 
@@ -29,7 +30,10 @@ export default function SiteFooter({ onNavigate, onOpenBecomeTutor }: SiteFooter
   };
 
   const totalToolsCount =
-    MATH_TOOLS_REGISTRY.length + SCIENCE_TOOLS_REGISTRY.length + STUDENT_TOOLS.length;
+    MATH_TOOLS_REGISTRY.length +
+    SCIENCE_TOOLS_REGISTRY.length +
+    CS_TOOLS_LIST.length +
+    STUDENT_TOOLS.length;
 
   return (
     <footer
@@ -106,6 +110,14 @@ export default function SiteFooter({ onNavigate, onOpenBecomeTutor }: SiteFooter
                   className="inline-flex items-center justify-between px-3 py-2 rounded-xl bg-[#F9FAFB] hover:bg-[#FFF7ED] border border-slate-200 hover:border-orange-300 text-[#111827] hover:text-[#EA580C] transition-colors cursor-pointer"
                 >
                   <span>Chemistry &amp; Orgo Hub (16 Tools)</span>
+                  <ArrowRight className="w-3.5 h-3.5 text-[#F97316] shrink-0" />
+                </a>
+                <a
+                  href="/tools/computer-science"
+                  onClick={(e) => handleNav(e, 'tools/computer-science')}
+                  className="inline-flex items-center justify-between px-3 py-2 rounded-xl bg-[#F9FAFB] hover:bg-[#FFF7ED] border border-slate-200 hover:border-orange-300 text-[#111827] hover:text-[#EA580C] transition-colors cursor-pointer"
+                >
+                  <span>Computer Science Hub ({CS_TOOLS_LIST.length} Tools)</span>
                   <ArrowRight className="w-3.5 h-3.5 text-[#F97316] shrink-0" />
                 </a>
                 <a
@@ -345,6 +357,26 @@ export default function SiteFooter({ onNavigate, onOpenBecomeTutor }: SiteFooter
                   {sci.shortTitle}
                 </a>
                 {idx < SCIENCE_TOOLS_REGISTRY.length - 1 && (
+                  <span className="text-slate-300" aria-hidden="true">
+                    ·
+                  </span>
+                )}
+              </React.Fragment>
+            ))}
+          </div>
+
+          <div className="flex flex-wrap items-center gap-x-3.5 gap-y-1.5 text-xs text-slate-500">
+            <span className="font-bold text-[#111827]">Computer Science &amp; Programming ({CS_TOOLS_LIST.length}):</span>
+            {CS_TOOLS_LIST.map((cs, idx) => (
+              <React.Fragment key={cs.slug}>
+                <a
+                  href={cs.path}
+                  onClick={(e) => handleNav(e, cs.viewKey)}
+                  className="hover:text-[#EA580C] transition-colors cursor-pointer"
+                >
+                  {cs.shortTitle}
+                </a>
+                {idx < CS_TOOLS_LIST.length - 1 && (
                   <span className="text-slate-300" aria-hidden="true">
                     ·
                   </span>

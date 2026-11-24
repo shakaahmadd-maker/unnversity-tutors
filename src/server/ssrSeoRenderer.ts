@@ -2,6 +2,7 @@ import { COUNTRY_ONLINE_TUTORING_PAGES } from '../data/countryOnlineTutoringData
 import { DEDICATED_SERVICE_ROUTES, resolveDedicatedServiceRoute } from '../data/dedicatedServiceRoutes';
 import { SPECIALIZED_SERVICE_PAGES_MAP } from '../data/specializedTutoringServicesData';
 import { TOOLS_SEO_META_BY_PATH, TOOLS_SEO_META_LIST } from '../data/toolsSeoMeta';
+import { CS_HUB_KEYWORDS } from '../data/csToolsRegistry';
 import { DEFAULT_20_BLOGS } from '../data/defaultBlogsData';
 import { getBlogCanonicalSlug, matchesBlogSlugOrId } from '../utils/blogSlug';
 import { getTutorCanonicalSlug, matchesTutorSlugOrId } from '../utils/tutorSlug';
@@ -25,6 +26,7 @@ interface SsrRenderParams {
 interface ResolvedRouteSeo {
   title: string;
   description: string;
+  keywords?: string[];
   canonicalUrl: string;
   robots: string;
   ogType: 'website' | 'article' | 'profile';
@@ -1040,6 +1042,7 @@ export async function renderSeoHtml(params: SsrRenderParams): Promise<string> {
             <h1>Free Online Student Tools &amp; STEM Calculators Suite</h1>
             <p class="preboot-lead">100% client-side, instant academic calculators for Mathematics, Biology, Chemistry, Citations, PDFs, and University Grade Conversion.</p>
             <div class="preboot-links-wrap">
+              <a href="/tools/computer-science">Computer Science &amp; Programming Suite (10 Tools)</a>
               <a href="/tools/math">University Math &amp; Statistics Suite (27 Tools)</a>
               <a href="/tools/biology">Biology &amp; Genetics Calculators (14 Tools)</a>
               <a href="/tools/chemistry">Chemistry &amp; Spectroscopy Solvers (16 Tools)</a>
@@ -1054,14 +1057,28 @@ export async function renderSeoHtml(params: SsrRenderParams): Promise<string> {
           </article>
         `,
       };
-    } else if (lowerPath === '/tools/math' || lowerPath === '/tools/biology' || lowerPath === '/tools/chemistry') {
-      const catLabel = lowerPath.endsWith('/math') ? 'Mathematics' : lowerPath.endsWith('/biology') ? 'Biology' : 'Chemistry';
+    } else if (
+      lowerPath === '/tools/computer-science' ||
+      lowerPath === '/tools/math' ||
+      lowerPath === '/tools/biology' ||
+      lowerPath === '/tools/chemistry'
+    ) {
+      const catLabel = lowerPath.endsWith('/computer-science')
+        ? 'Computer Science'
+        : lowerPath.endsWith('/math')
+        ? 'Mathematics'
+        : lowerPath.endsWith('/biology')
+        ? 'Biology'
+        : 'Chemistry';
       const titleMap: Record<string, string> = {
+        '/tools/computer-science': 'Free Computer Science & Programming Student Tools (10 Tools) | University Tutors',
         '/tools/math': 'Free University Mathematics & Statistics Calculators (27 Tools) | University Tutors',
         '/tools/biology': 'Free Biology, Genetics & Molecular Lab Calculators (14 Tools) | University Tutors',
         '/tools/chemistry': 'Free Chemistry, Stoichiometry & Spectroscopy Calculators (16 Tools) | University Tutors',
       };
       const descMap: Record<string, string> = {
+        '/tools/computer-science':
+          '10 free 100% browser-based Computer Science tools: SQL Query Playground, Boolean Truth Table & Logic Gates, Binary/IEEE 754 Converter, Sorting & BST Visualizers, CIDR Subnet Calculator, Regex Debugger, Big-O Analyzer, Diff Checker & JWT Inspector.',
         '/tools/math':
           '27 free interactive browser-based Mathematics & Statistics solvers: Calculus derivatives, Riemann integrals, Matrix RREF, Eigenvalues, Hypothesis Testing & ODEs.',
         '/tools/biology':
@@ -1069,10 +1086,15 @@ export async function renderSeoHtml(params: SsrRenderParams): Promise<string> {
         '/tools/chemistry':
           '16 free interactive browser-based Chemistry calculators: Periodic Table, Molar Mass, Equation Balancer, Limiting Reagent, Buffer pH & IR/NMR Lookup.',
       };
-      const matchingTools = TOOLS_SEO_META_LIST.filter((t) => t.path.startsWith(lowerPath + '/'));
+      const matchingTools =
+        lowerPath === '/tools/computer-science'
+          ? TOOLS_SEO_META_LIST.filter((t) => t.category === 'Computer Science')
+          : TOOLS_SEO_META_LIST.filter((t) => t.path.startsWith(lowerPath + '/'));
+      const hubKeywords = lowerPath === '/tools/computer-science' ? CS_HUB_KEYWORDS : undefined;
       seo = {
         title: titleMap[lowerPath],
         description: descMap[lowerPath],
+        keywords: hubKeywords,
         canonicalUrl: `${CANONICAL_BASE_URL}${lowerPath}`,
         robots: 'index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1',
         ogType: 'website',
@@ -1085,6 +1107,7 @@ export async function renderSeoHtml(params: SsrRenderParams): Promise<string> {
             name: titleMap[lowerPath],
             url: `${CANONICAL_BASE_URL}${lowerPath}`,
             description: descMap[lowerPath],
+            ...(hubKeywords ? { keywords: hubKeywords.join(', ') } : {}),
           },
         ],
         mainHtml: `
@@ -1099,6 +1122,13 @@ export async function renderSeoHtml(params: SsrRenderParams): Promise<string> {
                 )
                 .join('')}
             </div>
+            ${
+              hubKeywords?.length
+                ? `<section class="preboot-section"><h2>Popular ${escapeHtml(catLabel)} Student Search Topics</h2><div class="preboot-links-wrap">${hubKeywords
+                    .map((kw) => `<span>${escapeHtml(kw)}</span>`)
+                    .join(' · ')}</div></section>`
+                : ''
+            }
           </article>
         `,
       };
@@ -1112,6 +1142,7 @@ export async function renderSeoHtml(params: SsrRenderParams): Promise<string> {
         seo = {
           title: toolMeta.seoTitle,
           description: clipMetaDescription(toolMeta.seoDescription),
+          keywords: toolMeta.keywords,
           canonicalUrl,
           robots: 'index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1',
           ogType: 'website',
@@ -1126,6 +1157,7 @@ export async function renderSeoHtml(params: SsrRenderParams): Promise<string> {
               applicationCategory: 'EducationalApplication',
               operatingSystem: 'All',
               description: toolMeta.seoDescription,
+              ...(toolMeta.keywords?.length ? { keywords: toolMeta.keywords.join(', ') } : {}),
               offers: { '@type': 'Offer', price: '0', priceCurrency: 'USD' },
             },
           ],
@@ -1135,6 +1167,11 @@ export async function renderSeoHtml(params: SsrRenderParams): Promise<string> {
               <h1>${escapeHtml(toolMeta.title)}</h1>
               <p class="preboot-lead">${escapeHtml(toolMeta.seoDescription)}</p>
               <p>${escapeHtml(toolMeta.summary)}</p>
+              ${
+                toolMeta.keywords?.length
+                  ? `<section class="preboot-section"><h2>Relevant Search Topics</h2><p>${toolMeta.keywords.map((k) => escapeHtml(k)).join(' · ')}</p></section>`
+                  : ''
+              }
               <section class="preboot-section">
                 <h2>Related Academic Tools</h2>
                 <div class="preboot-links-wrap">
@@ -1326,6 +1363,7 @@ export async function renderSeoHtml(params: SsrRenderParams): Promise<string> {
   let outHtml = templateHtml
     .replace(/<title>[\s\S]*?<\/title>/i, '')
     .replace(/<meta\s+name=["']description["'][^>]*>/gi, '')
+    .replace(/<meta\s+name=["']keywords["'][^>]*>/gi, '')
     .replace(/<meta\s+name=["']robots["'][^>]*>/gi, '')
     .replace(/<link\s+rel=["']canonical["'][^>]*>/gi, '')
     .replace(/<link\s+rel=["']alternate["']\s+hreflang=["'][^"']*["'][^>]*>/gi, '')
@@ -1340,6 +1378,9 @@ export async function renderSeoHtml(params: SsrRenderParams): Promise<string> {
   const headInjections = [
     `<title>${escapeHtml(seo.title)}</title>`,
     `<meta name="description" content="${escapeHtml(seo.description)}" />`,
+    seo.keywords?.length
+      ? `<meta name="keywords" content="${escapeHtml(seo.keywords.join(', '))}" />`
+      : '',
     `<meta name="robots" content="${escapeHtml(seo.robots)}" />`,
     `<link rel="canonical" href="${escapeHtml(seo.canonicalUrl)}" id="canonical-url" data-ssr-seo="1" />`,
     seo.includeRegionalHreflangs ? REGIONAL_HREFLANG_LINKS : '',

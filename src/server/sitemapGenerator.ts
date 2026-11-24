@@ -7,6 +7,7 @@ import {
   MATH_TOOL_SLUGS,
   BIOLOGY_TOOL_SLUGS,
   CHEMISTRY_TOOL_SLUGS,
+  CS_TOOL_SLUGS,
   STUDENT_TOOL_SLUGS,
 } from '../data/toolRouteMatchers';
 import { getBlogCanonicalSlug } from '../utils/blogSlug';
@@ -176,6 +177,7 @@ function discoverToolPathsFromSourceFiles(): string[] {
     path.join(process.cwd(), 'src', 'data', 'studentToolsData.ts'),
     path.join(process.cwd(), 'src', 'data', 'mathToolsRegistry.ts'),
     path.join(process.cwd(), 'src', 'data', 'scienceToolsRegistry.ts'),
+    path.join(process.cwd(), 'src', 'data', 'csToolsRegistry.ts'),
     path.join(process.cwd(), 'src', 'data', 'toolRouteMatchers.ts'),
   ];
 
@@ -266,9 +268,15 @@ export function buildAllSitemapEntries(params: {
 
   // 5. Free Student Tools, Math Tools, Biology Tools & Chemistry Tools (auto-discovered)
   // Category Hubs
+  addRoute('/tools/computer-science', '0.85', 'weekly');
   addRoute('/tools/math', '0.85', 'weekly');
   addRoute('/tools/biology', '0.85', 'weekly');
   addRoute('/tools/chemistry', '0.85', 'weekly');
+
+  // Computer Science & Programming Student Tools (10 tools)
+  for (const slug of CS_TOOL_SLUGS) {
+    addRoute(`/tools/${slug}`, '0.8', 'weekly');
+  }
 
   // Student Utility Tools (CV Maker, Grade Converter, Paraphraser, Whiteboard, Graph Builders, PDF, OCR, etc.)
   for (const slug of STUDENT_TOOL_SLUGS) {

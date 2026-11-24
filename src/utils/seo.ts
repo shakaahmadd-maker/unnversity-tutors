@@ -9,6 +9,7 @@ export const BASE_CANONICAL_DOMAIN = 'https://university-tutors.com';
 interface SeoMetadataOptions {
   title?: string;
   description?: string;
+  keywords?: string[];
   canonicalPath?: string;
   ogImage?: string;
   ogType?: 'website' | 'article' | 'profile';
@@ -63,7 +64,7 @@ export function updateCanonicalTag(customCanonicalUrl?: string): void {
 export function updatePageSeo(options: SeoMetadataOptions): void {
   if (typeof document === 'undefined') return;
 
-  const { title, description, canonicalPath, ogImage, ogType, robots, structuredData } = options;
+  const { title, description, keywords, canonicalPath, ogImage, ogType, robots, structuredData } = options;
 
   if (title) {
     document.title = title;
@@ -86,6 +87,16 @@ export function updatePageSeo(options: SeoMetadataOptions): void {
     if (ogDesc) ogDesc.setAttribute('content', description);
     const twDesc = document.querySelector<HTMLMetaElement>("meta[name='twitter:description']");
     if (twDesc) twDesc.setAttribute('content', description);
+  }
+
+  if (keywords && keywords.length > 0) {
+    let metaKw = document.querySelector<HTMLMetaElement>("meta[name='keywords']");
+    if (!metaKw) {
+      metaKw = document.createElement('meta');
+      metaKw.setAttribute('name', 'keywords');
+      document.head.appendChild(metaKw);
+    }
+    metaKw.setAttribute('content', keywords.join(', '));
   }
 
   if (ogType) {

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, lazy, Suspense } from 'react';
-import { Search, ShieldCheck, Star, ArrowRight } from 'lucide-react';
+import { Search, ShieldCheck, Star, ArrowRight, Terminal } from 'lucide-react';
 import { ScienceCategoryIcon } from './ScienceHubVisuals';
 import {
   STUDENT_TOOLS,
@@ -268,9 +268,35 @@ export default function ToolsHub({
         </div>
       </section>
 
-      {/* Featured Math, Biology & Chemistry Knowledge Mega-Hubs (57 STEM Solvers) */}
+      {/* Featured CS, Math, Biology & Chemistry Knowledge Mega-Hubs (67 STEM Solvers) */}
       <section className="max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 pt-10 pb-2">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+          <a
+            href="/tools/computer-science"
+            onClick={(e) => handleAnchorNav(e, 'tools/computer-science')}
+            className="group bg-[#FFFFFF] border border-slate-200 hover:border-[#F97316] rounded-2xl p-6 flex flex-col justify-between gap-4 shadow-2xs hover:shadow-md transition-all cursor-pointer"
+          >
+            <div className="space-y-2.5">
+              <div className="flex items-center justify-between">
+                <span className="inline-flex items-center gap-1.5 text-xs font-bold text-[#EA580C] bg-[#FFF7ED] border border-orange-200 px-3 py-1 rounded-lg">
+                  <Terminal className="w-4 h-4 text-[#EA580C]" />
+                  <span>Computer Science Hub · 10 Tools</span>
+                </span>
+                <span className="font-mono text-xs text-slate-400">/tools/computer-science</span>
+              </div>
+              <h2 className="text-xl font-display font-bold text-[#111827] group-hover:text-[#EA580C] transition-colors">
+                Free Computer Science &amp; Programming Tools Suite
+              </h2>
+              <p className="text-xs sm:text-sm text-slate-600 leading-relaxed">
+                SQL Query Playground, Boolean Truth Table &amp; Logic Gates, Binary/IEEE 754 Converter, Sorting &amp; BST Visualizers, CIDR Subnet Calculator, Regex Debugger, Big-O Analyzer, Diff Checker &amp; JWT Inspector.
+              </p>
+            </div>
+            <span className="inline-flex items-center gap-1.5 text-xs font-bold text-[#F97316] group-hover:text-[#EA580C]">
+              <span>Explore All 10 CS &amp; Coding Tools</span>
+              <ArrowRight className="w-3.5 h-3.5 transition-transform group-hover:translate-x-0.5" />
+            </span>
+          </a>
+
           <a
             href="/tools/math"
             onClick={(e) => handleAnchorNav(e, 'tools/math')}

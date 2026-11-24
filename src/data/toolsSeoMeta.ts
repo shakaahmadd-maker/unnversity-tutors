@@ -5,6 +5,7 @@ export interface ToolSeoMeta {
   seoTitle: string;
   seoDescription: string;
   summary: string;
+  keywords?: string[];
 }
 
 export const TOOLS_SEO_META_LIST: ToolSeoMeta[] = [
@@ -583,6 +584,177 @@ export const TOOLS_SEO_META_LIST: ToolSeoMeta[] = [
     "seoTitle": "Modular Inverse, Extended Euclidean, CRT & RSA Cryptography Calculator | University Tutors",
     "seoDescription": "Calculate Extended Euclidean GCD Bézout coefficients, modular inverses, Euler’s totient φ(n), Chinese Remainder Theorem systems, and interactive RSA key generation.",
     "summary": "Run Extended Euclidean Bézout steps, modular inverse a⁻¹ mod m, fast modular exponentiation, Euler’s totient φ(n), Chinese Remainder Theorem, and live RSA encryption/decryption."
+  },
+  {
+    "path": "/tools/sql-playground",
+    "category": "Computer Science",
+    "title": "Client-Side SQL Query Playground",
+    "seoTitle": "Free Online SQL Query Playground & Practice Sandbox | University Tutors",
+    "seoDescription": "Practice SQL JOIN, GROUP BY, HAVING, aggregate functions, and subqueries 100% locally in your browser with pre-loaded university tables and instant CSV export.",
+    "summary": "Write and execute SQL queries locally against pre-loaded university tables (Students, Courses, Enrollments) with JOIN, GROUP BY, HAVING, subqueries, and CSV export.",
+    "keywords": [
+      "online sql playground",
+      "sql compiler online",
+      "sqlite online",
+      "sql practice online",
+      "sql query runner",
+      "sql join practice",
+      "sql group by having examples",
+      "free sql sandbox"
+    ]
+  },
+  {
+    "path": "/tools/truth-table-generator",
+    "category": "Computer Science",
+    "title": "Boolean Logic Gate & Truth Table Generator",
+    "seoTitle": "Boolean Truth Table Generator & Logic Gate Diagram Builder | University Tutors",
+    "seoDescription": "Generate step-by-step Boolean truth tables (up to 5 variables), canonical Sum of Products (SOP), Product of Sums (POS), and SVG logic gate circuits locally.",
+    "summary": "Parse Boolean expressions up to 5 variables with step-by-step sub-expression columns, canonical SOP/POS forms, and an auto-drawn SVG logic gate diagram.",
+    "keywords": [
+      "truth table generator",
+      "boolean algebra calculator",
+      "logic gate simulator",
+      "sop and pos calculator",
+      "boolean expression simplifier",
+      "xor nand nor truth table",
+      "digital logic circuit drawer"
+    ]
+  },
+  {
+    "path": "/tools/binary-hex-converter",
+    "category": "Computer Science",
+    "title": "Number Base, Two's Complement & IEEE 754 Converter",
+    "seoTitle": "Binary Hex Converter, Two's Complement & IEEE 754 Calculator | University Tutors",
+    "seoDescription": "Convert Binary, Octal, Decimal, and Hexadecimal in real time, inspect interactive 8/16/32-bit Two's Complement and IEEE 754 float bits, and compute bitwise operations.",
+    "summary": "Bidirectional Binary, Octal, Decimal, and Hex converter with interactive 8/16/32-bit Two's Complement, IEEE 754 single-precision bit breakdown, and bitwise calculator.",
+    "keywords": [
+      "binary to decimal converter",
+      "hex to binary converter",
+      "two's complement calculator",
+      "ieee 754 floating point converter",
+      "float to hex converter",
+      "bitwise calculator online",
+      "octal to hexadecimal"
+    ]
+  },
+  {
+    "path": "/tools/algorithm-visualizer",
+    "category": "Computer Science",
+    "title": "Interactive Sorting & Pathfinding Algorithm Visualizer",
+    "seoTitle": "Interactive Sorting & Binary Search Algorithm Visualizer | University Tutors",
+    "seoDescription": "Watch Bubble Sort, Selection Sort, Insertion Sort, Merge Sort, Quick Sort, and Binary Search step by step with live comparison and swap counters.",
+    "summary": "Step-by-step animated visualizer for Bubble, Selection, Insertion, Merge, Quick Sort, and Binary Search with live comparisons, swaps, speed, and array controls.",
+    "keywords": [
+      "sorting algorithm visualizer",
+      "algorithm visualizer online",
+      "quick sort visualizer",
+      "merge sort step by step",
+      "bubble sort animation",
+      "binary search visualizer",
+      "time complexity comparison"
+    ]
+  },
+  {
+    "path": "/tools/data-structure-visualizer",
+    "category": "Computer Science",
+    "title": "Data Structure & Binary Search Tree (BST) Explorer",
+    "seoTitle": "Interactive Binary Search Tree (BST), Stack & Queue Visualizer | University Tutors",
+    "seoDescription": "Build Binary Search Trees, Stacks, and Queues interactively. Insert, delete, search, and animate In-Order, Pre-Order, Post-Order, and Level-Order (BFS) traversals.",
+    "summary": "Insert, delete, and search nodes in an interactive SVG Binary Search Tree, Stack, or Queue with animated In-Order, Pre-Order, Post-Order, and BFS traversals.",
+    "keywords": [
+      "binary search tree visualizer",
+      "bst visualizer online",
+      "data structure visualizer",
+      "inorder preorder postorder traversal",
+      "bfs level order tree traversal",
+      "stack and queue visualizer",
+      "tree traversal generator"
+    ]
+  },
+  {
+    "path": "/tools/subnet-calculator",
+    "category": "Computer Science",
+    "title": "IPv4 / CIDR Subnet Mask Calculator",
+    "seoTitle": "Free IPv4 & CIDR Subnet Calculator with 32-Bit Binary Map | University Tutors",
+    "seoDescription": "Calculate IPv4 network address, broadcast address, usable host range, wildcard mask, CIDR prefix (/0–/32), and 32-bit binary bitmaps instantly in your browser.",
+    "summary": "Compute Network, Broadcast, First/Last Usable Host, Wildcard Mask, IP Class, Private/Public scope, and a color-coded 32-bit binary network vs. host bit map.",
+    "keywords": [
+      "subnet calculator",
+      "ipv4 cidr calculator",
+      "subnet mask calculator",
+      "cidr to ip range",
+      "network and broadcast address calculator",
+      "wildcard mask calculator",
+      "usable host calculator"
+    ]
+  },
+  {
+    "path": "/tools/regex-tester",
+    "category": "Computer Science",
+    "title": "Regex Tester, Debugger & Plain-English Explainer",
+    "seoTitle": "Free Online Regex Tester, Debugger & Plain-English Explainer | University Tutors",
+    "seoDescription": "Test JavaScript regular expressions with live match highlights, capture group tables, common CS validation presets, and plain-English token explanations locally.",
+    "summary": "Test regular expressions live with flags (g, i, m, s), highlighted match ranges, capture group breakdown tables, CS presets, and token-by-token English explanations.",
+    "keywords": [
+      "regex tester",
+      "regex debugger online",
+      "regular expression tester",
+      "regex explainer",
+      "regex capture group tester",
+      "email ipv4 regex validator",
+      "javascript regex playground"
+    ]
+  },
+  {
+    "path": "/tools/big-o-calculator",
+    "category": "Computer Science",
+    "title": "Big-O Time & Space Complexity Analyzer & Reference",
+    "seoTitle": "Big-O Time & Space Complexity Analyzer & Growth Chart | University Tutors",
+    "seoDescription": "Analyze loop and recursion complexity in JS, Python, Java, or C++ and compare O(1), O(log n), O(n), O(n log n), O(n^2), and O(2^n) operation counts interactively.",
+    "summary": "Paste JS/Python/Java/C++ loops or choose algorithm patterns to estimate Time & Space Big-O complexity alongside an interactive n = 10 to 10,000 growth-rate chart.",
+    "keywords": [
+      "big o notation calculator",
+      "time complexity calculator",
+      "space complexity analyzer",
+      "big o cheat sheet chart",
+      "algorithm complexity estimator",
+      "o(n log n) vs o(n^2)",
+      "code time complexity checker"
+    ]
+  },
+  {
+    "path": "/tools/code-formatter-diff",
+    "category": "Computer Science",
+    "title": "JSON / XML / YAML Formatter, Validator & Side-by-Side Diff Checker",
+    "seoTitle": "Free JSON, XML & YAML Formatter, Validator & Code Diff Checker | University Tutors",
+    "seoDescription": "Format, minify, validate with line numbers, convert JSON to YAML or CSV, and compare code side-by-side with LCS diff highlighting 100% locally in your browser.",
+    "summary": "Pretty-print, minify, validate JSON/XML/YAML with exact line diagnostics, convert between JSON, YAML, and CSV, and run a side-by-side line diff highlighter.",
+    "keywords": [
+      "json formatter online",
+      "json validator",
+      "yaml to json converter",
+      "json to csv converter",
+      "xml formatter and validator",
+      "diff checker online",
+      "side by side code compare"
+    ]
+  },
+  {
+    "path": "/tools/crypto-jwt-tool",
+    "category": "Computer Science",
+    "title": "Hash Generator, Base64 & JWT Inspector",
+    "seoTitle": "Free SHA-256 Hash Generator, Base64 & Local JWT Decoder | University Tutors",
+    "seoDescription": "Compute SHA-1/256/384/512 hashes with browser Web Crypto API, encode/decode Base64 & Base64URL, and inspect JWT headers, claims, and expiration dates locally.",
+    "summary": "Generate SHA-1, SHA-256, SHA-384, and SHA-512 hashes via Web Crypto API, encode/decode Base64 & URL strings, and decode JWT headers, payloads, and expirations locally.",
+    "keywords": [
+      "sha256 hash generator",
+      "jwt decoder online",
+      "base64 encode decode",
+      "jwt token inspector",
+      "sha512 hash calculator",
+      "url encoder decoder",
+      "base64url converter"
+    ]
   }
 ];
 

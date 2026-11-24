@@ -10,6 +10,7 @@ import {
   Dna,
   FlaskConical,
   Sigma,
+  Terminal,
   Wrench,
   BookCheck,
 } from 'lucide-react';
@@ -18,7 +19,7 @@ import {
   DEDICATED_SERVICE_ROUTES,
   isModifiedAnchorClick,
 } from '../data/dedicatedServiceRoutes';
-import { STUDENT_TOOLS_COUNT } from '../data/toolRouteMatchers';
+import { STUDENT_TOOLS_COUNT, matchCsRouteView } from '../data/toolRouteMatchers';
 import { getResponsiveAvatarProps } from '../utils/imageOptimization';
 
 interface ServicesDropdownPanelProps {
@@ -107,6 +108,29 @@ export function ToolsDropdownPanel({ activeView, onLinkClick }: ToolsDropdownPan
   return (
     <div className="absolute top-full left-0 pt-2 w-76 z-50">
       <div className="bg-white rounded-2xl shadow-xl border border-slate-200 p-2 space-y-1">
+        <a
+          href="/tools/computer-science"
+          onClick={(e) => {
+            if (!isModifiedAnchorClick(e)) {
+              e.preventDefault();
+              onLinkClick('tools/computer-science');
+            }
+          }}
+          className={`w-full text-left p-2.5 rounded-xl hover:bg-orange-50/70 transition-colors flex items-start gap-2.5 group cursor-pointer ${
+            Boolean(matchCsRouteView(activeView)) ? 'bg-orange-50/80 ring-1 ring-orange-200/70' : ''
+          }`}
+        >
+          <Terminal className="w-4 h-4 text-orange-650 mt-0.5 shrink-0" />
+          <div>
+            <div className="text-xs font-bold text-slate-900 group-hover:text-orange-650">
+              Computer Science Hub (10)
+            </div>
+            <div className="text-[10px] text-slate-600">
+              SQL, Truth Tables, IEEE 754, BST, CIDR, Big-O &amp; JWT
+            </div>
+          </div>
+        </a>
+
         <a
           href="/tools/math"
           onClick={(e) => {
@@ -324,8 +348,25 @@ export function MobileNavigationDrawer({
         {/* Mobile Free Science & Student Tools Links */}
         <div className="p-3 bg-orange-50/50 rounded-2xl border border-orange-200/70 space-y-1.5">
           <div className="text-xs font-bold text-orange-700 uppercase tracking-wider px-1">
-            Free Math, Science &amp; Student Tools
+            Free CS, Math, Science &amp; Student Tools
           </div>
+          <a
+            href="/tools/computer-science"
+            onClick={(e) => {
+              if (!isModifiedAnchorClick(e)) {
+                e.preventDefault();
+                onLinkClick('tools/computer-science');
+              }
+            }}
+            className={`flex items-center gap-2 text-left text-xs font-bold px-3 py-2.5 min-h-[44px] rounded-xl transition-colors ${
+              Boolean(matchCsRouteView(activeView))
+                ? 'bg-orange-100 text-orange-700'
+                : 'text-slate-800 hover:bg-orange-100/70'
+            }`}
+          >
+            <Terminal className="w-4 h-4 text-orange-650 shrink-0" />
+            <span>Computer Science &amp; Coding Hub (10 Tools)</span>
+          </a>
           <a
             href="/tools/math"
             onClick={(e) => {
