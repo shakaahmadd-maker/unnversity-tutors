@@ -362,8 +362,12 @@ export class AppStore {
   }
 
   private async bootstrap(): Promise<User | null> {
-    const user = await this.verifySession(false);
-    const pathname = typeof window !== 'undefined' ? window.location.pathname : '/';
+    const pathname = typeof window !== 'undefined' ? window.location.pathname.toLowerCase() : '/';
+    const isProtectedRoute =
+      /^\/(student|admin|user-data)(\/|$)/.test(pathname) ||
+      pathname === '/tutor' ||
+      pathname === '/tutor/dashboard';
+    const user = await this.verifySession(false, isProtectedRoute);
     if (!user && (pathname === '/' || pathname === '')) {
       if (typeof window !== 'undefined') {
         window.setTimeout(() => {

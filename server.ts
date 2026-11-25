@@ -3525,7 +3525,20 @@ export async function createApp(options: CreateAppOptions = {}) {
       };
     }
 
-    const expectedRedirectUri = `${prodBase}${GOOGLE_OAUTH_CALLBACK_PATH}`;
+    const allowedRedirectUris = new Set<string>([
+      `${prodBase}${GOOGLE_OAUTH_CALLBACK_PATH}`,
+      `https://${API_SUBDOMAIN_HOST}${GOOGLE_OAUTH_CALLBACK_PATH}`,
+    ]);
+    const configuredApiHost = readRuntimeEnv('API_HOSTNAME')
+      .replace(/^https?:\/\//i, '')
+      .replace(/\/.*$/, '')
+      .replace(/:\d+$/, '')
+      .trim()
+      .toLowerCase();
+    if (configuredApiHost) {
+      allowedRedirectUris.add(`https://${configuredApiHost}${GOOGLE_OAUTH_CALLBACK_PATH}`);
+    }
+    const preferredRedirectUri = `https://${API_SUBDOMAIN_HOST}${GOOGLE_OAUTH_CALLBACK_PATH}`;
 
     if (isForbiddenProductionUrl(explicitRedirectUri)) {
       return {
@@ -3538,7 +3551,7 @@ export async function createApp(options: CreateAppOptions = {}) {
         configured: false,
         missingVars: [] as string[],
         errorCode: 'redirect_uri_mismatch' as const,
-        error: `Redirect URI mismatch: GOOGLE_REDIRECT_URI must be a valid HTTPS live production URL matching ${expectedRedirectUri}.`,
+        error: `Redirect URI mismatch: GOOGLE_REDIRECT_URI must be a valid HTTPS live production URL matching ${preferredRedirectUri}.`,
         authUrl: 'https://accounts.google.com/o/oauth2/v2/auth',
         tokenUrl: 'https://oauth2.googleapis.com/token',
         userInfoUrl: 'https://www.googleapis.com/oauth2/v2/userinfo',
@@ -3546,7 +3559,7 @@ export async function createApp(options: CreateAppOptions = {}) {
       };
     }
 
-    if (explicitRedirectUri !== expectedRedirectUri) {
+    if (!allowedRedirectUris.has(explicitRedirectUri)) {
       return {
         id: 'google' as const,
         name: 'Google',
@@ -3557,7 +3570,7 @@ export async function createApp(options: CreateAppOptions = {}) {
         configured: false,
         missingVars: [] as string[],
         errorCode: 'redirect_uri_mismatch' as const,
-        error: `Redirect URI mismatch: GOOGLE_REDIRECT_URI must exactly match ${expectedRedirectUri}.`,
+        error: `Redirect URI mismatch: GOOGLE_REDIRECT_URI must match ${preferredRedirectUri} (or ${prodBase}${GOOGLE_OAUTH_CALLBACK_PATH}).`,
         authUrl: 'https://accounts.google.com/o/oauth2/v2/auth',
         tokenUrl: 'https://oauth2.googleapis.com/token',
         userInfoUrl: 'https://www.googleapis.com/oauth2/v2/userinfo',
@@ -3571,7 +3584,7 @@ export async function createApp(options: CreateAppOptions = {}) {
       clientId,
       clientSecret,
       appUrl: prodBase,
-      redirectUri: expectedRedirectUri,
+      redirectUri: explicitRedirectUri,
       configured: true,
       missingVars: [] as string[],
       errorCode: null,
@@ -3741,8 +3754,9 @@ export async function createApp(options: CreateAppOptions = {}) {
       });
     }
 
-    const targetOrigin = resolveProductionBaseUrl() || '*';
-    const authReturnUrl = `/auth?oauth_error=${encodeURIComponent(safeMsg)}`;
+    const prodBase = resolveProductionBaseUrl();
+    const targetOrigin = prodBase || '*';
+    const authReturnUrl = `${prodBase || ''}/auth?oauth_error=${encodeURIComponent(safeMsg)}`;
 
     return res.status(statusCode).send(`<!DOCTYPE html>
 <html lang="en">
@@ -3993,10 +4007,12 @@ export async function createApp(options: CreateAppOptions = {}) {
     const isHttps = isSecureCookieRequest(req);
     setSecureSessionCookie(req, res, sessionToken);
 
-    let targetRedirectUrl = '/student/dashboard';
+    const prodBase = resolveProductionBaseUrl();
+    let targetPath = '/student/dashboard';
     if (targetUser.role === 'tutor') {
-      targetRedirectUrl = '/tutor/dashboard';
+      targetPath = '/tutor/dashboard';
     }
+    const targetRedirectUrl = prodBase ? `${prodBase}${targetPath}` : targetPath;
 
     logSafeOAuthEvent('oauth_session_created', {
       provider: providerLabel.toLowerCase(),
