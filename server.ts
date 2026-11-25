@@ -151,7 +151,44 @@ const FORBIDDEN_LOG_KEYS = new Set([
   'database_url',
   'token',
   'code',
+  'state',
+  'stateprefix',
+  'google_client_secret',
+  'authorization_code',
+  'callbackurl',
+  'originalurl',
+  'redirecturi',
 ]);
+
+function extractSafeUrlHostname(rawUrl: string): string | null {
+  if (!rawUrl || typeof rawUrl !== 'string') return null;
+  try {
+    const parsed = new URL(rawUrl.trim());
+    return parsed.hostname ? parsed.hostname.toLowerCase() : null;
+  } catch {
+    return null;
+  }
+}
+
+function getAllowedGoogleApiCallbackUris(): string[] {
+  const allowed = new Set<string>([
+    `https://${API_SUBDOMAIN_HOST}${GOOGLE_OAUTH_CALLBACK_PATH}`,
+  ]);
+  const configuredApiHost = readRuntimeEnv('API_HOSTNAME')
+    .replace(/^https?:\/\//i, '')
+    .replace(/\/.*$/, '')
+    .replace(/:\d+$/, '')
+    .trim()
+    .toLowerCase();
+  if (
+    configuredApiHost &&
+    configuredApiHost !== 'university-tutors.com' &&
+    configuredApiHost !== 'www.university-tutors.com'
+  ) {
+    allowed.add(`https://${configuredApiHost}${GOOGLE_OAUTH_CALLBACK_PATH}`);
+  }
+  return Array.from(allowed);
+}
 
 // Safe structured OAuth logger: never logs secrets, tokens, passwords, DATABASE_URL, or SESSION_SECRET
 function logSafeOAuthEvent(
@@ -1880,26 +1917,42 @@ export async function createApp(options: CreateAppOptions = {}) {
   // ==========================================
 
   function isSecureCookieRequest(req: express.Request): boolean {
-    if (req.secure || req.headers['x-forwarded-proto'] === 'https') {
+    const forwardedProto = String(req.headers['x-forwarded-proto'] || '')
+      .split(',')[0]
+      .trim()
+      .toLowerCase();
+    if (req.secure || forwardedProto === 'https') {
       return true;
     }
-    const host = (req.hostname || '').toLowerCase();
-    const isLocalHost = host === 'localhost' || host === '127.0.0.1' || host === '::1';
+    const host = getNormalizedRequestHost(req);
+    const isLocalHost = !host || host === 'localhost' || host === '127.0.0.1' || host === '[::1]' || host === '::1';
     if (!isLocalHost && ((process.env.NODE_ENV || NODE_ENV) === 'production' || getRuntimeAppUrl().startsWith('https://'))) {
       return true;
     }
     return false;
   }
 
-  // Helper to set secure HTTP-only session cookie consistently
+  // Scope session cookies to .university-tutors.com in production so sessions persist seamlessly
+  // between https://university-tutors.com and https://api.university-tutors.com.
+  function resolveSessionCookieDomain(req: express.Request): string | undefined {
+    const host = getNormalizedRequestHost(req);
+    if (host === 'university-tutors.com' || host.endsWith('.university-tutors.com')) {
+      return '.university-tutors.com';
+    }
+    return undefined;
+  }
+
+  // Helper to set secure HTTP-only session cookie consistently across frontend & API subdomains
   function setSecureSessionCookie(req: express.Request, res: express.Response, token: string, maxAgeMs: number = 7 * 24 * 60 * 60 * 1000) {
     const isHttps = isSecureCookieRequest(req);
+    const cookieDomain = resolveSessionCookieDomain(req);
     res.cookie(COOKIE_NAME, token, {
       httpOnly: true,
       secure: isHttps,
       sameSite: 'lax',
       path: '/',
       maxAge: maxAgeMs,
+      ...(cookieDomain ? { domain: cookieDomain } : {}),
     });
     res.cookie('ut_session_active', '1', {
       httpOnly: false,
@@ -1907,11 +1960,14 @@ export async function createApp(options: CreateAppOptions = {}) {
       sameSite: 'lax',
       path: '/',
       maxAge: maxAgeMs,
+      ...(cookieDomain ? { domain: cookieDomain } : {}),
     });
   }
 
   function clearSecureSessionCookie(req: express.Request, res: express.Response) {
     const isHttps = isSecureCookieRequest(req);
+    const cookieDomain = resolveSessionCookieDomain(req);
+    // Clear host-only cookies (backwards compatibility)
     res.clearCookie(COOKIE_NAME, {
       httpOnly: true,
       secure: isHttps,
@@ -1924,6 +1980,23 @@ export async function createApp(options: CreateAppOptions = {}) {
       sameSite: 'lax',
       path: '/',
     });
+    // Also clear shared cross-subdomain cookies in production
+    if (cookieDomain) {
+      res.clearCookie(COOKIE_NAME, {
+        httpOnly: true,
+        secure: isHttps,
+        sameSite: 'lax',
+        path: '/',
+        domain: cookieDomain,
+      });
+      res.clearCookie('ut_session_active', {
+        httpOnly: false,
+        secure: isHttps,
+        sameSite: 'lax',
+        path: '/',
+        domain: cookieDomain,
+      });
+    }
   }
 
   // Sliding-window rate limiter helper (in-memory)
@@ -3473,12 +3546,14 @@ export async function createApp(options: CreateAppOptions = {}) {
 
   // 1. GOOGLE OAUTH CONFIGURATION
   // Reads ONLY GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, GOOGLE_REDIRECT_URI, and APP_URL from runtime process.env.
+  // Never derives GOOGLE_REDIRECT_URI from APP_URL when the API runs on a separate hostname (api.university-tutors.com).
   // Never uses fallback credentials, preview container URLs, localhost URLs, or dynamic container hosts.
   function getGoogleOAuthConfig() {
     const clientId = readRuntimeEnv('GOOGLE_CLIENT_ID');
     const clientSecret = readRuntimeEnv('GOOGLE_CLIENT_SECRET');
     const explicitRedirectUri = readRuntimeEnv('GOOGLE_REDIRECT_URI').replace(/\/+$/, '');
     const rawAppUrl = getRuntimeAppUrl();
+    const redirectUriHostname = extractSafeUrlHostname(explicitRedirectUri);
 
     const missingVars: string[] = [];
     if (!clientId) missingVars.push('GOOGLE_CLIENT_ID');
@@ -3494,6 +3569,7 @@ export async function createApp(options: CreateAppOptions = {}) {
         clientSecret: undefined,
         appUrl: '',
         redirectUri: '',
+        redirectUriHostname,
         configured: false,
         missingVars,
         errorCode: 'missing_oauth_credentials' as const,
@@ -3514,6 +3590,7 @@ export async function createApp(options: CreateAppOptions = {}) {
         clientSecret: undefined,
         appUrl: '',
         redirectUri: '',
+        redirectUriHostname,
         configured: false,
         missingVars: [] as string[],
         errorCode: 'redirect_uri_mismatch' as const,
@@ -3525,20 +3602,8 @@ export async function createApp(options: CreateAppOptions = {}) {
       };
     }
 
-    const allowedRedirectUris = new Set<string>([
-      `${prodBase}${GOOGLE_OAUTH_CALLBACK_PATH}`,
-      `https://${API_SUBDOMAIN_HOST}${GOOGLE_OAUTH_CALLBACK_PATH}`,
-    ]);
-    const configuredApiHost = readRuntimeEnv('API_HOSTNAME')
-      .replace(/^https?:\/\//i, '')
-      .replace(/\/.*$/, '')
-      .replace(/:\d+$/, '')
-      .trim()
-      .toLowerCase();
-    if (configuredApiHost) {
-      allowedRedirectUris.add(`https://${configuredApiHost}${GOOGLE_OAUTH_CALLBACK_PATH}`);
-    }
-    const preferredRedirectUri = `https://${API_SUBDOMAIN_HOST}${GOOGLE_OAUTH_CALLBACK_PATH}`;
+    const allowedApiCallbackUris = new Set<string>(getAllowedGoogleApiCallbackUris());
+    const expectedApiCallbackUri = `https://${API_SUBDOMAIN_HOST}${GOOGLE_OAUTH_CALLBACK_PATH}`;
 
     if (isForbiddenProductionUrl(explicitRedirectUri)) {
       return {
@@ -3548,10 +3613,11 @@ export async function createApp(options: CreateAppOptions = {}) {
         clientSecret: undefined,
         appUrl: prodBase,
         redirectUri: '',
+        redirectUriHostname,
         configured: false,
         missingVars: [] as string[],
         errorCode: 'redirect_uri_mismatch' as const,
-        error: `Redirect URI mismatch: GOOGLE_REDIRECT_URI must be a valid HTTPS live production URL matching ${preferredRedirectUri}.`,
+        error: `Redirect URI mismatch: GOOGLE_REDIRECT_URI must be a valid HTTPS API callback URL matching ${expectedApiCallbackUri}.`,
         authUrl: 'https://accounts.google.com/o/oauth2/v2/auth',
         tokenUrl: 'https://oauth2.googleapis.com/token',
         userInfoUrl: 'https://www.googleapis.com/oauth2/v2/userinfo',
@@ -3559,7 +3625,7 @@ export async function createApp(options: CreateAppOptions = {}) {
       };
     }
 
-    if (!allowedRedirectUris.has(explicitRedirectUri)) {
+    if (!allowedApiCallbackUris.has(explicitRedirectUri)) {
       return {
         id: 'google' as const,
         name: 'Google',
@@ -3567,10 +3633,11 @@ export async function createApp(options: CreateAppOptions = {}) {
         clientSecret: undefined,
         appUrl: prodBase,
         redirectUri: '',
+        redirectUriHostname,
         configured: false,
         missingVars: [] as string[],
         errorCode: 'redirect_uri_mismatch' as const,
-        error: `Redirect URI mismatch: GOOGLE_REDIRECT_URI must match ${preferredRedirectUri} (or ${prodBase}${GOOGLE_OAUTH_CALLBACK_PATH}).`,
+        error: `Redirect URI mismatch: GOOGLE_REDIRECT_URI must point to the API backend callback ${expectedApiCallbackUri} (do not use APP_URL).`,
         authUrl: 'https://accounts.google.com/o/oauth2/v2/auth',
         tokenUrl: 'https://oauth2.googleapis.com/token',
         userInfoUrl: 'https://www.googleapis.com/oauth2/v2/userinfo',
@@ -3585,6 +3652,7 @@ export async function createApp(options: CreateAppOptions = {}) {
       clientSecret,
       appUrl: prodBase,
       redirectUri: explicitRedirectUri,
+      redirectUriHostname,
       configured: true,
       missingVars: [] as string[],
       errorCode: null,
@@ -4088,9 +4156,9 @@ export async function createApp(options: CreateAppOptions = {}) {
     const cfg = getGoogleOAuthConfig();
     if (!cfg.configured || !cfg.clientId || !cfg.clientSecret || !cfg.redirectUri) {
       logSafeOAuthEvent('oauth_start', {
-        provider: 'google',
-        status: 'rejected_unconfigured',
-        errorCode: cfg.errorCode,
+        googleConfigured: false,
+        redirectUriHostname: cfg.redirectUriHostname,
+        callbackRoute: GOOGLE_OAUTH_CALLBACK_PATH,
         missingVars: cfg.missingVars,
       });
       return res.status(400).json({
@@ -4108,12 +4176,14 @@ export async function createApp(options: CreateAppOptions = {}) {
     });
 
     const isHttps = isSecureCookieRequest(req);
+    const cookieDomain = resolveSessionCookieDomain(req);
     res.cookie('oauth_state_google', signOAuthStateCookieValue('google', state, cfg.redirectUri), {
       httpOnly: true,
       secure: isHttps,
       sameSite: 'lax',
       path: '/',
       maxAge: 10 * 60 * 1000,
+      ...(cookieDomain ? { domain: cookieDomain } : {}),
     });
 
     const params = new URLSearchParams({
@@ -4126,10 +4196,10 @@ export async function createApp(options: CreateAppOptions = {}) {
     });
 
     logSafeOAuthEvent('oauth_start', {
-      provider: 'google',
-      status: 'initiated',
-      redirectUri: cfg.redirectUri,
-      statePrefix: state.slice(0, 8),
+      googleConfigured: true,
+      redirectUriHostname: cfg.redirectUriHostname,
+      callbackRoute: GOOGLE_OAUTH_CALLBACK_PATH,
+      missingVars: cfg.missingVars,
     });
 
     return res.status(200).json({
@@ -4141,17 +4211,16 @@ export async function createApp(options: CreateAppOptions = {}) {
   const handleGoogleOAuthCallback = async (req: express.Request, res: express.Response) => {
     const cfg = getGoogleOAuthConfig();
     const isHttps = isSecureCookieRequest(req);
+    const cookieDomain = resolveSessionCookieDomain(req);
 
     logSafeOAuthEvent('oauth_callback_received', {
-      provider: 'google',
-      path: req.path,
-      configured: cfg.configured,
-      hasCode: Boolean(req.query.code),
-      hasState: Boolean(req.query.state),
-      hasProviderError: Boolean(req.query.error),
+      googleConfigured: cfg.configured,
+      redirectUriHostname: cfg.redirectUriHostname,
+      callbackRoute: GOOGLE_OAUTH_CALLBACK_PATH,
+      missingVars: cfg.missingVars,
     });
 
-    // Always clear one-time state cookie on callback execution
+    // Always clear one-time state cookie on callback execution (host-only and shared subdomain)
     const rawStateCookie = req.cookies?.oauth_state_google;
     if (rawStateCookie) {
       res.clearCookie('oauth_state_google', {
@@ -4160,6 +4229,15 @@ export async function createApp(options: CreateAppOptions = {}) {
         sameSite: 'lax',
         path: '/',
       });
+      if (cookieDomain) {
+        res.clearCookie('oauth_state_google', {
+          httpOnly: true,
+          secure: isHttps,
+          sameSite: 'lax',
+          path: '/',
+          domain: cookieDomain,
+        });
+      }
     }
 
     if (!cfg.configured || !cfg.clientId || !cfg.clientSecret || !cfg.redirectUri) {
@@ -9678,8 +9756,16 @@ export async function startServer() {
   for (const key of ['GOOGLE_CLIENT_ID', 'GOOGLE_CLIENT_SECRET', 'GOOGLE_REDIRECT_URI', 'APP_URL'] as const) {
     if (!readRuntimeEnv(key)) missingGoogleVars.push(key);
   }
+  const rawRedirectUri = readRuntimeEnv('GOOGLE_REDIRECT_URI').replace(/\/+$/, '');
+  const allowedApiCallbacks = new Set<string>(getAllowedGoogleApiCallbackUris());
+  const googleConfigured =
+    missingGoogleVars.length === 0 &&
+    !isForbiddenProductionUrl(getRuntimeAppUrl()) &&
+    !isForbiddenProductionUrl(rawRedirectUri) &&
+    allowedApiCallbacks.has(rawRedirectUri);
   logSafeOAuthEvent('server_startup_oauth_check', {
-    googleConfigured: missingGoogleVars.length === 0 && !isForbiddenProductionUrl(getRuntimeAppUrl()) && !isForbiddenProductionUrl(readRuntimeEnv('GOOGLE_REDIRECT_URI')),
+    googleConfigured,
+    redirectUriHostname: extractSafeUrlHostname(rawRedirectUri),
     callbackRoute: GOOGLE_OAUTH_CALLBACK_PATH,
     missingVars: missingGoogleVars,
   });
