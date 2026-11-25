@@ -48,6 +48,15 @@ import {
   parsePermissions,
   hasModulePermission,
 } from './src/lib/adminPermissions';
+import {
+  API_ROBOTS_TAG_HEADER,
+  API_SUBDOMAIN_HOST,
+  buildCanonicalMainSiteRedirectUrl,
+  getNormalizedRequestHost,
+  isApiOrUploadPath,
+  isApiSubdomainRequest as checkApiSubdomainHost,
+  isEquivalentMainWebsitePath,
+} from './src/server/domainRouting';
 
 function stripSurroundingQuotePair(raw: string): string {
   const trimmed = raw.trim();
@@ -75,44 +84,10 @@ export function getRuntimeAppUrl(): string {
   return readRuntimeEnv('APP_URL').replace(/\/+$/, '');
 }
 
-export const API_ROBOTS_TAG_HEADER = 'noindex, nofollow, noarchive';
-export const API_SUBDOMAIN_HOST = 'api.university-tutors.com';
-
-export function getNormalizedRequestHost(req: express.Request): string {
-  const rawHost = String(req.hostname || req.headers.host || '')
-    .split(',')[0]
-    .trim()
-    .toLowerCase();
-  if (!rawHost) return '';
-  if (rawHost.startsWith('[')) {
-    const closeIdx = rawHost.indexOf(']');
-    return closeIdx >= 0 ? rawHost.slice(0, closeIdx + 1) : rawHost;
-  }
-  return rawHost.replace(/:\d+$/, '');
-}
+export { API_ROBOTS_TAG_HEADER, API_SUBDOMAIN_HOST, getNormalizedRequestHost };
 
 export function isApiSubdomainRequest(req: express.Request): boolean {
-  const host = getNormalizedRequestHost(req);
-  if (!host) return false;
-  if (host === API_SUBDOMAIN_HOST) return true;
-  const configuredApiHost = readRuntimeEnv('API_HOSTNAME')
-    .replace(/^https?:\/\//i, '')
-    .replace(/\/.*$/, '')
-    .replace(/:\d+$/, '')
-    .trim()
-    .toLowerCase();
-  return Boolean(configuredApiHost && host === configuredApiHost);
-}
-
-function isApiOrUploadPath(reqPath: string): boolean {
-  const clean = reqPath || '/';
-  return (
-    clean === '/api' ||
-    clean.startsWith('/api/') ||
-    clean === '/uploads' ||
-    clean.startsWith('/uploads/') ||
-    clean === '/health'
-  );
+  return checkApiSubdomainHost(req, readRuntimeEnv('API_HOSTNAME'));
 }
 
 export function getConfiguredAdminInitialPassword(): string {
@@ -940,7 +915,8 @@ export async function createApp(options: CreateAppOptions = {}) {
   };
 
   const app = express();
-  app.set('trust proxy', 1);
+  // Trust Dokploy + Traefik (and optional upstream CDN) proxy hops so req.hostname, req.ip, and req.protocol stay accurate
+  app.set('trust proxy', true);
 
   // Prevent search engine indexing of every API/upload/health response and every response on api.university-tutors.com
   // Mounted before body parsers, CORS, and routes so error/400/413/401/403/404/500 responses all include X-Robots-Tag.
@@ -1030,7 +1006,9 @@ export async function createApp(options: CreateAppOptions = {}) {
   // Strict API Subdomain Isolation (https://api.university-tutors.com)
   // - Keeps /api/*, /uploads/*, and /health fully functional for the production frontend & auth/CORS.
   // - Serves a restrictive robots.txt on the API host (paired with X-Robots-Tag: noindex, nofollow, noarchive).
-  // - Never renders the website homepage, SPA HTML, sitemap.xml, or public discovery files on the API hostname.
+  // - Permanently 301-redirects equivalent main website pages (/, /tutors, /about-us, /assignment-guidance, /contact-us, etc.)
+  //   to https://university-tutors.com preserving exact path and query string.
+  // - Returns a clean JSON 404 for unknown non-API paths and NEVER serves index.html or SPA HTML on the API hostname.
   app.use((req, res, next) => {
     if (!isApiSubdomainRequest(req)) {
       return next();
@@ -1047,6 +1025,12 @@ export async function createApp(options: CreateAppOptions = {}) {
       res.setHeader('Content-Type', 'text/plain; charset=utf-8');
       res.setHeader('Cache-Control', 'public, max-age=3600');
       return res.status(200).send(API_ROBOTS_TXT_CONTENT);
+    }
+
+    if ((req.method === 'GET' || req.method === 'HEAD') && isEquivalentMainWebsitePath(reqPath)) {
+      const redirectTarget = buildCanonicalMainSiteRedirectUrl(reqPath, req.originalUrl);
+      res.setHeader('Cache-Control', 'public, max-age=3600');
+      return res.redirect(301, redirectTarget);
     }
 
     res.setHeader('Cache-Control', 'no-store');
@@ -9486,6 +9470,11 @@ export async function createApp(options: CreateAppOptions = {}) {
 
       const devIndexHtmlPath = path.resolve(process.cwd(), 'index.html');
       app.get('*', async (req, res, next) => {
+        if (isApiSubdomainRequest(req)) {
+          res.setHeader('X-Robots-Tag', API_ROBOTS_TAG_HEADER);
+          res.setHeader('Cache-Control', 'no-store');
+          return res.status(404).json({ error: 'Not Found', code: 'NOT_FOUND', status: 404 });
+        }
         if (
           req.path.startsWith('/api/') ||
           req.path.startsWith('/uploads/') ||
@@ -9606,6 +9595,11 @@ export async function createApp(options: CreateAppOptions = {}) {
       }
 
       app.get('*', async (req, res, next) => {
+        if (isApiSubdomainRequest(req)) {
+          res.setHeader('X-Robots-Tag', API_ROBOTS_TAG_HEADER);
+          res.setHeader('Cache-Control', 'no-store');
+          return res.status(404).json({ error: 'Not Found', code: 'NOT_FOUND', status: 404 });
+        }
         if (
           req.path.startsWith('/api/') ||
           req.path.startsWith('/uploads/') ||
